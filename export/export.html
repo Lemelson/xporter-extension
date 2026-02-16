@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XPorter — Export</title>
+    <link rel="stylesheet" href="export.css">
+</head>
+
+<body class="dark">
+    <div class="app" id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-brand">
+                <span class="logo">⚡</span>
+                <h1 class="brand">XPorter</h1>
+            </div>
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                <span id="themeIcon">☀️</span>
+            </button>
+        </header>
+
+        <main class="main">
+            <!-- Left Panel: Controls -->
+            <section class="panel panel-controls">
+                <h2 class="panel-title">Export Settings</h2>
+
+                <!-- Username -->
+                <div class="field">
+                    <label class="field-label">Twitter Username</label>
+                    <div class="input-group">
+                        <span class="input-prefix">@</span>
+                        <input type="text" id="usernameInput" placeholder="elonmusk" autocomplete="off"
+                            spellcheck="false">
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div class="field">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="dateCheck">
+                        <span>Date Range</span>
+                    </label>
+                    <div class="date-fields hidden" id="dateFields">
+                        <div class="date-row">
+                            <span class="date-label">From</span>
+                            <input type="date" id="dateFrom">
+                        </div>
+                        <div class="date-row">
+                            <span class="date-label">To</span>
+                            <input type="date" id="dateTo">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="field">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="includeRetweets" checked>
+                        <span>Include retweets</span>
+                    </label>
+                </div>
+                <div class="field">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="includeReplies" checked>
+                        <span>Include replies</span>
+                    </label>
+                </div>
+
+                <!-- Quantity Limit -->
+                <div class="field">
+                    <label class="field-label">Export Limit</label>
+                    <select id="quantityLimit" class="select">
+                        <option value="0">Unlimited</option>
+                        <option value="100">100 posts</option>
+                        <option value="500">500 posts</option>
+                        <option value="1000">1,000 posts</option>
+                        <option value="5000">5,000 posts</option>
+                        <option value="10000">10,000 posts</option>
+                    </select>
+                </div>
+
+                <!-- Cooldown Config -->
+                <div class="field">
+                    <label class="field-label">Cooldown</label>
+                    <div class="cooldown-row">
+                        <input type="number" id="cooldownMinutes" value="3" min="1" max="15" class="input-small">
+                        <span>min /</span>
+                        <input type="number" id="cooldownBatch" value="20" min="5" max="50" class="input-small">
+                        <span>requests</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="actions">
+                    <button class="btn btn-primary btn-lg" id="startBtn">
+                        <span>▶</span> Start Exporting
+                    </button>
+                    <button class="btn btn-danger hidden" id="stopBtn">
+                        <span>⏹</span> Stop Export
+                    </button>
+                    <button class="btn btn-success hidden" id="resumeBtn">
+                        <span>▶</span> Resume Export
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Status & Results -->
+            <section class="panel panel-status">
+                <!-- Idle state -->
+                <div class="state state-idle" id="stateIdle">
+                    <div class="idle-icon">📊</div>
+                    <h3>Ready to Export</h3>
+                    <p>Enter a Twitter username and click "Start Exporting" to begin collecting posts.</p>
+                    <div class="idle-features">
+                        <div class="idle-feature">
+                            <span class="feature-icon">♾️</span>
+                            <span>No limits on posts</span>
+                        </div>
+                        <div class="idle-feature">
+                            <span class="feature-icon">📈</span>
+                            <span>All engagement metrics</span>
+                        </div>
+                        <div class="idle-feature">
+                            <span class="feature-icon">🔒</span>
+                            <span>100% local processing</span>
+                        </div>
+                        <div class="idle-feature">
+                            <span class="feature-icon">📅</span>
+                            <span>Date range filtering</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active export state -->
+                <div class="state state-active hidden" id="stateActive">
+                    <div class="export-header">
+                        <div class="export-user" id="exportUser">
+                            <span class="export-avatar">👤</span>
+                            <div>
+                                <div class="export-username" id="exportUsername">@username</div>
+                                <div class="export-expected" id="exportExpected"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Big counter -->
+                    <div class="counter-wrap">
+                        <div class="counter" id="counter">0</div>
+                        <div class="counter-label">posts collected</div>
+                    </div>
+
+                    <!-- Progress bar -->
+                    <div class="progress-bar-lg">
+                        <div class="progress-fill-lg" id="progressFill"></div>
+                    </div>
+
+                    <!-- Status line -->
+                    <div class="status-line">
+                        <span class="status-dot" id="statusDot"></span>
+                        <span class="status-msg" id="statusMsg">Initializing...</span>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="stats" id="statsRow">
+                        <div class="stat">
+                            <span class="stat-value" id="statBatch">0</span>
+                            <span class="stat-label">Batches</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="statRequests">0</span>
+                            <span class="stat-label">API Calls</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="statTime">0:00</span>
+                            <span class="stat-label">Elapsed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complete state -->
+                <div class="state state-complete hidden" id="stateComplete">
+                    <div class="complete-icon">✅</div>
+                    <h3>Export Complete!</h3>
+                    <div class="complete-info" id="completeInfo">
+                        <span class="complete-user" id="completeUser">@username</span>
+                        <span> — </span>
+                        <span class="complete-count" id="completeCount">0</span>
+                        <span> posts</span>
+                    </div>
+                    <div class="complete-actions">
+                        <button class="btn btn-success btn-lg" id="downloadBtn">
+                            <span>📥</span> Download CSV
+                        </button>
+                        <button class="btn btn-ghost" id="newExportBtn">
+                            <span>🔄</span> New Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error state -->
+                <div class="state state-error hidden" id="stateError">
+                    <div class="error-icon">❌</div>
+                    <h3 id="errorTitle">Error</h3>
+                    <p id="errorMessage">Something went wrong.</p>
+                    <button class="btn btn-secondary" id="errorRetryBtn">Try Again</button>
+                </div>
+
+                <!-- Auth error state -->
+                <div class="state state-auth hidden" id="stateAuth">
+                    <div class="error-icon">🔒</div>
+                    <h3>Not Logged In</h3>
+                    <p>Please <a href="https://x.com/login" target="_blank" class="link">log in to X</a> first, then try
+                        again.</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <span>XPorter v1.0.0 — Not affiliated with X Corp.</span>
+        </footer>
+    </div>
+
+    <script src="export.js"></script>
+</body>
+
+</html>
