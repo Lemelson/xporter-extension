@@ -9,6 +9,13 @@
 </head>
 
 <body>
+  <script>
+    // Early theme apply — read storage directly (no IPC) to prevent FOUC
+    chrome.storage.local.get('xporter_settings', (r) => {
+      if (r.xporter_settings?.theme === 'light') document.body.classList.add('light');
+    });
+  </script>
+
   <div class="popup" id="popup">
     <!-- Header -->
     <header class="header">
@@ -221,8 +228,8 @@
           <option value="custom" data-i18n="custom">Custom</option>
         </select>
         <div class="custom-quantity hidden" id="customQuantityRow">
-          <input type="number" id="customQuantity" class="input-small" min="1" max="100000" placeholder="e.g. 2500"
-            style="width: 100%; margin-top: 6px;">
+          <input type="number" id="customQuantity" class="input-small custom-quantity-input" min="1" max="100000"
+            placeholder="e.g. 2500">
         </div>
       </div>
       <div class="field">
@@ -232,6 +239,18 @@
           <span data-i18n="minAfterEvery">min after every</span>
           <input type="number" id="cooldownBatch" value="20" min="5" max="50" class="input-small">
           <span data-i18n="requests">requests</span>
+        </div>
+      </div>
+      <div class="field">
+        <label class="toggle-label">
+          <input type="checkbox" id="autoExpireEnabled" class="toggle-input" checked>
+          <span class="toggle-track"><span class="toggle-knob"></span></span>
+          <span data-i18n="autoExpireState">Auto-clear old exports</span>
+        </label>
+        <div class="cooldown-row" id="autoExpireRow">
+          <span data-i18n="autoExpireAfter">Clear after</span>
+          <input type="number" id="autoExpireHours" value="4" min="1" max="48" class="input-small">
+          <span data-i18n="hours">hours</span>
         </div>
       </div>
     </div>
@@ -311,12 +330,16 @@
     <!-- Footer -->
     <footer class="footer">
       <span>v1.0.0</span>
-      <span style="margin-left: 6px; opacity: 0.6;">·</span>
-      <span style="margin-left: 6px; opacity: 0.7;">Last update: Feb 16, 2026</span>
+      <span class="footer-separator">·</span>
+      <span class="footer-date">Last update: Feb 16, 2026</span>
     </footer>
   </div>
 
+  <script src="../utils/config.js"></script>
   <script src="i18n.js"></script>
+  <script src="utils.js"></script>
+  <script src="theme.js"></script>
+
   <script src="popup.js"></script>
 </body>
 

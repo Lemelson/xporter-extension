@@ -1,8 +1,11 @@
 // XPorter — X/Twitter GraphQL API Integration
 // Uses the internal API through the user's authenticated browser session
-// Dynamically extracts queryIds from X's JS bundles, with hardcoded fallbacks
+// Dynamically extracts queryIds and bearer token from X's JS bundles
 
-const BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+// Bearer token — dynamically extracted, falls back to config constant
+const _C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+let activeBearerToken = _C.FALLBACK_BEARER_TOKEN
+  || 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
 // Hardcoded queryIds as fallback — verified working as of Feb 2026
 const FALLBACK_ENDPOINTS = {
@@ -19,8 +22,8 @@ const FALLBACK_ENDPOINTS = {
 // Cache for discovered query IDs
 let discoveredEndpoints = null;
 let endpointsCacheTime = 0;
-const ENDPOINTS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-let usingFallbacks = false; // Track whether we're using hardcoded fallback IDs
+const ENDPOINTS_CACHE_TTL = _C.ENDPOINT_CACHE_TTL || (30 * 60 * 1000);
+let usingFallbacks = false;
 
 // Features for UserByScreenName — verified working (must include all required flags)
 const USER_FEATURES = {
@@ -95,8 +98,8 @@ const TWEETS_FEATURES = {
 // ==================== Dynamic QueryId Discovery ====================
 
 /**
- * Discover current GraphQL query IDs by parsing X's JS bundles.
- * Falls back to hardcoded IDs if discovery fails.
+ * Discover current GraphQL query IDs and bearer token by parsing X's JS bundles.
+ * Falls back to hardcoded values if discovery fails.
  */
 async function discoverEndpoints(forceRefresh = false) {
   // Return cached if still valid (unless explicitly forcing a refresh)
@@ -104,7 +107,7 @@ async function discoverEndpoints(forceRefresh = false) {
     return discoveredEndpoints;
   }
 
-  console.log('XPorter: Discovering GraphQL endpoints...');
+  XLog.log('Discovering GraphQL endpoints...');
 
   try {
     // Fetch X's main page to find JS bundle URLs
@@ -122,7 +125,7 @@ async function discoverEndpoints(forceRefresh = false) {
       scriptUrls.push(match[1]);
     }
 
-    console.log(`XPorter: Found ${scriptUrls.length} JS bundles to scan`);
+    XLog.log(`Found ${scriptUrls.length} JS bundles to scan`);
 
     if (scriptUrls.length === 0) {
       throw new Error('No JS bundles found');
@@ -130,13 +133,24 @@ async function discoverEndpoints(forceRefresh = false) {
 
     const targetOperations = ['UserByScreenName', 'UserTweets'];
     const found = {};
+    let discoveredBearer = null;
 
     for (const url of scriptUrls) {
-      if (targetOperations.every(op => found[op])) break;
+      if (targetOperations.every(op => found[op]) && discoveredBearer) break;
 
       try {
         const jsResponse = await fetch(url);
         const jsText = await jsResponse.text();
+
+        // Search for bearer token (pattern: "AAAAAAA..." — 100+ chars, URL-safe base64)
+        if (!discoveredBearer) {
+          const bearerMatch = jsText.match(/"(AAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,})"/)
+            || jsText.match(/Bearer\s+(AAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,})/);
+          if (bearerMatch) {
+            discoveredBearer = bearerMatch[1];
+            XLog.log('Dynamically extracted bearer token');
+          }
+        }
 
         for (const opName of targetOperations) {
           if (found[opName]) continue;
@@ -153,14 +167,19 @@ async function discoverEndpoints(forceRefresh = false) {
             const m = pattern.exec(jsText);
             if (m) {
               found[opName] = m[1];
-              console.log(`XPorter: Found ${opName} queryId: ${m[1]}`);
+              XLog.log(`Found ${opName} queryId: ${m[1]}`);
               break;
             }
           }
         }
       } catch (e) {
-        console.warn(`XPorter: Error scanning bundle ${url}:`, e.message);
+        XLog.warn(`Error scanning bundle ${url}:`, e.message);
       }
+    }
+
+    // Update bearer token if dynamically extracted
+    if (discoveredBearer) {
+      activeBearerToken = discoveredBearer;
     }
 
     if (found.UserByScreenName && found.UserTweets) {
@@ -169,13 +188,13 @@ async function discoverEndpoints(forceRefresh = false) {
         UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' }
       };
       endpointsCacheTime = Date.now();
-      console.log('XPorter: Endpoints discovered:', discoveredEndpoints);
+      XLog.log('Endpoints discovered successfully');
       return discoveredEndpoints;
     }
 
     throw new Error(`Missing queryIds: ${targetOperations.filter(op => !found[op]).join(', ')}`);
   } catch (error) {
-    console.warn('XPorter: Discovery failed, using fallback endpoints:', error.message);
+    XLog.warn('Discovery failed, using fallback endpoints:', error.message);
     discoveredEndpoints = { ...FALLBACK_ENDPOINTS };
     endpointsCacheTime = Date.now();
     usingFallbacks = true;
@@ -218,12 +237,12 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     url += `&fieldToggles=${encodeURIComponent(JSON.stringify(fieldToggles))}`;
   }
 
-  console.log(`XPorter: Fetching ${endpoint.operationName} (queryId: ${endpoint.queryId})`);
+  XLog.log(`Fetching ${endpoint.operationName} (queryId: ${endpoint.queryId})`);
 
   const response = await fetch(url, {
     method: 'GET',
     headers: {
-      'authorization': `Bearer ${BEARER_TOKEN}`,
+      'authorization': `Bearer ${activeBearerToken}`,
       'x-csrf-token': auth.csrfToken,
       'x-twitter-active-user': 'yes',
       'x-twitter-client-language': 'en'
@@ -241,7 +260,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
 
   if (response.status === 400) {
     const body = await response.text().catch(() => '');
-    console.error('XPorter: 400 error body:', body.substring(0, 500));
+    XLog.error('400 error body:', body.substring(0, 500));
     // Invalidate cache so next call tries fresh discovery
     discoveredEndpoints = null;
     endpointsCacheTime = 0;
@@ -251,36 +270,44 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    console.error(`XPorter: API error ${response.status}:`, body.substring(0, 500));
+    XLog.error(`API error ${response.status}:`, body.substring(0, 500));
     throw new Error(`API_ERROR_${response.status}`);
   }
 
   return response.json();
 }
 
+// ==================== Stale Query ID Retry Wrapper ====================
+
+/**
+ * Executes a GraphQL request with automatic retry on STALE_QUERY_ID.
+ * Forces endpoint re-discovery on stale IDs, eliminating duplicated retry logic.
+ */
+async function withStaleRetry(endpointKey, makeRequest) {
+  const endpoints = await discoverEndpoints();
+  try {
+    return await makeRequest(endpoints[endpointKey]);
+  } catch (err) {
+    if (err.message === 'STALE_QUERY_ID') {
+      XLog.log(`Retrying ${endpointKey} with fresh queryIds...`);
+      const freshEndpoints = await discoverEndpoints(true);
+      return await makeRequest(freshEndpoints[endpointKey]);
+    }
+    throw err;
+  }
+}
+
 // ==================== User Lookup ====================
 
 async function getUserByScreenName(screenName) {
-  const endpoints = await discoverEndpoints();
-
   const variables = {
     screen_name: screenName,
     withSafetyModeUserFields: true
   };
 
-  let data;
-  try {
-    data = await graphqlRequest(endpoints.UserByScreenName, variables, USER_FEATURES, USER_FIELD_TOGGLES);
-  } catch (err) {
-    if (err.message === 'STALE_QUERY_ID') {
-      console.log('XPorter: Retrying UserByScreenName with fresh queryIds...');
-      // Force fresh discovery — don't use cached/fallback endpoints
-      const freshEndpoints = await discoverEndpoints(true);
-      data = await graphqlRequest(freshEndpoints.UserByScreenName, variables, USER_FEATURES, USER_FIELD_TOGGLES);
-    } else {
-      throw err;
-    }
-  }
+  const data = await withStaleRetry('UserByScreenName', (endpoint) =>
+    graphqlRequest(endpoint, variables, USER_FEATURES, USER_FIELD_TOGGLES)
+  );
 
   const userResult = data?.data?.user?.result;
 
@@ -307,8 +334,6 @@ async function getUserByScreenName(screenName) {
 // ==================== Tweet Fetching ====================
 
 async function fetchUserTweets(userId, cursor = null, count = 20) {
-  const endpoints = await discoverEndpoints();
-
   const variables = {
     userId: userId,
     count: count,
@@ -322,19 +347,9 @@ async function fetchUserTweets(userId, cursor = null, count = 20) {
     variables.cursor = cursor;
   }
 
-  let data;
-  try {
-    data = await graphqlRequest(endpoints.UserTweets, variables, TWEETS_FEATURES, null);
-  } catch (err) {
-    if (err.message === 'STALE_QUERY_ID') {
-      console.log('XPorter: Retrying UserTweets with fresh queryIds...');
-      // Force fresh discovery — don't use cached/fallback endpoints
-      const freshEndpoints = await discoverEndpoints(true);
-      data = await graphqlRequest(freshEndpoints.UserTweets, variables, TWEETS_FEATURES, null);
-    } else {
-      throw err;
-    }
-  }
+  const data = await withStaleRetry('UserTweets', (endpoint) =>
+    graphqlRequest(endpoint, variables, TWEETS_FEATURES, null)
+  );
 
   return parseTimelineResponse(data);
 }
@@ -519,6 +534,6 @@ if (typeof globalThis !== 'undefined') {
     fetchUserTweets,
     parseTweetObject,
     discoverEndpoints,
-    BEARER_TOKEN
+    get BEARER_TOKEN() { return activeBearerToken; }
   };
 }

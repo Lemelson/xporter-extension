@@ -3,17 +3,19 @@
 
 class RateLimitManager {
     constructor(options = {}) {
-        this.requestDelay = options.requestDelay || 3000;        // ms between requests
-        this.batchSize = options.batchSize || 20;                // requests before cooldown
-        this.cooldownDuration = options.cooldownDuration || 180000; // 3 min cooldown
-        this.rateLimitPause = options.rateLimitPause || 60000;   // 60s on 429
-        this.maxRetries = options.maxRetries || 5;
+        const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+        this.requestDelay = options.requestDelay || C.REQUEST_DELAY || 3000;
+        this.batchSize = options.batchSize || C.BATCH_SIZE || 20;
+        this.cooldownDuration = options.cooldownDuration || C.COOLDOWN_DURATION || 180000;
+        this.rateLimitPause = options.rateLimitPause || C.RATE_LIMIT_PAUSE || 60000;
+        this.maxRetries = options.maxRetries || C.MAX_RETRIES || 5;
 
         this.requestCount = 0;
         this.totalRequests = 0;
         this.status = 'idle'; // idle, fetching, cooldown, error, retrying
         this.listeners = [];
         this._aborted = false;
+        this._abortController = null;
     }
 
     /**
@@ -30,25 +32,37 @@ class RateLimitManager {
         this.status = status;
         const event = { running: true, status, ...detail, totalRequests: this.totalRequests };
         this.listeners.forEach(cb => {
-            try { cb(event); } catch (e) { console.error('Status listener error:', e); }
+            try { cb(event); } catch (e) { XLog.error('Status listener error:', e); }
         });
     }
 
     /**
-     * Wait for specified ms, respecting abort
+     * Wait for specified ms, instantly cancellable via AbortController.
+     * No polling — uses a single event listener for abort.
      */
     async _wait(ms) {
         return new Promise((resolve, reject) => {
-            const timer = setTimeout(resolve, ms);
-            // Check abort periodically
-            const check = setInterval(() => {
-                if (this._aborted) {
-                    clearTimeout(timer);
-                    clearInterval(check);
-                    reject(new Error('ABORTED'));
-                }
-            }, 500);
-            setTimeout(() => clearInterval(check), ms + 100);
+            // Create a fresh controller for this wait
+            this._abortController = new AbortController();
+            const signal = this._abortController.signal;
+
+            // If already aborted, reject immediately
+            if (this._aborted) {
+                reject(new Error('ABORTED'));
+                return;
+            }
+
+            const timer = setTimeout(() => {
+                signal.removeEventListener('abort', onAbort);
+                resolve();
+            }, ms);
+
+            function onAbort() {
+                clearTimeout(timer);
+                reject(new Error('ABORTED'));
+            }
+
+            signal.addEventListener('abort', onAbort, { once: true });
         });
     }
 
@@ -109,7 +123,8 @@ class RateLimitManager {
 
                 // Stale query ID — API changed, retry after delay
                 if (error.message === 'STALE_QUERY_ID') {
-                    const waitTime = 10000 * (attempt + 1);
+                    const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+                    const waitTime = (C.STALE_RETRY_BASE_WAIT || 10000) * (attempt + 1);
                     this._emitStatus('error', {
                         error: 'API changed, refreshing...',
                         retryIn: waitTime,
@@ -122,7 +137,8 @@ class RateLimitManager {
 
                 // Network errors — retry
                 if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
-                    const waitTime = 30000 * (attempt + 1);
+                    const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+                    const waitTime = (C.NETWORK_RETRY_BASE_WAIT || 30000) * (attempt + 1);
                     this._emitStatus('error', {
                         error: 'Network error',
                         retryIn: waitTime,
@@ -142,10 +158,13 @@ class RateLimitManager {
     }
 
     /**
-     * Abort all pending operations
+     * Abort all pending operations — instantly cancels any active _wait()
      */
     abort() {
         this._aborted = true;
+        if (this._abortController) {
+            this._abortController.abort();
+        }
         this._emitStatus('idle', { reason: 'Aborted by user' });
     }
 
@@ -156,6 +175,7 @@ class RateLimitManager {
         this.requestCount = 0;
         this.totalRequests = 0;
         this._aborted = false;
+        this._abortController = null;
         this.status = 'idle';
         this._emitStatus('idle');
     }

@@ -1,5 +1,6 @@
 // XPorter — Chrome Storage Helpers
 // Persist export state for service worker resilience
+// All operations include error handling and quota awareness
 
 const STORAGE_KEYS = {
     EXPORT_STATE: 'xporter_export_state',
@@ -8,13 +9,79 @@ const STORAGE_KEYS = {
     TWEETS_PREFIX: 'xporter_tweets_batch_'
 };
 
-const MAX_TWEETS_PER_BATCH = 50; // Store tweets in chunks — smaller batches ensure data is persisted quickly
+// Use config constant if available, otherwise default
+const MAX_TWEETS_PER_BATCH = (typeof XPORTER_CONFIG !== 'undefined')
+    ? XPORTER_CONFIG.TWEETS_PER_BATCH
+    : 50;
+
+// ==================== Storage Quota ====================
+
+/**
+ * Check storage usage and warn if approaching quota.
+ * Returns { bytesInUse, quota, percentUsed, isWarning }
+ */
+async function checkStorageQuota() {
+    try {
+        const bytesInUse = await chrome.storage.local.getBytesInUse(null);
+        const quota = chrome.storage.local.QUOTA_BYTES || 10485760; // 10 MB default
+        const threshold = (typeof XPORTER_CONFIG !== 'undefined')
+            ? XPORTER_CONFIG.STORAGE_WARN_THRESHOLD
+            : 0.8;
+        const percentUsed = bytesInUse / quota;
+        const isWarning = percentUsed >= threshold;
+        if (isWarning) {
+            const log = (typeof XLog !== 'undefined') ? XLog : console;
+            log.warn(`Storage usage: ${Math.round(percentUsed * 100)}% (${bytesInUse} / ${quota} bytes)`);
+        }
+        return { bytesInUse, quota, percentUsed, isWarning };
+    } catch (e) {
+        return { bytesInUse: 0, quota: 0, percentUsed: 0, isWarning: false };
+    }
+}
+
+// ==================== Safe Storage Wrappers ====================
+
+/**
+ * Safe write to chrome.storage.local with error handling
+ */
+async function safeSet(data) {
+    try {
+        await chrome.storage.local.set(data);
+        if (chrome.runtime.lastError) {
+            throw new Error(chrome.runtime.lastError.message);
+        }
+        return true;
+    } catch (e) {
+        const log = (typeof XLog !== 'undefined') ? XLog : console;
+        log.error('Storage write failed:', e.message);
+        return false;
+    }
+}
+
+/**
+ * Safe read from chrome.storage.local with error handling
+ */
+async function safeGet(keys) {
+    try {
+        const result = await chrome.storage.local.get(keys);
+        if (chrome.runtime.lastError) {
+            throw new Error(chrome.runtime.lastError.message);
+        }
+        return result;
+    } catch (e) {
+        const log = (typeof XLog !== 'undefined') ? XLog : console;
+        log.error('Storage read failed:', e.message);
+        return {};
+    }
+}
+
+// ==================== Export State ====================
 
 /**
  * Save current export state
  */
 async function saveExportState(state) {
-    return chrome.storage.local.set({
+    return safeSet({
         [STORAGE_KEYS.EXPORT_STATE]: {
             ...state,
             updatedAt: Date.now()
@@ -26,16 +93,24 @@ async function saveExportState(state) {
  * Load current export state
  */
 async function loadExportState() {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.EXPORT_STATE);
+    const result = await safeGet(STORAGE_KEYS.EXPORT_STATE);
     return result[STORAGE_KEYS.EXPORT_STATE] || null;
 }
 
+// ==================== Tweet Batches ====================
+
 /**
- * Save a batch of tweets to storage
+ * Save a batch of tweets to storage (with quota check)
  */
 async function saveTweetBatch(batchIndex, tweets) {
+    // Check quota before writing
+    const { isWarning, percentUsed } = await checkStorageQuota();
+    if (isWarning) {
+        const log = (typeof XLog !== 'undefined') ? XLog : console;
+        log.warn(`Storage at ${Math.round(percentUsed * 100)}% — tweet batch ${batchIndex} may fail`);
+    }
     const key = STORAGE_KEYS.TWEETS_PREFIX + batchIndex;
-    return chrome.storage.local.set({ [key]: tweets });
+    return safeSet({ [key]: tweets });
 }
 
 /**
@@ -50,7 +125,7 @@ async function loadAllTweets() {
         keys.push(STORAGE_KEYS.TWEETS_PREFIX + i);
     }
 
-    const result = await chrome.storage.local.get(keys);
+    const result = await safeGet(keys);
     let allTweets = [];
     for (let i = 0; i < state.totalBatches; i++) {
         const batch = result[STORAGE_KEYS.TWEETS_PREFIX + i] || [];
@@ -59,6 +134,8 @@ async function loadAllTweets() {
 
     return allTweets;
 }
+
+// ==================== Cleanup ====================
 
 /**
  * Clear all export data
@@ -73,45 +150,59 @@ async function clearExportState() {
         }
     }
 
-    return chrome.storage.local.remove(keysToRemove);
+    try {
+        await chrome.storage.local.remove(keysToRemove);
+        return true;
+    } catch (e) {
+        const log = (typeof XLog !== 'undefined') ? XLog : console;
+        log.error('Failed to clear export state:', e.message);
+        return false;
+    }
 }
+
+// ==================== Settings ====================
 
 /**
  * Save settings
  */
 async function saveSettings(settings) {
-    return chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: settings });
+    return safeSet({ [STORAGE_KEYS.SETTINGS]: settings });
 }
 
 /**
  * Load settings with defaults
  */
 async function loadSettings() {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
+    const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+    const result = await safeGet(STORAGE_KEYS.SETTINGS);
     return {
         includeRetweets: true,
         includeReplies: true,
-        quantityLimit: 500, // default: 500 posts per export
-        requestDelay: 3000,
-        batchSize: 20,
-        cooldownDuration: 180000,
+        quantityLimit: 500,
+        requestDelay: C.REQUEST_DELAY || 3000,
+        batchSize: C.BATCH_SIZE || 20,
+        cooldownDuration: C.COOLDOWN_DURATION || 180000,
         theme: 'dark',
+        autoExpireEnabled: true,
+        autoExpireHours: 4,
         ...(result[STORAGE_KEYS.SETTINGS] || {})
     };
 }
+
+// ==================== Username ====================
 
 /**
  * Save detected username from content script
  */
 async function saveDetectedUsername(username) {
-    return chrome.storage.local.set({ [STORAGE_KEYS.USERNAME]: username });
+    return safeSet({ [STORAGE_KEYS.USERNAME]: username });
 }
 
 /**
  * Load detected username
  */
 async function loadDetectedUsername() {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.USERNAME);
+    const result = await safeGet(STORAGE_KEYS.USERNAME);
     return result[STORAGE_KEYS.USERNAME] || '';
 }
 
@@ -122,6 +213,7 @@ if (typeof globalThis !== 'undefined') {
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,
+        checkStorageQuota,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH
     };
 }

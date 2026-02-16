@@ -51,6 +51,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     let exportStartTime = null;
     let timeInterval = null;
 
+    // ==================== i18n ====================
+    let currentTranslations = {};
+
+    // Load saved language preference and apply translations
+    async function initI18n() {
+        const stored = await chrome.storage.local.get('xporter_lang');
+        const lang = stored.xporter_lang || 'en';
+        if (typeof loadTranslations === 'function') {
+            currentTranslations = await loadTranslations(lang);
+        }
+        applyTranslations();
+    }
+
+    function applyTranslations() {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (currentTranslations[key] !== undefined) {
+                el.textContent = currentTranslations[key];
+            }
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (currentTranslations[key] !== undefined) {
+                el.placeholder = currentTranslations[key];
+            }
+        });
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            if (currentTranslations[key] !== undefined) {
+                el.title = currentTranslations[key];
+            }
+        });
+        // Update select options for quantity limit
+        const options = quantityLimit.querySelectorAll('option');
+        const posts = currentTranslations.posts || 'posts';
+        if (options.length >= 1) options[0].textContent = currentTranslations.unlimited || 'Unlimited';
+        if (options.length >= 2) options[1].textContent = `100 ${posts}`;
+        if (options.length >= 3) options[2].textContent = `500 ${posts}`;
+        if (options.length >= 4) options[3].textContent = `1,000 ${posts}`;
+        if (options.length >= 5) options[4].textContent = `5,000 ${posts}`;
+        if (options.length >= 6) options[5].textContent = `10,000 ${posts}`;
+    }
+
+    function t(key) {
+        return currentTranslations[key] || key;
+    }
+
+    await initI18n();
+
     // ==================== Load Settings & State ====================
     const settingsResult = await sendMessage({ type: 'GET_SETTINGS' });
     const settings = settingsResult?.settings || {};

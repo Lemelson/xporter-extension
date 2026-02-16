@@ -1,4 +1,4 @@
-// XPorter Popup — Logic
+// XPorter Popup — Logic (optimized)
 document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Elements ====================
     const popup = document.getElementById('popup');
@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cooldownBatch = document.getElementById('cooldownBatch');
     const customQuantityRow = document.getElementById('customQuantityRow');
     const customQuantity = document.getElementById('customQuantity');
+    const autoExpireEnabled = document.getElementById('autoExpireEnabled');
+    const autoExpireHours = document.getElementById('autoExpireHours');
+    const autoExpireRow = document.getElementById('autoExpireRow');
 
     // Language selector elements
     const langBtn = document.getElementById('langBtn');
@@ -48,41 +51,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
 
+    // ==================== Parallel Init ====================
+    // Fire all independent async requests at once instead of sequentially
+    const [settingsResult, authResult, status, activeTabs] = await Promise.all([
+        sendMessage({ type: 'GET_SETTINGS' }),
+        checkAuth().catch(() => null),
+        sendMessage({ type: 'GET_STATUS' }),
+        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [])
+    ]);
+
+    const currentSettings = settingsResult?.settings || {};
+
     // ==================== Theme & Design ====================
-    // SVG icon templates
-    const ICONS = {
-        sun: '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
-        moon: '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>',
-        circleCheck: '<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
-        circlePause: '<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/></svg>',
-        download: '<svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>'
-    };
+    // Apply saved theme (uses theme.js)
+    initTheme(currentSettings.theme, themeIcon);
 
-    const settings = await sendMessage({ type: 'GET_SETTINGS' });
-    const currentSettings = settings?.settings || {};
-
-    // Apply saved theme
-    if (currentSettings.theme === 'light') {
-        document.body.classList.add('light');
-        themeIcon.innerHTML = ICONS.moon;
-    }
-
-    // Theme toggle (dark ↔ light)
+    // Theme toggle (dark <-> light)
     themeToggle.addEventListener('click', async () => {
-        document.body.classList.toggle('light');
-        const isLight = document.body.classList.contains('light');
-        themeIcon.innerHTML = isLight ? ICONS.moon : ICONS.sun;
-        currentSettings.theme = isLight ? 'light' : 'dark';
+        currentSettings.theme = toggleTheme(themeIcon);
         await sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
     });
 
     // ==================== Language Selector ====================
     // Auto-detect Chrome UI language on first launch; respect saved choice afterwards
-    function detectBrowserLanguage() {
-        const uiLang = chrome.i18n.getUILanguage(); // e.g. "en-US", "ru", "zh-CN"
-        const base = uiLang.split('-')[0].toLowerCase(); // e.g. "en", "ru", "zh"
-        return LANGUAGES.find(l => l.code === base) ? base : 'en';
-    }
     let currentLang = currentSettings.language || detectBrowserLanguage();
 
     // If language was auto-detected (not saved yet), persist it immediately
@@ -92,7 +83,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
     }
 
-    // Build dropdown options
+    // Lazy-build flag: dropdown is built only on first click
+    let dropdownBuilt = false;
+
+    // Build dropdown options (called lazily)
     function buildLangDropdown() {
         langDropdown.innerHTML = '';
         LANGUAGES.forEach(lang => {
@@ -106,6 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             opt.addEventListener('click', () => selectLanguage(lang.code));
             langDropdown.appendChild(opt);
         });
+        dropdownBuilt = true;
     }
 
     // Update the language button display
@@ -115,31 +110,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         langCode.textContent = code.toUpperCase();
     }
 
-    // Apply translations to all data-i18n elements
-    function applyLanguage(code) {
-        const t = TRANSLATIONS[code] || TRANSLATIONS['en'];
+    // Current translations cache (populated by applyLanguage)
+    let currentTranslations = {};
 
-        // Translate all data-i18n elements
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            if (t[key] !== undefined) {
-                el.textContent = t[key];
+    // Apply translations to all data-i18n elements — single-pass optimization
+    async function applyLanguage(code) {
+        const t = await loadTranslations(code);
+        currentTranslations = t;
+
+        // Single pass: translate all data-i18n, data-i18n-placeholder, data-i18n-title
+        document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]').forEach(el => {
+            const textKey = el.getAttribute('data-i18n');
+            if (textKey && t[textKey] !== undefined) {
+                el.textContent = t[textKey];
             }
-        });
-
-        // Translate data-i18n-placeholder
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-            const key = el.getAttribute('data-i18n-placeholder');
-            if (t[key] !== undefined) {
-                el.placeholder = t[key];
+            const placeholderKey = el.getAttribute('data-i18n-placeholder');
+            if (placeholderKey && t[placeholderKey] !== undefined) {
+                el.placeholder = t[placeholderKey];
             }
-        });
-
-        // Translate data-i18n-title
-        document.querySelectorAll('[data-i18n-title]').forEach(el => {
-            const key = el.getAttribute('data-i18n-title');
-            if (t[key] !== undefined) {
-                el.title = t[key];
+            const titleKey = el.getAttribute('data-i18n-title');
+            if (titleKey && t[titleKey] !== undefined) {
+                el.title = t[titleKey];
             }
         });
 
@@ -161,7 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function selectLanguage(code) {
         currentLang = code;
         updateLangButton(code);
-        applyLanguage(code);
+        await applyLanguage(code);
         // Re-apply current export state to fix dynamic text overwritten by applyLanguage
         if (lastExportState) {
             updateUI(lastExportState);
@@ -185,6 +176,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function openLangDropdown() {
+        // Lazy-build on first open
+        if (!dropdownBuilt) {
+            buildLangDropdown();
+        }
         langDropdown.classList.remove('hidden');
         langBtn.classList.add('active');
         // Dynamically extend .popup min-height so glass background covers the dropdown
@@ -216,15 +211,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Initialize language
-    buildLangDropdown();
+    // Initialize language (dropdown built lazily on first click)
     updateLangButton(currentLang);
-    applyLanguage(currentLang);
+    await applyLanguage(currentLang);
 
     // Helper to get translated text for dynamic content
     function t(key) {
-        const translations = TRANSLATIONS[currentLang] || TRANSLATIONS['en'];
-        return translations[key] || TRANSLATIONS['en'][key] || key;
+        return currentTranslations[key] || key;
     }
 
     // ==================== Tabs ====================
@@ -253,6 +246,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         cooldownMinutes.value = Math.round((currentSettings.cooldownDuration || 180000) / 60000);
         cooldownBatch.value = currentSettings.batchSize || 20;
+        // Auto-expire setting
+        autoExpireEnabled.checked = currentSettings.autoExpireEnabled !== false;
+        autoExpireHours.value = currentSettings.autoExpireHours || 4;
+        autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
     }
 
     // Show/hide custom quantity input based on select value
@@ -263,6 +260,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             customQuantityRow.classList.add('hidden');
         }
+        saveSettingsDebounced();
+    });
+
+    // Toggle auto-expire hours visibility
+    autoExpireEnabled.addEventListener('change', () => {
+        autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
         saveSettingsDebounced();
     });
 
@@ -284,12 +287,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 batchSize: parseInt(cooldownBatch.value) || 20,
                 cooldownDuration: (parseInt(cooldownMinutes.value) || 3) * 60000,
                 theme: document.body.classList.contains('light') ? 'light' : 'dark',
-                language: currentLang
+                language: currentLang,
+                autoExpireEnabled: autoExpireEnabled.checked,
+                autoExpireHours: Math.max(1, Math.min(48, parseInt(autoExpireHours.value) || 4))
             }
         });
     }, 500);
 
-    [includeRetweets, includeReplies, quantityLimit, cooldownMinutes, cooldownBatch, customQuantity].forEach(el => {
+    [includeRetweets, includeReplies, quantityLimit, cooldownMinutes, cooldownBatch, customQuantity, autoExpireHours].forEach(el => {
         el.addEventListener('change', saveSettingsDebounced);
     });
     customQuantity.addEventListener('input', saveSettingsDebounced);
@@ -299,50 +304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         dateFields.classList.toggle('hidden', !dateCheck.checked);
     });
 
-    // ==================== Username Helpers ====================
-    // Reserved X/Twitter paths that are NOT usernames
-    const RESERVED_PATHS = new Set([
-        'home', 'explore', 'search', 'notifications', 'messages',
-        'settings', 'i', 'compose', 'intent', 'account', 'login',
-        'logout', 'signup', 'tos', 'privacy', 'about', 'help',
-        'hashtag', 'lists', 'communities', 'premium', 'jobs',
-        'who_to_follow', 'trending'
-    ]);
-
-    /**
-     * Extracts a clean username from various input formats:
-     *  - https://x.com/beffjezos
-     *  - https://twitter.com/beffjezos/status/123
-     *  - @beffjezos
-     *  - beffjezos
-     */
-    function extractUsernameFromInput(input) {
-        if (!input) return '';
-        let val = input.trim();
-
-        // Try to parse as URL
-        try {
-            const url = new URL(val);
-            if (url.hostname === 'x.com' || url.hostname === 'www.x.com' ||
-                url.hostname === 'twitter.com' || url.hostname === 'www.twitter.com') {
-                const pathMatch = url.pathname.match(/^\/([a-zA-Z0-9_]{1,15})(\/|$)/);
-                if (pathMatch && !RESERVED_PATHS.has(pathMatch[1].toLowerCase())) {
-                    return pathMatch[1];
-                }
-            }
-            // It's a URL but not a valid X profile — return empty
-            return '';
-        } catch (_) {
-            // Not a URL — continue
-        }
-
-        // Strip @ prefix
-        val = val.replace(/^@/, '');
-
-        // Validate as username (1-15 alphanumeric + underscore chars)
-        const usernameMatch = val.match(/^([a-zA-Z0-9_]{1,15})$/);
-        return usernameMatch ? usernameMatch[1] : val;
-    }
+    // Username helpers are in utils.js (extractUsernameFromInput, RESERVED_PATHS)
 
     // Auto-clean input on paste or type (e.g. pasting a full URL)
     usernameInput.addEventListener('input', () => {
@@ -356,40 +318,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // ==================== Apply Auth Result ====================
+    if (!authResult) {
+        authWarning.classList.remove('hidden');
+    }
+
+    // ==================== Apply Export Status ====================
+    if (status) {
+        updateUI(status);
+    }
+
     // ==================== Auto-fill Username from Active Tab ====================
-    // Query the active tab URL directly — always fresh, no stale storage
-    try {
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    // Run AFTER updateUI so stale export state doesn't overwrite the fresh tab URL.
+    // Only auto-fill when idle — never replace the username of an active/paused export.
+    const isIdle = !status || status.status === 'idle' || !status.running;
+    if (isIdle) {
+        const activeTab = activeTabs[0];
         if (activeTab?.url) {
             const tabUsername = extractUsernameFromInput(activeTab.url);
             if (tabUsername) {
                 usernameInput.value = tabUsername;
             }
+        } else if (!activeTab) {
+            // Fallback to stored username if tabs API failed
+            const usernameResult = await sendMessage({ type: 'GET_USERNAME' });
+            if (usernameResult?.username) {
+                usernameInput.value = usernameResult.username;
+            }
         }
-    } catch (_) {
-        // Fallback to stored username if tabs API fails
-        const usernameResult = await sendMessage({ type: 'GET_USERNAME' });
-        if (usernameResult?.username) {
-            usernameInput.value = usernameResult.username;
-        }
-    }
-
-    // ==================== Check Auth ====================
-    try {
-        const auth = await checkAuth();
-        if (!auth) {
-            authWarning.classList.remove('hidden');
-            // Don't disable button — let the export attempt handle auth errors
-            // startBtn.disabled = true;
-        }
-    } catch (e) {
-        // cookies API may not be available from popup directly
-    }
-
-    // ==================== Check Existing Export State ====================
-    const status = await sendMessage({ type: 'GET_STATUS' });
-    if (status) {
-        updateUI(status);
     }
 
     // ==================== Start Export ====================
@@ -412,7 +368,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const result = await sendMessage(params);
             if (result?.error) {
-                alert(formatError(result.error));
+                alert(formatError(result.error, t));
                 return;
             }
 
@@ -565,7 +521,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     setDotColor('red');
                     statusMessage.textContent = `${state.error} — ${t('retryIn')} ${Math.round(state.retryIn / 1000)}s`;
                 } else {
-                    statusText.textContent = `Error: ${formatError(state.error)}`;
+                    statusText.textContent = `Error: ${formatError(state.error, t)}`;
                     setDotColor('red');
                     statusMessage.textContent = state.error;
                 }
@@ -603,59 +559,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         tweetCountEl.innerHTML = `${Number(tweetCount).toLocaleString()} <span data-i18n="postsCollected">${t('postsCollected')}</span>`;
     }
 
-    // ==================== Helpers ====================
-    function sendMessage(msg) {
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                console.warn('sendMessage timeout for:', msg.type);
-                resolve({});
-            }, 3000);
-            try {
-                chrome.runtime.sendMessage(msg, (response) => {
-                    clearTimeout(timeout);
-                    if (chrome.runtime.lastError) {
-                        console.error('sendMessage error:', chrome.runtime.lastError.message);
-                        resolve({});
-                        return;
-                    }
-                    resolve(response || {});
-                });
-            } catch (e) {
-                clearTimeout(timeout);
-                console.error('sendMessage exception:', e);
-                resolve({});
-            }
-        });
-    }
-
-    async function checkAuth() {
-        return new Promise((resolve) => {
-            chrome.cookies.get({ url: 'https://x.com', name: 'auth_token' }, (cookie) => {
-                resolve(!!cookie);
-            });
-        });
-    }
-
-    function formatError(error) {
-        const errorMap = {
-            'NOT_LOGGED_IN': 'errNotLoggedIn',
-            'USER_NOT_FOUND': 'errUserNotFound',
-            'USER_SUSPENDED': 'errUserSuspended',
-            'ACCOUNT_PRIVATE': 'errAccountPrivate',
-            'AUTH_ERROR': 'errAuthError',
-            'RATE_LIMITED': 'errRateLimited',
-            'STALE_QUERY_ID': 'errStaleQuery',
-            'ENDPOINT_DISCOVERY_FAILED': 'errEndpointFailed'
-        };
-        const key = errorMap[error];
-        return key ? t(key) : error;
-    }
-
-    function debounce(fn, ms) {
-        let timer;
-        return (...args) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), ms);
-        };
-    }
+    // formatError uses the shared utils.js version with t() passed in
+    // (sendMessage, checkAuth, extractUsernameFromInput, debounce are global from utils.js)
 });

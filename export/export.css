@@ -76,6 +76,11 @@ body {
     filter: drop-shadow(0 0 8px var(--accent));
 }
 
+.logo-icon {
+    color: var(--accent);
+    filter: drop-shadow(0 0 8px var(--accent));
+}
+
 .brand {
     font-size: 24px;
     font-weight: 800;
@@ -391,8 +396,8 @@ body {
 
 /* Idle state */
 .idle-icon {
-    font-size: 56px;
     margin-bottom: 16px;
+    color: var(--accent);
     animation: float 3s ease-in-out infinite;
 }
 
@@ -446,7 +451,8 @@ body {
 }
 
 .feature-icon {
-    font-size: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
 }
 
 /* Active state */
@@ -470,6 +476,11 @@ body {
 
 .export-avatar {
     font-size: 32px;
+}
+
+.export-avatar-icon {
+    color: var(--accent);
+    flex-shrink: 0;
 }
 
 .export-username {
@@ -622,7 +633,7 @@ body {
 
 /* Complete state */
 .complete-icon {
-    font-size: 72px;
+    color: var(--accent);
     margin-bottom: 16px;
     animation: bounceIn 0.5s ease;
 }
@@ -676,8 +687,12 @@ body {
 
 /* Error state */
 .error-icon {
-    font-size: 56px;
+    color: var(--text-secondary);
     margin-bottom: 12px;
+}
+
+.btn-icon {
+    flex-shrink: 0;
 }
 
 .state-error h3,

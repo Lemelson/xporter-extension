@@ -13,10 +13,14 @@
         <!-- Header -->
         <header class="header">
             <div class="header-brand">
-                <span class="logo">⚡</span>
+                <svg class="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+                </svg>
                 <h1 class="brand">XPorter</h1>
             </div>
-            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+            <button class="theme-toggle" id="themeToggle" data-i18n-title="toggleTheme" title="Toggle theme">
                 <span id="themeIcon">☀️</span>
             </button>
         </header>
@@ -24,15 +28,15 @@
         <main class="main">
             <!-- Left Panel: Controls -->
             <section class="panel panel-controls">
-                <h2 class="panel-title">Export Settings</h2>
+                <h2 class="panel-title" data-i18n="exportSettings">Export Settings</h2>
 
                 <!-- Username -->
                 <div class="field">
-                    <label class="field-label">Twitter Username</label>
+                    <label class="field-label" data-i18n="fieldUsername">Twitter Username</label>
                     <div class="input-group">
                         <span class="input-prefix">@</span>
-                        <input type="text" id="usernameInput" placeholder="elonmusk" autocomplete="off"
-                            spellcheck="false">
+                        <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername"
+                            placeholder="elonmusk" autocomplete="off" spellcheck="false">
                     </div>
                 </div>
 
@@ -40,15 +44,15 @@
                 <div class="field">
                     <label class="checkbox-label">
                         <input type="checkbox" id="dateCheck">
-                        <span>Date Range</span>
+                        <span data-i18n="dateRange">Date Range</span>
                     </label>
                     <div class="date-fields hidden" id="dateFields">
                         <div class="date-row">
-                            <span class="date-label">From</span>
+                            <span class="date-label" data-i18n="dateFrom">From</span>
                             <input type="date" id="dateFrom">
                         </div>
                         <div class="date-row">
-                            <span class="date-label">To</span>
+                            <span class="date-label" data-i18n="dateTo">To</span>
                             <input type="date" id="dateTo">
                         </div>
                     </div>
@@ -58,50 +62,62 @@
                 <div class="field">
                     <label class="checkbox-label">
                         <input type="checkbox" id="includeRetweets" checked>
-                        <span>Include retweets</span>
+                        <span data-i18n="includeRetweets">Include retweets</span>
                     </label>
                 </div>
                 <div class="field">
                     <label class="checkbox-label">
                         <input type="checkbox" id="includeReplies" checked>
-                        <span>Include replies</span>
+                        <span data-i18n="includeReplies">Include replies</span>
                     </label>
                 </div>
 
                 <!-- Quantity Limit -->
                 <div class="field">
-                    <label class="field-label">Export Limit</label>
+                    <label class="field-label" data-i18n="exportQuantityLimit">Export Limit</label>
                     <select id="quantityLimit" class="select">
-                        <option value="0">Unlimited</option>
-                        <option value="100">100 posts</option>
-                        <option value="500">500 posts</option>
-                        <option value="1000">1,000 posts</option>
-                        <option value="5000">5,000 posts</option>
-                        <option value="10000">10,000 posts</option>
+                        <option value="0" data-i18n="unlimited">Unlimited</option>
+                        <option value="100">100 <span data-i18n="posts">posts</span></option>
+                        <option value="500">500 <span data-i18n="posts">posts</span></option>
+                        <option value="1000">1,000 <span data-i18n="posts">posts</span></option>
+                        <option value="5000">5,000 <span data-i18n="posts">posts</span></option>
+                        <option value="10000">10,000 <span data-i18n="posts">posts</span></option>
                     </select>
                 </div>
 
                 <!-- Cooldown Config -->
                 <div class="field">
-                    <label class="field-label">Cooldown</label>
+                    <label class="field-label" data-i18n="requestCooldown">Cooldown</label>
                     <div class="cooldown-row">
                         <input type="number" id="cooldownMinutes" value="3" min="1" max="15" class="input-small">
-                        <span>min /</span>
+                        <span data-i18n="minAfterEvery">min /</span>
                         <input type="number" id="cooldownBatch" value="20" min="5" max="50" class="input-small">
-                        <span>requests</span>
+                        <span data-i18n="requests">requests</span>
                     </div>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="actions">
                     <button class="btn btn-primary btn-lg" id="startBtn">
-                        <span>▶</span> Start Exporting
+                        <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                            stroke="none">
+                            <polygon points="6 3 20 12 6 21 6 3" />
+                        </svg>
+                        <span data-i18n="startExporting">Start Exporting</span>
                     </button>
                     <button class="btn btn-danger hidden" id="stopBtn">
-                        <span>⏹</span> Stop Export
+                        <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                            stroke="none">
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                        </svg>
+                        <span data-i18n="stop">Stop Export</span>
                     </button>
                     <button class="btn btn-success hidden" id="resumeBtn">
-                        <span>▶</span> Resume Export
+                        <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                            stroke="none">
+                            <polygon points="6 3 20 12 6 21 6 3" />
+                        </svg>
+                        <span data-i18n="resumeExport">Resume Export</span>
                     </button>
                 </div>
             </section>
@@ -110,25 +126,50 @@
             <section class="panel panel-status">
                 <!-- Idle state -->
                 <div class="state state-idle" id="stateIdle">
-                    <div class="idle-icon">📊</div>
-                    <h3>Ready to Export</h3>
-                    <p>Enter a Twitter username and click "Start Exporting" to begin collecting posts.</p>
+                    <div class="idle-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+                            <path d="m19 9-5 5-4-4-3 3" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="readyToExport">Ready to Export</h3>
+                    <p data-i18n="readyToExportDesc">Enter a Twitter username and click "Start Exporting" to begin
+                        collecting posts.</p>
                     <div class="idle-features">
                         <div class="idle-feature">
-                            <span class="feature-icon">♾️</span>
-                            <span>No limits on posts</span>
+                            <svg class="feature-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path
+                                    d="M18.178 8c5.096 0 5.096 8 0 8-5.095 0-7.133-8-12.739-8-4.585 0-4.585 8 0 8 5.606 0 7.644-8 12.74-8z" />
+                            </svg>
+                            <span data-i18n="featureNoLimits">No limits on posts</span>
                         </div>
                         <div class="idle-feature">
-                            <span class="feature-icon">📈</span>
-                            <span>All engagement metrics</span>
+                            <svg class="feature-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+                                <path d="m19 9-5 5-4-4-3 3" />
+                            </svg>
+                            <span data-i18n="featureMetrics">All engagement metrics</span>
                         </div>
                         <div class="idle-feature">
-                            <span class="feature-icon">🔒</span>
-                            <span>100% local processing</span>
+                            <svg class="feature-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                            <span data-i18n="featureLocal">100% local processing</span>
                         </div>
                         <div class="idle-feature">
-                            <span class="feature-icon">📅</span>
-                            <span>Date range filtering</span>
+                            <svg class="feature-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 2v4" />
+                                <path d="M16 2v4" />
+                                <rect width="18" height="18" x="3" y="4" rx="2" />
+                                <path d="M3 10h18" />
+                            </svg>
+                            <span data-i18n="featureDateRange">Date range filtering</span>
                         </div>
                     </div>
                 </div>
@@ -137,7 +178,11 @@
                 <div class="state state-active hidden" id="stateActive">
                     <div class="export-header">
                         <div class="export-user" id="exportUser">
-                            <span class="export-avatar">👤</span>
+                            <svg class="export-avatar-icon" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="8" r="5" />
+                                <path d="M20 21a8 8 0 0 0-16 0" />
+                            </svg>
                             <div>
                                 <div class="export-username" id="exportUsername">@username</div>
                                 <div class="export-expected" id="exportExpected"></div>
@@ -148,7 +193,7 @@
                     <!-- Big counter -->
                     <div class="counter-wrap">
                         <div class="counter" id="counter">0</div>
-                        <div class="counter-label">posts collected</div>
+                        <div class="counter-label" data-i18n="postsCollected">posts collected</div>
                     </div>
 
                     <!-- Progress bar -->
@@ -159,69 +204,103 @@
                     <!-- Status line -->
                     <div class="status-line">
                         <span class="status-dot" id="statusDot"></span>
-                        <span class="status-msg" id="statusMsg">Initializing...</span>
+                        <span class="status-msg" id="statusMsg" data-i18n="starting">Initializing...</span>
                     </div>
 
                     <!-- Stats -->
                     <div class="stats" id="statsRow">
                         <div class="stat">
                             <span class="stat-value" id="statBatch">0</span>
-                            <span class="stat-label">Batches</span>
+                            <span class="stat-label" data-i18n="statBatches">Batches</span>
                         </div>
                         <div class="stat">
                             <span class="stat-value" id="statRequests">0</span>
-                            <span class="stat-label">API Calls</span>
+                            <span class="stat-label" data-i18n="statApiCalls">API Calls</span>
                         </div>
                         <div class="stat">
                             <span class="stat-value" id="statTime">0:00</span>
-                            <span class="stat-label">Elapsed</span>
+                            <span class="stat-label" data-i18n="statElapsed">Elapsed</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Complete state -->
                 <div class="state state-complete hidden" id="stateComplete">
-                    <div class="complete-icon">✅</div>
-                    <h3>Export Complete!</h3>
+                    <div class="complete-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.801 10A10 10 0 1 1 17 3.335" />
+                            <path d="m9 11 3 3L22 4" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="exportComplete">Export Complete!</h3>
                     <div class="complete-info" id="completeInfo">
                         <span class="complete-user" id="completeUser">@username</span>
                         <span> — </span>
                         <span class="complete-count" id="completeCount">0</span>
-                        <span> posts</span>
+                        <span data-i18n="posts"> posts</span>
                     </div>
                     <div class="complete-actions">
                         <button class="btn btn-success btn-lg" id="downloadBtn">
-                            <span>📥</span> Download CSV
+                            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" x2="12" y1="15" y2="3" />
+                            </svg>
+                            <span data-i18n="downloadCsv">Download CSV</span>
                         </button>
                         <button class="btn btn-ghost" id="newExportBtn">
-                            <span>🔄</span> New Export
+                            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                                <path d="M21 3v5h-5" />
+                            </svg>
+                            <span data-i18n="newExport">New Export</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Error state -->
                 <div class="state state-error hidden" id="stateError">
-                    <div class="error-icon">❌</div>
-                    <h3 id="errorTitle">Error</h3>
-                    <p id="errorMessage">Something went wrong.</p>
-                    <button class="btn btn-secondary" id="errorRetryBtn">Try Again</button>
+                    <div class="error-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="15" x2="9" y1="9" y2="15" />
+                            <line x1="9" x2="15" y1="9" y2="15" />
+                        </svg>
+                    </div>
+                    <h3 id="errorTitle" data-i18n="errorTitle">Error</h3>
+                    <p id="errorMessage" data-i18n="errorDesc">Something went wrong.</p>
+                    <button class="btn btn-secondary" id="errorRetryBtn" data-i18n="tryAgain">Try Again</button>
                 </div>
 
                 <!-- Auth error state -->
                 <div class="state state-auth hidden" id="stateAuth">
-                    <div class="error-icon">🔒</div>
-                    <h3>Not Logged In</h3>
-                    <p>Please <a href="https://x.com/login" target="_blank" class="link">log in to X</a> first, then try
-                        again.</p>
+                    <div class="error-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </div>
+                    <h3 data-i18n="notLoggedIn">Not Logged In</h3>
+                    <p><span data-i18n="authWarning">Please</span> <a href="https://x.com/login" target="_blank"
+                            class="link" data-i18n="authLink">log in to X</a> <span data-i18n="authSuffix">first</span>,
+                        <span data-i18n="thenTryAgain">then try
+                            again.</span></p>
                 </div>
             </section>
         </main>
 
         <footer class="app-footer">
-            <span>XPorter v1.0.0 — Not affiliated with X Corp.</span>
+            <span>XPorter v1.0.0 — <span data-i18n="notAffiliated">Not affiliated with X Corp.</span></span>
         </footer>
     </div>
 
+    <script src="../utils/config.js"></script>
+    <script src="../popup/i18n.js"></script>
     <script src="export.js"></script>
 </body>
 

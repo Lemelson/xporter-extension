@@ -3,6 +3,7 @@
 
 // Import utility scripts
 importScripts(
+    '/utils/config.js',
     '/utils/api.js',
     '/utils/rateLimit.js',
     '/utils/csv.js',
@@ -384,7 +385,16 @@ async function getExportStatus() {
     // Check saved state
     const savedState = await XPorterStorage.loadExportState();
     if (savedState) {
+        // Auto-expire: clear stale exports based on settings
         const savedSettings = await XPorterStorage.loadSettings();
+        if (savedSettings.autoExpireEnabled && savedState.updatedAt) {
+            const maxAge = (savedSettings.autoExpireHours || 4) * 60 * 60 * 1000;
+            if (Date.now() - savedState.updatedAt > maxAge) {
+                await XPorterStorage.clearExportState();
+                return { running: false, status: 'idle' };
+            }
+        }
+
         return {
             running: false,
             status: savedState.status,
