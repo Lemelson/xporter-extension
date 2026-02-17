@@ -93,10 +93,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     applyModeUI(exportMode.value);
 
-    exportMode.addEventListener('change', () => {
+    exportMode.addEventListener('change', async () => {
         applyModeUI(exportMode.value);
         currentSettings.exportMode = exportMode.value;
         sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
+
+        // If there's an active/stopped/completed export, auto-reset (like New Export)
+        const currentStatus = lastExportState?.status;
+        if (currentStatus === 'stopped' || currentStatus === 'complete' || currentStatus === 'error') {
+            await sendMessage({ type: 'CLEAR_EXPORT' });
+            updateUI({ running: false, status: 'idle' });
+        }
     });
 
     // Apply saved output format
@@ -477,8 +484,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportStatus.classList.toggle('hidden', status === 'idle');
         statusDetail.classList.remove('hidden');
 
-        // Lock mode selector during export
-        exportMode.disabled = isRunning || status === 'complete' || status === 'stopped';
+        // Lock mode selector only during active export (not when stopped/complete)
+        exportMode.disabled = isRunning;
         outputFormat.disabled = isRunning;
 
         if (state.username) {
