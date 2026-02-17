@@ -1,10 +1,10 @@
 {
-    "extName": {
-        "message": "XPorter — Exportar X/Twitter Gratis: Posts, Seguidores a CSV, Excel, JSON",
-        "description": "Extension name for Spanish CWS"
-    },
-    "extDescription": {
-        "message": "Exporta publicaciones, seguidores, siguiendo y seguidores verificados de cualquier perfil de X (Twitter). Ilimitado, gratuito, 100% privado. CSV, JSON, Excel (XLSX). 14 idiomas.",
-        "description": "Extension description for Spanish CWS"
-    }
+  "extName": {
+    "message": "XPorter — Exportar X/Twitter Gratis: Posts, Seguidores CSV/JSON",
+    "description": "Extension name for CWS"
+  },
+  "extDescription": {
+    "message": "Exporta publicaciones, seguidores y seguidos de cualquier perfil X (Twitter) a CSV, JSON, Excel. Gratis, ilimitado, privado.",
+    "description": "Extension description for CWS"
+  }
 }

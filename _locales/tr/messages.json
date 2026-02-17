@@ -1,10 +1,10 @@
 {
-    "extName": {
-        "message": "XPorter — Ücretsiz X/Twitter Dışa Aktarma: Gönderiler, Takipçiler CSV, Excel, JSON",
-        "description": "Extension name for Turkish CWS"
-    },
-    "extDescription": {
-        "message": "Herhangi bir X (Twitter) profilinden gönderileri, takipçileri, takip edilenleri ve doğrulanmış takipçileri dışa aktarın. Sınırsız, ücretsiz, %100 gizli. CSV, JSON, Excel (XLSX). 14 dil.",
-        "description": "Extension description for Turkish CWS"
-    }
+  "extName": {
+    "message": "XPorter — Ücretsiz X/Twitter Dışa Aktarma: Gönderiler CSV/JSON",
+    "description": "Extension name for CWS"
+  },
+  "extDescription": {
+    "message": "Herhangi bir X (Twitter) profilinden gönderileri, takipçileri dışa aktarın. CSV, JSON, Excel. Ücretsiz, sınırsız, %100 gizli.",
+    "description": "Extension description for CWS"
+  }
 }
