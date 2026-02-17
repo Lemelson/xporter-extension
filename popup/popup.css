@@ -832,7 +832,7 @@ body {
     radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
     linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
-  width: 578px;
+  width: 350px;
   min-height: 200px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
@@ -849,6 +849,10 @@ body.light {
 }
 
 /* ========== END GLASS MODE ========== */
+
+html {
+  zoom: 1.65;
+}
 
 * {
   margin: 0;
