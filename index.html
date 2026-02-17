@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XPorter — Export X (Twitter) Data to CSV</title>
+    <meta name="description"
+        content="Free Chrome extension to export followers, following, posts, and verified followers from any X (Twitter) profile to CSV.">
+    <link rel="icon" type="image/png" href="icon128.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #08090d;
+            --bg-surface: #0f1118;
+            --bg-card: #161924;
+            --border: #22263a;
+            --text: #e8ecf4;
+            --text-muted: #7c8498;
+            --accent: #4f8fff;
+            --accent-glow: rgba(79, 143, 255, 0.25);
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --pink: #f472b6;
+            --radius: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ====== NAV ====== */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: rgba(8, 9, 13, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 32px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .nav-logo img {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        .nav-cta {
+            background: var(--accent);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .nav-cta:hover {
+            background: #6ba0ff;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        /* ====== HERO ====== */
+        .hero {
+            padding: 160px 32px 100px;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 28px;
+            margin-bottom: 32px;
+            position: relative;
+            filter: drop-shadow(0 0 40px var(--accent-glow));
+        }
+
+        .hero h1 {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #fff 0%, #94b8ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 20px;
+            color: var(--text-muted);
+            max-width: 560px;
+            margin: 0 auto 40px;
+            line-height: 1.7;
+        }
+
+        .hero-badges {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .hero-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            background: #6ba0ff;
+            box-shadow: 0 4px 30px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            background: rgba(79, 143, 255, 0.05);
+        }
+
+        /* ====== FEATURES ====== */
+        .features {
+            padding: 80px 32px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .section-label {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 48px;
+            letter-spacing: -0.01em;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px 28px;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(79, 143, 255, 0.3);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 20px;
+        }
+
+        .feature-icon.blue {
+            background: rgba(79, 143, 255, 0.15);
+        }
+
+        .feature-icon.green {
+            background: rgba(52, 211, 153, 0.15);
+        }
+
+        .feature-icon.yellow {
+            background: rgba(251, 191, 36, 0.15);
+        }
+
+        .feature-icon.pink {
+            background: rgba(244, 114, 182, 0.15);
+        }
+
+        .feature-icon.purple {
+            background: rgba(167, 139, 250, 0.15);
+        }
+
+        .feature-icon.red {
+            background: rgba(248, 113, 113, 0.15);
+        }
+
+        .feature-card h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* ====== EXPORT TYPES ====== */
+        .export-types {
+            padding: 80px 32px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .export-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .export-card:hover {
+            border-color: var(--accent);
+            background: rgba(79, 143, 255, 0.04);
+        }
+
+        .export-card .emoji {
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+
+        .export-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .export-card p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ====== HOW IT WORKS ====== */
+        .how-it-works {
+            padding: 80px 32px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            position: relative;
+        }
+
+        .step {
+            display: flex;
+            gap: 24px;
+            padding: 32px 0;
+            position: relative;
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 2px solid var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+            position: relative;
+            z-index: 2;
+        }
+
+        .step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 23px;
+            top: 80px;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .step-content h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .step-content p {
+            font-size: 15px;
+            color: var(--text-muted);
+        }
+
+        /* ====== PRIVACY BANNER ====== */
+        .privacy-banner {
+            padding: 60px 32px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .privacy-card {
+            background: linear-gradient(135deg, rgba(52, 211, 153, 0.06) 0%, rgba(79, 143, 255, 0.06) 100%);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .privacy-card .shield {
+            font-size: 48px;
+            min-width: 48px;
+        }
+
+        .privacy-card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .privacy-card p {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .privacy-card a {
+            color: var(--green);
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .privacy-card a:hover {
+            text-decoration: underline;
+        }
+
+        /* ====== FOOTER ====== */
+        footer {
+            padding: 40px 32px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        footer p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 24px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        /* ====== RESPONSIVE ====== */
+        @media (max-width: 900px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .export-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .hero h1 {
+                font-size: 40px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .export-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .hero p {
+                font-size: 17px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .privacy-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                gap: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <img src="icon128.png" alt="XPorter">
+                XPorter
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#export-types">Export Types</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="privacy-policy.html">Privacy Policy</a></li>
+            </ul>
+            <a href="https://github.com/Lemelson/xporter" class="nav-cta">⭐ GitHub</a>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <img src="icon128.png" alt="XPorter" class="hero-icon">
+        <h1>Export anything from X<br>in one click</h1>
+        <p>Free &amp; open-source Chrome extension to export followers, following, posts, and verified followers from
+            any X (Twitter) profile to CSV.</p>
+
+        <div class="hero-badges">
+            <span class="hero-badge"><span class="dot"></span> Free &amp; unlimited</span>
+            <span class="hero-badge"><span class="dot"></span> No login required</span>
+            <span class="hero-badge"><span class="dot"></span> 100% local processing</span>
+            <span class="hero-badge"><span class="dot"></span> Open source</span>
+        </div>
+
+        <div class="hero-buttons">
+            <a href="#" class="btn-primary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16V12M8 12l4-4 4 4" />
+                </svg>
+                Add to Chrome — Free
+            </a>
+            <a href="https://github.com/Lemelson/xporter" class="btn-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+                View Source
+            </a>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features" id="features">
+        <div class="section-label">Features</div>
+        <h2 class="section-title">Everything you need, nothing you don't</h2>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon blue">📊</div>
+                <h3>CSV Export</h3>
+                <p>Export data in clean, structured CSV format. Open in Excel, Google Sheets, or any data analysis tool.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon green">⚡</div>
+                <h3>Smart Rate Limiting</h3>
+                <p>Built-in intelligent rate limiter prevents API throttling. Automatically pauses and resumes export.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon yellow">🔄</div>
+                <h3>Resume & Download</h3>
+                <p>Stop mid-export and resume later. Download what you've collected so far at any time.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon pink">🌍</div>
+                <h3>14 Languages</h3>
+                <p>Interface available in English, Russian, Spanish, French, German, Japanese, Korean, Chinese, and
+                    more.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon purple">🎨</div>
+                <h3>Themes & Palettes</h3>
+                <p>Dark and light modes with 6 color palettes. Auto-theme follows your OS preferences.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon red">🔒</div>
+                <h3>100% Private</h3>
+                <p>All processing happens locally in your browser. Zero data sent to external servers. Fully open
+                    source.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- EXPORT TYPES -->
+    <section class="export-types" id="export-types">
+        <div class="section-label">Export Types</div>
+        <h2 class="section-title">Four export modes</h2>
+
+        <div class="export-grid">
+            <div class="export-card">
+                <div class="emoji">📝</div>
+                <h3>Posts</h3>
+                <p>Text, engagement stats, media URLs, hashtags, language, timestamps</p>
+            </div>
+            <div class="export-card">
+                <div class="emoji">👥</div>
+                <h3>Followers</h3>
+                <p>Name, username, bio, location, follower/following counts, join date</p>
+            </div>
+            <div class="export-card">
+                <div class="emoji">➡️</div>
+                <h3>Following</h3>
+                <p>Full profile data of accounts the user follows</p>
+            </div>
+            <div class="export-card">
+                <div class="emoji">✅</div>
+                <h3>Verified Followers</h3>
+                <p>Blue-verified followers with complete profile information</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="section-label">How It Works</div>
+        <h2 class="section-title">Three steps to your data</h2>
+
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Install the extension</h3>
+                    <p>Add XPorter to Chrome from the Chrome Web Store. No sign-up, no account needed.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Visit any X profile</h3>
+                    <p>Navigate to any public X (Twitter) profile page. Click the XPorter icon in your toolbar.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h3>Choose & export</h3>
+                    <p>Select what to export — posts, followers, following, or verified followers. Click export and
+                        download your CSV.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRIVACY BANNER -->
+    <section class="privacy-banner">
+        <div class="privacy-card">
+            <div class="shield">🛡️</div>
+            <div>
+                <h3>Your privacy, guaranteed</h3>
+                <p>XPorter processes everything locally in your browser. No data ever leaves your machine. No analytics,
+                    no tracking, no ads. The source code is fully open for audit.</p>
+                <a href="privacy-policy.html">Read our Privacy Policy →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="footer-inner">
+            <p>XPorter © 2026</p>
+            <div class="footer-links">
+                <a href="https://github.com/Lemelson/xporter">GitHub</a>
+                <a href="privacy-policy.html">Privacy Policy</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>
