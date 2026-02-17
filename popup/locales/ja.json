@@ -17,7 +17,6 @@
   "postsCollected": "件のポスト取得済み",
   "startExporting": "エクスポート開始",
   "stop": "停止",
-  "downloadCsv": "CSV ダウンロード",
   "resumeExport": "再開",
   "morePosts": "件追加",
   "newExport": "新規エクスポート",
@@ -72,5 +71,13 @@
   "thenTryAgain": "その後、再試行してください。",
   "autoExpireState": "古いエクスポートを自動削除",
   "autoExpireAfter": "削除まで",
-  "hours": "時間"
+  "hours": "時間",
+  "exportMode": "エクスポートモード",
+  "modePosts": "📝 投稿",
+  "modeFollowers": "👥 フォロワー",
+  "modeFollowing": "➡️ フォロー中",
+  "modeVerifiedFollowers": "✓ 認証済みフォロワー",
+  "outputFormat": "出力形式",
+  "download": "ダウンロード",
+  "usersCollected": "ユーザー取得済み"
 }

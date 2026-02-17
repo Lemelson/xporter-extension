@@ -17,7 +17,6 @@
   "postsCollected": "postingan terkumpul",
   "startExporting": "Mulai Ekspor",
   "stop": "Berhenti",
-  "downloadCsv": "Unduh CSV",
   "resumeExport": "Lanjutkan",
   "morePosts": "posting lagi",
   "newExport": "Ekspor Baru",
@@ -72,5 +71,13 @@
   "thenTryAgain": "kemudian coba lagi.",
   "autoExpireState": "Hapus ekspor lama otomatis",
   "autoExpireAfter": "Hapus setelah",
-  "hours": "jam"
+  "hours": "jam",
+  "exportMode": "Mode Ekspor",
+  "modePosts": "📝 Postingan",
+  "modeFollowers": "👥 Pengikut",
+  "modeFollowing": "➡️ Mengikuti",
+  "modeVerifiedFollowers": "✓ Pengikut Terverifikasi",
+  "outputFormat": "Format Output",
+  "download": "Unduh",
+  "usersCollected": "pengguna terkumpul"
 }

@@ -67,3 +67,51 @@ window.addEventListener('popstate', () => {
     const username = extractUsername();
     sendUsername(username);
 });
+
+// ==================== GraphQL QueryId Discovery via Fetch Interception ====================
+// X.com makes GraphQL requests with the correct queryIds.
+// We intercept these and forward them to the service worker so the extension
+// always has up-to-date queryIds without relying on fragile JS-bundle scanning.
+
+const TRACKED_OPERATIONS = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserByScreenName'];
+
+// Inject a fetch interceptor into the actual page context
+const interceptorScript = document.createElement('script');
+interceptorScript.textContent = `
+(function() {
+  const _origFetch = window.fetch;
+  const TRACKED = ${JSON.stringify(TRACKED_OPERATIONS)};
+
+  window.fetch = function(...args) {
+    try {
+      const url = (typeof args[0] === 'string') ? args[0] : args[0]?.url;
+      if (url && url.includes('/i/api/graphql/')) {
+        const match = url.match(/\\/i\\/api\\/graphql\\/([^/]+)\\/([^?]+)/);
+        if (match && TRACKED.includes(match[2])) {
+          window.postMessage({
+            type: '__XPORTER_QUERYID__',
+            queryId: match[1],
+            operationName: match[2]
+          }, '*');
+        }
+      }
+    } catch(e) { /* ignore */ }
+    return _origFetch.apply(this, args);
+  };
+})();
+`;
+(document.head || document.documentElement).appendChild(interceptorScript);
+interceptorScript.remove();
+
+// Listen for messages from the injected script
+window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    if (event.data?.type === '__XPORTER_QUERYID__') {
+        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+        chrome.runtime.sendMessage({
+            type: 'DISCOVERED_QUERYID',
+            queryId: event.data.queryId,
+            operationName: event.data.operationName
+        }).catch(() => { });
+    }
+});

@@ -17,7 +17,6 @@
   "postsCollected": "منشور تم جمعه",
   "startExporting": "بدء التصدير",
   "stop": "إيقاف",
-  "downloadCsv": "تحميل CSV",
   "resumeExport": "استئناف",
   "morePosts": "منشورات إضافية",
   "newExport": "تصدير جديد",
@@ -72,5 +71,13 @@
   "thenTryAgain": "ثم حاول مرة أخرى.",
   "autoExpireState": "حذف التصديرات القديمة تلقائياً",
   "autoExpireAfter": "حذف بعد",
-  "hours": "ساعات"
+  "hours": "ساعات",
+  "exportMode": "وضع التصدير",
+  "modePosts": "📝 المنشورات",
+  "modeFollowers": "👥 المتابعون",
+  "modeFollowing": "➡️ المتابَعون",
+  "modeVerifiedFollowers": "✓ متابعون موثقون",
+  "outputFormat": "صيغة الإخراج",
+  "download": "تنزيل",
+  "usersCollected": "مستخدمون تم جمعهم"
 }

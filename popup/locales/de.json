@@ -17,7 +17,6 @@
   "postsCollected": "Beiträge gesammelt",
   "startExporting": "Export starten",
   "stop": "Stoppen",
-  "downloadCsv": "CSV herunterladen",
   "resumeExport": "Fortsetzen",
   "morePosts": "weitere Posts",
   "newExport": "Neuer Export",
@@ -72,5 +71,13 @@
   "thenTryAgain": "dann versuchen Sie es erneut.",
   "autoExpireState": "Alte Exporte automatisch löschen",
   "autoExpireAfter": "Löschen nach",
-  "hours": "Stunden"
+  "hours": "Stunden",
+  "exportMode": "Exportmodus",
+  "modePosts": "📝 Beiträge",
+  "modeFollowers": "👥 Follower",
+  "modeFollowing": "➡️ Folge ich",
+  "modeVerifiedFollowers": "✓ Verifizierte Follower",
+  "outputFormat": "Ausgabeformat",
+  "download": "Herunterladen",
+  "usersCollected": "Benutzer gesammelt"
 }

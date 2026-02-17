@@ -107,6 +107,17 @@
             data-i18n="authLink">log in to X</a> <span data-i18n="authSuffix">first</span></span>
       </div>
 
+      <!-- Export Mode -->
+      <div class="field">
+        <label class="field-label" data-i18n="exportMode">Export Mode</label>
+        <select id="exportMode" class="select">
+          <option value="posts" data-i18n="modePosts">📝 Posts</option>
+          <option value="followers" data-i18n="modeFollowers">👥 Followers</option>
+          <option value="following" data-i18n="modeFollowing">➡️ Following</option>
+          <option value="verified_followers" data-i18n="modeVerifiedFollowers">✓ Verified Followers</option>
+        </select>
+      </div>
+
       <!-- Username input -->
       <div class="field">
         <label class="field-label" data-i18n="fieldUsername">Twitter Username</label>
@@ -117,23 +128,36 @@
         </div>
       </div>
 
-      <!-- Date range -->
-      <div class="field">
-        <label class="toggle-label">
-          <input type="checkbox" id="dateCheck" class="toggle-input">
-          <span class="toggle-track"><span class="toggle-knob"></span></span>
-          <span data-i18n="dateRange">Date Range</span>
-        </label>
-        <div class="date-fields hidden" id="dateFields">
-          <div class="date-row">
-            <span class="date-label" data-i18n="dateFrom">From</span>
-            <input type="date" id="dateFrom">
-          </div>
-          <div class="date-row">
-            <span class="date-label" data-i18n="dateTo">To</span>
-            <input type="date" id="dateTo">
+      <!-- Posts-only options (hidden when mode is followers/following) -->
+      <div id="postsOnlyOptions">
+        <!-- Date range -->
+        <div class="field">
+          <label class="toggle-label">
+            <input type="checkbox" id="dateCheck" class="toggle-input">
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="dateRange">Date Range</span>
+          </label>
+          <div class="date-fields hidden" id="dateFields">
+            <div class="date-row">
+              <span class="date-label" data-i18n="dateFrom">From</span>
+              <input type="date" id="dateFrom">
+            </div>
+            <div class="date-row">
+              <span class="date-label" data-i18n="dateTo">To</span>
+              <input type="date" id="dateTo">
+            </div>
           </div>
         </div>
+      </div>
+
+      <!-- Output Format -->
+      <div class="field">
+        <label class="field-label" data-i18n="outputFormat">Output Format</label>
+        <select id="outputFormat" class="select">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+          <option value="xlsx">Excel (XLSX)</option>
+        </select>
       </div>
 
       <!-- Export status (shown when export is active) -->
@@ -174,7 +198,7 @@
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <path d="m7 10 5 5 5-5" />
           </svg>
-          <span data-i18n="downloadCsv">Download CSV</span>
+          <span data-i18n="download">Download</span>
         </button>
         <div class="resume-row hidden" id="resumeRow">
           <input type="number" id="resumeQuantity" class="input-resume" min="1" placeholder="50" value="100">
@@ -202,19 +226,21 @@
 
     <!-- SETTINGS TAB -->
     <div class="tab-content" id="tab-settings">
-      <div class="field">
-        <label class="toggle-label">
-          <input type="checkbox" id="includeRetweets" class="toggle-input" checked>
-          <span class="toggle-track"><span class="toggle-knob"></span></span>
-          <span data-i18n="includeRetweets">Include retweets</span>
-        </label>
-      </div>
-      <div class="field">
-        <label class="toggle-label">
-          <input type="checkbox" id="includeReplies" class="toggle-input" checked>
-          <span class="toggle-track"><span class="toggle-knob"></span></span>
-          <span data-i18n="includeReplies">Include replies</span>
-        </label>
+      <div id="settingsPostsOnly">
+        <div class="field">
+          <label class="toggle-label">
+            <input type="checkbox" id="includeRetweets" class="toggle-input" checked>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="includeRetweets">Include retweets</span>
+          </label>
+        </div>
+        <div class="field">
+          <label class="toggle-label">
+            <input type="checkbox" id="includeReplies" class="toggle-input" checked>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="includeReplies">Include replies</span>
+          </label>
+        </div>
       </div>
       <div class="field">
         <label class="field-label" data-i18n="exportQuantityLimit">Export Quantity Limit</label>

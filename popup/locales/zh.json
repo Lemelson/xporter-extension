@@ -17,7 +17,6 @@
   "postsCollected": "条帖子已收集",
   "startExporting": "开始导出",
   "stop": "停止",
-  "downloadCsv": "下载 CSV",
   "resumeExport": "继续",
   "morePosts": "更多帖子",
   "newExport": "新建导出",
@@ -72,5 +71,13 @@
   "thenTryAgain": "然后再试一次。",
   "autoExpireState": "自动清除旧导出",
   "autoExpireAfter": "清除时间",
-  "hours": "小时"
+  "hours": "小时",
+  "exportMode": "导出模式",
+  "modePosts": "📝 帖子",
+  "modeFollowers": "👥 关注者",
+  "modeFollowing": "➡️ 正在关注",
+  "modeVerifiedFollowers": "✓ 已认证关注者",
+  "outputFormat": "输出格式",
+  "download": "下载",
+  "usersCollected": "用户已收集"
 }

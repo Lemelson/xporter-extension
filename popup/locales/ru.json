@@ -17,7 +17,6 @@
   "postsCollected": "постов собрано",
   "startExporting": "Начать экспорт",
   "stop": "Остановить",
-  "downloadCsv": "Скачать CSV",
   "resumeExport": "Продолжить",
   "morePosts": "ещё постов",
   "newExport": "Новый экспорт",
@@ -72,5 +71,13 @@
   "thenTryAgain": "затем попробуйте снова.",
   "autoExpireState": "Автоочистка старых экспортов",
   "autoExpireAfter": "Очищать через",
-  "hours": "ч"
+  "hours": "ч",
+  "exportMode": "Режим экспорта",
+  "modePosts": "📝 Посты",
+  "modeFollowers": "👥 Подписчики",
+  "modeFollowing": "➡️ Подписки",
+  "modeVerifiedFollowers": "✓ Верифицированные",
+  "outputFormat": "Формат вывода",
+  "download": "Скачать",
+  "usersCollected": "пользователей собрано"
 }

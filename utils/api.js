@@ -7,7 +7,7 @@ const _C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
 let activeBearerToken = _C.FALLBACK_BEARER_TOKEN
   || 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
-// Hardcoded queryIds as fallback — verified working as of Feb 2026
+// Hardcoded queryIds as fallback — extracted from X.com JS bundles (Feb 2026)
 const FALLBACK_ENDPOINTS = {
   UserByScreenName: {
     queryId: 'AWbeRIdkLtqTRN7yL_H8yw',
@@ -16,6 +16,18 @@ const FALLBACK_ENDPOINTS = {
   UserTweets: {
     queryId: 'eApPT8jppbYXlweF_ByTyA',
     operationName: 'UserTweets'
+  },
+  Followers: {
+    queryId: 'efNzdTpE-mkUcLARCd3RPQ',
+    operationName: 'Followers'
+  },
+  Following: {
+    queryId: 'M3LO-sJg6BCWdEliN_C2fQ',
+    operationName: 'Following'
+  },
+  BlueVerifiedFollowers: {
+    queryId: 'YGl_IyrL0bFU7KHxQoSRVg',
+    operationName: 'BlueVerifiedFollowers'
   }
 };
 
@@ -24,6 +36,9 @@ let discoveredEndpoints = null;
 let endpointsCacheTime = 0;
 const ENDPOINTS_CACHE_TTL = _C.ENDPOINT_CACHE_TTL || (30 * 60 * 1000);
 let usingFallbacks = false;
+
+// Live queryIds captured from X.com's own network traffic (highest priority)
+const liveQueryIds = {};
 
 // Features for UserByScreenName — verified working (must include all required flags)
 const USER_FEATURES = {
@@ -95,6 +110,57 @@ const TWEETS_FEATURES = {
   communities_web_enable_tweet_community_results_fetch: true
 };
 
+// Features for Followers/Following/BlueVerifiedFollowers
+// Extracted from X.com client-web main JS bundle — Feb 2026
+const FOLLOWERS_FEATURES = {
+  rweb_video_screen_enabled: true,
+  profile_label_improvements_pcf_label_in_post_enabled: true,
+  responsive_web_profile_redirect_enabled: true,
+  rweb_tipjar_consumption_enabled: true,
+  verified_phone_label_enabled: true,
+  creator_subscriptions_tweet_preview_api_enabled: true,
+  responsive_web_graphql_timeline_navigation_enabled: true,
+  responsive_web_graphql_skip_user_profile_image_extensions_enabled: true,
+  premium_content_api_read_enabled: true,
+  communities_web_enable_tweet_community_results_fetch: true,
+  c9s_tweet_anatomy_moderator_badge_enabled: true,
+  responsive_web_grok_analyze_button_fetch_trends_enabled: true,
+  responsive_web_grok_analyze_post_followups_enabled: true,
+  responsive_web_jetfuel_frame: true,
+  responsive_web_grok_share_attachment_enabled: true,
+  responsive_web_grok_annotations_enabled: true,
+  articles_preview_enabled: true,
+  responsive_web_edit_tweet_api_enabled: true,
+  graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+  view_counts_everywhere_api_enabled: true,
+  longform_notetweets_consumption_enabled: true,
+  responsive_web_twitter_article_tweet_consumption_enabled: true,
+  tweet_awards_web_tipping_enabled: true,
+  responsive_web_grok_show_grok_translated_post: true,
+  responsive_web_grok_analysis_button_from_backend: true,
+  post_ctas_fetch_enabled: true,
+  freedom_of_speech_not_reach_fetch_enabled: true,
+  standardized_nudges_misinfo: true,
+  tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+  longform_notetweets_rich_text_read_enabled: true,
+  longform_notetweets_inline_media_enabled: true,
+  responsive_web_grok_image_annotation_enabled: true,
+  responsive_web_grok_imagine_annotation_enabled: true,
+  responsive_web_grok_community_note_auto_translation_is_enabled: true,
+  responsive_web_enhance_cards_enabled: true
+};
+
+// Field toggles for Followers/Following/BlueVerifiedFollowers
+// Extracted from X.com client-web main JS bundle — Feb 2026
+const FOLLOWERS_FIELD_TOGGLES = {
+  withPayments: false,
+  withAuxiliaryUserLabels: false,
+  withArticleRichContentState: false,
+  withArticlePlainText: false,
+  withGrokAnalyze: false,
+  withDisallowedReplyControls: false
+};
+
 // ==================== Dynamic QueryId Discovery ====================
 
 /**
@@ -131,7 +197,7 @@ async function discoverEndpoints(forceRefresh = false) {
       throw new Error('No JS bundles found');
     }
 
-    const targetOperations = ['UserByScreenName', 'UserTweets'];
+    const targetOperations = ['UserByScreenName', 'UserTweets', 'Followers', 'Following', 'BlueVerifiedFollowers'];
     const found = {};
     let discoveredBearer = null;
 
@@ -152,22 +218,43 @@ async function discoverEndpoints(forceRefresh = false) {
           }
         }
 
+        // Batch approach: find ALL queryId/operationName pairs in one pass
+        // X bundles endpoints in various formats, so we scan for all pairs at once
+        const batchPatterns = [
+          /queryId:"([^"]+)",operationName:"([^"]+)"/g,
+          /\{queryId:"([^"]+)",operationName:"([^"]+)"/g,
+          /operationName:"([^"]+)"[^}]{0,50}queryId:"([^"]+)"/g
+        ];
+
+        for (const pattern of batchPatterns) {
+          let m;
+          while ((m = pattern.exec(jsText)) !== null) {
+            let qId, opName;
+            // Different patterns capture in different order
+            if (pattern.source.startsWith('operationName')) {
+              opName = m[1]; qId = m[2];
+            } else {
+              qId = m[1]; opName = m[2];
+            }
+            if (targetOperations.includes(opName) && !found[opName]) {
+              found[opName] = qId;
+              XLog.log(`Found ${opName} queryId: ${qId}`);
+            }
+          }
+        }
+
+        // Fallback: also try individual per-operation patterns for any still-missing
         for (const opName of targetOperations) {
           if (found[opName]) continue;
-
-          // Multiple patterns to handle X's JS bundling
-          const patterns = [
-            new RegExp(`queryId:"([^"]+)",operationName:"${opName}"`),
-            new RegExp(`\\{queryId:"([^"]+)",operationName:"${opName}"`),
-            new RegExp(`operationName:"${opName}"[^}]*queryId:"([^"]+)"`),
-            new RegExp(`queryId:"([^"]+)"[^}]{0,200}operationName:"${opName}"`)
+          const fallbackPatterns = [
+            new RegExp(`queryId:"([^"]+)"[^}]{0,300}operationName:"${opName}"`),
+            new RegExp(`"${opName}"[^}]{0,300}queryId:"([^"]+)"`)
           ];
-
-          for (const pattern of patterns) {
-            const m = pattern.exec(jsText);
-            if (m) {
-              found[opName] = m[1];
-              XLog.log(`Found ${opName} queryId: ${m[1]}`);
+          for (const p of fallbackPatterns) {
+            const fm = p.exec(jsText);
+            if (fm) {
+              found[opName] = fm[1];
+              XLog.log(`Found ${opName} queryId (fallback): ${fm[1]}`);
               break;
             }
           }
@@ -183,9 +270,26 @@ async function discoverEndpoints(forceRefresh = false) {
     }
 
     if (found.UserByScreenName && found.UserTweets) {
+      // Log discovery results for debugging
+      for (const op of targetOperations) {
+        if (found[op]) {
+          XLog.log(`✓ ${op}: discovered queryId = ${found[op]}`);
+        } else {
+          XLog.warn(`✗ ${op}: NOT found in bundles, using fallback = ${FALLBACK_ENDPOINTS[op]?.queryId || 'none'}`);
+        }
+      }
       discoveredEndpoints = {
         UserByScreenName: { queryId: found.UserByScreenName, operationName: 'UserByScreenName' },
-        UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' }
+        UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' },
+        Followers: found.Followers
+          ? { queryId: found.Followers, operationName: 'Followers' }
+          : FALLBACK_ENDPOINTS.Followers,
+        Following: found.Following
+          ? { queryId: found.Following, operationName: 'Following' }
+          : FALLBACK_ENDPOINTS.Following,
+        BlueVerifiedFollowers: found.BlueVerifiedFollowers
+          ? { queryId: found.BlueVerifiedFollowers, operationName: 'BlueVerifiedFollowers' }
+          : FALLBACK_ENDPOINTS.BlueVerifiedFollowers
       };
       endpointsCacheTime = Date.now();
       XLog.log('Endpoints discovered successfully');
@@ -237,14 +341,13 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     url += `&fieldToggles=${encodeURIComponent(JSON.stringify(fieldToggles))}`;
   }
 
-  XLog.log(`Fetching ${endpoint.operationName} (queryId: ${endpoint.queryId})`);
-
   const response = await fetch(url, {
     method: 'GET',
     headers: {
       'authorization': `Bearer ${activeBearerToken}`,
       'x-csrf-token': auth.csrfToken,
       'x-twitter-active-user': 'yes',
+      'x-twitter-auth-type': 'OAuth2Session',
       'x-twitter-client-language': 'en'
     },
     credentials: 'include'
@@ -258,9 +361,9 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     throw new Error('AUTH_ERROR');
   }
 
-  if (response.status === 400) {
+  if (response.status === 400 || response.status === 404) {
     const body = await response.text().catch(() => '');
-    XLog.error('400 error body:', body.substring(0, 500));
+    XLog.error(`GraphQL ${response.status} error for ${endpoint.operationName}:`, body.substring(0, 200));
     // Invalidate cache so next call tries fresh discovery
     discoveredEndpoints = null;
     endpointsCacheTime = 0;
@@ -274,7 +377,13 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     throw new Error(`API_ERROR_${response.status}`);
   }
 
-  return response.json();
+  const jsonData = await response.json();
+
+  if (jsonData.errors) {
+    XLog.error(`GraphQL errors for ${endpoint.operationName}:`, JSON.stringify(jsonData.errors).substring(0, 300));
+  }
+
+  return jsonData;
 }
 
 // ==================== Stale Query ID Retry Wrapper ====================
@@ -284,16 +393,70 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
  * Forces endpoint re-discovery on stale IDs, eliminating duplicated retry logic.
  */
 async function withStaleRetry(endpointKey, makeRequest) {
-  const endpoints = await discoverEndpoints();
-  try {
-    return await makeRequest(endpoints[endpointKey]);
-  } catch (err) {
-    if (err.message === 'STALE_QUERY_ID') {
-      XLog.log(`Retrying ${endpointKey} with fresh queryIds...`);
-      const freshEndpoints = await discoverEndpoints(true);
-      return await makeRequest(freshEndpoints[endpointKey]);
+  const triedIds = new Set();
+
+  // Attempt 0: if we have a live-captured queryId from X.com's traffic, try it first
+  if (liveQueryIds[endpointKey]) {
+    const liveId = liveQueryIds[endpointKey];
+    triedIds.add(liveId);
+    try {
+      const liveEndpoint = { queryId: liveId, operationName: endpointKey };
+      XLog.log(`Trying ${endpointKey} with live-captured queryId: ${liveId}`);
+      return await makeRequest(liveEndpoint);
+    } catch (err) {
+      if (err.message !== 'STALE_QUERY_ID') throw err;
+      delete liveQueryIds[endpointKey];
+      XLog.warn(`Live queryId for ${endpointKey} was stale, trying discovery...`);
     }
-    throw err;
+  }
+
+  // Attempt 1: use discovered (or cached) endpoint
+  const endpoints = await discoverEndpoints();
+  const discoveredId = endpoints[endpointKey]?.queryId;
+  if (discoveredId && !triedIds.has(discoveredId)) {
+    triedIds.add(discoveredId);
+    try {
+      return await makeRequest(endpoints[endpointKey]);
+    } catch (err) {
+      if (err.message !== 'STALE_QUERY_ID') throw err;
+      XLog.log(`Discovered queryId for ${endpointKey} was stale (${discoveredId}), re-discovering...`);
+    }
+  }
+
+  // Attempt 2: force re-discovery from JS bundles
+  const freshEndpoints = await discoverEndpoints(true);
+  const freshId = freshEndpoints[endpointKey]?.queryId;
+  if (freshId && !triedIds.has(freshId)) {
+    triedIds.add(freshId);
+    try {
+      return await makeRequest(freshEndpoints[endpointKey]);
+    } catch (err) {
+      if (err.message !== 'STALE_QUERY_ID') throw err;
+      XLog.log(`Fresh queryId for ${endpointKey} also stale (${freshId}), trying fallback...`);
+    }
+  }
+
+  // Attempt 3: use hardcoded FALLBACK_ENDPOINTS as last resort
+  const fallback = FALLBACK_ENDPOINTS[endpointKey];
+  if (fallback && !triedIds.has(fallback.queryId)) {
+    XLog.log(`Trying ${endpointKey} with hardcoded fallback queryId: ${fallback.queryId}`);
+    return await makeRequest(fallback);
+  }
+
+  XLog.error(`All queryIds exhausted for ${endpointKey}. Tried: ${[...triedIds].join(', ')}`);
+  throw new Error('STALE_QUERY_ID');
+}
+
+/**
+ * Store a live-captured queryId from X.com's own network traffic.
+ * Called from the service worker when the content script intercepts a GraphQL request.
+ */
+function setLiveQueryId(operationName, queryId) {
+  liveQueryIds[operationName] = queryId;
+  XLog.log(`Live queryId captured: ${operationName} = ${queryId}`);
+  // Also update discovered endpoints cache if it exists
+  if (discoveredEndpoints && discoveredEndpoints[operationName]) {
+    discoveredEndpoints[operationName] = { queryId, operationName };
   }
 }
 
@@ -321,13 +484,188 @@ async function getUserByScreenName(screenName) {
   }
 
   const legacy = userResult.legacy;
+  const core = userResult.core || {};
 
   return {
     id: userResult.rest_id,
-    name: legacy.name,
-    screenName: legacy.screen_name,
+    name: core.name || legacy.name,
+    screenName: core.screen_name || legacy.screen_name,
     isProtected: legacy.protected || false,
-    tweetCount: legacy.statuses_count
+    tweetCount: legacy.statuses_count,
+    followersCount: legacy.followers_count || 0,
+    followingCount: legacy.friends_count || 0
+  };
+}
+
+// ==================== Followers/Following Fetching ====================
+
+async function fetchFollowers(userId, cursor = null, count = 20) {
+  // X has deprecated the GraphQL Followers endpoint (returns 404).
+  // Use REST v1.1 /followers/list.json as a reliable alternative.
+  const auth = await getAuthTokens();
+
+  let url = `https://x.com/i/api/1.1/followers/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=false`;
+  if (cursor && cursor !== '0' && cursor !== '-1') {
+    url += `&cursor=${cursor}`;
+  }
+
+  XLog.log(`[REST] Fetching Followers via v1.1 API (cursor: ${cursor || 'initial'})`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'authorization': `Bearer ${activeBearerToken}`,
+      'x-csrf-token': auth.csrfToken,
+      'x-twitter-active-user': 'yes',
+      'x-twitter-auth-type': 'OAuth2Session',
+      'x-twitter-client-language': 'en'
+    },
+    credentials: 'include'
+  });
+
+  if (response.status === 429) {
+    throw new Error('RATE_LIMITED');
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('AUTH_ERROR');
+  }
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    XLog.error(`[REST] Followers API error ${response.status}:`, body.substring(0, 500));
+    throw new Error(`API_ERROR_${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // Parse REST v1.1 response into the same format used by GraphQL
+  const users = (data.users || []).map(u => ({
+    id: u.id_str || String(u.id),
+    name: u.name || '',
+    username: u.screen_name || '',
+    bio: (u.description || '').replace(/\n/g, ' '),
+    location: u.location || '',
+    url: u.url || '',
+    followers_count: u.followers_count || 0,
+    following_count: u.friends_count || 0,
+    tweet_count: u.statuses_count || 0,
+    listed_count: u.listed_count || 0,
+    verified: u.verified || u.is_blue_verified || false,
+    protected: u.protected || false,
+    created_at: u.created_at || '',
+    profile_image_url: (u.profile_image_url_https || '').replace('_normal', '_400x400'),
+    profile_url: `https://x.com/${u.screen_name}`
+  }));
+
+  // REST v1.1 uses numeric cursors; "0" means no more pages
+  const nextCursorStr = data.next_cursor_str || String(data.next_cursor || 0);
+  const nextCursor = (nextCursorStr && nextCursorStr !== '0') ? nextCursorStr : null;
+
+  XLog.log(`[REST] Parsed ${users.length} followers, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
+  return { users, nextCursor };
+}
+
+async function fetchFollowing(userId, cursor = null, count = 20) {
+  return _fetchUserList('Following', userId, cursor, count);
+}
+
+async function fetchVerifiedFollowers(userId, cursor = null, count = 20) {
+  return _fetchUserList('BlueVerifiedFollowers', userId, cursor, count);
+}
+
+/**
+ * Internal helper: fetch a user list (following, verified followers)
+ * Note: Followers now uses REST v1.1 directly (see fetchFollowers above)
+ */
+async function _fetchUserList(endpointKey, userId, cursor, count) {
+  const variables = {
+    userId: userId,
+    count: count,
+    includePromotedContent: false
+  };
+  if (cursor) {
+    variables.cursor = cursor;
+  }
+
+  const data = await withStaleRetry(endpointKey, (endpoint) =>
+    graphqlRequest(endpoint, variables, FOLLOWERS_FEATURES, FOLLOWERS_FIELD_TOGGLES)
+  );
+
+  return parseFollowersResponse(data);
+}
+
+// ==================== Followers Response Parsing ====================
+
+function parseFollowersResponse(data) {
+  const timeline = data?.data?.user?.result?.timeline?.timeline;
+  const instructions = timeline?.instructions || [];
+
+  const users = [];
+  let nextCursor = null;
+
+  for (const instruction of instructions) {
+    const entries = instruction.entries || [];
+
+    if (instruction.type === 'TimelineAddEntries' || entries.length > 0) {
+      for (const entry of entries) {
+        const entryId = entry.entryId || '';
+
+        // User entries
+        if (entryId.startsWith('user-')) {
+          const userResult = entry.content?.itemContent?.user_results?.result;
+          if (userResult && userResult.__typename !== 'UserUnavailable') {
+            const parsed = parseUserObject(userResult);
+            if (parsed) users.push(parsed);
+          }
+        }
+
+        // Cursor entries
+        if (entryId.startsWith('cursor-bottom-')) {
+          nextCursor = entry.content?.value || null;
+        }
+      }
+    }
+  }
+
+  XLog.log(`Parsed ${users.length} users, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
+  return { users, nextCursor };
+}
+
+/**
+ * Parse a single user object from the API response into a flat structure.
+ * X has moved identity fields (name, screen_name, created_at) to `result.core`
+ * and profile images to `result.avatar`. Stats remain in `result.legacy`.
+ */
+function parseUserObject(result) {
+  if (!result) return null;
+  const legacy = result.legacy;
+  const core = result.core || {};
+  if (!legacy) return null;
+
+  // Identity fields: prefer core (new location), fall back to legacy
+  const name = core.name || legacy.name || '';
+  const screenName = core.screen_name || legacy.screen_name || '';
+  const createdAt = core.created_at || legacy.created_at || '';
+
+  // Profile image: prefer avatar (new location), fall back to legacy
+  const rawImageUrl = result.avatar?.image_url || legacy.profile_image_url_https || '';
+  const profileImageUrl = rawImageUrl.replace('_normal', '_400x400');
+
+  return {
+    id: result.rest_id,
+    name: name,
+    username: screenName,
+    bio: (legacy.description || '').replace(/\n/g, ' '),
+    location: core.location || legacy.location || '',
+    url: legacy.url || '',
+    followers_count: legacy.followers_count || 0,
+    following_count: legacy.friends_count || 0,
+    tweet_count: legacy.statuses_count || 0,
+    listed_count: legacy.listed_count || 0,
+    verified: result.is_blue_verified || false,
+    protected: legacy.protected || false,
+    created_at: createdAt,
+    profile_image_url: profileImageUrl,
+    profile_url: `https://x.com/${screenName}`
   };
 }
 
@@ -440,8 +778,9 @@ function parseTweetObject(result) {
   const legacy = result.legacy;
   if (!legacy) return null;
 
-  const core = result.core?.user_results?.result;
-  const userLegacy = core?.legacy || {};
+  const tweetUser = result.core?.user_results?.result;
+  const userLegacy = tweetUser?.legacy || {};
+  const userCore = tweetUser?.core || {};
   const views = result.views;
 
   const type = detectTweetType(legacy, result);
@@ -454,14 +793,18 @@ function parseTweetObject(result) {
 
   const media = extractMedia(legacy);
 
+  // Author identity: prefer userCore (new location), fall back to userLegacy
+  const authorName = userCore.name || userLegacy.name || '';
+  const authorUsername = userCore.screen_name || userLegacy.screen_name || '';
+
   return {
     id: legacy.id_str,
     text: text,
-    tweet_url: `https://x.com/${userLegacy.screen_name}/status/${legacy.id_str}`,
+    tweet_url: `https://x.com/${authorUsername}/status/${legacy.id_str}`,
     language: legacy.lang || '',
     type: type,
-    author_name: userLegacy.name || '',
-    author_username: userLegacy.screen_name || '',
+    author_name: authorName,
+    author_username: authorUsername,
     view_count: views?.count || '',
     bookmark_count: legacy.bookmark_count || 0,
     favorite_count: legacy.favorite_count || 0,
@@ -532,8 +875,13 @@ if (typeof globalThis !== 'undefined') {
     getAuthTokens,
     getUserByScreenName,
     fetchUserTweets,
+    fetchFollowers,
+    fetchFollowing,
+    fetchVerifiedFollowers,
     parseTweetObject,
+    parseUserObject,
     discoverEndpoints,
+    setLiveQueryId,
     get BEARER_TOKEN() { return activeBearerToken; }
   };
 }

@@ -1,10 +1,13 @@
-// XPorter Popup — Logic (optimized)
+// XPorter Popup — Logic (optimized, multi-mode)
 document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Elements ====================
     const popup = document.getElementById('popup');
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
     const usernameInput = document.getElementById('usernameInput');
+    const exportMode = document.getElementById('exportMode');
+    const outputFormat = document.getElementById('outputFormat');
+    const postsOnlyOptions = document.getElementById('postsOnlyOptions');
     const dateCheck = document.getElementById('dateCheck');
     const dateFields = document.getElementById('dateFields');
     const dateFrom = document.getElementById('dateFrom');
@@ -39,6 +42,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const autoExpireHours = document.getElementById('autoExpireHours');
     const autoExpireRow = document.getElementById('autoExpireRow');
 
+    // Settings tab — posts-only elements
+    const settingsPostsOnly = document.getElementById('settingsPostsOnly');
+
     // Language selector elements
     const langBtn = document.getElementById('langBtn');
     const langFlag = document.getElementById('langFlag');
@@ -46,8 +52,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const langDropdown = document.getElementById('langDropdown');
 
     // Cache values for updateUI — must be declared before any updateUI call
-    let lastTweetCount = 0;
-    let lastExpectedTweets = 0;
+    let lastItemCount = 0;
+    let lastExpectedItems = 0;
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
 
@@ -63,30 +69,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currentSettings = settingsResult?.settings || {};
 
     // ==================== Theme & Design ====================
-    // Apply saved theme (uses theme.js)
     initTheme(currentSettings.theme, themeIcon);
 
-    // Theme toggle (dark <-> light)
     themeToggle.addEventListener('click', async () => {
         currentSettings.theme = toggleTheme(themeIcon);
         await sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
     });
 
+    // ==================== Export Mode Switching ====================
+    function applyModeUI(mode) {
+        const isPostsMode = (mode === 'posts');
+        // Show/hide posts-only options in Home tab
+        postsOnlyOptions.classList.toggle('hidden', !isPostsMode);
+        // Show/hide posts-only settings in Settings tab
+        if (settingsPostsOnly) {
+            settingsPostsOnly.classList.toggle('hidden', !isPostsMode);
+        }
+    }
+
+    // Apply saved mode or default
+    if (currentSettings.exportMode) {
+        exportMode.value = currentSettings.exportMode;
+    }
+    applyModeUI(exportMode.value);
+
+    exportMode.addEventListener('change', () => {
+        applyModeUI(exportMode.value);
+        currentSettings.exportMode = exportMode.value;
+        sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
+    });
+
+    // Apply saved output format
+    if (currentSettings.outputFormat) {
+        outputFormat.value = currentSettings.outputFormat;
+    }
+    outputFormat.addEventListener('change', () => {
+        currentSettings.outputFormat = outputFormat.value;
+        sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
+    });
+
     // ==================== Language Selector ====================
-    // Auto-detect Chrome UI language on first launch; respect saved choice afterwards
     let currentLang = currentSettings.language || detectBrowserLanguage();
 
-    // If language was auto-detected (not saved yet), persist it immediately
-    // so auto-detection only happens once — on the very first launch
     if (!currentSettings.language) {
         currentSettings.language = currentLang;
         sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
     }
 
-    // Lazy-build flag: dropdown is built only on first click
     let dropdownBuilt = false;
 
-    // Build dropdown options (called lazily)
     function buildLangDropdown() {
         langDropdown.innerHTML = '';
         LANGUAGES.forEach(lang => {
@@ -103,22 +134,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         dropdownBuilt = true;
     }
 
-    // Update the language button display
     function updateLangButton(code) {
         const lang = LANGUAGES.find(l => l.code === code) || LANGUAGES[0];
         langFlag.textContent = lang.flag;
         langCode.textContent = code.toUpperCase();
     }
 
-    // Current translations cache (populated by applyLanguage)
     let currentTranslations = {};
 
-    // Apply translations to all data-i18n elements — single-pass optimization
     async function applyLanguage(code) {
         const t = await loadTranslations(code);
         currentTranslations = t;
 
-        // Single pass: translate all data-i18n, data-i18n-placeholder, data-i18n-title
+        // Single pass for all i18n attributes
         document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]').forEach(el => {
             const textKey = el.getAttribute('data-i18n');
             if (textKey && t[textKey] !== undefined) {
@@ -134,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // Update select options for quantity limit
+        // Update quantity limit options
         const options = quantityLimit.querySelectorAll('option');
         if (options.length >= 1) options[0].textContent = t.unlimited || 'Unlimited';
         if (options.length >= 2) options[1].textContent = `100 ${t.posts || 'posts'}`;
@@ -144,28 +172,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (options.length >= 6) options[5].textContent = `10,000 ${t.posts || 'posts'}`;
         if (options.length >= 7) options[6].textContent = t.custom || 'Custom';
 
-        // Update html lang attribute
         document.documentElement.lang = code;
     }
 
-    // Select a language
     async function selectLanguage(code) {
         currentLang = code;
         updateLangButton(code);
         await applyLanguage(code);
-        // Re-apply current export state to fix dynamic text overwritten by applyLanguage
         if (lastExportState) {
             updateUI(lastExportState);
         }
-        buildLangDropdown(); // rebuild to update active state
+        buildLangDropdown();
         closeLangDropdown();
 
-        // Save to settings
         currentSettings.language = code;
         await sendMessage({ type: 'SAVE_SETTINGS', settings: { ...currentSettings } });
     }
 
-    // Toggle dropdown
     function toggleLangDropdown() {
         const isOpen = !langDropdown.classList.contains('hidden');
         if (isOpen) {
@@ -176,13 +199,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function openLangDropdown() {
-        // Lazy-build on first open
         if (!dropdownBuilt) {
             buildLangDropdown();
         }
         langDropdown.classList.remove('hidden');
         langBtn.classList.add('active');
-        // Dynamically extend .popup min-height so glass background covers the dropdown
         requestAnimationFrame(() => {
             const dropdownRect = langDropdown.getBoundingClientRect();
             const popupRect = popup.getBoundingClientRect();
@@ -204,18 +225,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         toggleLangDropdown();
     });
 
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!langDropdown.classList.contains('hidden') && !e.target.closest('.lang-selector')) {
             closeLangDropdown();
         }
     });
 
-    // Initialize language (dropdown built lazily on first click)
     updateLangButton(currentLang);
     await applyLanguage(currentLang);
 
-    // Helper to get translated text for dynamic content
     function t(key) {
         return currentTranslations[key] || key;
     }
@@ -235,7 +253,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         includeRetweets.checked = currentSettings.includeRetweets !== false;
         includeReplies.checked = currentSettings.includeReplies !== false;
         const savedLimit = currentSettings.quantityLimit ?? 500;
-        // Check if saved limit matches a preset option
         const presetValues = ['0', '100', '500', '1000', '5000', '10000'];
         if (presetValues.includes(String(savedLimit))) {
             quantityLimit.value = String(savedLimit);
@@ -246,13 +263,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         cooldownMinutes.value = Math.round((currentSettings.cooldownDuration || 180000) / 60000);
         cooldownBatch.value = currentSettings.batchSize || 20;
-        // Auto-expire setting
         autoExpireEnabled.checked = currentSettings.autoExpireEnabled !== false;
         autoExpireHours.value = currentSettings.autoExpireHours || 4;
         autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
     }
 
-    // Show/hide custom quantity input based on select value
     quantityLimit.addEventListener('change', () => {
         if (quantityLimit.value === 'custom') {
             customQuantityRow.classList.remove('hidden');
@@ -263,13 +278,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveSettingsDebounced();
     });
 
-    // Toggle auto-expire hours visibility
     autoExpireEnabled.addEventListener('change', () => {
         autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
         saveSettingsDebounced();
     });
 
-    // Save settings on change
     const saveSettingsDebounced = debounce(async () => {
         let qLimit;
         if (quantityLimit.value === 'custom') {
@@ -288,6 +301,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cooldownDuration: (parseInt(cooldownMinutes.value) || 3) * 60000,
                 theme: document.body.classList.contains('light') ? 'light' : 'dark',
                 language: currentLang,
+                exportMode: exportMode.value,
+                outputFormat: outputFormat.value,
                 autoExpireEnabled: autoExpireEnabled.checked,
                 autoExpireHours: Math.max(1, Math.min(48, parseInt(autoExpireHours.value) || 4))
             }
@@ -304,12 +319,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         dateFields.classList.toggle('hidden', !dateCheck.checked);
     });
 
-    // Username helpers are in utils.js (extractUsernameFromInput, RESERVED_PATHS)
-
-    // Auto-clean input on paste or type (e.g. pasting a full URL)
+    // Auto-clean input on paste or type
     usernameInput.addEventListener('input', () => {
         const raw = usernameInput.value;
-        // Only auto-clean if it looks like a URL or @handle
         if (raw.includes('x.com/') || raw.includes('twitter.com/') || raw.startsWith('@')) {
             const cleaned = extractUsernameFromInput(raw);
             if (cleaned && cleaned !== raw) {
@@ -329,8 +341,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==================== Auto-fill Username from Active Tab ====================
-    // Run AFTER updateUI so stale export state doesn't overwrite the fresh tab URL.
-    // Only auto-fill when idle — never replace the username of an active/paused export.
     const isIdle = !status || status.status === 'idle' || !status.running;
     if (isIdle) {
         const activeTab = activeTabs[0];
@@ -340,12 +350,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 usernameInput.value = tabUsername;
             }
         } else if (!activeTab) {
-            // Fallback to stored username if tabs API failed
             const usernameResult = await sendMessage({ type: 'GET_USERNAME' });
             if (usernameResult?.username) {
                 usernameInput.value = usernameResult.username;
             }
         }
+    }
+
+    // ==================== Helper: mode-specific item label ====================
+    function itemLabel() {
+        const mode = exportMode.value;
+        if (mode === 'followers' || mode === 'verified_followers') return t('usersCollected') || 'users collected';
+        if (mode === 'following') return t('usersCollected') || 'users collected';
+        return t('postsCollected');
     }
 
     // ==================== Start Export ====================
@@ -359,11 +376,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
+            const mode = exportMode.value;
             const params = {
                 type: 'START_EXPORT',
                 username: username,
-                dateFrom: dateCheck.checked ? dateFrom.value : null,
-                dateTo: dateCheck.checked ? dateTo.value : null
+                exportMode: mode,
+                outputFormat: outputFormat.value,
+                dateFrom: (mode === 'posts' && dateCheck.checked) ? dateFrom.value : null,
+                dateTo: (mode === 'posts' && dateCheck.checked) ? dateTo.value : null
             };
 
             const result = await sendMessage(params);
@@ -372,7 +392,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            updateUI({ running: true, status: 'resolving_user', username, tweetCount: 0 });
+            updateUI({ running: true, status: 'resolving_user', username, tweetCount: 0, exportMode: mode });
         } catch (err) {
             alert('Export error: ' + err.message);
         }
@@ -384,26 +404,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUI({ running: false, status: 'stopped', tweetCount: parseInt(tweetCountEl.textContent) || 0 });
     });
 
-    // ==================== Download CSV ====================
+    // ==================== Download ====================
     downloadBtn.addEventListener('click', async () => {
         downloadBtn.disabled = true;
-        downloadBtn.querySelector('[data-i18n="downloadCsv"]').textContent = t('preparing');
-        const result = await sendMessage({ type: 'DOWNLOAD_CSV' });
+        downloadBtn.querySelector('[data-i18n="download"]').textContent = t('preparing');
+        const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: outputFormat.value });
         downloadBtn.disabled = false;
         if (result?.error) {
             alert(result.error);
         }
-        downloadBtn.querySelector('[data-i18n="downloadCsv"]').textContent = t('downloadCsv');
+        downloadBtn.querySelector('[data-i18n="download"]').textContent = t('download');
     });
 
     // ==================== Resume ====================
     resumeBtn.addEventListener('click', async () => {
-        // Update quantity limit before resuming
         const extraPosts = parseInt(resumeQuantity.value) || 100;
-        const currentCount = lastTweetCount || 0;
+        const currentCount = lastItemCount || 0;
         const newLimit = currentCount + extraPosts;
 
-        // Save the new limit to settings
         await sendMessage({
             type: 'SAVE_SETTINGS',
             settings: {
@@ -424,7 +442,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     newExportBtn.addEventListener('click', async () => {
         await sendMessage({ type: 'CLEAR_EXPORT' });
         updateUI({ running: false, status: 'idle' });
-        // Auto-fill username from current X page
         try {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab?.url) {
@@ -439,8 +456,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         usernameInput.focus();
     });
 
-    // ==================== UI Update Function ====================
-
     // ==================== Listen for Status Updates ====================
     chrome.runtime.onMessage.addListener((message) => {
         if (message.type === 'EXPORT_STATUS_UPDATE') {
@@ -448,48 +463,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // ==================== UI Update Function ====================
     function updateUI(state) {
-        // Cache the state for language switch re-apply
         lastExportState = { ...state };
 
         const isRunning = state.running;
         const status = state.status;
+        const mode = state.exportMode || exportMode.value;
 
-        // Update cached values only if present in state
+        // Update cached values
         if (state.tweetCount !== undefined && state.tweetCount !== null) {
-            lastTweetCount = state.tweetCount;
+            lastItemCount = state.tweetCount;
         }
-        if (state.expectedTweets) lastExpectedTweets = state.expectedTweets;
+        if (state.expectedTweets) lastExpectedItems = state.expectedTweets;
         if (state.quantityLimit !== undefined) lastQuantityLimit = state.quantityLimit;
 
-        const tweetCount = lastTweetCount;
+        const itemCount = lastItemCount;
+        const label = (mode === 'posts') ? t('postsCollected') : (t('usersCollected') || 'users collected');
 
-        // Show/hide elements based on state
+        // Show/hide elements
         startBtn.classList.toggle('hidden', isRunning || status === 'complete' || status === 'stopped');
         stopBtn.classList.toggle('hidden', !isRunning);
-        // Show download if we have tweets AND export is not actively running
-        downloadBtn.classList.toggle('hidden', !((status === 'complete' || status === 'stopped') && tweetCount > 0));
-        // Show resume on both stopped AND complete (user may want more posts)
+        downloadBtn.classList.toggle('hidden', !((status === 'complete' || status === 'stopped') && itemCount > 0));
         resumeRow.classList.toggle('hidden', !(status === 'stopped' || status === 'complete'));
         newExportBtn.classList.toggle('hidden', status !== 'complete' && status !== 'stopped' && status !== 'error');
         exportStatus.classList.toggle('hidden', status === 'idle');
         statusDetail.classList.remove('hidden');
 
+        // Lock mode selector during export
+        exportMode.disabled = isRunning || status === 'complete' || status === 'stopped';
+        outputFormat.disabled = isRunning;
+
         if (state.username) {
             usernameInput.value = state.username;
         }
 
-        // Calculate progress percentage
-        // Use quantityLimit as target if set, otherwise expectedTweets
-        const target = (lastQuantityLimit > 0) ? lastQuantityLimit : (lastExpectedTweets || 1000);
-        const progressPct = Math.min(100, Math.round(tweetCount / target * 100));
+        // Calculate progress
+        const target = (lastQuantityLimit > 0) ? lastQuantityLimit : (lastExpectedItems || 1000);
+        const progressPct = Math.min(100, Math.round(itemCount / target * 100));
 
-        // Helper to set status dot color
         function setDotColor(color) {
             statusIndicator.className = 'status-dot status-' + color;
         }
 
-        // Update status display
+        // Status-specific display
         switch (status) {
             case 'resolving_user':
                 statusText.textContent = `${t('lookingUp')} @${state.username}...`;
@@ -511,7 +528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setDotColor('yellow');
                 const seconds = Math.round((state.duration || 180000) / 1000);
                 statusMessage.textContent = `${t('cooldown')} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-                // Keep progress bar position — don't change it
                 progressFill.classList.remove('indeterminate');
                 progressFill.style.width = progressPct + '%';
                 break;
@@ -525,7 +541,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     setDotColor('red');
                     statusMessage.textContent = state.error;
                 }
-                // Keep progress bar position
                 progressFill.classList.remove('indeterminate');
                 progressFill.style.width = progressPct + '%';
                 break;
@@ -533,7 +548,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'retrying':
                 setDotColor('yellow');
                 statusMessage.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
-                // Keep progress bar position
                 progressFill.classList.remove('indeterminate');
                 progressFill.style.width = progressPct + '%';
                 break;
@@ -555,10 +569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
         }
 
-        // Update tweet count display (always use cached value)
-        tweetCountEl.innerHTML = `${Number(tweetCount).toLocaleString()} <span data-i18n="postsCollected">${t('postsCollected')}</span>`;
+        // Update count display
+        tweetCountEl.innerHTML = `${Number(itemCount).toLocaleString()} <span>${label}</span>`;
     }
-
-    // formatError uses the shared utils.js version with t() passed in
-    // (sendMessage, checkAuth, extractUsernameFromInput, debounce are global from utils.js)
 });

@@ -17,7 +17,6 @@
   "postsCollected": "gönderi toplandı",
   "startExporting": "Dışa Aktarmayı Başlat",
   "stop": "Durdur",
-  "downloadCsv": "CSV İndir",
   "resumeExport": "Devam",
   "morePosts": "daha fazla gönderi",
   "newExport": "Yeni Dışa Aktarma",
@@ -72,5 +71,13 @@
   "thenTryAgain": "sonra tekrar deneyin.",
   "autoExpireState": "Eski dışa aktarmaları otomatik sil",
   "autoExpireAfter": "Silme süresi",
-  "hours": "saat"
+  "hours": "saat",
+  "exportMode": "Dışa Aktarma Modu",
+  "modePosts": "📝 Gönderiler",
+  "modeFollowers": "👥 Takipçiler",
+  "modeFollowing": "➡️ Takip Edilenler",
+  "modeVerifiedFollowers": "✓ Doğrulanmış Takipçiler",
+  "outputFormat": "Çıktı Formatı",
+  "download": "İndir",
+  "usersCollected": "kullanıcı toplandı"
 }

@@ -17,7 +17,6 @@
   "postsCollected": "개 게시물 수집됨",
   "startExporting": "내보내기 시작",
   "stop": "중지",
-  "downloadCsv": "CSV 다운로드",
   "resumeExport": "재개",
   "morePosts": "추가 게시물",
   "newExport": "새 내보내기",
@@ -72,5 +71,13 @@
   "thenTryAgain": "그런 다음 다시 시도하세요.",
   "autoExpireState": "오래된 내보내기 자동 삭제",
   "autoExpireAfter": "삭제 시간",
-  "hours": "시간"
+  "hours": "시간",
+  "exportMode": "내보내기 모드",
+  "modePosts": "📝 게시물",
+  "modeFollowers": "👥 팔로워",
+  "modeFollowing": "➡️ 팔로잉",
+  "modeVerifiedFollowers": "✓ 인증된 팔로워",
+  "outputFormat": "출력 형식",
+  "download": "다운로드",
+  "usersCollected": "수집된 사용자"
 }

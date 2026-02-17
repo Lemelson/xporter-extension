@@ -17,7 +17,6 @@
   "postsCollected": "पोस्ट एकत्रित",
   "startExporting": "निर्यात शुरू करें",
   "stop": "रोकें",
-  "downloadCsv": "CSV डाउनलोड करें",
   "resumeExport": "जारी रखें",
   "morePosts": "और पोस्ट",
   "newExport": "नया निर्यात",
@@ -72,5 +71,13 @@
   "thenTryAgain": "फिर पुनः प्रयास करें।",
   "autoExpireState": "पुराने एक्सपोर्ट स्वतः हटाएं",
   "autoExpireAfter": "इसके बाद हटाएं",
-  "hours": "घंटे"
+  "hours": "घंटे",
+  "exportMode": "निर्यात मोड",
+  "modePosts": "📝 पोस्ट",
+  "modeFollowers": "👥 फॉलोअर्स",
+  "modeFollowing": "➡️ फॉलोइंग",
+  "modeVerifiedFollowers": "✓ सत्यापित फॉलोअर्स",
+  "outputFormat": "आउटपुट प्रारूप",
+  "download": "डाउनलोड",
+  "usersCollected": "उपयोगकर्ता एकत्र"
 }
