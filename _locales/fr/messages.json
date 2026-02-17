@@ -1,0 +1,10 @@
+{
+    "extName": {
+        "message": "XPorter — Export X/Twitter Gratuit : Posts, Abonnés en CSV, Excel, JSON",
+        "description": "Extension name for French CWS"
+    },
+    "extDescription": {
+        "message": "Exportez publications, abonnés, abonnements et abonnés vérifiés de n'importe quel profil X (Twitter). Illimité, gratuit, 100% privé. CSV, JSON, Excel (XLSX). 14 langues.",
+        "description": "Extension description for French CWS"
+    }
+}

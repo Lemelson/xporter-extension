@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "XPorter - Export X Posts to CSV",
+  "name": "__MSG_extName__",
   "version": "1.0.0",
-  "description": "Export tweets from any X (Twitter) account to CSV. Free & unlimited.",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "permissions": [
     "cookies",
     "activeTab",
