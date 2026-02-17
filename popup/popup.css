@@ -493,6 +493,225 @@ body.light .footer {
   margin-top: 6px;
 }
 
+/* ========== Export History ========== */
+.history-field {
+  margin-top: 4px;
+}
+
+.history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  box-shadow: var(--glass-inner-glow);
+}
+
+.history-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--glass-border-strong);
+}
+
+.history-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-chevron {
+  transition: transform 0.3s ease;
+  opacity: 0.6;
+}
+
+.history-chevron.open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.history-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 16px 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* History card */
+.history-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  box-shadow: var(--glass-inner-glow);
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.history-card:hover {
+  border-color: var(--glass-border-strong);
+}
+
+.history-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+}
+
+.history-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.history-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-handle {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.history-meta .history-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: rgba(96, 184, 255, 0.15);
+  color: var(--accent);
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.history-dl-btn {
+  background: rgba(0, 186, 124, 0.2);
+  border: 1px solid rgba(0, 186, 124, 0.4);
+  color: var(--success);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.history-dl-btn:hover {
+  background: rgba(0, 186, 124, 0.35);
+  transform: scale(1.08);
+}
+
+.history-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+  opacity: 0;
+}
+
+.history-card:hover .history-del-btn {
+  opacity: 1;
+}
+
+.history-del-btn:hover {
+  color: var(--danger);
+  background: rgba(244, 33, 46, 0.1);
+}
+
+.history-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.history-clear-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+
 /* Glass auth warning */
 .auth-warning {
   background: rgba(244, 33, 46, 0.08);

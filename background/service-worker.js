@@ -70,6 +70,17 @@ async function handleMessage(message, sender) {
             }
             return { success: true };
 
+        case 'GET_EXPORT_HISTORY':
+            return { history: await XPorterStorage.loadExportHistory() };
+
+        case 'DELETE_HISTORY_ENTRY':
+            await XPorterStorage.deleteExportHistoryEntry(message.id);
+            return { success: true };
+
+        case 'CLEAR_HISTORY':
+            await XPorterStorage.clearExportHistory();
+            return { success: true };
+
         default:
             return { error: 'Unknown message type' };
     }
@@ -194,6 +205,18 @@ async function runExportLoop() {
         currentExport.status = 'complete';
         currentExport.completedAt = Date.now();
         await saveCurrentState();
+
+        // Save to export history
+        const ui = currentExport.userInfo || {};
+        await XPorterStorage.saveExportHistory({
+            username: ui.screenName || currentExport.username,
+            displayName: ui.name || currentExport.username,
+            profileImageUrl: ui.profileImageUrl || '',
+            exportMode: currentExport.exportMode,
+            itemCount: currentExport.tweetCount,
+            outputFormat: currentExport.outputFormat || 'csv',
+            completedAt: Date.now()
+        });
 
         broadcastStatus({
             running: false,

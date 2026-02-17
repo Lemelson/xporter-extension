@@ -372,6 +372,7 @@ async function getUserByScreenName(screenName) {
     id: userResult.rest_id,
     name: core.name || legacy.name,
     screenName: core.screen_name || legacy.screen_name,
+    profileImageUrl: (legacy.profile_image_url_https || '').replace('_normal', '_200x200'),
     isProtected: legacy.protected || false,
     tweetCount: legacy.statuses_count,
     followersCount: legacy.followers_count || 0,

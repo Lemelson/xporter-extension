@@ -566,4 +566,159 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Update count display
         tweetCountEl.innerHTML = `${Number(itemCount).toLocaleString()} <span>${label}</span>`;
     }
+
+    // ==================== Export History ====================
+    const historyToggle = document.getElementById('historyToggle');
+    const historyChevron = document.getElementById('historyChevron');
+    const historyList = document.getElementById('historyList');
+    const historyEmpty = document.getElementById('historyEmpty');
+
+    historyToggle.addEventListener('click', async () => {
+        const isOpen = !historyList.classList.contains('hidden');
+        historyList.classList.toggle('hidden');
+        historyChevron.classList.toggle('open');
+        if (!isOpen) {
+            await loadAndRenderHistory();
+        }
+    });
+
+    async function loadAndRenderHistory() {
+        const result = await sendMessage({ type: 'GET_EXPORT_HISTORY' });
+        const history = result?.history || [];
+        renderHistory(history);
+    }
+
+    function renderHistory(history) {
+        // Clear existing cards (preserve empty placeholder)
+        historyList.querySelectorAll('.history-card, .history-clear-btn').forEach(el => el.remove());
+
+        if (history.length === 0) {
+            historyEmpty.classList.remove('hidden');
+            return;
+        }
+        historyEmpty.classList.add('hidden');
+
+        history.forEach((entry, index) => {
+            const card = document.createElement('div');
+            card.className = 'history-card';
+            card.dataset.id = entry.id;
+
+            // Avatar
+            if (entry.profileImageUrl) {
+                const avatar = document.createElement('img');
+                avatar.className = 'history-avatar';
+                avatar.src = entry.profileImageUrl;
+                avatar.alt = entry.displayName || entry.username;
+                avatar.onerror = () => {
+                    // Replace broken image with placeholder
+                    const ph = document.createElement('div');
+                    ph.className = 'history-avatar-placeholder';
+                    ph.textContent = (entry.displayName || entry.username || '?')[0].toUpperCase();
+                    avatar.replaceWith(ph);
+                };
+                card.appendChild(avatar);
+            } else {
+                const ph = document.createElement('div');
+                ph.className = 'history-avatar-placeholder';
+                ph.textContent = (entry.displayName || entry.username || '?')[0].toUpperCase();
+                card.appendChild(ph);
+            }
+
+            // Info block
+            const info = document.createElement('div');
+            info.className = 'history-info';
+
+            const name = document.createElement('div');
+            name.className = 'history-name';
+            name.textContent = entry.displayName || entry.username;
+            info.appendChild(name);
+
+            const handle = document.createElement('div');
+            handle.className = 'history-handle';
+            handle.textContent = '@' + (entry.username || '');
+            info.appendChild(handle);
+
+            const meta = document.createElement('div');
+            meta.className = 'history-meta';
+
+            const badge = document.createElement('span');
+            badge.className = 'history-badge';
+            badge.textContent = (entry.exportMode || 'posts').replace('_', ' ');
+            meta.appendChild(badge);
+
+            const count = document.createTextNode(` · ${Number(entry.itemCount || 0).toLocaleString()} · ${(entry.outputFormat || 'csv').toUpperCase()}`);
+            meta.appendChild(count);
+
+            // Date
+            if (entry.completedAt) {
+                const dateStr = new Date(entry.completedAt).toLocaleDateString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                });
+                const dateSpan = document.createTextNode(` · ${dateStr}`);
+                meta.appendChild(dateSpan);
+            }
+            info.appendChild(meta);
+            card.appendChild(info);
+
+            // Actions
+            const actions = document.createElement('div');
+            actions.className = 'history-actions';
+
+            // Download button (only for the most recent / index 0)
+            if (index === 0) {
+                const dlBtn = document.createElement('button');
+                dlBtn.className = 'history-dl-btn';
+                dlBtn.title = 'Download';
+                dlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+                dlBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    dlBtn.disabled = true;
+                    const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: entry.outputFormat || 'csv' });
+                    dlBtn.disabled = false;
+                    if (result?.error) {
+                        alert(result.error);
+                    }
+                });
+                actions.appendChild(dlBtn);
+            }
+
+            // Delete button
+            const delBtn = document.createElement('button');
+            delBtn.className = 'history-del-btn';
+            delBtn.title = 'Remove';
+            delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            delBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await sendMessage({ type: 'DELETE_HISTORY_ENTRY', id: entry.id });
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(20px)';
+                card.style.transition = 'opacity 0.25s, transform 0.25s';
+                setTimeout(() => {
+                    card.remove();
+                    // Check if empty
+                    if (!historyList.querySelector('.history-card')) {
+                        historyEmpty.classList.remove('hidden');
+                        const clearBtn = historyList.querySelector('.history-clear-btn');
+                        if (clearBtn) clearBtn.remove();
+                    }
+                }, 250);
+            });
+            actions.appendChild(delBtn);
+            card.appendChild(actions);
+
+            historyList.appendChild(card);
+        });
+
+        // Clear all button
+        if (history.length > 1) {
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'history-clear-btn';
+            clearBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear all';
+            clearBtn.addEventListener('click', async () => {
+                await sendMessage({ type: 'CLEAR_HISTORY' });
+                renderHistory([]);
+            });
+            historyList.appendChild(clearBtn);
+        }
+    }
 });

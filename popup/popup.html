@@ -279,6 +279,29 @@
           <span data-i18n="hours">hours</span>
         </div>
       </div>
+      <!-- Export History (collapsible) -->
+      <div class="field history-field">
+        <button class="history-toggle" id="historyToggle">
+          <span class="history-toggle-left">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span data-i18n="exportHistory">Export History</span>
+          </span>
+          <svg class="icon history-chevron" id="historyChevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="history-list hidden" id="historyList">
+          <div class="history-empty" id="historyEmpty">
+            <span data-i18n="noExportsYet">No exports yet</span>
+          </div>
+          <!-- cards rendered dynamically by popup.js -->
+        </div>
+      </div>
     </div>
 
     <div class="tab-content" id="tab-about">

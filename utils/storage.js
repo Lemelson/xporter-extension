@@ -6,8 +6,11 @@ const STORAGE_KEYS = {
     EXPORT_STATE: 'xporter_export_state',
     SETTINGS: 'xporter_settings',
     USERNAME: 'xporter_detected_username',
-    TWEETS_PREFIX: 'xporter_tweets_batch_'
+    TWEETS_PREFIX: 'xporter_tweets_batch_',
+    EXPORT_HISTORY: 'xporter_export_history'
 };
+
+const MAX_HISTORY_ENTRIES = 20;
 
 // Use config constant if available, otherwise default
 const MAX_TWEETS_PER_BATCH = (typeof XPORTER_CONFIG !== 'undefined')
@@ -162,6 +165,48 @@ async function clearExportState() {
     }
 }
 
+// ==================== Export History ====================
+
+/**
+ * Save a completed export to history (metadata only, max 20 entries FIFO)
+ */
+async function saveExportHistory(entry) {
+    const history = await loadExportHistory();
+    history.unshift({
+        ...entry,
+        id: Date.now()
+    });
+    // Keep only the most recent entries
+    while (history.length > MAX_HISTORY_ENTRIES) {
+        history.pop();
+    }
+    return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+}
+
+/**
+ * Load export history array
+ */
+async function loadExportHistory() {
+    const result = await safeGet(STORAGE_KEYS.EXPORT_HISTORY);
+    return result[STORAGE_KEYS.EXPORT_HISTORY] || [];
+}
+
+/**
+ * Delete a single history entry by id
+ */
+async function deleteExportHistoryEntry(id) {
+    const history = await loadExportHistory();
+    const filtered = history.filter(e => e.id !== id);
+    return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: filtered });
+}
+
+/**
+ * Clear all export history
+ */
+async function clearExportHistory() {
+    return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: [] });
+}
+
 // ==================== Settings ====================
 
 /**
@@ -215,6 +260,8 @@ if (typeof globalThis !== 'undefined') {
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,
+        saveExportHistory, loadExportHistory,
+        deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH
     };
