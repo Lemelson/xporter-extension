@@ -65,24 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function applyTranslations() {
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            if (currentTranslations[key] !== undefined) {
-                el.textContent = currentTranslations[key];
-            }
-        });
-        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-            const key = el.getAttribute('data-i18n-placeholder');
-            if (currentTranslations[key] !== undefined) {
-                el.placeholder = currentTranslations[key];
-            }
-        });
-        document.querySelectorAll('[data-i18n-title]').forEach(el => {
-            const key = el.getAttribute('data-i18n-title');
-            if (currentTranslations[key] !== undefined) {
-                el.title = currentTranslations[key];
-            }
-        });
+        applyI18nToDOM(currentTranslations);
         // Update select options for quantity limit
         const options = quantityLimit.querySelectorAll('option');
         const posts = currentTranslations.posts || 'posts';
@@ -322,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     statusDot.className = 'status-dot red';
                     statusMsg.textContent = `${state.error} — retry in ${Math.round(state.retryIn / 1000)}s`;
                 } else {
-                    const errorMsg = formatError(state.error);
+                    const errorMsg = formatError(state.error, t);
                     if (state.error === 'NOT_LOGGED_IN') {
                         showState('auth');
                     } else {
@@ -424,40 +407,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==================== Helpers ====================
-    function sendMessage(msg) {
-        return new Promise((resolve) => {
-            chrome.runtime.sendMessage(msg, (response) => {
-                resolve(response || {});
-            });
-        });
-    }
-
-    function formatError(error) {
-        const errorMessages = {
-            'NOT_LOGGED_IN': 'Please log in to x.com first',
-            'USER_NOT_FOUND': 'User not found — check the username',
-            'USER_SUSPENDED': 'This account is suspended',
-            'USER_UNAVAILABLE': 'This account is unavailable',
-            'ACCOUNT_PRIVATE': 'This account is private',
-            'AUTH_ERROR': 'Authentication failed — please refresh x.com and try again',
-            'RATE_LIMITED': 'Rate limited by X — please wait',
-            'MAX_RETRIES_EXCEEDED': 'Maximum retries exceeded — please try again later',
-            'STALE_QUERY_ID': 'X API changed — retrying with fresh data...',
-            'ENDPOINT_DISCOVERY_FAILED': 'Could not connect to X API — make sure x.com is accessible'
-        };
-        return errorMessages[error] || error;
-    }
-
-    function debounce(fn, ms) {
-        let timer;
-        const debounced = (...args) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), ms);
-        };
-        debounced.flush = () => {
-            clearTimeout(timer);
-            return fn();
-        };
-        return debounced;
-    }
+    // sendMessage, formatError, debounce — loaded from /utils/shared.js
 });

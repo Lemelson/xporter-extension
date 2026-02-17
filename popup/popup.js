@@ -146,21 +146,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const t = await loadTranslations(code);
         currentTranslations = t;
 
-        // Single pass for all i18n attributes
-        document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]').forEach(el => {
-            const textKey = el.getAttribute('data-i18n');
-            if (textKey && t[textKey] !== undefined) {
-                el.textContent = t[textKey];
-            }
-            const placeholderKey = el.getAttribute('data-i18n-placeholder');
-            if (placeholderKey && t[placeholderKey] !== undefined) {
-                el.placeholder = t[placeholderKey];
-            }
-            const titleKey = el.getAttribute('data-i18n-title');
-            if (titleKey && t[titleKey] !== undefined) {
-                el.title = t[titleKey];
-            }
-        });
+        // Apply all data-i18n attributes via shared utility
+        applyI18nToDOM(t);
 
         // Update quantity limit options
         const options = quantityLimit.querySelectorAll('option');

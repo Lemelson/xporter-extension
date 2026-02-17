@@ -4,6 +4,7 @@
 // Import utility scripts
 importScripts(
     '/utils/config.js',
+    '/utils/api-features.js',
     '/utils/api.js',
     '/utils/rateLimit.js',
     '/utils/csv.js',
@@ -120,7 +121,7 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
 
     // Start the export process (non-blocking)
     runExportLoop().catch(err => {
-        console.error('Export loop error:', err.message);
+        XLog.error('Export loop error:', err.message);
         if (currentExport) {
             currentExport.running = false;
             currentExport.status = 'error';
@@ -451,7 +452,7 @@ async function resumeExport() {
     };
 
     runExportLoop().catch(err => {
-        console.error('Resume export error:', err);
+        XLog.error('Resume export error:', err);
         if (currentExport) {
             currentExport.running = false;
             currentExport.status = 'error';
@@ -528,9 +529,7 @@ async function downloadExport(format) {
     const mode = state?.exportMode || 'posts';
     format = format || state?.outputFormat || 'csv';
 
-    // Determine headers based on mode
     const isUsers = (mode !== 'posts');
-
     let content, mimeType, extension;
 
     if (format === 'json') {
@@ -538,21 +537,16 @@ async function downloadExport(format) {
         mimeType = 'application/json;charset=utf-8;';
         extension = 'json';
     } else if (format === 'xlsx') {
-        content = generateSimpleXLSX(allItems, isUsers);
+        content = XPorterCSV.generateSimpleXLSX(allItems, isUsers);
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         extension = 'xlsx';
     } else {
-        // CSV (default)
-        if (isUsers) {
-            content = generateUsersCSV(allItems);
-        } else {
-            content = XPorterCSV.generateCSV(allItems);
-        }
+        content = XPorterCSV.generateCSV(allItems, isUsers);
         mimeType = 'text/csv;charset=utf-8;';
         extension = 'csv';
     }
 
-    const filename = generateExportFilename(username, mode, extension);
+    const filename = XPorterCSV.generateExportFilename(username, mode, extension);
     const blob = new Blob([content], { type: mimeType });
     const reader = new FileReader();
 
@@ -568,99 +562,6 @@ async function downloadExport(format) {
         };
         reader.readAsDataURL(blob);
     });
-}
-
-/**
- * Generate CSV for user data (followers/following)
- */
-function generateUsersCSV(users) {
-    const headers = [
-        'id', 'name', 'username', 'bio', 'location', 'url',
-        'followers_count', 'following_count', 'tweet_count', 'listed_count',
-        'verified', 'protected', 'created_at', 'profile_image_url', 'profile_url'
-    ];
-
-    let csv = headers.join(',') + '\n';
-
-    for (const user of users) {
-        const row = headers.map(h => {
-            let val = user[h] ?? '';
-            val = String(val);
-            if (val.includes(',') || val.includes('"') || val.includes('\n') || val.includes('\r')) {
-                val = '"' + val.replace(/"/g, '""') + '"';
-            }
-            return val;
-        });
-        csv += row.join(',') + '\n';
-    }
-
-    return '\uFEFF' + csv; // BOM for Excel
-}
-
-/**
- * Generate a simple XLSX file (XML-based SpreadsheetML) — no external deps
- */
-function generateSimpleXLSX(items, isUsers) {
-    const headers = isUsers
-        ? ['id', 'name', 'username', 'bio', 'location', 'url', 'followers_count', 'following_count', 'tweet_count', 'listed_count', 'verified', 'protected', 'created_at', 'profile_image_url', 'profile_url']
-        : ['id', 'text', 'tweet_url', 'language', 'type', 'author_name', 'author_username', 'view_count', 'bookmark_count', 'favorite_count', 'retweet_count', 'reply_count', 'quote_count', 'created_at', 'source', 'hashtags', 'urls', 'media_type', 'media_urls'];
-
-    // Generate XML Spreadsheet (compatible with Excel, LibreOffice, Google Sheets)
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<?mso-application progid="Excel.Sheet"?>\n';
-    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
-    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
-    xml += '<Worksheet ss:Name="Export">\n<Table>\n';
-
-    // Header row
-    xml += '<Row>';
-    for (const h of headers) {
-        xml += `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`;
-    }
-    xml += '</Row>\n';
-
-    // Data rows
-    for (const item of items) {
-        xml += '<Row>';
-        for (const h of headers) {
-            const val = String(item[h] ?? '');
-            const isNum = !isNaN(val) && val !== '' && !val.includes(' ');
-            xml += `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(val)}</Data></Cell>`;
-        }
-        xml += '</Row>\n';
-    }
-
-    xml += '</Table>\n</Worksheet>\n</Workbook>';
-    return xml;
-}
-
-function escapeXml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-/**
- * Generate filename: XPorter_{username}_{mode}_{timestamp}.{ext}
- */
-function generateExportFilename(username, mode, ext) {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const timestamp = [
-        now.getFullYear(),
-        pad(now.getMonth() + 1),
-        pad(now.getDate()),
-        '_',
-        pad(now.getHours()),
-        pad(now.getMinutes()),
-        pad(now.getSeconds())
-    ].join('');
-
-    const modeLabel = mode === 'posts' ? 'posts'
-        : mode === 'followers' ? 'followers'
-            : mode === 'following' ? 'following'
-                : mode === 'verified_followers' ? 'verified_followers'
-                    : mode;
-
-    return `XPorter_${username}_${modeLabel}_${timestamp}.${ext}`;
 }
 
 // ==================== Helpers ====================
@@ -703,10 +604,18 @@ function broadcastStatus(event) {
 chrome.runtime.onStartup.addListener(async () => {
     const state = await XPorterStorage.loadExportState();
     if (state && state.running) {
-        console.log('XPorter: Resuming interrupted export...');
+        XLog.log('Resuming interrupted export...');
         state.running = false;
         state.status = 'stopped';
         await XPorterStorage.saveExportState(state);
+    }
+
+    // Pre-discover endpoints in background so first export is fast
+    try {
+        await XPorterAPI.discoverEndpoints();
+        XLog.log('Endpoints pre-discovered on startup');
+    } catch (e) {
+        XLog.warn('Pre-discovery on startup failed (will retry on export):', e.message);
     }
 });
 
@@ -724,5 +633,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
             exportMode: 'posts',
             outputFormat: 'csv'
         });
+    }
+
+    // Pre-discover endpoints on install/update
+    try {
+        await XPorterAPI.discoverEndpoints();
+        XLog.log('Endpoints pre-discovered on install/update');
+    } catch (e) {
+        XLog.warn('Pre-discovery on install failed:', e.message);
     }
 });

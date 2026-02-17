@@ -103,11 +103,13 @@ async function loadExportState() {
  * Save a batch of tweets to storage (with quota check)
  */
 async function saveTweetBatch(batchIndex, tweets) {
-    // Check quota before writing
-    const { isWarning, percentUsed } = await checkStorageQuota();
-    if (isWarning) {
-        const log = (typeof XLog !== 'undefined') ? XLog : console;
-        log.warn(`Storage at ${Math.round(percentUsed * 100)}% — tweet batch ${batchIndex} may fail`);
+    // Check quota every 10 batches to reduce overhead
+    if (batchIndex % 10 === 0) {
+        const { isWarning, percentUsed } = await checkStorageQuota();
+        if (isWarning) {
+            const log = (typeof XLog !== 'undefined') ? XLog : console;
+            log.warn(`Storage at ${Math.round(percentUsed * 100)}% — tweet batch ${batchIndex} may fail`);
+        }
     }
     const key = STORAGE_KEYS.TWEETS_PREFIX + batchIndex;
     return safeSet({ [key]: tweets });
@@ -126,10 +128,10 @@ async function loadAllTweets() {
     }
 
     const result = await safeGet(keys);
-    let allTweets = [];
+    const allTweets = [];
     for (let i = 0; i < state.totalBatches; i++) {
         const batch = result[STORAGE_KEYS.TWEETS_PREFIX + i] || [];
-        allTweets = allTweets.concat(batch);
+        allTweets.push(...batch);
     }
 
     return allTweets;

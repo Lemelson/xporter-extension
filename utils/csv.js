@@ -1,41 +1,111 @@
-// XPorter — CSV Generator
-// Generates properly escaped CSV with BOM for Excel Unicode support
+// XPorter — Export Format Generator
+// Single source of truth for CSV, XLSX, and JSON export generation.
+// Used by service-worker.js via importScripts.
+
+// ==================== Header Definitions ====================
+
+const POSTS_HEADERS = [
+    'id', 'text', 'tweet_url', 'language', 'type',
+    'author_name', 'author_username', 'view_count',
+    'bookmark_count', 'favorite_count', 'retweet_count',
+    'reply_count', 'quote_count', 'created_at', 'source',
+    'hashtags', 'urls', 'media_type', 'media_urls'
+];
+
+const USERS_HEADERS = [
+    'id', 'name', 'username', 'bio', 'location', 'url',
+    'followers_count', 'following_count', 'tweet_count', 'listed_count',
+    'verified', 'protected', 'created_at', 'profile_image_url', 'profile_url'
+];
+
+// ==================== CSV ====================
 
 /**
- * Generate CSV string from array of tweet objects
+ * Escape a single CSV value according to RFC 4180.
  */
-function generateCSV(tweets) {
-    const headers = [
-        'id', 'text', 'tweet_url', 'language', 'type',
-        'author_name', 'author_username', 'view_count',
-        'bookmark_count', 'favorite_count', 'retweet_count',
-        'reply_count', 'quote_count', 'created_at', 'source',
-        'hashtags', 'urls', 'media_type', 'media_urls'
-    ];
-
-    let csv = headers.join(',') + '\n';
-
-    for (const tweet of tweets) {
-        const row = headers.map(h => {
-            let val = tweet[h] ?? '';
-            val = String(val);
-            // Escape: if value contains comma, quote, or newline — wrap in quotes
-            if (val.includes(',') || val.includes('"') || val.includes('\n') || val.includes('\r')) {
-                val = '"' + val.replace(/"/g, '""') + '"';
-            }
-            return val;
-        });
-        csv += row.join(',') + '\n';
+function escapeCSVValue(val) {
+    val = String(val ?? '');
+    if (val.includes(',') || val.includes('"') || val.includes('\n') || val.includes('\r')) {
+        return '"' + val.replace(/"/g, '""') + '"';
     }
-
-    // BOM for correct Unicode display in Excel
-    return '\uFEFF' + csv;
+    return val;
 }
 
 /**
- * Generate filename for the CSV export
+ * Generate CSV string from an array of objects.
+ * @param {Array} items - Array of data objects
+ * @param {boolean} isUsers - true for followers/following, false for posts
+ * @returns {string} CSV with BOM prefix for Excel compatibility
  */
-function generateFilename(username) {
+function generateCSV(items, isUsers = false) {
+    const headers = isUsers ? USERS_HEADERS : POSTS_HEADERS;
+    let csv = headers.join(',') + '\n';
+
+    for (const item of items) {
+        const row = headers.map(h => escapeCSVValue(item[h]));
+        csv += row.join(',') + '\n';
+    }
+
+    return '\uFEFF' + csv; // BOM for correct Unicode in Excel
+}
+
+// ==================== XLSX (XML SpreadsheetML) ====================
+
+/**
+ * Escape XML special characters.
+ */
+function escapeXml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Generate a simple XLSX file (XML-based SpreadsheetML) — no external deps.
+ * Compatible with Excel, LibreOffice, and Google Sheets.
+ * @param {Array} items - Array of data objects
+ * @param {boolean} isUsers - true for followers/following, false for posts
+ * @returns {string} XML SpreadsheetML string
+ */
+function generateSimpleXLSX(items, isUsers = false) {
+    const headers = isUsers ? USERS_HEADERS : POSTS_HEADERS;
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+    xml += '<Worksheet ss:Name="Export">\n<Table>\n';
+
+    // Header row
+    xml += '<Row>';
+    for (const h of headers) {
+        xml += `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`;
+    }
+    xml += '</Row>\n';
+
+    // Data rows
+    for (const item of items) {
+        xml += '<Row>';
+        for (const h of headers) {
+            const val = String(item[h] ?? '');
+            const isNum = !isNaN(val) && val !== '' && !val.includes(' ');
+            xml += `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(val)}</Data></Cell>`;
+        }
+        xml += '</Row>\n';
+    }
+
+    xml += '</Table>\n</Worksheet>\n</Workbook>';
+    return xml;
+}
+
+// ==================== Filename ====================
+
+/**
+ * Generate export filename: XPorter_{username}_{mode}_{timestamp}.{ext}
+ * @param {string} username
+ * @param {string} mode - 'posts', 'followers', 'following', 'verified_followers'
+ * @param {string} ext - file extension
+ * @returns {string}
+ */
+function generateExportFilename(username, mode, ext) {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = [
@@ -48,17 +118,18 @@ function generateFilename(username) {
         pad(now.getSeconds())
     ].join('');
 
-    return `XPorter_${username}_${timestamp}.csv`;
+    return `XPorter_${username}_${mode}_${timestamp}.${ext}`;
 }
 
-/**
- * Create a downloadable blob URL from CSV string
- */
-function createCSVBlobUrl(csvString) {
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    return URL.createObjectURL(blob);
-}
+// ==================== Global Export ====================
 
 if (typeof globalThis !== 'undefined') {
-    globalThis.XPorterCSV = { generateCSV, generateFilename, createCSVBlobUrl };
+    globalThis.XPorterCSV = {
+        generateCSV,
+        generateSimpleXLSX,
+        generateExportFilename,
+        escapeXml,
+        POSTS_HEADERS,
+        USERS_HEADERS
+    };
 }
