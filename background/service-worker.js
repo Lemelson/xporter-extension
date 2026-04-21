@@ -285,6 +285,8 @@ async function _fetchPostsLoop() {
                 const tweetDate = new Date(tweet.created_at);
                 if (currentExport.dateTo && tweetDate > currentExport.dateTo) continue;
                 if (currentExport.dateFrom && tweetDate < currentExport.dateFrom) {
+                    // Pinned tweets can be arbitrarily old — skip without ending pagination
+                    if (tweet.is_pinned) continue;
                     hasMore = false;
                     break;
                 }

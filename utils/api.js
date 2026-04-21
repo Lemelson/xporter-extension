@@ -593,7 +593,10 @@ function parseTimelineResponse(data) {
     // Handle pinned tweet entry
     if (instruction.type === 'TimelinePinEntry' && instruction.entry) {
       const pinned = extractTweetResult(instruction.entry);
-      if (pinned) tweets.push(pinned);
+      if (pinned) {
+        pinned.is_pinned = true;
+        tweets.push(pinned);
+      }
     }
 
     const entries = instruction.entries || [];
