@@ -50,12 +50,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const langFlag = document.getElementById('langFlag');
     const langCode = document.getElementById('langCode');
     const langDropdown = document.getElementById('langDropdown');
+    const extensionVersion = document.getElementById('extensionVersion');
 
     // Cache values for updateUI — must be declared before any updateUI call
     let lastItemCount = 0;
     let lastExpectedItems = 0;
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
+
+    if (extensionVersion && chrome.runtime?.getManifest) {
+        extensionVersion.textContent = `v${chrome.runtime.getManifest().version}`;
+    }
 
     // ==================== Parallel Init ====================
     // Fire all independent async requests at once instead of sequentially

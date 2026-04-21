@@ -95,6 +95,12 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
 
     const settings = await XPorterStorage.loadSettings();
     const mode = exportMode || 'posts';
+    const normalizedDateFrom = (mode === 'posts') ? normalizeDateBoundary(dateFrom, 'start') : null;
+    const normalizedDateTo = (mode === 'posts') ? normalizeDateBoundary(dateTo, 'end') : null;
+
+    if (normalizedDateFrom && normalizedDateTo && normalizedDateFrom > normalizedDateTo) {
+        return { error: 'INVALID_DATE_RANGE' };
+    }
 
     // Initialize rate limiter with current settings
     rateLimiter = new RateLimitManager({
@@ -115,8 +121,8 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
         username: username,
         exportMode: mode,
         outputFormat: outputFormat || 'csv',
-        dateFrom: (mode === 'posts' && dateFrom) ? new Date(dateFrom) : null,
-        dateTo: (mode === 'posts' && dateTo) ? new Date(dateTo) : null,
+        dateFrom: normalizedDateFrom,
+        dateTo: normalizedDateTo,
         settings: settings,
         tweetCount: 0, // used for both tweets and users (item count)
         totalBatches: 0,
@@ -258,15 +264,17 @@ async function _fetchPostsLoop() {
             break;
         }
 
+        const requestCursor = currentExport.cursor;
         const result = await rateLimiter.executeWithRateLimit(async () => {
             return await XPorterAPI.fetchUserTweets(
                 currentExport.userId,
-                currentExport.cursor
+                requestCursor
             );
         });
 
         if (!result.tweets || result.tweets.length === 0) {
-            emptyPages++;
+            const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
+            emptyPages = cursorAdvanced ? 0 : (emptyPages + 1);
             if (emptyPages >= 3) {
                 hasMore = false;
                 break;
@@ -350,6 +358,19 @@ async function _fetchPostsLoop() {
             exportMode: currentExport.exportMode
         });
     }
+}
+
+function normalizeDateBoundary(dateValue, boundary) {
+    if (!dateValue) return null;
+
+    const normalized = new Date(`${dateValue}T00:00:00.000Z`);
+    if (isNaN(normalized.getTime())) return null;
+
+    if (boundary === 'end') {
+        normalized.setUTCHours(23, 59, 59, 999);
+    }
+
+    return normalized;
 }
 
 // ==================== Users (Followers/Following) Fetch Loop ====================
