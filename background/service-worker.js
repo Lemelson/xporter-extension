@@ -275,8 +275,10 @@ async function _fetchPostsLoop() {
             emptyPages = 0;
         }
 
-        // Track oldest non-pinned tweet date in this batch for pagination decision
-        let oldestNonPinnedDate = null;
+        // Track newest non-pinned tweet date in this batch for pagination decision.
+        // Using "newest" (not "oldest") makes us robust against out-of-order old items
+        // such as reply-context tweets embedded in profile-conversation threads.
+        let newestNonPinnedDate = null;
 
         // Process tweets
         for (const tweet of (result.tweets || [])) {
@@ -288,8 +290,8 @@ async function _fetchPostsLoop() {
             if (tweet.created_at) {
                 tweetDate = new Date(tweet.created_at);
                 if (!isNaN(tweetDate.getTime()) && !tweet.is_pinned) {
-                    if (!oldestNonPinnedDate || tweetDate < oldestNonPinnedDate) {
-                        oldestNonPinnedDate = tweetDate;
+                    if (!newestNonPinnedDate || tweetDate > newestNonPinnedDate) {
+                        newestNonPinnedDate = tweetDate;
                     }
                 }
                 if (currentExport.dateTo && tweetDate > currentExport.dateTo) continue;
@@ -318,10 +320,12 @@ async function _fetchPostsLoop() {
             }
         }
 
-        // Stop paginating only when the whole batch has scrolled past dateFrom.
-        // Doing this after the full batch avoids losing valid tweets that appear
-        // after an out-of-range item (e.g. old tweets embedded in conversation threads).
-        if (currentExport.dateFrom && oldestNonPinnedDate && oldestNonPinnedDate < currentExport.dateFrom) {
+        // Stop paginating when even the newest eligible tweet in this batch is
+        // already older than dateFrom — the timeline has clearly scrolled past
+        // the window. This avoids false positives from isolated old items
+        // (pinned tweets, reply-context in conversation threads) while still
+        // guaranteeing termination once we reach the pre-window era.
+        if (currentExport.dateFrom && newestNonPinnedDate && newestNonPinnedDate < currentExport.dateFrom) {
             hasMore = false;
         }
 
