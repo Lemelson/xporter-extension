@@ -1,14 +1,14 @@
 // XPorter — Background Service Worker
 // Orchestrates the export process, handles messages from popup/export page
 
-// Import utility scripts
+// Import utility scripts (paths relative to this service worker's location)
 importScripts(
-    '/utils/config.js',
-    '/utils/api-features.js',
-    '/utils/api.js',
-    '/utils/rateLimit.js',
-    '/utils/csv.js',
-    '/utils/storage.js'
+    '../utils/config.js',
+    '../utils/api-features.js',
+    '../utils/api.js',
+    '../utils/rateLimit.js',
+    '../utils/csv.js',
+    '../utils/storage.js'
 );
 
 // Current export state
