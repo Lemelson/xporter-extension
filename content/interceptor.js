@@ -2,7 +2,7 @@
 // Intercepts fetch() to capture GraphQL queryIds for tracked operations
 // and forwards them to the content script via window.postMessage.
 (function () {
-  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserByScreenName'];
+  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserByScreenName', 'SearchTimeline'];
   const _origFetch = window.fetch;
 
   window.fetch = function (...args) {

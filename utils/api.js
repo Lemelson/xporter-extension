@@ -17,6 +17,10 @@ const FALLBACK_ENDPOINTS = {
     queryId: 'eApPT8jppbYXlweF_ByTyA',
     operationName: 'UserTweets'
   },
+  SearchTimeline: {
+    queryId: 'R0u1RWRf748KzyGBXvOYRA',
+    operationName: 'SearchTimeline'
+  },
   Followers: {
     queryId: 'efNzdTpE-mkUcLARCd3RPQ',
     operationName: 'Followers'
@@ -79,7 +83,7 @@ async function discoverEndpoints(forceRefresh = false) {
       throw new Error('No JS bundles found');
     }
 
-    const targetOperations = ['UserByScreenName', 'UserTweets', 'Followers', 'Following', 'BlueVerifiedFollowers'];
+    const targetOperations = ['UserByScreenName', 'UserTweets', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
     const found = {};
     let discoveredBearer = null;
 
@@ -163,6 +167,9 @@ async function discoverEndpoints(forceRefresh = false) {
       discoveredEndpoints = {
         UserByScreenName: { queryId: found.UserByScreenName, operationName: 'UserByScreenName' },
         UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' },
+        SearchTimeline: found.SearchTimeline
+          ? { queryId: found.SearchTimeline, operationName: 'SearchTimeline' }
+          : FALLBACK_ENDPOINTS.SearchTimeline,
         Followers: found.Followers
           ? { queryId: found.Followers, operationName: 'Followers' }
           : FALLBACK_ENDPOINTS.Followers,
@@ -575,15 +582,42 @@ async function fetchUserTweets(userId, cursor = null, count = 20) {
   return parseTimelineResponse(data);
 }
 
+async function fetchSearchTweets(rawQuery, cursor = null, count = 20) {
+  const variables = {
+    rawQuery,
+    count,
+    querySource: 'typed_query',
+    product: 'Latest',
+    withGrokTranslatedBio: false
+  };
+
+  if (cursor) {
+    variables.cursor = cursor;
+  }
+
+  const data = await withStaleRetry('SearchTimeline', (endpoint) =>
+    graphqlRequest(endpoint, variables, SEARCH_FEATURES, SEARCH_FIELD_TOGGLES)
+  );
+
+  return parseSearchTimelineResponse(data);
+}
+
 // ==================== Response Parsing ====================
 
 function parseTimelineResponse(data) {
   // X may return data under either `timeline` or `timeline_v2` depending on API version
   const result = data?.data?.user?.result;
   const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
-  const instructions = timeline?.instructions || [];
+  return parseTimelineByInstructions(timeline?.instructions || [], result?.timeline_v2 ? 'timeline_v2' : 'timeline');
+}
 
-  XLog.log(`Response path: ${result?.timeline_v2 ? 'timeline_v2' : 'timeline'}, instructions: ${instructions.length}`);
+function parseSearchTimelineResponse(data) {
+  const timeline = data?.data?.search_by_raw_query?.search_timeline?.timeline;
+  return parseTimelineByInstructions(timeline?.instructions || [], 'search_timeline');
+}
+
+function parseTimelineByInstructions(instructions, sourceLabel = 'timeline') {
+  XLog.log(`Response path: ${sourceLabel}, instructions: ${instructions.length}`);
 
   const tweets = [];
   const seenIds = new Set();
@@ -796,6 +830,7 @@ if (typeof globalThis !== 'undefined') {
     getAuthTokens,
     getUserByScreenName,
     fetchUserTweets,
+    fetchSearchTweets,
     fetchFollowers,
     fetchFollowing,
     fetchVerifiedFollowers,
