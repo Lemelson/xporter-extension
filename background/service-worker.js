@@ -275,21 +275,25 @@ async function _fetchPostsLoop() {
             emptyPages = 0;
         }
 
+        // Track oldest non-pinned tweet date in this batch for pagination decision
+        let oldestNonPinnedDate = null;
+
         // Process tweets
         for (const tweet of (result.tweets || [])) {
             if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
             if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
 
             // Date filtering
+            let tweetDate = null;
             if (tweet.created_at) {
-                const tweetDate = new Date(tweet.created_at);
-                if (currentExport.dateTo && tweetDate > currentExport.dateTo) continue;
-                if (currentExport.dateFrom && tweetDate < currentExport.dateFrom) {
-                    // Pinned tweets can be arbitrarily old — skip without ending pagination
-                    if (tweet.is_pinned) continue;
-                    hasMore = false;
-                    break;
+                tweetDate = new Date(tweet.created_at);
+                if (!isNaN(tweetDate.getTime()) && !tweet.is_pinned) {
+                    if (!oldestNonPinnedDate || tweetDate < oldestNonPinnedDate) {
+                        oldestNonPinnedDate = tweetDate;
+                    }
                 }
+                if (currentExport.dateTo && tweetDate > currentExport.dateTo) continue;
+                if (currentExport.dateFrom && tweetDate < currentExport.dateFrom) continue;
             }
 
             if (seenIds.has(tweet.id)) continue;
@@ -312,6 +316,13 @@ async function _fetchPostsLoop() {
                 currentExport.totalBatches++;
                 currentExport.tweetBuffer = [];
             }
+        }
+
+        // Stop paginating only when the whole batch has scrolled past dateFrom.
+        // Doing this after the full batch avoids losing valid tweets that appear
+        // after an out-of-range item (e.g. old tweets embedded in conversation threads).
+        if (currentExport.dateFrom && oldestNonPinnedDate && oldestNonPinnedDate < currentExport.dateFrom) {
+            hasMore = false;
         }
 
         // Update cursor
