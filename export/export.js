@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statBatch = document.getElementById('statBatch');
     const statRequests = document.getElementById('statRequests');
     const statTime = document.getElementById('statTime');
+    const exportVersion = document.getElementById('exportVersion');
 
     // Complete state elements
     const completeUser = document.getElementById('completeUser');
@@ -50,6 +51,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let exportStartTime = null;
     let timeInterval = null;
+
+    if (exportVersion && chrome.runtime?.getManifest) {
+        exportVersion.textContent = `v${chrome.runtime.getManifest().version}`;
+    }
 
     // ==================== i18n ====================
     let currentTranslations = {};

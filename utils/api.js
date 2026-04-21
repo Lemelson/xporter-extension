@@ -586,59 +586,94 @@ function parseTimelineResponse(data) {
   XLog.log(`Response path: ${result?.timeline_v2 ? 'timeline_v2' : 'timeline'}, instructions: ${instructions.length}`);
 
   const tweets = [];
+  const seenIds = new Set();
   let nextCursor = null;
   let previousCursor = null;
+
+  function addTweet(tweet, { pinned = false } = {}) {
+    if (!tweet?.id || seenIds.has(tweet.id)) return;
+    if (pinned) tweet.is_pinned = true;
+    seenIds.add(tweet.id);
+    tweets.push(tweet);
+  }
 
   for (const instruction of instructions) {
     // Handle pinned tweet entry
     if (instruction.type === 'TimelinePinEntry' && instruction.entry) {
-      const pinned = extractTweetResult(instruction.entry);
-      if (pinned) {
-        pinned.is_pinned = true;
-        tweets.push(pinned);
-      }
+      extractTimelineEntry(instruction.entry, { addTweet, setNextCursor, setPreviousCursor }, { pinned: true });
+    }
+
+    // Some instruction variants carry a single entry outside of `entries`.
+    if (instruction.entry && instruction.type !== 'TimelinePinEntry') {
+      extractTimelineEntry(instruction.entry, { addTweet, setNextCursor, setPreviousCursor });
     }
 
     const entries = instruction.entries || [];
 
     if (instruction.type === 'TimelineAddEntries' || entries.length > 0) {
       for (const entry of entries) {
-        const entryId = entry.entryId || '';
-
-        // Tweet entries
-        if (entryId.startsWith('tweet-')) {
-          const tweetResult = extractTweetResult(entry);
-          if (tweetResult) {
-            tweets.push(tweetResult);
-          }
-        }
-
-        // Profile conversation threads — multiple tweets in one entry
-        if (entryId.startsWith('profile-conversation-')) {
-          if (entry.content?.items) {
-            for (const item of entry.content.items) {
-              const itemResult = item?.item?.itemContent?.tweet_results?.result;
-              if (itemResult) {
-                const parsed = parseTweetObject(itemResult);
-                if (parsed) tweets.push(parsed);
-              }
-            }
-          }
-        }
-
-        // Cursor entries for pagination
-        if (entryId.startsWith('cursor-bottom-')) {
-          nextCursor = entry.content?.value || null;
-        }
-        if (entryId.startsWith('cursor-top-')) {
-          previousCursor = entry.content?.value || null;
-        }
+        extractTimelineEntry(entry, { addTweet, setNextCursor, setPreviousCursor });
       }
     }
   }
 
   XLog.log(`Parsed ${tweets.length} tweets, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
   return { tweets, nextCursor, previousCursor };
+
+  function setNextCursor(value) {
+    if (value) nextCursor = value;
+  }
+
+  function setPreviousCursor(value) {
+    if (value) previousCursor = value;
+  }
+}
+
+function extractTimelineEntry(entry, sinks, options = {}) {
+  if (!entry) return;
+
+  const entryId = entry.entryId || '';
+  if (entryId.startsWith('cursor-bottom-')) {
+    sinks.setNextCursor(entry.content?.value || null);
+  }
+  if (entryId.startsWith('cursor-top-')) {
+    sinks.setPreviousCursor(entry.content?.value || null);
+  }
+
+  const directTweet = extractTweetResult(entry);
+  if (directTweet) {
+    sinks.addTweet(directTweet, options);
+  }
+
+  walkTimelineNode(entry.content, sinks, options);
+}
+
+function walkTimelineNode(node, sinks, options = {}) {
+  if (!node) return;
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      walkTimelineNode(item, sinks, options);
+    }
+    return;
+  }
+
+  if (typeof node !== 'object') return;
+
+  const tweetResult = node.tweet_results?.result || node.itemContent?.tweet_results?.result;
+  if (tweetResult) {
+    const parsed = parseTweetObject(tweetResult);
+    if (parsed) sinks.addTweet(parsed, options);
+  }
+
+  if (node.__typename === 'TimelineTimelineCursor' || node.cursorType) {
+    if (node.cursorType === 'Bottom') sinks.setNextCursor(node.value || null);
+    if (node.cursorType === 'Top') sinks.setPreviousCursor(node.value || null);
+  }
+
+  for (const value of Object.values(node)) {
+    walkTimelineNode(value, sinks, options);
+  }
 }
 
 function extractTweetResult(entry) {
