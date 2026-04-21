@@ -253,6 +253,11 @@ async function runExportLoop() {
 // ==================== Posts Fetch Loop ====================
 
 async function _fetchPostsLoop() {
+    if (currentExport.dateFrom || currentExport.dateTo) {
+        await _fetchPostsByDateRangeLoop();
+        return;
+    }
+
     let hasMore = true;
     let emptyPages = 0;
     const seenIds = new Set();
@@ -371,6 +376,100 @@ function normalizeDateBoundary(dateValue, boundary) {
     }
 
     return normalized;
+}
+
+async function _fetchPostsByDateRangeLoop() {
+    let hasMore = true;
+    let emptyPages = 0;
+    const seenIds = new Set();
+    const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom, currentExport.dateTo);
+
+    while (hasMore && currentExport.running) {
+        if (currentExport.settings.quantityLimit > 0 &&
+            currentExport.tweetCount >= currentExport.settings.quantityLimit) {
+            break;
+        }
+
+        const requestCursor = currentExport.cursor;
+        const result = await rateLimiter.executeWithRateLimit(async () => {
+            return await XPorterAPI.fetchSearchTweets(rawQuery, requestCursor);
+        });
+
+        if (!result.tweets || result.tweets.length === 0) {
+            const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
+            emptyPages = cursorAdvanced ? 0 : (emptyPages + 1);
+            if (emptyPages >= 3) {
+                hasMore = false;
+                break;
+            }
+        } else {
+            emptyPages = 0;
+        }
+
+        for (const tweet of (result.tweets || [])) {
+            if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
+            if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
+            if (seenIds.has(tweet.id)) continue;
+            seenIds.add(tweet.id);
+
+            if (!tweet.author_name && currentExport.userInfo) {
+                tweet.author_name = currentExport.userInfo.name || '';
+                tweet.author_username = currentExport.userInfo.screenName || currentExport.username || '';
+                if (tweet.tweet_url && tweet.tweet_url.includes('/undefined/')) {
+                    tweet.tweet_url = tweet.tweet_url.replace('/undefined/', `/${tweet.author_username}/`);
+                }
+            }
+
+            currentExport.tweetBuffer.push(tweet);
+            currentExport.tweetCount++;
+
+            if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
+                await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
+                currentExport.totalBatches++;
+                currentExport.tweetBuffer = [];
+            }
+        }
+
+        if (result.nextCursor) {
+            currentExport.cursor = result.nextCursor;
+        } else {
+            hasMore = false;
+        }
+
+        await saveCurrentState();
+
+        broadcastStatus({
+            running: true,
+            status: 'fetching',
+            username: currentExport.username,
+            tweetCount: currentExport.tweetCount,
+            expectedTweets: currentExport.userInfo?.tweetCount || 0,
+            quantityLimit: currentExport.settings?.quantityLimit || 0,
+            batch: Math.floor(rateLimiter.totalRequests / rateLimiter.batchSize) + 1,
+            totalRequests: rateLimiter.totalRequests,
+            exportMode: currentExport.exportMode
+        });
+    }
+}
+
+function buildDateRangeSearchQuery(username, dateFrom, dateTo) {
+    const parts = [`(from:${username})`];
+
+    if (dateFrom) {
+        parts.push(`since:${formatDateForSearch(dateFrom)}`);
+    }
+
+    if (dateTo) {
+        const dayAfter = new Date(dateTo.getTime());
+        dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
+        parts.push(`until:${formatDateForSearch(dayAfter)}`);
+    }
+
+    return parts.join(' ');
+}
+
+function formatDateForSearch(date) {
+    return date.toISOString().slice(0, 10);
 }
 
 // ==================== Users (Followers/Following) Fetch Loop ====================

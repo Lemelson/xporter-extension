@@ -21,7 +21,7 @@
             console.log('Alt pattern found', urls.length, 'JS bundles');
         }
 
-        const targets = ['UserByScreenName', 'UserTweets', 'Followers', 'Following', 'BlueVerifiedFollowers'];
+        const targets = ['UserByScreenName', 'UserTweets', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
         const found = {};
         const allEndpoints = {}; // Collect ALL endpoints for debugging
 
