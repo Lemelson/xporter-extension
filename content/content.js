@@ -73,35 +73,12 @@ window.addEventListener('popstate', () => {
 // We intercept these and forward them to the service worker so the extension
 // always has up-to-date queryIds without relying on fragile JS-bundle scanning.
 
-const TRACKED_OPERATIONS = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserByScreenName'];
-
-// Inject a fetch interceptor into the actual page context
+// Inject a fetch interceptor into the actual page context.
+// Loaded via src (not inline textContent) so it doesn't violate x.com's CSP.
 const interceptorScript = document.createElement('script');
-interceptorScript.textContent = `
-(function() {
-  const _origFetch = window.fetch;
-  const TRACKED = ${JSON.stringify(TRACKED_OPERATIONS)};
-
-  window.fetch = function(...args) {
-    try {
-      const url = (typeof args[0] === 'string') ? args[0] : args[0]?.url;
-      if (url && url.includes('/i/api/graphql/')) {
-        const match = url.match(/\\/i\\/api\\/graphql\\/([^/]+)\\/([^?]+)/);
-        if (match && TRACKED.includes(match[2])) {
-          window.postMessage({
-            type: '__XPORTER_QUERYID__',
-            queryId: match[1],
-            operationName: match[2]
-          }, '*');
-        }
-      }
-    } catch(e) { /* ignore */ }
-    return _origFetch.apply(this, args);
-  };
-})();
-`;
+interceptorScript.src = chrome.runtime.getURL('content/interceptor.js');
+interceptorScript.onload = () => interceptorScript.remove();
 (document.head || document.documentElement).appendChild(interceptorScript);
-interceptorScript.remove();
 
 // Listen for messages from the injected script
 window.addEventListener('message', (event) => {
