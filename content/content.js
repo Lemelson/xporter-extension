@@ -91,4 +91,32 @@ window.addEventListener('message', (event) => {
             operationName: event.data.operationName
         }).catch(() => { });
     }
+    if (event.data?.type === '__XPORTER_GRAPHQL_RESPONSE__') {
+        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+        chrome.runtime.sendMessage({
+            type: 'PAGE_GRAPHQL_RESPONSE',
+            operationName: event.data.operationName,
+            url: event.data.url,
+            status: event.data.status,
+            bodyText: event.data.bodyText
+        }).catch(() => { });
+    }
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'XPORTER_SCROLL_SEARCH_PAGE') {
+        try {
+            const target = Math.max(
+                document.documentElement?.scrollHeight || 0,
+                document.body?.scrollHeight || 0
+            );
+            window.scrollTo(0, target);
+            sendResponse({ success: true, scrollTop: target });
+        } catch (error) {
+            sendResponse({ error: error.message });
+        }
+        return true;
+    }
+
+    return false;
 });

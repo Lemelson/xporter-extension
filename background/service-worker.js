@@ -14,6 +14,7 @@ importScripts(
 // Current export state
 let currentExport = null;
 let rateLimiter = null;
+let searchCapture = null;
 
 // ==================== Message Handling ====================
 
@@ -69,6 +70,9 @@ async function handleMessage(message, sender) {
                 XPorterAPI.setLiveQueryId(message.operationName, message.queryId);
             }
             return { success: true };
+
+        case 'PAGE_GRAPHQL_RESPONSE':
+            return handlePageGraphqlResponse(message, sender);
 
         case 'GET_EXPORT_HISTORY':
             return { history: await XPorterStorage.loadExportHistory() };
@@ -383,72 +387,84 @@ async function _fetchPostsByDateRangeLoop() {
     let emptyPages = 0;
     const seenIds = new Set();
     const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom, currentExport.dateTo);
+    let payload = null;
 
-    while (hasMore && currentExport.running) {
-        if (currentExport.settings.quantityLimit > 0 &&
-            currentExport.tweetCount >= currentExport.settings.quantityLimit) {
-            break;
+    await openSearchCaptureTab(rawQuery);
+
+    try {
+        payload = await waitForSearchCapturePayload(20000);
+        if (!payload) {
+            throw new Error('SEARCH_CAPTURE_TIMEOUT');
         }
 
-        const requestCursor = currentExport.cursor;
-        const result = await rateLimiter.executeWithRateLimit(async () => {
-            return await XPorterAPI.fetchSearchTweets(rawQuery, requestCursor);
-        });
-
-        if (!result.tweets || result.tweets.length === 0) {
-            const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
-            emptyPages = cursorAdvanced ? 0 : (emptyPages + 1);
-            if (emptyPages >= 3) {
-                hasMore = false;
+        while (hasMore && currentExport.running) {
+            if (currentExport.settings.quantityLimit > 0 &&
+                currentExport.tweetCount >= currentExport.settings.quantityLimit) {
                 break;
             }
-        } else {
-            emptyPages = 0;
-        }
 
-        for (const tweet of (result.tweets || [])) {
-            if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
-            if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
-            if (seenIds.has(tweet.id)) continue;
-            seenIds.add(tweet.id);
+            const parsedPayload = parseSearchTimelineResponse(JSON.parse(payload.bodyText));
 
-            if (!tweet.author_name && currentExport.userInfo) {
-                tweet.author_name = currentExport.userInfo.name || '';
-                tweet.author_username = currentExport.userInfo.screenName || currentExport.username || '';
-                if (tweet.tweet_url && tweet.tweet_url.includes('/undefined/')) {
-                    tweet.tweet_url = tweet.tweet_url.replace('/undefined/', `/${tweet.author_username}/`);
+            if (!parsedPayload.tweets || parsedPayload.tweets.length === 0) {
+                emptyPages++;
+                if (emptyPages >= 3) {
+                    hasMore = false;
+                    break;
+                }
+            } else {
+                emptyPages = 0;
+            }
+
+            for (const tweet of (parsedPayload.tweets || [])) {
+                if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
+                if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
+                if (seenIds.has(tweet.id)) continue;
+                seenIds.add(tweet.id);
+
+                if (!tweet.author_name && currentExport.userInfo) {
+                    tweet.author_name = currentExport.userInfo.name || '';
+                    tweet.author_username = currentExport.userInfo.screenName || currentExport.username || '';
+                    if (tweet.tweet_url && tweet.tweet_url.includes('/undefined/')) {
+                        tweet.tweet_url = tweet.tweet_url.replace('/undefined/', `/${tweet.author_username}/`);
+                    }
+                }
+
+                currentExport.tweetBuffer.push(tweet);
+                currentExport.tweetCount++;
+
+                if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
+                    await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
+                    currentExport.totalBatches++;
+                    currentExport.tweetBuffer = [];
                 }
             }
 
-            currentExport.tweetBuffer.push(tweet);
-            currentExport.tweetCount++;
-
-            if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
-                await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
-                currentExport.totalBatches++;
-                currentExport.tweetBuffer = [];
+            if (parsedPayload.nextCursor) {
+                currentExport.cursor = parsedPayload.nextCursor;
+                payload = await requestNextSearchCapturePayload();
+                if (!payload) {
+                    hasMore = false;
+                }
+            } else {
+                hasMore = false;
             }
+
+            await saveCurrentState();
+
+            broadcastStatus({
+                running: true,
+                status: 'fetching',
+                username: currentExport.username,
+                tweetCount: currentExport.tweetCount,
+                expectedTweets: currentExport.userInfo?.tweetCount || 0,
+                quantityLimit: currentExport.settings?.quantityLimit || 0,
+                batch: Math.floor(rateLimiter.totalRequests / rateLimiter.batchSize) + 1,
+                totalRequests: rateLimiter.totalRequests,
+                exportMode: currentExport.exportMode
+            });
         }
-
-        if (result.nextCursor) {
-            currentExport.cursor = result.nextCursor;
-        } else {
-            hasMore = false;
-        }
-
-        await saveCurrentState();
-
-        broadcastStatus({
-            running: true,
-            status: 'fetching',
-            username: currentExport.username,
-            tweetCount: currentExport.tweetCount,
-            expectedTweets: currentExport.userInfo?.tweetCount || 0,
-            quantityLimit: currentExport.settings?.quantityLimit || 0,
-            batch: Math.floor(rateLimiter.totalRequests / rateLimiter.batchSize) + 1,
-            totalRequests: rateLimiter.totalRequests,
-            exportMode: currentExport.exportMode
-        });
+    } finally {
+        await closeSearchCaptureTab();
     }
 }
 
@@ -470,6 +486,121 @@ function buildDateRangeSearchQuery(username, dateFrom, dateTo) {
 
 function formatDateForSearch(date) {
     return date.toISOString().slice(0, 10);
+}
+
+function buildSearchTimelinePageUrl(rawQuery) {
+    return `https://x.com/search?q=${encodeURIComponent(rawQuery)}&src=typed_query&f=live`;
+}
+
+async function openSearchCaptureTab(rawQuery) {
+    await closeSearchCaptureTab();
+
+    // X search lazy-loads reliably only in a foreground tab.
+    const tab = await chrome.tabs.create({
+        url: buildSearchTimelinePageUrl(rawQuery),
+        active: true
+    });
+
+    searchCapture = {
+        tabId: tab.id,
+        queue: [],
+        resolver: null,
+        seenUrls: new Set()
+    };
+}
+
+async function closeSearchCaptureTab() {
+    if (!searchCapture) return;
+
+    const { tabId, resolver } = searchCapture;
+    searchCapture = null;
+
+    if (resolver) {
+        resolver(null);
+    }
+
+    if (typeof tabId === 'number') {
+        try {
+            await chrome.tabs.remove(tabId);
+        } catch (_) {
+            // Tab may already be closed
+        }
+    }
+}
+
+function waitForSearchCapturePayload(timeoutMs = 10000) {
+    if (!searchCapture) return Promise.resolve(null);
+    if (searchCapture.queue.length > 0) {
+        return Promise.resolve(searchCapture.queue.shift());
+    }
+
+    return new Promise((resolve) => {
+        const activeCapture = searchCapture;
+        const timer = setTimeout(() => {
+            if (activeCapture && activeCapture.resolver === resolver) {
+                activeCapture.resolver = null;
+            }
+            resolve(null);
+        }, timeoutMs);
+
+        const resolver = (payload) => {
+            clearTimeout(timer);
+            resolve(payload);
+        };
+
+        activeCapture.resolver = resolver;
+    });
+}
+
+async function requestNextSearchCapturePayload() {
+    if (!searchCapture?.tabId) return null;
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+            await chrome.tabs.sendMessage(searchCapture.tabId, { type: 'XPORTER_SCROLL_SEARCH_PAGE' });
+        } catch (_) {
+            // Tab may still be loading; wait for the payload timeout instead
+        }
+
+        const payload = await waitForSearchCapturePayload(8000);
+        if (payload) {
+            return payload;
+        }
+    }
+
+    return null;
+}
+
+function handlePageGraphqlResponse(message, sender) {
+    const senderTabId = sender?.tab?.id;
+    if (!searchCapture || senderTabId !== searchCapture.tabId) {
+        return { ignored: true };
+    }
+
+    if (message.operationName !== 'SearchTimeline' || !message.bodyText || !message.url) {
+        return { ignored: true };
+    }
+
+    if (searchCapture.seenUrls.has(message.url)) {
+        return { duplicate: true };
+    }
+    searchCapture.seenUrls.add(message.url);
+
+    const payload = {
+        url: message.url,
+        bodyText: message.bodyText,
+        status: message.status || 200
+    };
+
+    if (searchCapture.resolver) {
+        const resolver = searchCapture.resolver;
+        searchCapture.resolver = null;
+        resolver(payload);
+    } else {
+        searchCapture.queue.push(payload);
+    }
+
+    return { success: true };
 }
 
 // ==================== Users (Followers/Following) Fetch Loop ====================
@@ -572,6 +703,7 @@ async function stopExport() {
     if (rateLimiter) {
         rateLimiter.abort();
     }
+    await closeSearchCaptureTab();
     return { success: true };
 }
 
