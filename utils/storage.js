@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
 };
 
 const MAX_HISTORY_ENTRIES = 20;
+const MAX_HISTORY_DATA_ENTRIES = 5;
 
 // Use config constant if available, otherwise default
 const MAX_TWEETS_PER_BATCH = (typeof XPORTER_CONFIG !== 'undefined')
@@ -174,13 +175,26 @@ async function saveExportHistory(entry) {
     const history = await loadExportHistory();
     history.unshift({
         ...entry,
-        id: Date.now()
+        id: Date.now(),
+        hasData: Array.isArray(entry.items) && entry.items.length > 0
     });
     // Keep only the most recent entries
     while (history.length > MAX_HISTORY_ENTRIES) {
         history.pop();
     }
-    return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+    history.forEach((item, index) => {
+        if (index >= MAX_HISTORY_DATA_ENTRIES && item.items) {
+            delete item.items;
+            item.hasData = false;
+        }
+    });
+    const saved = await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+    if (!saved && entry.items) {
+        delete history[0].items;
+        history[0].hasData = false;
+        return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+    }
+    return saved;
 }
 
 /**
@@ -189,6 +203,11 @@ async function saveExportHistory(entry) {
 async function loadExportHistory() {
     const result = await safeGet(STORAGE_KEYS.EXPORT_HISTORY);
     return result[STORAGE_KEYS.EXPORT_HISTORY] || [];
+}
+
+async function loadExportHistoryEntry(id) {
+    const history = await loadExportHistory();
+    return history.find(e => String(e.id) === String(id)) || null;
 }
 
 /**
@@ -260,7 +279,7 @@ if (typeof globalThis !== 'undefined') {
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,
-        saveExportHistory, loadExportHistory,
+        saveExportHistory, loadExportHistory, loadExportHistoryEntry,
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH

@@ -669,8 +669,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const actions = document.createElement('div');
             actions.className = 'history-actions';
 
-            // Download button (only for the most recent / index 0)
-            if (index === 0) {
+            // Download button for entries whose data snapshot is still available.
+            if (entry.hasData || Array.isArray(entry.items)) {
                 const dlBtn = document.createElement('button');
                 dlBtn.className = 'history-dl-btn';
                 dlBtn.title = 'Download';
@@ -678,7 +678,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dlBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     dlBtn.disabled = true;
-                    const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: entry.outputFormat || 'csv' });
+                    const result = await sendMessage({
+                        type: 'DOWNLOAD_HISTORY_ENTRY',
+                        id: entry.id,
+                        outputFormat: entry.outputFormat || 'csv'
+                    });
                     dlBtn.disabled = false;
                     if (result?.error) {
                         alert(result.error);
