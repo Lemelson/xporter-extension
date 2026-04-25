@@ -241,7 +241,10 @@
         </div>
       </div>
       <div class="field">
-        <label class="field-label" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
+        <div class="field-label-row">
+          <label class="field-label" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
+          <span class="date-help" tabindex="0" aria-label="Quantity limit controls the maximum number of posts or users to collect. Unlimited keeps going until X stops returning results or rate limits." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
+        </div>
         <select id="quantityLimit" class="select">
           <option value="0" data-i18n="unlimited">Unlimited</option>
           <option value="100">100 <span data-i18n="posts">posts</span></option>
@@ -257,7 +260,10 @@
         </div>
       </div>
       <div class="field">
-        <label class="field-label" data-i18n="requestCooldown">Request Cooldown</label>
+        <div class="field-label-row">
+          <label class="field-label" data-i18n="requestCooldown">Request Cooldown</label>
+          <span class="date-help" tabindex="0" aria-label="Cooldown pauses exports after a batch of X API requests. Default: wait 3 minutes after every 20 requests to reduce rate limits." data-i18n-aria-label="requestCooldownHelp" data-i18n-tooltip="requestCooldownHelp">!</span>
+        </div>
         <div class="cooldown-row">
           <input type="number" id="cooldownMinutes" value="3" min="1" max="15" class="input-small">
           <span data-i18n="minAfterEvery">min after every</span>
@@ -266,11 +272,14 @@
         </div>
       </div>
       <div class="field">
-        <label class="toggle-label">
-          <input type="checkbox" id="autoExpireEnabled" class="toggle-input" checked>
-          <span class="toggle-track"><span class="toggle-knob"></span></span>
-          <span data-i18n="autoExpireState">Auto-clear old exports</span>
-        </label>
+        <div class="date-toggle-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="autoExpireEnabled" class="toggle-input" checked>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="autoExpireState">Auto-clear old exports</span>
+          </label>
+          <span class="date-help" tabindex="0" aria-label="Auto-clear removes temporary export data after the selected number of hours. Export history stays visible, but old entries may not include downloadable data." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp">!</span>
+        </div>
         <div class="cooldown-row" id="autoExpireRow">
           <span data-i18n="autoExpireAfter">Clear after</span>
           <input type="number" id="autoExpireHours" value="4" min="1" max="48" class="input-small">

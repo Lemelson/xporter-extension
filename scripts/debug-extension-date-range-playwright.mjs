@@ -156,6 +156,8 @@ async function main() {
       });
 
       if (!status?.running) {
+        const historyResult = await popupPage.evaluate(async () => chrome.runtime.sendMessage({ type: 'GET_EXPORT_HISTORY' }));
+        const latestHistory = (historyResult?.history || [])[0] || null;
         console.log(JSON.stringify({
           username: USERNAME,
           dateFrom: DATE_FROM,
@@ -164,6 +166,11 @@ async function main() {
           finalStatus: status?.status || null,
           tweetCount: status?.tweetCount || 0,
           error: status?.error || null,
+          latestHistory: latestHistory ? {
+            itemCount: latestHistory.itemCount || 0,
+            hasData: !!latestHistory.hasData,
+            hasItemsInListPayload: Array.isArray(latestHistory.items)
+          } : null,
           snapshots
         }, null, 2));
         return;
@@ -171,6 +178,8 @@ async function main() {
     }
 
     const status = await popupPage.evaluate(async () => chrome.runtime.sendMessage({ type: 'GET_STATUS' }));
+    const historyResult = await popupPage.evaluate(async () => chrome.runtime.sendMessage({ type: 'GET_EXPORT_HISTORY' }));
+    const latestHistory = (historyResult?.history || [])[0] || null;
     console.log(JSON.stringify({
       username: USERNAME,
       dateFrom: DATE_FROM,
@@ -179,6 +188,11 @@ async function main() {
       finalStatus: status?.status || null,
       tweetCount: status?.tweetCount || 0,
       error: status?.error || null,
+      latestHistory: latestHistory ? {
+        itemCount: latestHistory.itemCount || 0,
+        hasData: !!latestHistory.hasData,
+        hasItemsInListPayload: Array.isArray(latestHistory.items)
+      } : null,
       snapshots
     }, null, 2));
   } finally {

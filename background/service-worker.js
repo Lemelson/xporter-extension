@@ -48,6 +48,9 @@ async function handleMessage(message, sender) {
         case 'DOWNLOAD_EXPORT':
             return await downloadExport(message.outputFormat);
 
+        case 'DOWNLOAD_HISTORY_ENTRY':
+            return await downloadHistoryEntry(message.id, message.outputFormat);
+
         case 'RESUME_EXPORT':
             return await resumeExport();
 
@@ -75,7 +78,8 @@ async function handleMessage(message, sender) {
             return handlePageGraphqlResponse(message, sender);
 
         case 'GET_EXPORT_HISTORY':
-            return { history: await XPorterStorage.loadExportHistory() };
+            const history = await XPorterStorage.loadExportHistory();
+            return { history: history.map(({ items, ...entry }) => entry) };
 
         case 'DELETE_HISTORY_ENTRY':
             await XPorterStorage.deleteExportHistoryEntry(message.id);
@@ -218,6 +222,7 @@ async function runExportLoop() {
 
         // Save to export history
         const ui = currentExport.userInfo || {};
+        const historyItems = await XPorterStorage.loadAllTweets();
         await XPorterStorage.saveExportHistory({
             username: ui.screenName || currentExport.username,
             displayName: ui.name || currentExport.username,
@@ -225,7 +230,10 @@ async function runExportLoop() {
             exportMode: currentExport.exportMode,
             itemCount: currentExport.tweetCount,
             outputFormat: currentExport.outputFormat || 'csv',
-            completedAt: Date.now()
+            dateFrom: currentExport.dateFrom?.toISOString() || null,
+            dateTo: currentExport.dateTo?.toISOString() || null,
+            completedAt: Date.now(),
+            items: historyItems
         });
 
         broadcastStatus({
@@ -864,6 +872,38 @@ async function downloadExport(format) {
     const mode = state?.exportMode || 'posts';
     format = format || state?.outputFormat || 'csv';
 
+    return await downloadItems(allItems, {
+        username,
+        mode,
+        format,
+        dateFrom: state?.dateFrom,
+        dateTo: state?.dateTo
+    });
+}
+
+async function downloadHistoryEntry(id, format) {
+    const entry = await XPorterStorage.loadExportHistoryEntry(id);
+    if (!entry) {
+        return { error: 'History entry not found' };
+    }
+    if (!Array.isArray(entry.items) || entry.items.length === 0) {
+        return { error: 'Export data is no longer available for this history entry' };
+    }
+
+    return await downloadItems(entry.items, {
+        username: entry.username || 'unknown',
+        mode: entry.exportMode || 'posts',
+        format: format || entry.outputFormat || 'csv',
+        dateFrom: entry.dateFrom,
+        dateTo: entry.dateTo,
+        exportedAt: entry.completedAt || new Date()
+    });
+}
+
+async function downloadItems(allItems, options) {
+    const username = options.username || 'unknown';
+    const mode = options.mode || 'posts';
+    const format = options.format || 'csv';
     const isUsers = (mode !== 'posts');
     let content, mimeType, extension;
 
@@ -882,9 +922,9 @@ async function downloadExport(format) {
     }
 
     const filename = XPorterCSV.generateExportFilename(username, mode, extension, {
-        dateFrom: state?.dateFrom,
-        dateTo: state?.dateTo,
-        exportedAt: new Date()
+        dateFrom: options.dateFrom,
+        dateTo: options.dateTo,
+        exportedAt: options.exportedAt || new Date()
     });
     const blob = new Blob([content], { type: mimeType });
     const reader = new FileReader();
