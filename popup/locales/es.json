@@ -10,6 +10,7 @@
   "fieldUsername": "Usuario de Twitter",
   "placeholderUsername": "elonmusk",
   "dateRange": "Rango de fechas",
+  "dateRangeHelp": "La exportación por fechas abre una pestaña de búsqueda de X y la desplaza mientras recopila publicaciones. Mantén esa pestaña abierta hasta que termine.",
   "dateFrom": "Desde",
   "dateTo": "Hasta",
   "exporting": "Exportando...",

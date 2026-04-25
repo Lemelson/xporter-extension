@@ -10,6 +10,7 @@
   "fieldUsername": "Twitter 用户名",
   "placeholderUsername": "elonmusk",
   "dateRange": "日期范围",
+  "dateRangeHelp": "日期范围导出会打开一个 X 搜索标签页，并在收集帖子时自动滚动。导出完成前请保持该标签页打开。",
   "dateFrom": "从",
   "dateTo": "到",
   "exporting": "导出中...",

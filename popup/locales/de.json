@@ -10,6 +10,7 @@
   "fieldUsername": "Twitter-Benutzername",
   "placeholderUsername": "elonmusk",
   "dateRange": "Datumsbereich",
+  "dateRangeHelp": "Der Export nach Datum öffnet einen X-Suchtab und scrollt ihn, während Beiträge gesammelt werden. Lassen Sie diesen Tab bis zum Ende geöffnet.",
   "dateFrom": "Von",
   "dateTo": "Bis",
   "exporting": "Exportieren...",

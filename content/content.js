@@ -106,6 +106,12 @@ window.addEventListener('message', (event) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'XPORTER_SCROLL_SEARCH_PAGE') {
         try {
+            const retryButton = Array.from(document.querySelectorAll('button, [role="button"]')).find((button) => {
+                const text = (button.textContent || '').trim().toLowerCase();
+                return text === 'retry' || text === 'try again' || text === 'повторить';
+            });
+            retryButton?.click();
+
             const target = Math.max(
                 document.documentElement?.scrollHeight || 0,
                 document.body?.scrollHeight || 0

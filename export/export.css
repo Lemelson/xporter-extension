@@ -213,6 +213,63 @@ body {
     cursor: pointer;
 }
 
+.date-toggle-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.date-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: help;
+    outline: none;
+}
+
+.date-help::after {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 8px);
+    z-index: 30;
+    width: min(320px, calc(100vw - 64px));
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    box-shadow: 0 12px 28px var(--shadow);
+    content: attr(data-tooltip);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.45;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.date-help:hover,
+.date-help:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.date-help:hover::after,
+.date-help:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .date-fields {
     margin-top: 10px;
     display: flex;

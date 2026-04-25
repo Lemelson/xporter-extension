@@ -10,6 +10,7 @@
   "fieldUsername": "Nom d'utilisateur Twitter",
   "placeholderUsername": "elonmusk",
   "dateRange": "Plage de dates",
+  "dateRangeHelp": "L'export par dates ouvre un onglet de recherche X et le fait défiler pendant la collecte. Gardez cet onglet ouvert jusqu'à la fin.",
   "dateFrom": "De",
   "dateTo": "À",
   "exporting": "Exportation...",

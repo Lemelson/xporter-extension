@@ -10,6 +10,7 @@
   "fieldUsername": "Twitter उपयोगकर्ता नाम",
   "placeholderUsername": "elonmusk",
   "dateRange": "तारीख सीमा",
+  "dateRangeHelp": "तारीख सीमा निर्यात X खोज टैब खोलता है और पोस्ट इकट्ठा करते समय उसे स्क्रोल करता है। निर्यात पूरा होने तक उस टैब को खुला रखें।",
   "dateFrom": "से",
   "dateTo": "तक",
   "exporting": "निर्यात हो रहा है...",

@@ -838,7 +838,11 @@ async function downloadExport(format) {
         extension = 'csv';
     }
 
-    const filename = XPorterCSV.generateExportFilename(username, mode, extension);
+    const filename = XPorterCSV.generateExportFilename(username, mode, extension, {
+        dateFrom: state?.dateFrom,
+        dateTo: state?.dateTo,
+        exportedAt: new Date()
+    });
     const blob = new Blob([content], { type: mimeType });
     const reader = new FileReader();
 

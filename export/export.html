@@ -42,10 +42,13 @@
 
                 <!-- Date Range -->
                 <div class="field">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="dateCheck">
-                        <span data-i18n="dateRange">Date Range</span>
-                    </label>
+                    <div class="date-toggle-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="dateCheck">
+                            <span data-i18n="dateRange">Date Range</span>
+                        </label>
+                        <span class="date-help" tabindex="0" aria-label="Date range export opens an X search tab and scrolls it while posts are collected. Do not close that tab until export finishes." data-i18n-aria-label="dateRangeHelp" data-i18n-tooltip="dateRangeHelp">!</span>
+                    </div>
                     <div class="date-fields hidden" id="dateFields">
                         <div class="date-row">
                             <span class="date-label" data-i18n="dateFrom">From</span>

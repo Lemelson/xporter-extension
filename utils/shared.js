@@ -140,11 +140,11 @@ function extractUsernameFromInput(input) {
 // ==================== i18n Helpers ====================
 
 /**
- * Apply translations to all elements with data-i18n, data-i18n-placeholder,
- * and data-i18n-title attributes. Used by both popup and export pages.
+ * Apply translations to common i18n attributes.
+ * Used by both popup and export pages.
  */
 function applyI18nToDOM(translations) {
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]').forEach(el => {
+    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-tooltip], [data-i18n-aria-label]').forEach(el => {
         const textKey = el.getAttribute('data-i18n');
         if (textKey && translations[textKey] !== undefined) {
             el.textContent = translations[textKey];
@@ -156,6 +156,15 @@ function applyI18nToDOM(translations) {
         const titleKey = el.getAttribute('data-i18n-title');
         if (titleKey && translations[titleKey] !== undefined) {
             el.title = translations[titleKey];
+        }
+        const tooltipKey = el.getAttribute('data-i18n-tooltip');
+        if (tooltipKey && translations[tooltipKey] !== undefined) {
+            el.dataset.tooltip = translations[tooltipKey];
+            el.title = translations[tooltipKey];
+        }
+        const ariaLabelKey = el.getAttribute('data-i18n-aria-label');
+        if (ariaLabelKey && translations[ariaLabelKey] !== undefined) {
+            el.setAttribute('aria-label', translations[ariaLabelKey]);
         }
     });
 }

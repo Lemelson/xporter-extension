@@ -10,6 +10,7 @@
   "fieldUsername": "Twitter Kullanıcı Adı",
   "placeholderUsername": "elonmusk",
   "dateRange": "Tarih Aralığı",
+  "dateRangeHelp": "Tarih aralığı dışa aktarımı bir X arama sekmesi açar ve gönderiler toplanırken sayfayı kaydırır. Dışa aktarma bitene kadar bu sekmeyi kapatmayın.",
   "dateFrom": "Başlangıç",
   "dateTo": "Bitiş",
   "exporting": "Dışa aktarılıyor...",

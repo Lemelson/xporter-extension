@@ -10,6 +10,7 @@
   "fieldUsername": "Twitter 사용자 이름",
   "placeholderUsername": "elonmusk",
   "dateRange": "날짜 범위",
+  "dateRangeHelp": "날짜 범위 내보내기는 X 검색 탭을 열고 게시물을 수집하는 동안 스크롤합니다. 내보내기가 끝날 때까지 해당 탭을 닫지 마세요.",
   "dateFrom": "시작",
   "dateTo": "종료",
   "exporting": "내보내는 중...",
