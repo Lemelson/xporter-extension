@@ -10,6 +10,7 @@
   "fieldUsername": "Twitterユーザー名",
   "placeholderUsername": "elonmusk",
   "dateRange": "日付範囲",
+  "dateRangeHelp": "日付範囲のエクスポートでは X の検索タブを開き、投稿を収集中に自動スクロールします。完了までそのタブを閉じないでください。",
   "dateFrom": "開始",
   "dateTo": "終了",
   "exporting": "エクスポート中...",

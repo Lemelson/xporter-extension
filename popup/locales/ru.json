@@ -10,6 +10,7 @@
   "fieldUsername": "Имя пользователя Twitter",
   "placeholderUsername": "elonmusk",
   "dateRange": "Диапазон дат",
+  "dateRangeHelp": "Экспорт по датам открывает вкладку поиска X и прокручивает её, пока собираются посты. Не закрывайте эту вкладку до конца экспорта.",
   "dateFrom": "С",
   "dateTo": "По",
   "exporting": "Экспорт...",

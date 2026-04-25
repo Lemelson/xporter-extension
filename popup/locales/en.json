@@ -10,6 +10,7 @@
   "fieldUsername": "Twitter Username",
   "placeholderUsername": "elonmusk",
   "dateRange": "Date Range",
+  "dateRangeHelp": "Date range export opens an X search tab and scrolls it while posts are collected. Keep that tab open until export finishes.",
   "dateFrom": "From",
   "dateTo": "To",
   "exporting": "Exporting...",

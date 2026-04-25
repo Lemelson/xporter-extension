@@ -10,6 +10,7 @@
   "fieldUsername": "Username Twitter",
   "placeholderUsername": "elonmusk",
   "dateRange": "Rentang Tanggal",
+  "dateRangeHelp": "Ekspor rentang tanggal membuka tab pencarian X dan menggulirkannya saat postingan dikumpulkan. Biarkan tab itu terbuka sampai ekspor selesai.",
   "dateFrom": "Dari",
   "dateTo": "Sampai",
   "exporting": "Mengekspor...",

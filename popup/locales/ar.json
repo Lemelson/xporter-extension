@@ -10,6 +10,7 @@
   "fieldUsername": "اسم مستخدم تويتر",
   "placeholderUsername": "elonmusk",
   "dateRange": "نطاق التاريخ",
+  "dateRangeHelp": "يفتح التصدير حسب التاريخ تبويب بحث في X ويمرره أثناء جمع المنشورات. أبق هذا التبويب مفتوحاً حتى ينتهي التصدير.",
   "dateFrom": "من",
   "dateTo": "إلى",
   "exporting": "جاري التصدير...",

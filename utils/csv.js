@@ -99,26 +99,54 @@ function generateSimpleXLSX(items, isUsers = false) {
 // ==================== Filename ====================
 
 /**
- * Generate export filename: XPorter_{username}_{mode}_{timestamp}.{ext}
+ * Generate export filename with mode, handle, optional date range, and export time.
  * @param {string} username
  * @param {string} mode - 'posts', 'followers', 'following', 'verified_followers'
  * @param {string} ext - file extension
+ * @param {Object} [options]
  * @returns {string}
  */
-function generateExportFilename(username, mode, ext) {
-    const now = new Date();
+function generateExportFilename(username, mode, ext, options = {}) {
+    const now = options.exportedAt ? new Date(options.exportedAt) : new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = [
         now.getFullYear(),
         pad(now.getMonth() + 1),
         pad(now.getDate()),
-        '_',
+        'at',
         pad(now.getHours()),
         pad(now.getMinutes()),
         pad(now.getSeconds())
-    ].join('');
+    ].join('-');
 
-    return `XPorter_${username}_${mode}_${timestamp}.${ext}`;
+    const cleanPart = (value, fallback = 'unknown') => {
+        const safe = String(value || fallback)
+            .replace(/^@/, '')
+            .replace(/[^a-zA-Z0-9_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        return safe || fallback;
+    };
+    const formatDatePart = (value) => {
+        if (!value) return null;
+        const date = new Date(value);
+        if (isNaN(date.getTime())) return null;
+        return date.toISOString().slice(0, 10);
+    };
+
+    const parts = [
+        'XPorter',
+        cleanPart(mode, 'posts'),
+        cleanPart(username)
+    ];
+
+    const from = formatDatePart(options.dateFrom);
+    const to = formatDatePart(options.dateTo);
+    if (from || to) {
+        parts.push('from', from || 'start', 'to', to || 'latest');
+    }
+
+    parts.push('exported', timestamp);
+    return `${parts.join('_')}.${cleanPart(ext, 'csv').toLowerCase()}`;
 }
 
 // ==================== Global Export ====================

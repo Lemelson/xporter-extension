@@ -10,6 +10,7 @@
   "fieldUsername": "Usuário do Twitter",
   "placeholderUsername": "elonmusk",
   "dateRange": "Intervalo de datas",
+  "dateRangeHelp": "A exportação por datas abre uma aba de busca do X e rola a página enquanto coleta publicações. Mantenha essa aba aberta até terminar.",
   "dateFrom": "De",
   "dateTo": "Até",
   "exporting": "Exportando...",

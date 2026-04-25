@@ -10,6 +10,7 @@
   "fieldUsername": "Nome utente Twitter",
   "placeholderUsername": "elonmusk",
   "dateRange": "Intervallo date",
+  "dateRangeHelp": "L'esportazione per date apre una scheda di ricerca X e la scorre mentre raccoglie i post. Tieni aperta la scheda fino al termine.",
   "dateFrom": "Da",
   "dateTo": "A",
   "exporting": "Esportazione...",
