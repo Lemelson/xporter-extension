@@ -160,7 +160,7 @@ function applyI18nToDOM(translations) {
         const tooltipKey = el.getAttribute('data-i18n-tooltip');
         if (tooltipKey && translations[tooltipKey] !== undefined) {
             el.dataset.tooltip = translations[tooltipKey];
-            el.title = translations[tooltipKey];
+            el.removeAttribute('title');
         }
         const ariaLabelKey = el.getAttribute('data-i18n-aria-label');
         if (ariaLabelKey && translations[ariaLabelKey] !== undefined) {
