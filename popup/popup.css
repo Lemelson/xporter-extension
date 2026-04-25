@@ -1252,11 +1252,13 @@ body.light .lang-option.active {
   z-index: 30;
   width: min(300px, calc(100vw - 56px));
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(125, 190, 255, 0.38);
   border-radius: 8px;
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, rgba(21, 33, 56, 0.98), rgba(37, 43, 80, 0.98));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   color: var(--text-primary);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
   content: attr(data-tooltip);
   font-size: 12px;
   font-weight: 500;
@@ -1277,6 +1279,13 @@ body.light .lang-option.active {
 .date-help:focus-visible::after {
   opacity: 1;
   transform: translateY(0);
+}
+
+body.light .date-help::after {
+  border-color: rgba(10, 111, 219, 0.32);
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--text-primary);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
 }
 
 .date-fields {
