@@ -137,12 +137,22 @@ async function main() {
     for (let attempt = 0; attempt < 60; attempt++) {
       await sleep(3000);
       const status = await popupPage.evaluate(async () => chrome.runtime.sendMessage({ type: 'GET_STATUS' }));
+      const searchPage = context.pages().find((page) => page.url().includes('/search?'));
+      const overlay = searchPage ? await searchPage.evaluate(() => {
+        const root = document.getElementById('xporter-capture-overlay');
+        return root ? {
+          visible: true,
+          text: root.textContent.replace(/\s+/g, ' ').trim()
+        } : { visible: false, text: '' };
+      }).catch(() => ({ visible: false, text: '' })) : { visible: false, text: '' };
+
       snapshots.push({
         attempt,
         status: status?.status || null,
         running: !!status?.running,
         tweetCount: status?.tweetCount || 0,
-        error: status?.error || null
+        error: status?.error || null,
+        overlay
       });
 
       if (!status?.running) {

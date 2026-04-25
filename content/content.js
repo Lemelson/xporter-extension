@@ -103,7 +103,111 @@ window.addEventListener('message', (event) => {
     }
 });
 
+function ensureXporterCaptureOverlay() {
+    let overlay = document.getElementById('xporter-capture-overlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'xporter-capture-overlay';
+    overlay.innerHTML = `
+        <div class="xporter-capture-title">XPorter date range export</div>
+        <div class="xporter-capture-subtitle" data-xporter-subtitle>Preparing search page...</div>
+        <div class="xporter-capture-bar"><span data-xporter-bar></span></div>
+        <div class="xporter-capture-meta">
+            <span data-xporter-count>0 posts collected</span>
+            <span data-xporter-range></span>
+        </div>
+        <div class="xporter-capture-note">Keep this tab open. XPorter is scrolling it to collect posts.</div>
+    `;
+
+    const style = document.createElement('style');
+    style.id = 'xporter-capture-overlay-style';
+    style.textContent = `
+        #xporter-capture-overlay {
+            position: fixed;
+            left: 50%;
+            top: 22px;
+            z-index: 2147483647;
+            width: min(520px, calc(100vw - 32px));
+            transform: translateX(-50%);
+            padding: 14px 16px;
+            border: 1px solid rgba(96, 184, 255, 0.36);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(12, 20, 32, 0.96), rgba(31, 41, 73, 0.96));
+            color: #fff;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.48);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            pointer-events: none;
+        }
+        #xporter-capture-overlay .xporter-capture-title {
+            font-size: 15px;
+            font-weight: 750;
+            line-height: 1.25;
+        }
+        #xporter-capture-overlay .xporter-capture-subtitle,
+        #xporter-capture-overlay .xporter-capture-note {
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+        #xporter-capture-overlay .xporter-capture-bar {
+            height: 7px;
+            margin-top: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+        }
+        #xporter-capture-overlay .xporter-capture-bar span {
+            display: block;
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #60B8FF, #00BA7C);
+            transition: width 0.25s ease;
+        }
+        #xporter-capture-overlay .xporter-capture-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.88);
+            font-size: 12px;
+            font-weight: 650;
+        }
+    `;
+
+    document.documentElement.appendChild(style);
+    document.documentElement.appendChild(overlay);
+    return overlay;
+}
+
+function updateXporterCaptureOverlay(status) {
+    const overlay = ensureXporterCaptureOverlay();
+    const count = Number(status.tweetCount || 0);
+    const limit = Number(status.quantityLimit || 0);
+    const progress = limit > 0 ? Math.min(100, Math.round((count / limit) * 100)) : Math.min(100, count > 0 ? 12 : 5);
+    const range = [status.dateFrom, status.dateTo].filter(Boolean).join(' to ');
+
+    overlay.querySelector('[data-xporter-subtitle]').textContent = status.phase || `Exporting @${status.username || 'profile'}...`;
+    overlay.querySelector('[data-xporter-count]').textContent = `${count} posts collected`;
+    overlay.querySelector('[data-xporter-range]').textContent = range;
+    overlay.querySelector('[data-xporter-bar]').style.width = `${progress}%`;
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'XPORTER_SEARCH_CAPTURE_STATUS') {
+        try {
+            updateXporterCaptureOverlay(message);
+            sendResponse({ success: true });
+        } catch (error) {
+            sendResponse({ error: error.message });
+        }
+        return true;
+    }
+
     if (message?.type === 'XPORTER_SCROLL_SEARCH_PAGE') {
         try {
             const retryButton = Array.from(document.querySelectorAll('button, [role="button"]')).find((button) => {

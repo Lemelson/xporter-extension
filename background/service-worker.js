@@ -396,6 +396,7 @@ async function _fetchPostsByDateRangeLoop() {
         if (!payload) {
             throw new Error('SEARCH_CAPTURE_TIMEOUT');
         }
+        await sendSearchCaptureStatus({ phase: `Exporting @${currentExport.username}...` });
 
         while (hasMore && currentExport.running) {
             if (currentExport.settings.quantityLimit > 0 &&
@@ -441,6 +442,7 @@ async function _fetchPostsByDateRangeLoop() {
 
             if (parsedPayload.nextCursor) {
                 currentExport.cursor = parsedPayload.nextCursor;
+                await sendSearchCaptureStatus({ phase: `Scrolling X search for @${currentExport.username}...` });
                 payload = await requestNextSearchCapturePayload();
                 if (!payload) {
                     hasMore = false;
@@ -450,6 +452,7 @@ async function _fetchPostsByDateRangeLoop() {
             }
 
             await saveCurrentState();
+            await sendSearchCaptureStatus({ phase: `Exporting @${currentExport.username}...` });
 
             broadcastStatus({
                 running: true,
@@ -507,6 +510,10 @@ async function openSearchCaptureTab(rawQuery) {
         resolver: null,
         seenUrls: new Set()
     };
+
+    setTimeout(() => {
+        sendSearchCaptureStatus({ phase: `Preparing search for @${currentExport?.username || 'profile'}...` }, 8);
+    }, 1000);
 }
 
 async function closeSearchCaptureTab() {
@@ -569,6 +576,31 @@ async function requestNextSearchCapturePayload() {
     }
 
     return null;
+}
+
+async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
+    if (!searchCapture?.tabId || !currentExport) return false;
+
+    const message = {
+        type: 'XPORTER_SEARCH_CAPTURE_STATUS',
+        username: currentExport.username,
+        tweetCount: currentExport.tweetCount || 0,
+        quantityLimit: currentExport.settings?.quantityLimit || 0,
+        dateFrom: currentExport.dateFrom ? formatDateForSearch(currentExport.dateFrom) : '',
+        dateTo: currentExport.dateTo ? formatDateForSearch(currentExport.dateTo) : '',
+        ...overrides
+    };
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        try {
+            await chrome.tabs.sendMessage(searchCapture.tabId, message);
+            return true;
+        } catch (_) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+
+    return false;
 }
 
 function handlePageGraphqlResponse(message, sender) {
