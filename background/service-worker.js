@@ -498,6 +498,8 @@ function buildSearchTimelinePageUrl(rawQuery) {
 async function openSearchCaptureTab(rawQuery) {
     await closeSearchCaptureTab();
 
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+
     // X search lazy-loads reliably only in a foreground tab.
     const tab = await chrome.tabs.create({
         url: buildSearchTimelinePageUrl(rawQuery),
@@ -506,6 +508,7 @@ async function openSearchCaptureTab(rawQuery) {
 
     searchCapture = {
         tabId: tab.id,
+        returnTabId: activeTab?.id || null,
         queue: [],
         resolver: null,
         seenUrls: new Set()
@@ -519,7 +522,7 @@ async function openSearchCaptureTab(rawQuery) {
 async function closeSearchCaptureTab() {
     if (!searchCapture) return;
 
-    const { tabId, resolver } = searchCapture;
+    const { tabId, returnTabId, resolver } = searchCapture;
     searchCapture = null;
 
     if (resolver) {
@@ -531,6 +534,14 @@ async function closeSearchCaptureTab() {
             await chrome.tabs.remove(tabId);
         } catch (_) {
             // Tab may already be closed
+        }
+    }
+
+    if (typeof returnTabId === 'number') {
+        try {
+            await chrome.tabs.update(returnTabId, { active: true });
+        } catch (_) {
+            // Original tab may already be closed
         }
     }
 }
