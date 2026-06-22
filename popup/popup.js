@@ -548,8 +548,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const target = (lastQuantityLimit > 0) ? lastQuantityLimit : (lastExpectedItems || 1);
         const progressPct = Math.min(100, Math.round(itemCount / target * 100));
 
-        function setDotColor(color) {
-            statusIndicator.className = 'status-dot status-' + color;
+        // `live` adds a pulsing animation to the status dot while the export is
+        // actively working (fetching / cooling down / retrying).
+        function setDotColor(color, live = false) {
+            statusIndicator.className = 'status-dot status-' + color + (live ? ' live' : '');
         }
 
         function setMeasuredProgress() {
@@ -562,28 +564,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        // Cooldown tint is per-state; clear it before each render, re-add below.
+        progressFill.classList.remove('cooldown');
+
         // Status-specific display
         switch (status) {
             case 'resolving_user':
-                statusText.textContent = `${t('lookingUp')} @${state.username}...`;
-                setDotColor('green');
+                statusText.textContent = `${t('lookingUp')} @${state.username}`;
+                setDotColor('green', true);
                 statusMessage.textContent = t('resolvingUser');
                 progressFill.classList.add('indeterminate');
                 progressFill.style.width = '100%';
                 break;
 
             case 'fetching':
-                statusText.textContent = `${t('exporting')} @${state.username || usernameInput.value}...`;
-                setDotColor('green');
+                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} @${state.username || usernameInput.value}`;
+                setDotColor('green', true);
                 statusMessage.textContent = `${t('fetching')} (${t('batch')} ${state.batch || 1})`;
                 setMeasuredProgress();
                 break;
 
             case 'cooldown':
-                setDotColor('yellow');
+                setDotColor('yellow', true);
                 const seconds = Math.round((state.duration || 180000) / 1000);
                 statusMessage.textContent = `${t('cooldown')} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
                 setMeasuredProgress();
+                progressFill.classList.add('cooldown');
                 break;
 
             case 'error':
