@@ -141,6 +141,15 @@ async function loadAllTweets() {
     return allTweets;
 }
 
+/**
+ * Load one saved export batch.
+ */
+async function loadTweetBatch(batchIndex) {
+    const key = STORAGE_KEYS.TWEETS_PREFIX + batchIndex;
+    const result = await safeGet(key);
+    return result[key] || [];
+}
+
 // ==================== Cleanup ====================
 
 /**
@@ -275,7 +284,7 @@ async function loadDetectedUsername() {
 if (typeof globalThis !== 'undefined') {
     globalThis.XPorterStorage = {
         saveExportState, loadExportState,
-        saveTweetBatch, loadAllTweets,
+        saveTweetBatch, loadTweetBatch, loadAllTweets,
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,

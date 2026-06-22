@@ -269,12 +269,15 @@ function updateXporterCaptureOverlay(status) {
     const overlay = ensureXporterCaptureOverlay();
     const i = status.i18n || {};
     overlay._xporterI18n = i;
+    if (i.lang) overlay.setAttribute('lang', i.lang);
+    if (i.dir) overlay.setAttribute('dir', i.dir);
     const count = Number(status.tweetCount || 0);
     const limit = Number(status.quantityLimit || 0);
     const range = [status.dateFrom, status.dateTo].filter(Boolean).join(' → ');
+    const locale = i.lang || undefined;
     const postsWord = i.posts || 'posts';
     const limitText = limit > 0
-        ? `${i.limitLabel || 'Limit:'} ${limit.toLocaleString()} ${postsWord}`
+        ? `${i.limitLabel || 'Limit:'} ${limit.toLocaleString(locale)} ${postsWord}`
         : (i.noLimit || 'No post limit');
 
     // Localize static labels once translations arrive.
@@ -295,7 +298,7 @@ function updateXporterCaptureOverlay(status) {
     overlay.querySelector('[data-xporter-subtitle]').textContent =
         status.phase || i.preparingPage || 'Preparing search page...';
     overlay.querySelector('[data-xporter-count]').textContent =
-        `${count.toLocaleString()} ${i.postsCollected || 'posts collected'}`;
+        `${count.toLocaleString(locale)} ${i.postsCollected || 'posts collected'}`;
     overlay.querySelector('[data-xporter-range]').textContent = range;
     overlay.querySelector('[data-xporter-limit]').textContent = limitText;
 }
