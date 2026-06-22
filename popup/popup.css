@@ -273,25 +273,27 @@ body.light .btn-primary:hover {
 }
 
 .btn-danger {
-  background: rgba(220, 38, 38, 0.75);
+  background: rgba(220, 38, 38, 0.78);
   border: 1px solid rgba(248, 113, 113, 0.5);
-  box-shadow: 0 0 16px rgba(220, 38, 38, 0.25), var(--glass-inner-glow);
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.30), var(--glass-edge);
   color: #fff;
 }
 
 .btn-danger:hover {
-  background: rgba(220, 38, 38, 0.9);
+  background: rgba(220, 38, 38, 0.92);
+  box-shadow: 0 6px 24px rgba(220, 38, 38, 0.42), var(--glass-edge);
 }
 
 .btn-success {
-  background: rgba(0, 166, 104, 0.75);
-  border: 1px solid rgba(52, 211, 153, 0.5);
-  box-shadow: 0 0 16px rgba(0, 166, 104, 0.2), var(--glass-inner-glow);
+  background: linear-gradient(135deg, rgba(0, 200, 134, 0.92) 0%, rgba(0, 166, 104, 0.92) 50%, rgba(0, 214, 143, 0.9) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 166, 104, 0.34), var(--glass-edge);
   color: #fff;
 }
 
 .btn-success:hover {
-  background: rgba(0, 166, 104, 0.9);
+  background: linear-gradient(135deg, rgba(0, 214, 143, 1) 0%, rgba(0, 184, 116, 1) 50%, rgba(20, 224, 153, 1) 100%);
+  box-shadow: 0 6px 24px rgba(0, 166, 104, 0.46), var(--glass-edge);
 }
 
 .btn-secondary {
@@ -362,11 +364,23 @@ input[type="number"] {
   font-weight: 600;
   font-family: inherit;
   text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 body.light .input-resume {
   border-color: rgba(0, 0, 0, 0.16);
   background: rgba(255, 255, 255, 0.62);
+}
+
+/* Unified field hover — inputs and selects brighten their border to the accent
+   on hover to show they're interactive, without lifting (they're not buttons).
+   Focus then adds the glow ring on top. */
+.select:hover,
+.input-group:hover,
+.input-small:hover,
+.input-resume:hover,
+.date-row input[type="date"]:hover {
+  border-color: var(--accent);
 }
 
 .input-resume:focus {
@@ -397,13 +411,6 @@ body.light .input-resume {
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-}
-
-.feature:hover {
-  border-color: var(--glass-border-strong);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(6, 10, 28, 0.30), var(--glass-edge);
 }
 
 .about-link {
@@ -424,9 +431,10 @@ body.light .input-resume {
 }
 
 .about-link:hover {
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.12);
   border-color: var(--accent);
-  box-shadow: 0 2px 12px var(--accent-glow);
+  box-shadow: 0 4px 16px var(--accent-glow), var(--glass-edge);
+  transform: translateY(-1px);
 }
 
 /* Glass progress bar */
@@ -545,13 +553,15 @@ body.light .footer {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
   box-shadow: var(--glass-edge);
 }
 
 .history-toggle:hover {
   background: var(--bg-hover);
   border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(6, 10, 28, 0.28), var(--glass-edge);
 }
 
 .history-toggle-left {
@@ -597,13 +607,11 @@ body.light .footer {
   padding: 10px;
   box-shadow: var(--glass-edge);
   position: relative;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s;
 }
 
 .history-card:hover {
   border-color: var(--glass-border-strong);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(6, 10, 28, 0.28), var(--glass-edge);
 }
 
 .history-avatar {
@@ -836,9 +844,7 @@ body.light .toggle-input:checked+.toggle-track {
 }
 
 .date-row input[type="date"]:hover {
-  border-color: var(--glass-border-strong);
-  transform: translateY(-1px);
-  box-shadow: var(--glass-inner-glow), 0 4px 10px rgba(0, 0, 0, 0.12);
+  border-color: var(--accent);
 }
 
 .date-row input[type="date"]:focus {
@@ -852,7 +858,7 @@ body.light .date-row input[type="date"] {
 }
 
 body.light .date-row input[type="date"]:hover {
-  border-color: rgba(0, 0, 0, 0.24);
+  border-color: var(--accent);
 }
 
 body.light .date-row input[type="date"]:focus {
@@ -1437,8 +1443,14 @@ body.light .date-help::after {
   font-family: inherit;
 }
 
+/* Unified button interaction: every clickable button lifts on hover and
+   presses in on click — applied here once so all variants behave identically. */
+.btn:hover {
+  transform: translateY(-1px);
+}
+
 .btn:active {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.98);
 }
 
 /* About */
@@ -1532,7 +1544,6 @@ body.light .date-help::after {
 .input-small,
 .export-status,
 .feature,
-.about-link,
 .footer,
 .toggle-track,
 .toggle-label,
