@@ -372,15 +372,23 @@ body.light .input-resume {
   background: rgba(255, 255, 255, 0.62);
 }
 
-/* Unified field hover — inputs and selects brighten their border to the accent
-   on hover to show they're interactive, without lifting (they're not buttons).
-   Focus then adds the glow ring on top. */
+/* Unified field hover — inputs and selects light up with an accent border and a
+   soft accent ring on hover, so they clearly read as interactive without lifting
+   (they're value pickers, not action buttons). The body.light copy below is
+   required because `body.light .select` etc. otherwise out-specify a bare
+   `.select:hover` and cancel the effect in light mode. */
 .select:hover,
 .input-group:hover,
 .input-small:hover,
 .input-resume:hover,
-.date-row input[type="date"]:hover {
+.date-row input[type="date"]:hover,
+body.light .select:hover,
+body.light .input-group:hover,
+body.light .input-small:hover,
+body.light .input-resume:hover,
+body.light .date-row input[type="date"]:hover {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
 }
 
 .input-resume:focus {
@@ -843,10 +851,6 @@ body.light .toggle-input:checked+.toggle-track {
   outline: none;
 }
 
-.date-row input[type="date"]:hover {
-  border-color: var(--accent);
-}
-
 .date-row input[type="date"]:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
@@ -855,10 +859,6 @@ body.light .toggle-input:checked+.toggle-track {
 body.light .date-row input[type="date"] {
   border: 1px solid rgba(0, 0, 0, 0.16);
   box-shadow: var(--glass-inner-glow), 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-body.light .date-row input[type="date"]:hover {
-  border-color: var(--accent);
 }
 
 body.light .date-row input[type="date"]:focus {
