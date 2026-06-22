@@ -321,7 +321,7 @@ body.light .btn-secondary {
 .about-link:hover,
 .history-toggle:hover,
 .select:hover {
-  background-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.18);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(6, 10, 28, 0.42), var(--glass-edge);
   transform: translateY(-1px);
@@ -331,7 +331,7 @@ body.light .btn-secondary:hover,
 body.light .about-link:hover,
 body.light .history-toggle:hover,
 body.light .select:hover {
-  background-color: rgba(255, 255, 255, 0.96);
+  background-color: rgba(255, 255, 255, 0.82);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(30, 41, 89, 0.18), var(--glass-edge);
   transform: translateY(-1px);
@@ -400,7 +400,7 @@ body.light .input-resume {
 .date-row input[type="date"]:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
-  background-color: rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.11);
 }
 
 body.light .input-group:hover,
@@ -409,7 +409,7 @@ body.light .input-resume:hover,
 body.light .date-row input[type="date"]:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
-  background-color: rgba(255, 255, 255, 0.92);
+  background-color: rgba(255, 255, 255, 0.74);
 }
 
 .input-resume:focus {
