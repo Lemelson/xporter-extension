@@ -290,25 +290,31 @@ body.light .input-small {
 
 /* Contextual action: a fixed compact square (icon over a short label), centered
    beside the status — never stretches tall on long translations. */
-.btn-square {
+/* NOTE: must be `.btn.btn-square`, not `.btn-square` — the base `.btn` rule is
+   defined LATER in this file, so at equal specificity it was overriding the
+   font-size (15px) and padding (16px) here, which blew the label up and forced
+   it to wrap mid-word. The extra `.btn` class wins regardless of order. */
+.btn.btn-square {
   flex-direction: column;
   gap: 4px;
   width: 78px;
   height: 78px;
   flex-shrink: 0;
-  padding: 8px;
+  padding: 8px 6px;
+  /* ~the size of the "Can be resumed" status line, bold — fits long labels
+     like "Остановить" on one line in the 78px square. */
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.15;
   border-radius: var(--radius-sm);
 }
 
-.btn-square span {
+.btn.btn-square span {
   text-align: center;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
-.btn-square svg {
+.btn.btn-square svg {
   width: 22px;
   height: 22px;
   flex-shrink: 0;
@@ -1698,7 +1704,7 @@ body.light .help-pop {
 /* ========== CONTACT & SUPPORT ========== */
 .about-contact {
   text-align: left;
-  margin: 4px 0 12px;
+  margin: 10px 0 16px;
   padding: 14px;
   border-radius: var(--radius);
   background: var(--glass-bg);
@@ -1799,7 +1805,8 @@ body.light .help-pop {
 
 .contact-btn--telegram:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(34, 158, 217, 0.5), var(--glass-edge);
+  background: linear-gradient(135deg, #3BB8FF 0%, #229ED9 100%);
+  box-shadow: 0 0 0 3px rgba(56, 170, 255, 0.42), 0 12px 28px rgba(34, 158, 217, 0.55), var(--glass-edge);
 }
 
 .contact-pill {
@@ -1815,55 +1822,145 @@ body.light .help-pop {
   flex-shrink: 0;
 }
 
-/* Email — secondary, glass */
+/* Email — secondary glass card: [mail-icon link] + [copyable address] */
 .contact-btn--email {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-edge);
   color: var(--text-primary);
-}
-
-.contact-btn--email .contact-btn-icon {
-  background: var(--accent-glow);
-  color: var(--accent);
-}
-
-.contact-btn--email .contact-btn-sub {
-  color: var(--text-muted);
+  gap: 8px;
+  padding: 9px 10px;
 }
 
 .contact-btn--email:hover {
   transform: translateY(-1px);
   border-color: var(--accent);
-  background-color: rgba(255, 255, 255, 0.14);
   box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(6, 10, 28, 0.42), var(--glass-edge);
 }
 
 body.light .contact-btn--email:hover {
-  background-color: rgba(255, 255, 255, 0.74);
   box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(30, 41, 89, 0.18), var(--glass-edge);
 }
 
-/* GitHub — tertiary, subtle pill */
-.about-github {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 12px;
-  padding: 7px 14px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
+/* Envelope (left) — opens the mail app */
+.contact-email-mail {
+  display: flex;
+  flex-shrink: 0;
   text-decoration: none;
-  border: 1px solid transparent;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  border-radius: 10px;
 }
 
-.about-github:hover {
+.contact-email-mail .contact-btn-icon {
+  background: var(--accent-glow);
+  color: var(--accent);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.contact-email-mail:hover .contact-btn-icon {
+  background: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* Address zone (right) — click to copy */
+.contact-email-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  margin: -2px 0;
+  padding: 4px 4px 4px 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  transition: background 0.2s ease;
+}
+
+.contact-email-copy:hover,
+.contact-email-copy:focus-visible {
+  background: rgba(255, 255, 255, 0.10);
+  outline: none;
+}
+
+body.light .contact-email-copy:hover,
+body.light .contact-email-copy:focus-visible {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.contact-email-addr {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
   color: var(--text-primary);
-  border-color: var(--glass-border);
-  background: var(--glass-bg);
+  word-break: break-all;
+}
+
+.contact-email-copy:hover .contact-email-addr {
+  color: var(--accent);
+}
+
+.contact-email-copy .contact-btn-sub {
+  color: var(--text-muted);
+}
+
+.contact-email-copied {
+  display: none;
+  color: var(--success);
+  font-weight: 600;
+}
+
+.contact-email-dot {
+  opacity: 0.5;
+}
+
+/* Copy icon (far right of the address zone) */
+.contact-copy-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--text-muted);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.contact-email-copy:hover .contact-copy-icon {
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.ico-check {
+  display: none;
+}
+
+/* "Copied!" confirmation state */
+.contact-btn--email.is-copied .contact-email-hint {
+  display: none;
+}
+
+.contact-btn--email.is-copied .contact-email-copied {
+  display: inline;
+}
+
+.contact-btn--email.is-copied .ico-copy {
+  display: none;
+}
+
+.contact-btn--email.is-copied .ico-check {
+  display: block;
+  color: var(--success);
+}
+
+.contact-btn--email.is-copied .contact-copy-icon {
+  color: var(--success);
+  background: rgba(0, 186, 124, 0.16);
 }
 
 /* Utility */
