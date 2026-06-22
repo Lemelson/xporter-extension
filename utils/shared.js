@@ -140,6 +140,35 @@ function extractUsernameFromInput(input) {
 // ==================== i18n Helpers ====================
 
 /**
+ * Escape HTML so locale strings can never inject markup.
+ */
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/**
+ * Render help-tooltip text. Everything is escaped first, then the only
+ * markup we allow — **bold** spans used to highlight the gist — becomes
+ * <strong>. So a reader can scan the bold for the essence or read it all.
+ */
+function renderHelpMarkup(text) {
+    return escapeHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+}
+
+/**
+ * Strip the **bold** markers from a string (for plain-text contexts like
+ * aria-label, where screen readers would otherwise read the asterisks).
+ */
+function stripHelpMarkup(text) {
+    return String(text).replace(/\*\*/g, '').replace(/\s*\n\s*/g, ' ').trim();
+}
+
+/**
  * Apply translations to common i18n attributes.
  * Used by both popup and export pages.
  */
@@ -159,12 +188,21 @@ function applyI18nToDOM(translations) {
         }
         const tooltipKey = el.getAttribute('data-i18n-tooltip');
         if (tooltipKey && translations[tooltipKey] !== undefined) {
-            el.dataset.tooltip = translations[tooltipKey];
+            // Render into a real child element so **bold** gist markup works
+            // (a CSS attr() tooltip can only show plain text).
+            let pop = el.querySelector(':scope > .help-pop');
+            if (!pop) {
+                pop = document.createElement('span');
+                pop.className = 'help-pop';
+                pop.setAttribute('aria-hidden', 'true');
+                el.appendChild(pop);
+            }
+            pop.innerHTML = renderHelpMarkup(translations[tooltipKey]);
             el.removeAttribute('title');
         }
         const ariaLabelKey = el.getAttribute('data-i18n-aria-label');
         if (ariaLabelKey && translations[ariaLabelKey] !== undefined) {
-            el.setAttribute('aria-label', translations[ariaLabelKey]);
+            el.setAttribute('aria-label', stripHelpMarkup(translations[ariaLabelKey]));
         }
     });
 }

@@ -94,12 +94,42 @@ body {
 
 .logo {
     font-size: 28px;
-    filter: drop-shadow(0 0 8px var(--accent));
 }
 
 .logo-icon {
-    color: var(--accent);
-    filter: drop-shadow(0 0 8px var(--accent));
+    color: #ffd60a;
+    --zap-glow: 9px;
+    --zap-glow-hi: 15px;
+    filter: drop-shadow(0 0 9px rgba(255, 200, 36, 0.85));
+    animation: zap-glow 5s ease-in-out infinite, zap-flicker 7s linear infinite;
+}
+
+/* Fill the bolt yellow (not just its outline). */
+.logo-icon path {
+    fill: currentColor;
+}
+
+/* Lightning bolt: gentle glow breathing + occasional lightbulb-style flicker. */
+@keyframes zap-glow {
+    0%, 100% { filter: drop-shadow(0 0 var(--zap-glow, 9px) rgba(255, 200, 36, 0.72)); }
+    50% { filter: drop-shadow(0 0 var(--zap-glow-hi, 15px) rgba(255, 222, 92, 1)); }
+}
+
+@keyframes zap-flicker {
+    0%, 37%, 100% { opacity: 1; }
+    37.6% { opacity: 0.4; }
+    38.2% { opacity: 1; }
+    38.9% { opacity: 0.62; }
+    39.5% { opacity: 1; }
+    71% { opacity: 1; }
+    71.5% { opacity: 0.3; }
+    72% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .logo-icon {
+        animation: none !important;
+    }
 }
 
 .brand {
@@ -257,7 +287,7 @@ body {
     outline: none;
 }
 
-.date-help::after {
+.help-pop {
     position: absolute;
     left: 0;
     top: calc(100% + 8px);
@@ -271,14 +301,19 @@ body {
     -webkit-backdrop-filter: blur(16px);
     color: var(--text-primary);
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
-    content: attr(data-tooltip);
     font-size: 12px;
     font-weight: 500;
-    line-height: 1.45;
+    line-height: 1.5;
+    text-align: start;
     opacity: 0;
     pointer-events: none;
     transform: translateY(-4px);
     transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.help-pop strong {
+    font-weight: 700;
+    color: var(--accent);
 }
 
 .date-help:hover,
@@ -287,13 +322,13 @@ body {
     color: var(--accent);
 }
 
-.date-help:hover::after,
-.date-help:focus-visible::after {
+.date-help:hover .help-pop,
+.date-help:focus-visible .help-pop {
     opacity: 1;
     transform: translateY(0);
 }
 
-body.light .date-help::after {
+body.light .help-pop {
     border-color: rgba(29, 155, 240, 0.32);
     background: rgba(255, 255, 255, 0.98);
     color: var(--text-primary);

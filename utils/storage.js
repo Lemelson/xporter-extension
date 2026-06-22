@@ -260,6 +260,7 @@ async function loadSettings() {
         theme: 'dark',
         autoExpireEnabled: true,
         autoExpireHours: 4,
+        ladybugEnabled: true,
         ...(result[STORAGE_KEYS.SETTINGS] || {})
     };
 }

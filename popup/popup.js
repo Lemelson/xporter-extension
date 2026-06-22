@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const autoExpireEnabled = document.getElementById('autoExpireEnabled');
     const autoExpireHours = document.getElementById('autoExpireHours');
     const autoExpireRow = document.getElementById('autoExpireRow');
+    const ladybugEnabled = document.getElementById('ladybugEnabled');
 
     // Settings tab — posts-only elements
     const settingsPostsOnly = document.getElementById('settingsPostsOnly');
@@ -147,7 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateLangButton(code) {
-        const lang = LANGUAGES.find(l => l.code === code) || LANGUAGES[0];
+        const lang = LANGUAGES.find(l => l.code === code) || LANGUAGES.find(l => l.code === 'en');
         langFlag.textContent = lang.flag;
         langCode.textContent = code.toUpperCase();
     }
@@ -275,6 +276,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // ==================== Copy-to-clipboard (About tab email) ====================
+    document.querySelectorAll('[data-copy]').forEach(el => {
+        el.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const text = el.getAttribute('data-copy');
+            if (!text) return;
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch {
+                // Fallback for older browsers / restricted clipboard access
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch { /* noop */ }
+                ta.remove();
+            }
+            const target = el.closest('.email-action') || el;
+            target.classList.add('is-copied');
+            showToast(t('contactCopied') || 'Copied!', 'success');
+            clearTimeout(el._copyTimer);
+            el._copyTimer = setTimeout(() => target.classList.remove('is-copied'), 1800);
+        });
+    });
+
+    // ==================== "How it works" accordion (About tab) ====================
+    document.querySelectorAll('.detail-head').forEach(head => {
+        head.addEventListener('click', () => {
+            const item = head.closest('.detail-item');
+            const isOpen = item.classList.toggle('open');
+            head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+    });
+
     // ==================== Load Settings ====================
     if (currentSettings) {
         includeRetweets.checked = currentSettings.includeRetweets !== false;
@@ -293,6 +330,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         autoExpireEnabled.checked = currentSettings.autoExpireEnabled !== false;
         autoExpireHours.value = currentSettings.autoExpireHours || 4;
         autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
+        if (ladybugEnabled) {
+            ladybugEnabled.checked = currentSettings.ladybugEnabled !== false;
+            window.XPorterLadybug?.setEnabled?.(ladybugEnabled.checked);
+        }
     }
 
     quantityLimit.addEventListener('change', () => {
@@ -309,6 +350,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
         saveSettingsDebounced();
     });
+
+    if (ladybugEnabled) {
+        ladybugEnabled.addEventListener('change', () => {
+            window.XPorterLadybug?.setEnabled?.(ladybugEnabled.checked);
+            saveSettingsDebounced();
+        });
+    }
 
     const saveSettingsDebounced = debounce(async () => {
         let qLimit;
@@ -331,7 +379,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 exportMode: exportMode.value,
                 outputFormat: outputFormat.value,
                 autoExpireEnabled: autoExpireEnabled.checked,
-                autoExpireHours: Math.max(1, Math.min(48, parseInt(autoExpireHours.value) || 4))
+                autoExpireHours: Math.max(1, Math.min(48, parseInt(autoExpireHours.value) || 4)),
+                ladybugEnabled: ladybugEnabled ? ladybugEnabled.checked : true
             }
         });
     }, 500);
