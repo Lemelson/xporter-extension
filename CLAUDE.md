@@ -1,0 +1,43 @@
+# CLAUDE.md — quick orientation
+
+**XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, followers, following, and verified followers to **CSV / JSON / XLSX**, using X's internal GraphQL API through the user's own logged-in session.
+
+- **Version:** 1.2.0 (`manifest.json`)
+- **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
+- **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
+
+## Where things live (start here)
+
+| You want to… | Go to |
+|---|---|
+| Export engine, message routing, state machine | `background/service-worker.js` |
+| X GraphQL calls, endpoint discovery, parsers | `utils/api.js` (+ `utils/api-features.js` = feature flags) |
+| Live queryId capture / page hooks | `content/content.js` + `content/interceptor.js` (page MAIN world) |
+| Rate limiting (cooldowns, retries, abort) | `utils/rateLimit.js` |
+| Storage, settings + defaults | `utils/storage.js` |
+| Tunable constants + logger (`XLog`) | `utils/config.js` |
+| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css` |
+| Full-page export UI (mirrors popup) | `export/export.{html,js,css}` |
+| Helpers shared by popup **and** export | `utils/shared.js` (NOT `popup/utils.js` — that's a thin wrapper) |
+| In-app UI strings (14 languages) | `popup/locales/*.json` (`en.json` = fallback) |
+| Localized CSV/XLSX column headers | `utils/columns-i18n.js` (`XPorterColumns`; data keys + JSON stay English; gated by the `localizeExportHeaders` setting, default on) |
+| Store name/description i18n | `_locales/*/messages.json` (≠ `popup/locales/`) |
+| Ladybug Easter egg (About tab) | `popup/ladybug.js` |
+| "Rate XPorter" prompt (popup + export) | `popup/rate-prompt.{js,css}` (self-contained; state in `chrome.storage.local` key `xporter_rate_prompt`; deep-links to the CWS reviews page) |
+| Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
+| Dev/debug scripts (not shipped) | `scripts/`, `index.html`, `docs/` |
+
+## Gotchas that bite
+
+1. **Two i18n systems:** `popup/locales/` = in-app strings; `_locales/` = Chrome Store metadata. Don't confuse them.
+2. **Adding a setting or string → update ALL 14 `popup/locales/*.json`** (add to `en.json` first). Settings also need a default in `utils/storage.js` + `onInstalled` in the SW.
+3. **Dual UI:** logic is shared via `utils/shared.js`, but message-protocol/status changes must land in **both** `popup.js` and `export.js`.
+4. **Help tooltips** (`!` icons) support `**bold**` markup for the "gist" — keep both `**…**` spans when editing/translating; aria-labels are auto-stripped (`renderHelpMarkup` / `stripHelpMarkup` in `utils/shared.js`).
+5. **X API is fragile:** 400s usually = a changed GraphQL **feature flag** (`utils/api-features.js`); queryIds drift (auto-discovered + live-captured, with `FALLBACK_ENDPOINTS` to refresh). Use `encodeURIComponent`, never `URLSearchParams`.
+6. **Service worker can be killed mid-export** — state is persisted to `chrome.storage.local` after every batch.
+7. **Date-range posts** use a separate path: open an X **search tab** and scroll it; the user must keep it open. See `agent.md` §5.
+8. **`tweetCount`/`tweetBuffer`** mean item count/buffer even for user exports (historical naming).
+9. **CSS:** never hardcode colours — everything is CSS custom properties with `dark`/`light` (`.light` on `<body>`).
+
+## When you change things
+Keep **`agent.md`** and this file in sync (new files, message types, storage keys, settings, export modes). Bump `version` in `manifest.json` for releases.

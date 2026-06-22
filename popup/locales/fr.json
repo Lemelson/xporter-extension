@@ -149,7 +149,6 @@
   "rateReport": "Signaler un problème",
   "rateClose": "Fermer",
   "rateThanks": "Merci !",
-  "ratePreview": "Afficher la fenêtre de notation",
   "rateAbout": "Noter XPorter",
   "localizeHeaders": "Traduire les titres de colonnes",
   "localizeHeadersHelp": "**Traduit les en-têtes de colonnes des fichiers CSV et XLSX dans votre langue.** Désactivez-le pour conserver les en-têtes en anglais ; ils conviennent mieux aux scripts et aux modèles de tableur. Les clés JSON restent toujours en anglais."

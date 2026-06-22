@@ -149,7 +149,6 @@
   "rateReport": "Report a problem",
   "rateClose": "Close",
   "rateThanks": "Thank you!",
-  "ratePreview": "Show rating prompt",
   "rateAbout": "Rate XPorter",
   "localizeHeaders": "Localize column titles",
   "localizeHeadersHelp": "**Translates the CSV and XLSX column headers into your language.** Turn it off to keep the original English headers; they work best with scripts and spreadsheet templates. JSON keys always stay English."

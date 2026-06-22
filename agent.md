@@ -1,66 +1,72 @@
 # XPorter — Agent Context File
 
-> **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this before making changes. **Keep this file updated** when adding new features, changing architecture, or modifying critical logic.
+> **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
+>
+> Last verified against the codebase at **v1.1.0**.
 
 ---
 
 ## 1. Project Overview
 
-**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — tweets, followers, following, and verified followers — into CSV, JSON, or XLSX files. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
+**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, followers, following, and verified followers — into CSV, JSON, or XLSX files. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
 
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
+| Version | 1.1.0 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
-| Frameworks | None — zero dependencies |
-| Build System | None — raw source, no bundler |
-| Target Browser | Chrome / Chromium-based |
-| Min Chrome Version | 88+ (MV3 support) |
+| Frameworks | None — zero dependencies, no build step, no bundler |
+| Target Browser | Chrome / Chromium-based, 88+ (MV3) |
 
 ### Key Selling Points
 - **Free & unlimited** — competitors charge $12–15/mo and cap at 150–200 posts
 - **Multi-mode** — posts, followers, following, verified followers
 - **Multi-format** — CSV, JSON, XLSX (XML SpreadsheetML)
-- **14 languages** — automatic browser language detection
-- **Dynamic endpoint discovery** — auto-extracts GraphQL queryIds from X's JS bundles
+- **Date-range filtering** for posts (via an X search tab — see §5)
+- **14 languages** — auto-detected from the browser
+- **Self-healing API** — discovers GraphQL queryIds from X's JS bundles AND captures them live from X's own network traffic
 
 ---
 
 ## 2. Architecture & Data Flow
 
 ```
-┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐
-│ content.js   │────▶│ service-worker.js │◀───▶│ popup.js / export.js │
-│ (x.com page) │     │ (background)      │     │ (UI layer)           │
-│              │     │                   │     │                      │
-│ Detects      │     │ • Export engine   │     │ • User input         │
-│ username     │     │ • API calls       │     │ • Progress display   │
-│ from URL     │     │ • Rate limiting   │     │ • Settings           │
-│              │     │ • Storage mgmt    │     │ • Download trigger    │
-│              │     │ • CSV/JSON/XLSX   │     │                      │
-└──────────────┘     └──────────────────┘     └──────────────────────┘
-                              │
-                              ▼
-                     ┌───────────────┐
-                     │ X GraphQL API │
-                     │ (api.x.com)   │
-                     └───────────────┘
+┌─────────────────────────┐     ┌──────────────────────┐     ┌──────────────────────┐
+│ content/content.js      │     │ background/          │◀───▶│ popup/popup.js       │
+│  + interceptor.js       │────▶│ service-worker.js    │     │ export/export.js     │
+│ (runs on x.com)         │     │ (the engine)         │     │ (the two UIs)        │
+│                         │     │                      │     │                      │
+│ • detect username       │     │ • export state mach. │     │ • user input         │
+│ • capture live queryIds │     │ • GraphQL API calls  │     │ • live progress      │
+│   (MAIN-world fetch/XHR │     │ • rate limiting      │     │ • settings           │
+│   interception)         │     │ • storage / batching │     │ • download trigger   │
+│ • drive the date-range  │     │ • CSV/JSON/XLSX build │     │                      │
+│   search-capture tab    │     │ • date-range capture │     │                      │
+└─────────────────────────┘     └──────────────────────┘     └──────────────────────┘
+                                          │
+                                          ▼
+                                 ┌───────────────────┐
+                                 │ X GraphQL API     │
+                                 │ x.com/i/api/...   │
+                                 └───────────────────┘
 ```
 
 ### Communication Pattern
 All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage`:
-- **popup/export → service-worker**: Commands (`START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `DOWNLOAD_CSV`, etc.)
-- **service-worker → popup/export**: Status updates (`EXPORT_STATUS_UPDATE` broadcast)
-- **content.js → service-worker**: Username detection (`SET_USERNAME`)
+- **popup/export → service-worker**: commands (`START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `DOWNLOAD_EXPORT`, `SAVE_SETTINGS`, …)
+- **service-worker → popup/export**: live status (`EXPORT_STATUS_UPDATE` broadcast)
+- **content.js → service-worker**: username detection (`SET_USERNAME`) and captured queryIds
+- **interceptor.js → content.js**: `window.postMessage({type:'__XPORTER_QUERYID__'})` (page MAIN world → content-script isolated world)
 
 ### Export Flow (High-Level)
-1. User enters username + options in popup
-2. Popup sends `START_EXPORT` message to service worker
-3. Service worker resolves user ID via `UserByScreenName` GraphQL
-4. Fetches data in batches using the appropriate API endpoint
-5. Each batch is parsed and stored in `chrome.storage.local` (batched at 50 items)
-6. Rate limiter manages cooldowns and retries
-7. On completion, user clicks Download → service worker assembles all batches and triggers `chrome.downloads`
+1. User enters username + options in popup/export page
+2. UI sends `START_EXPORT` to the service worker
+3. SW resolves user ID via `UserByScreenName` GraphQL
+4. Fetches data in batches via the appropriate endpoint, parsing each page
+5. Items are buffered in memory and flushed to `chrome.storage.local` in batches of 50
+6. `RateLimitManager` manages spacing, batch cooldowns, and retries
+7. On completion the user clicks Download → SW assembles all batches and calls `chrome.downloads`
+8. **Posts + date range** takes a different path — see §5.
 
 ---
 
@@ -68,384 +74,301 @@ All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage
 
 ```
 xporter/
-├── manifest.json                    # Extension manifest (MV3)
-├── agent.md                         # THIS FILE — AI context
-├── README.md                        # User-facing documentation
-├── LICENSE                          # Custom license
-├── .gitignore                       # Git ignore rules
+├── manifest.json                # MV3 manifest (name/desc via __MSG__ i18n)
+├── agent.md                     # THIS FILE — detailed AI context
+├── CLAUDE.md                    # Short orientation / file map (auto-read by Claude Code)
+├── README.md                    # User-facing documentation
+├── LICENSE                      # Custom license
+├── index.html                  # GitHub Pages landing page (marketing, not part of the extension)
+├── privacy-policy.html          # Hosted privacy policy
+├── icon128.png                  # Loose copy of the store icon (also in icons/ and docs/)
 │
 ├── background/
-│   └── service-worker.js            # 🔑 CORE: Export engine, message router
+│   └── service-worker.js        # 🔑 CORE: export engine, message router, state machine,
+│                                #         date-range search-capture orchestration
 │
 ├── content/
-│   └── content.js                   # Username detection from X page URL
+│   ├── content.js               # Username detection from the X page URL; injects + relays
+│   │                            #   interceptor messages; drives the search-capture tab
+│   └── interceptor.js           # Injected into the page MAIN world; wraps fetch/XHR to
+│                                #   capture live GraphQL queryIds + SearchTimeline payloads
 │
-├── popup/                           # Popup UI (compact 350px view)
-│   ├── popup.html                   # Popup structure
-│   ├── popup.css                    # All styles (dark/light theme via CSS vars)
-│   ├── popup.js                     # Popup logic (tabs, export trigger, status)
-│   ├── theme.js                     # Theme toggle + SVG icon templates
-│   ├── i18n.js                      # Internationalization engine
-│   ├── utils.js                     # Messaging, auth check, URL parsing, debounce
-│   └── locales/                     # 14 language files
-│       ├── en.json                  # English (fallback/default)
-│       ├── ru.json, es.json, ...    # Other languages
+├── popup/                       # Compact popup UI (~350px)
+│   ├── popup.html               # Markup (Home / Settings / About tabs)
+│   ├── popup.css                # 🔑 ALL popup styles (themes, animations, ladybug, logo)
+│   ├── popup.js                 # Tabs, export controls, settings, status, history
+│   ├── ladybug.js               # Easter-egg ladybug on the About tab (see §6.2)
+│   ├── theme-init.js            # Inline-loaded FIRST: applies saved theme to avoid FOUC
+│   ├── theme.js                 # Theme toggle logic + SVG icon helpers
+│   ├── i18n.js                  # In-app i18n engine + LANGUAGES list + loadTranslations()
+│   ├── utils.js                 # Thin popup-only wrapper (most helpers live in utils/shared.js)
+│   └── locales/                 # 🔑 In-app UI strings — 14 JSON files (en is the fallback)
+│       └── en.json, ru.json, es.json, de.json, fr.json, pt.json, it.json,
+│           tr.json, id.json, hi.json, ja.json, ko.json, zh.json, ar.json
 │
-├── export/                          # Full-page export UI (alternative to popup)
-│   ├── export.html                  # Export page structure
-│   ├── export.css                   # Export page styles
-│   └── export.js                    # Export page logic (mirrors popup flow)
+├── export/                      # Full-page export UI (alternative surface, mirrors popup)
+│   ├── export.html
+│   ├── export.css
+│   └── export.js
 │
-├── utils/                           # Shared utility modules (loaded by service-worker)
-│   ├── config.js                    # 🔑 Centralized config constants + XLog logger
-│   ├── api.js                       # 🔑 X GraphQL API integration + endpoint discovery
-│   ├── rateLimit.js                 # RateLimitManager class (batch, cooldown, retry)
-│   ├── csv.js                       # CSV generation with BOM for Excel
-│   └── storage.js                   # chrome.storage.local wrapper (quota-aware)
+├── utils/                       # Shared modules (some load in SW, some in pages)
+│   ├── config.js                # 🔑 XPORTER_CONFIG constants + XLog logger
+│   ├── api.js                   # 🔑 X GraphQL client + endpoint discovery + parsers
+│   ├── api-features.js          # GraphQL feature-flag constant objects (split from api.js)
+│   ├── rateLimit.js             # RateLimitManager (spacing, batch cooldown, retry, abort)
+│   ├── csv.js                   # CSV / XLSX / JSON output generation
+│   ├── storage.js               # chrome.storage.local wrapper (quota-aware) + settings
+│   └── shared.js                # 🔑 Helpers shared by popup + export pages (see §4.6)
 │
-├── scripts/
-│   └── discover_endpoints.js        # Standalone debugging script for finding queryIds
+├── _locales/                    # Chrome STORE metadata i18n (manifest __MSG_extName__ etc.)
+│   └── en/, ru/, … (messages.json per language)  ← NOT the same as popup/locales/
 │
-└── icons/
-    ├── icon16.png, icon48.png, icon128.png
+├── scripts/                     # Dev/debug only — NOT shipped in the extension
+│   ├── discover_endpoints.js                  # find current queryIds from a console
+│   ├── debug-date-range-playwright.mjs        # Playwright repro for date-range
+│   └── debug-extension-date-range-playwright.mjs
+│
+├── docs/                        # GitHub Pages copy (icon, index, privacy)
+├── icons/                       # icon16/48/128.png
+└── .github/workflows/           # CI (e.g. Pages deploy)
 ```
+
+> ⚠️ **Two separate i18n systems.** `popup/locales/*.json` are the **in-app UI strings** (loaded by `i18n.js`). `_locales/*/messages.json` are the **Chrome Web Store** name/description, referenced from `manifest.json` as `__MSG_extName__` / `__MSG_extDescription__`. Keep them straight.
 
 ---
 
 ## 4. Critical Files — Detailed Reference
 
 ### 4.1. `utils/config.js` — Central Configuration
-
-All tunable parameters are centralized here. **Never hardcode magic numbers elsewhere.**
+All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 
 | Constant | Default | Purpose |
 |---|---|---|
-| `DEBUG` | `true` | Enable/disable verbose `[XPorter]` console logging |
-| `REQUEST_DELAY` | `3000` | ms pause between API requests |
-| `COOLDOWN_DURATION` | `180000` | 3 min cooldown after each batch |
-| `BATCH_SIZE` | `20` | Requests per batch before cooldown |
-| `RATE_LIMIT_PAUSE` | `60000` | Base wait on 429 (exponential backoff) |
-| `MAX_RETRIES` | `5` | Max retry attempts per request |
-| `ENDPOINT_CACHE_TTL` | `1800000` | 30 min cache for discovered queryIds |
-| `TWEETS_PER_BATCH` | `50` | Items per storage batch |
-| `FALLBACK_BEARER_TOKEN` | `AAAA...` | Static bearer (same for all X users) |
+| `DEBUG` | `true` | toggle verbose `[XPorter]` logging |
+| `REQUEST_DELAY` | `3000` | ms between API requests |
+| `COOLDOWN_DURATION` | `180000` | 3-min cooldown after each batch |
+| `BATCH_SIZE` | `20` | requests per batch before cooldown |
+| `RATE_LIMIT_PAUSE` | `60000` | base 429 wait (exponential backoff) |
+| `MAX_RETRIES` | `5` | retries per request |
+| `ENDPOINT_CACHE_TTL` | `1800000` | 30-min queryId cache |
+| `TWEETS_PER_BATCH` | `50` | items per storage batch |
+| `FALLBACK_BEARER_TOKEN` | `AAAA…` | static public bearer |
 
-**`XLog`** — Debug logger used throughout. Always use `XLog.log()`, `XLog.warn()`, `XLog.error()` instead of `console.*` in service worker code.
+**`XLog`** — use `XLog.log/warn/error/info()` instead of `console.*` in SW code.
 
-### 4.2. `utils/api.js` — X GraphQL API Integration
+### 4.2. `utils/api.js` + `utils/api-features.js` — X GraphQL Integration
+The most complex, most fragile area.
 
-This is the most complex and fragile file. Key concepts:
-
-#### Endpoint Discovery
-The extension dynamically discovers GraphQL `queryId` values by:
-1. Fetching `https://x.com` HTML
-2. Extracting JS bundle URLs (`abs.twimg.com/responsive-web/client-web*.js`)
-3. Scanning bundle source code with regex for `queryId:"...",operationName:"..."`
-4. Caching results for 30 minutes
-
-If discovery fails, hardcoded `FALLBACK_ENDPOINTS` are used. These **will become stale** when X updates their bundles — they must be manually updated.
-
-#### Target Operations
-| Operation | Purpose | Feature Set |
-|---|---|---|
-| `UserByScreenName` | Resolve username → userId | `USER_FEATURES` |
-| `UserTweets` | Fetch user's tweets | `TWEETS_FEATURES` (39 flags!) |
-| `Followers` | Fetch user's followers | `FOLLOWERS_FEATURES` |
-| `Following` | Fetch user's following | `FOLLOWERS_FEATURES` |
-| `BlueVerifiedFollowers` | Fetch verified followers | `FOLLOWERS_FEATURES` |
-
-#### Feature Flags (CRITICAL)
-X requires specific boolean feature flags in every GraphQL request. Missing flags cause `400 Bad Request`. These flags change periodically — especially Grok-related ones added in 2025+. **When updating, use the actual flags sent by x.com in DevTools Network tab.**
-
-#### Stale Query ID Retry
-```
-withStaleRetry(endpointKey, makeRequest)
-```
-Wrapper that catches `STALE_QUERY_ID` errors, forces endpoint re-discovery, and retries once with fresh IDs. This is the self-healing mechanism against X API changes.
-
-#### Authentication
-The extension reads cookies directly from the browser:
-- `ct0` cookie → CSRF token (`x-csrf-token` header)
-- `auth_token` cookie → session authentication
-- Bearer token → extracted from X's JS bundles or hardcoded fallback
-
-**Important**: Requests go through `https://x.com/i/api/graphql/...` (not `api.x.com`) and use `encodeURIComponent` for URL params (NOT `URLSearchParams` — X rejects `+` encoding for spaces).
+- **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 30 min. Falls back to `FALLBACK_ENDPOINTS` (these go stale when X ships new bundles — update periodically).
+- **Live queryId capture**: `content/interceptor.js` also captures real queryIds (and `SearchTimeline` bodies) from X's own traffic and forwards them to the SW, which is more reliable than scraping bundles.
+- **Feature flags** (`api-features.js`): `USER_FEATURES`, `TWEETS_FEATURES` (large!), `FOLLOWERS_FEATURES`. Missing/renamed flags → `400 Bad Request`. To fix: copy the live `features` object from a real x.com GraphQL request in DevTools.
+- **`withStaleRetry(key, fn)`**: catches `STALE_QUERY_ID`, forces re-discovery, retries once. Self-healing against X changes.
+- **Auth**: reads cookies directly — `ct0` → `x-csrf-token`, `auth_token` → session. Requests go to `https://x.com/i/api/graphql/…` and use `encodeURIComponent` (NOT `URLSearchParams` — X rejects `+` for spaces).
+- **Target ops**: `UserByScreenName`, `UserTweets`, `Followers`, `Following`, `BlueVerifiedFollowers`, `SearchTimeline` (date range).
 
 ### 4.3. `background/service-worker.js` — Export Engine
-
-Central orchestrator. Key state object:
+Central orchestrator + message router. Loads utils via `importScripts` (§11). Key state:
 
 ```javascript
 currentExport = {
-    running: boolean,
-    username: string,
-    exportMode: 'posts' | 'followers' | 'following' | 'verified_followers',
-    outputFormat: 'csv' | 'json' | 'xlsx',
-    dateFrom: Date | null,      // posts only
-    dateTo: Date | null,        // posts only
-    settings: object,
-    tweetCount: number,         // actually "item count" (tweets or users)
-    totalBatches: number,
-    tweetBuffer: array,         // in-memory buffer flushed to storage
-    userId: string,
-    cursor: string,             // pagination cursor
-    status: 'resolving_user' | 'fetching' | 'complete' | 'stopped' | 'error'
+  running, username,
+  exportMode: 'posts'|'followers'|'following'|'verified_followers',
+  outputFormat: 'csv'|'json'|'xlsx',
+  dateFrom, dateTo,        // posts only → triggers the search-capture path (§5)
+  settings, tweetCount,    // "tweetCount"/"tweetBuffer" = item count/buffer (historical names)
+  totalBatches, tweetBuffer, userId, cursor,
+  status: 'resolving_user'|'fetching'|'scrolling'|'complete'|'stopped'|'error'
 }
 ```
 
-#### Message Types
-| Message | Direction | Purpose |
+**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT`, `GET_STATUS`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE` (from content/interceptor). Plus the `EXPORT_STATUS_UPDATE` broadcast SW→UI.
+
+**Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
+
+### 4.4. `utils/rateLimit.js` — `RateLimitManager`
+Batch cooldowns, request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
+
+### 4.5. `utils/storage.js` — Chrome Storage + Settings
+`chrome.storage.local` (10 MB). Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values:
+
+| Setting | Default | Notes |
 |---|---|---|
-| `SET_USERNAME` | content → SW | Auto-detected username |
-| `GET_USERNAME` | popup → SW | Retrieve cached username |
-| `START_EXPORT` | popup → SW | Begin export (username, mode, options) |
-| `STOP_EXPORT` | popup → SW | Stop running export |
-| `RESUME_EXPORT` | popup → SW | Resume stopped/errored export |
-| `GET_STATUS` | popup → SW | Get current export state |
-| `DOWNLOAD_CSV` / `DOWNLOAD_EXPORT` | popup → SW | Trigger file download |
-| `SAVE_SETTINGS` / `GET_SETTINGS` | popup → SW | Persist/load user settings |
-| `CLEAR_EXPORT` | popup → SW | Clear saved export data |
-| `EXPORT_STATUS_UPDATE` | SW → popup | Live status broadcast |
+| `includeRetweets` / `includeReplies` | `true` | posts filter |
+| `quantityLimit` | `500` | 0 = unlimited |
+| `requestDelay` / `batchSize` / `cooldownDuration` | from config | rate limiting |
+| `theme` | `'dark'` | `'dark'`/`'light'` |
+| `language` | auto-detected | locale code |
+| `exportMode` / `outputFormat` | posts / csv | |
+| `autoExpireEnabled` / `autoExpireHours` | `true` / `4` | auto-clear old exports |
+| `ladybugEnabled` | `true` | show the Easter-egg ladybug (§6.2) |
 
-#### Service Worker Lifecycle
-- Can be **killed by Chrome** at any time during long exports
-- State is periodically saved to `chrome.storage.local` via `saveCurrentState()`
-- On startup (`onStartup`): marks interrupted exports as `stopped`
-- On install (`onInstalled`): initializes default settings
+### 4.6. `utils/shared.js` — Shared Page Helpers (popup + export)
+Loaded by BOTH `popup.html` and `export.html` (so don't duplicate these in `popup/utils.js`, which is now a thin wrapper). Provides:
+- `sendMessage(msg)` — promisified `chrome.runtime.sendMessage` with timeout
+- `checkAuth()` — looks for the `auth_token` cookie
+- `formatError(code, t)` — maps error codes → i18n key / English fallback
+- `extractUsernameFromInput(input)` + `RESERVED_PATHS` — parse @handle / URL
+- `applyI18nToDOM(translations)` — applies all `data-i18n*` attributes (§6.1)
+- `escapeHtml`, `renderHelpMarkup`, `stripHelpMarkup` — tooltip markup (§6.1)
+- RTL + number-formatting helpers
 
-### 4.4. `utils/rateLimit.js` — Rate Limiting
-
-`RateLimitManager` class handles:
-- **Batch cooldowns** — pause after every N requests
-- **Request spacing** — delay between individual requests
-- **429 handling** — exponential backoff (`base * 2^attempt`)
-- **STALE_QUERY_ID** — linear backoff with re-discovery
-- **Network errors** — linear backoff
-- **Abort** — instant cancellation via `AbortController`
-
-Key methods:
-- `executeWithRateLimit(requestFn)` — wraps any async function with rate limiting
-- `abort()` — immediately cancels any pending wait
-- `getState()` / `restoreState()` — serialize for storage persistence
-
-### 4.5. `utils/storage.js` — Chrome Storage
-
-Uses `chrome.storage.local` (10 MB quota). Storage keys:
-
-| Key | Purpose |
-|---|---|
-| `xporter_export_state` | Current export metadata (cursor, counts, status) |
-| `xporter_settings` | User preferences |
-| `xporter_detected_username` | Auto-detected username from content script |
-| `xporter_tweets_batch_N` | Exported data batches (N = 0, 1, 2, ...) |
-
-Includes quota monitoring (`checkStorageQuota`) and safe read/write wrappers.
-
-### 4.6. `popup/i18n.js` — Internationalization
-
-- 14 languages with per-language JSON files in `popup/locales/`
-- English is the **fallback locale** — any missing key falls through to `en.json`
-- Browser language is auto-detected on first run via `chrome.i18n.getUILanguage()`
-- Translation keys are applied via `data-i18n` attributes in HTML
-- Locales are cached in memory after first load
-
-### 4.7. `content/content.js` — Username Detection
-
-Runs on x.com/twitter.com pages. Extracts username from URL path:
-- Filters out reserved paths (`home`, `explore`, `messages`, etc.)
-- Handles SPA navigation via `MutationObserver` + `popstate`
-- Sends `SET_USERNAME` to service worker for popup auto-fill
+### 4.7. `content/content.js` + `content/interceptor.js`
+- **content.js** (isolated world): username detection from the URL (filters reserved paths, handles SPA nav via `MutationObserver`/`popstate`), injects `interceptor.js` into the page, relays `__XPORTER_QUERYID__` messages to the SW, and drives the date-range search-capture tab.
+- **interceptor.js** (page MAIN world, a `web_accessible_resource`): wraps `fetch`/`XHR` to read GraphQL queryIds + `SearchTimeline` response bodies, posting them back via `window.postMessage`.
 
 ---
 
-## 5. Export Modes & Data Schemas
+## 5. Export Modes, Date Range & Data Schemas
 
-### Posts Export
-CSV columns: `id`, `text`, `tweet_url`, `language`, `type`, `author_name`, `author_username`, `view_count`, `bookmark_count`, `favorite_count`, `retweet_count`, `reply_count`, `quote_count`, `created_at`, `source`, `hashtags`, `urls`, `media_type`, `media_urls`
+### Standard exports (posts without dates, followers, following, verified)
+Direct GraphQL paging from the service worker.
 
-Tweet types: `tweet`, `retweet`, `reply`, `quote`
+### Posts + Date Range (special path)
+X has no clean date-filter on the timeline GraphQL, so XPorter:
+1. Opens an **X search tab** at `https://x.com/search?q=…&f=live` (`openSearchCaptureTab` / `buildSearchTimelinePageUrl`).
+2. `interceptor.js` captures the page's own `SearchTimeline` responses; `content.js` scrolls the tab to load more.
+3. SW parses captured payloads (`parseSearchTimelineResponse`) and emits `scrolling` status to the in-page overlay (localized via `i18n.js` — that's why the SW imports it).
+4. **The user must keep that tab open until the export finishes** — this is what the `dateRangeHelp` tooltip warns about.
 
-### Users Export (Followers/Following/Verified)
-CSV columns: `id`, `name`, `username`, `bio`, `location`, `url`, `followers_count`, `following_count`, `tweet_count`, `listed_count`, `verified`, `protected`, `created_at`, `profile_image_url`, `profile_url`
-
-### Output Formats
-- **CSV** — BOM-prefixed UTF-8 for Excel compatibility
-- **JSON** — Pretty-printed `JSON.stringify(data, null, 2)`
-- **XLSX** — XML SpreadsheetML (no external library needed)
-
----
-
-## 6. Theme System
-
-- Two themes: `dark` (default) and `light`
-- Toggled via `.light` class on `<body>`
-- All colors in `popup.css` use CSS custom properties (`:root` / `.light` selectors)
-- Early theme application via inline `<script>` in HTML prevents FOUC (flash of unstyled content)
+### Schemas
+- **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
+- **Users CSV**: `id, name, username, bio, location, url, followers_count, following_count, tweet_count, listed_count, verified, protected, created_at, profile_image_url, profile_url`.
+- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (XML SpreadsheetML, no library).
 
 ---
 
-## 7. Common Errors & Error Handling
+## 6. UI Layer Details
 
-| Error Code | Cause | Action |
+### 6.1. Internationalization & Help Tooltips
+- `popup/i18n.js` loads `popup/locales/{code}.json`; **`en.json` is the fallback** for any missing key. Language auto-detected on first run; cached in memory.
+- Strings are applied by `applyI18nToDOM()` (in `utils/shared.js`) via attributes: `data-i18n` (textContent), `data-i18n-placeholder`, `data-i18n-title`, `data-i18n-tooltip`, `data-i18n-aria-label`.
+- **Help tooltips** (the `!` icons, class `.date-help`): the tooltip text supports a tiny markup — `**bold**` marks the "gist" so a reader can scan the bold for the essence or read it all. `applyI18nToDOM` renders it into a real `.help-pop` child element via `renderHelpMarkup` (escapes HTML, then `**…**` → `<strong>`, `\n` → `<br>`). The matching `aria-label` uses `stripHelpMarkup` so screen readers don't read the asterisks. **When writing/translating a help string, keep the two `**…**` spans.**
+- **Adding a setting/string** → add the key to **all 14** `popup/locales/*.json` (en first).
+
+### 6.2. Easter Egg: the Ladybug (`popup/ladybug.js`)
+A ladybug wanders the "Questions or found a bug?" contact card on the **About** tab.
+- **Behaviour**: spawns at a random spot above the Telegram button, wanders with a steering algorithm (biased away from pure-horizontal so it doesn't sit on a word), turns in place for big turns, pauses occasionally. Legs are CSS-animated; their gait is driven from JS state (`--gait-dur` + `.gait-paused`): legs freeze when it stops, shuffle while turning, step faster/slower with speed.
+- **Click to squash**: flattens (`scale(1.32,0.16)`), leaves a translucent `.lb-splat` that holds then fades (`SPLAT_VISIBLE`/`SPLAT_FADE`, currently 3.5s each). It does **not** respawn until you leave and re-enter the About tab.
+- **Respawn**: a `MutationObserver` on `#tab-about`'s `active` class spawns/despawns it.
+- **Toggle**: Settings → "Show ladybug" (`ladybugEnabled`). `popup.js` calls `window.XPorterLadybug.setEnabled(bool)`.
+- **Theming**: dark bug in both themes; a very subtle `.lb-shadow` underneath (white-ish on dark, dark on light).
+
+### 6.3. Lightning Logo (`.logo`, `.about-icon`)
+Yellow filled bolt with a glow + occasional "lightbulb" flicker:
+- `@keyframes zap-glow` (breathing glow) + `@keyframes zap-flicker` (opacity dips). Both bolts use the **same periods** and `ladybug.js`'s `syncBolts()` re-syncs their phase when the About tab opens (the About bolt's animation only starts when its tab first shows).
+- Glow colour/size are theme-aware via CSS vars (`--zap-c1/c2`, `--zap-glow/-hi`, `--zap-extra`). Light theme keeps the bolt yellow but adds a soft violet separation shadow so it reads on the pale background.
+
+### 6.4. Theme System
+`dark` (default) / `light` via a `.light` class on `<body>`. All colours are CSS custom properties. `theme-init.js` (inline, loaded first) applies the saved theme before CSS to prevent FOUC — **don't remove it**.
+
+---
+
+## 7. Common Errors
+
+| Code | Cause | Action |
 |---|---|---|
-| `NOT_LOGGED_IN` | No `auth_token` / `ct0` cookie | Show login prompt |
-| `USER_NOT_FOUND` | Invalid username | Show error message |
-| `USER_SUSPENDED` | Account suspended | Show error message |
-| `ACCOUNT_PRIVATE` | Protected account | Show error message |
-| `RATE_LIMITED` | HTTP 429 | Exponential backoff, auto-retry |
-| `STALE_QUERY_ID` | HTTP 400/404 (queryId changed) | Invalidate cache, re-discover, retry |
-| `AUTH_ERROR` | HTTP 401/403 | Re-auth required |
-| `ABORTED` | User stopped export | Save state for resume |
+| `NOT_LOGGED_IN` | no `auth_token`/`ct0` | login prompt |
+| `USER_NOT_FOUND` / `USER_SUSPENDED` / `ACCOUNT_PRIVATE` / `USER_UNAVAILABLE` | bad/unavailable account | error message |
+| `INVALID_DATE_RANGE` | from > to | error message |
+| `RATE_LIMITED` | 429 | exponential backoff |
+| `STALE_QUERY_ID` | 400/404 (queryId changed) | re-discover + retry |
+| `AUTH_ERROR` | 401/403 | re-auth |
+| `ENDPOINT_DISCOVERY_FAILED` | can't reach x.com | surface to user |
+| `MAX_RETRIES_EXCEEDED` | gave up | error message |
+| `ABORTED` | user stopped | save state for resume |
+
+Error codes ↔ i18n keys are mapped in `formatError()` (`utils/shared.js`).
 
 ---
 
 ## 8. Known Pitfalls & Gotchas
 
-### API-Related
-1. **Feature flags are fragile** — X periodically adds new required flags. If you get 400 errors, open DevTools on x.com, find a GraphQL request, and copy the current `features` object.
-2. **URL encoding matters** — Use `encodeURIComponent`, NOT `URLSearchParams`. X rejects `+` for spaces.
-3. **Bearer token is public** — The same token works for all users. It changes very rarely but can be dynamically extracted from X's JS bundles.
-4. **QueryIds change frequently** — The dynamic discovery system handles this, but fallback IDs in `api.js` should be periodically updated for resilience.
-5. **Response paths vary** — Some endpoints use `timeline_v2.timeline`, others use `timeline.timeline`. Always check both.
-6. **Grok features** — As of 2025+, Grok-related feature flags are required in `TWEETS_FEATURES`. Omitting them causes 400 errors.
-
-### Extension-Related
-7. **Service worker sleep** — Chrome can kill the service worker at any time. All progress must be saved to `chrome.storage.local` after every batch.
-8. **Message timeout** — `sendMessage` can fail silently if the service worker is asleep. The popup uses timeout-based fallback (5s default).
-9. **Dual UI surfaces** — Both `popup.js` and `export.js` implement similar logic. Changes to messaging protocol or status handling **must be reflected in both**.
-10. **Naming inconsistency** — The code uses `tweetCount`/`tweetBuffer` even for user exports (followers/following). This is a historical artifact — treat them as `itemCount`/`itemBuffer`.
-
-### CSS/Theme
-11. **FOUC prevention** — Theme is applied via an inline `<script>` in `popup.html` (before CSS loads) to prevent flash of wrong theme. Don't remove this.
-12. **CSS variables** — All colors use CSS vars. Never hardcode hex/rgb values.
+1. **Feature flags are fragile** — 400s usually mean a new/renamed flag. Copy the live `features` object from DevTools into `api-features.js`.
+2. **URL encoding** — use `encodeURIComponent`, never `URLSearchParams` (X rejects `+`).
+3. **QueryIds change** — handled by discovery + live capture + `withStaleRetry`, but refresh `FALLBACK_ENDPOINTS` periodically.
+4. **Response paths vary** — some endpoints use `timeline_v2.timeline`, others `timeline.timeline`. Check both.
+5. **Service worker sleep** — Chrome kills the SW at will; persist after every batch.
+6. **Dual UI surfaces** — `popup.js` and `export.js` share logic via `utils/shared.js`, but messaging/status changes must be reflected in **both**.
+7. **`tweetCount`/`tweetBuffer`** mean item count/buffer even for user exports — historical naming.
+8. **Two i18n systems** — `popup/locales/` (in-app) vs `_locales/` (store metadata). See §3.
+9. **Help-tooltip markup** — keep the `**bold**` spans when editing/translating; aria-labels are auto-stripped.
+10. **FOUC** — `theme-init.js` must stay first in `popup.html`.
+11. **CSS variables** — never hardcode colours.
+12. **`scripts/` and `index.html`/`docs/` are not part of the runtime extension** — dev/marketing only.
 
 ---
 
 ## 9. Development Guidelines
 
-### Adding a New Export Mode
-1. Add GraphQL endpoint to `FALLBACK_ENDPOINTS` and `discoverEndpoints()` in `api.js`
-2. Create fetch function (follow `fetchFollowers` pattern)
-3. Create response parser (follow `parseFollowersResponse` pattern)
-4. Export new function via `globalThis.XPorterAPI`
-5. Add mode to `_fetchUsersLoop` dispatch in `service-worker.js`
-6. Add UI option in `popup.html` and `export.html`
-7. Add CSV column headers in `generateUsersCSV` or create new generator
-8. Add i18n keys to all 14 locale files
+### Add an export mode
+1. Add endpoint to `FALLBACK_ENDPOINTS` + `discoverEndpoints()` in `api.js` (and `interceptor.js` `TRACKED` if capturing live).
+2. Add fetch fn (follow `fetchFollowers`) + parser (`parseFollowersResponse`).
+3. Export via `globalThis.XPorterAPI`; dispatch in the SW fetch loop.
+4. Add UI option in `popup.html` **and** `export.html`; add CSV headers; add i18n keys to all 14 locales.
 
-### Adding a New Setting
-1. Add default value in `loadSettings()` in `storage.js`
-2. Add default in `onInstalled` handler in `service-worker.js`
-3. Add UI element in settings tab of `popup.html` / `export.html`
-4. Wire up save handler in `popup.js` / `export.js`
-5. Add i18n key to all 14 locale files
+### Add a setting
+1. Default in `loadSettings()` (`storage.js`) and `onInstalled` (SW).
+2. UI in the Settings tab of `popup.html` (and export if relevant).
+3. Wire save handler in `popup.js` (read → `SAVE_SETTINGS`), apply on load.
+4. Add the i18n key to all 14 locales (en first).
 
-### Updating Feature Flags
-1. Open x.com in Chrome DevTools → Network tab
-2. Filter by `graphql`
-3. Find a request for the target operation (e.g., `UserTweets`)
-4. Copy the `features` query parameter value
-5. Replace the corresponding constant (`TWEETS_FEATURES`, `USER_FEATURES`, etc.) in `api.js`
+### Update feature flags / queryIds
+DevTools → Network → `graphql` → copy `features` / queryId → update `api-features.js` / `FALLBACK_ENDPOINTS`. Or run `scripts/discover_endpoints.js` in an x.com console.
 
-### Updating Fallback QueryIds
-1. Run `scripts/discover_endpoints.js` in a x.com tab console, OR
-2. Use DevTools Network tab to find current queryIds
-3. Update `FALLBACK_ENDPOINTS` in `api.js`
+### Bump the version
+Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
-### Adding a New Translation
-1. Create `popup/locales/{code}.json` based on `en.json`
-2. Add language entry to `LANGUAGES` array in `i18n.js`
-3. Translate all keys
-
-### Testing Considerations
-- Always test with **both** dark and light themes
-- Test with **export stopped/resumed** (service worker resilience)
-- Test with large exports (>1000 items) to verify storage batching
-- Verify CSV opens correctly in Excel (BOM, escaping of commas/quotes/newlines)
-- Test error recovery: kill network mid-export, test 429 handling
-- Test i18n: switch languages, verify all strings translate
+### Testing
+Both themes; stop/resume (SW resilience); large exports (>1000 → storage batching); CSV in Excel (BOM/escaping); 429 + network-loss recovery; every language; date-range (keep the search tab open).
 
 ---
 
-## 10. Permissions Used
+## 10. Permissions
 
 | Permission | Purpose |
 |---|---|
-| `cookies` | Read `ct0` and `auth_token` cookies for API auth |
-| `activeTab` | Access current tab for username detection |
-| `tabs` | Query active tab URL |
-| `downloads` | Trigger file downloads |
-| `storage` | Persist export state, settings, batched data |
-| `host_permissions: x.com, api.x.com, twitter.com` | Make API requests to X |
+| `cookies` | read `ct0`/`auth_token` for auth |
+| `activeTab` / `tabs` | username detection, search-capture tab |
+| `downloads` | save files |
+| `storage` | export state, settings, batches |
+| `host_permissions` | `https://x.com/*`, `https://api.x.com/*`, `https://twitter.com/*` |
+
+`interceptor.js` is injected via a page `<script>` from `content.js` (a `web_accessible_resource`), so no `scripting` permission is needed. (Confirm against the live `manifest.json` — permissions evolve.)
 
 ---
 
 ## 11. Script Loading Order
 
-### Service Worker (`background/service-worker.js`)
-Loads utils via `importScripts()` in this order (order matters — later scripts depend on earlier ones):
-1. `utils/config.js` — defines `XPORTER_CONFIG` and `XLog`
-2. `utils/api.js` — defines `XPorterAPI` (uses `XPORTER_CONFIG`, `XLog`)
-3. `utils/rateLimit.js` — defines `RateLimitManager` (uses `XPORTER_CONFIG`, `XLog`)
-4. `utils/csv.js` — defines `XPorterCSV`
-5. `utils/storage.js` — defines `XPorterStorage` (uses `XPORTER_CONFIG`, `XLog`)
+**Service worker** (`importScripts`, order matters):
+`config.js` → `api-features.js` → `api.js` → `rateLimit.js` → `csv.js` → `storage.js` → `popup/i18n.js` (for the localized capture overlay).
 
-### Popup (`popup/popup.html`)
-Scripts loaded at end of `<body>`:
-1. `popup/i18n.js`
-2. `popup/theme.js`
-3. `popup/utils.js`
-4. `popup/popup.js`
+**Popup** (`popup.html`, end of body):
+`theme-init.js` (in `<head>`/top, first) → `utils/config.js` → `utils/shared.js` → `i18n.js` → `utils.js` → `theme.js` → `popup.js` → `ladybug.js`.
 
-### Export Page (`export/export.html`)
-Loads `popup/i18n.js` and `popup/utils.js` via relative paths, then `export/export.js`.
+**Export page** (`export.html`):
+`utils/config.js` → `utils/shared.js` → `popup/i18n.js` → `export.js`.
 
 ---
 
 ## 12. Global Objects (Service Worker Scope)
 
-All utility modules export to `globalThis` for use in the service worker:
-
-| Global | Source | Key Methods/Properties |
+| Global | Source | Notes |
 |---|---|---|
-| `XPORTER_CONFIG` | `config.js` | All config constants |
-| `XLog` | `config.js` | `.log()`, `.warn()`, `.error()`, `.info()` |
-| `XPorterAPI` | `api.js` | `.getUserByScreenName()`, `.fetchUserTweets()`, `.fetchFollowers()`, `.fetchFollowing()`, `.fetchVerifiedFollowers()`, `.discoverEndpoints()` |
-| `RateLimitManager` | `rateLimit.js` | Class constructor |
-| `XPorterCSV` | `csv.js` | `.generateCSV()`, `.generateFilename()` |
-| `XPorterStorage` | `storage.js` | `.saveExportState()`, `.loadExportState()`, `.saveTweetBatch()`, `.loadAllTweets()`, `.clearExportState()`, `.saveSettings()`, `.loadSettings()`, `.saveDetectedUsername()`, `.loadDetectedUsername()` |
+| `XPORTER_CONFIG`, `XLog` | `config.js` | constants + logger |
+| `XPorterAPI` | `api.js` | `.getUserByScreenName`, `.fetchUserTweets`, `.fetchFollowers/Following/VerifiedFollowers`, `.discoverEndpoints`, search-capture parsers |
+| `RateLimitManager` | `rateLimit.js` | class |
+| `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateFilename` (+ JSON/XLSX) |
+| `XPorterStorage` | `storage.js` | export state, batches, settings, username |
+
+In pages, `utils/shared.js` exposes its helpers as plain globals; `ladybug.js` exposes `window.XPorterLadybug`.
 
 ---
 
-## 13. Future Development Notes
-
-### Planned Features (from spec)
-- [ ] Export likes, bookmarks
-- [ ] Media download (photos/videos)
-- [ ] Built-in analytics (average metrics, top tweets, charts)
-- [ ] Export threads as single units
-- [ ] `conversation_id` and location data in CSV
-- [ ] Firefox version
-
-### Architectural Improvements to Consider
-- [ ] **Refactor dual UI**: `popup.js` and `export.js` share ~60% logic — extract shared module
-- [ ] **Rename `tweetBuffer`/`tweetCount`** to generic `itemBuffer`/`itemCount` for clarity
-- [ ] **Add unit tests**: CSV escaping, URL parsing, tweet type detection, error mapping
-- [ ] **Consider Web Workers** for CSV/XLSX generation on very large datasets
-- [ ] **Add storage cleanup** for orphaned batch keys after crashes
+## 13. Future / Backlog
+- Export likes & bookmarks; media download; built-in analytics; threads as units; Firefox build.
+- Refactor: the dual UI still shares a lot — keep consolidating into `utils/shared.js`. Rename `tweetCount`/`tweetBuffer` → `itemCount`/`itemBuffer`. Add unit tests (CSV escaping, URL parsing, error mapping). Clean up orphaned batch keys after crashes.
 
 ---
 
-## 14. Quick Reference — How to Update This File
-
-Update `agent.md` whenever you:
-- Add/remove/rename a file
-- Change the message protocol (message types, payload structure)
-- Modify storage keys or schema
-- Add new export modes or output formats
-- Update feature flags or fallback queryIds
-- Change settings defaults
-- Add new error codes
-- Modify the data flow or architecture
-
-**Format**: Keep sections numbered. Add new info to the appropriate section. For major architectural changes, update the data flow diagram (Section 2).
+## 14. How to Update This File
+Update `agent.md` (and `CLAUDE.md`) whenever you add/rename a file, change the message protocol or storage schema, add export modes/formats/settings, update feature flags or queryIds, or change the data flow. Keep sections numbered; update §2's diagram for architectural changes.

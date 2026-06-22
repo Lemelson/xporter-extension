@@ -259,7 +259,7 @@ async function runExportLoop() {
             await flushExportBuffer();
             currentExport.status = 'stopped';
             await saveCurrentState();
-            broadcastStatus({ running: false, status: 'stopped', tweetCount: currentExport.tweetCount, canResume: true, exportMode: currentExport.exportMode });
+            broadcastStopped();
             return;
         }
 
@@ -303,7 +303,7 @@ async function runExportLoop() {
             currentExport.running = false;
             currentExport.status = 'stopped';
             await saveCurrentState();
-            broadcastStatus({ running: false, status: 'stopped', tweetCount: currentExport.tweetCount, canResume: true, exportMode: currentExport.exportMode });
+            broadcastStopped();
         } else {
             throw error;
         }
@@ -312,13 +312,20 @@ async function runExportLoop() {
 
 // ==================== Posts Fetch Loop ====================
 
-// Seed a de-dup set with recent saved IDs. On resume the loop starts with a
-// fresh in-memory Set, and X often re-serves items around the saved cursor
-// boundary. Loading only the latest batches avoids pulling a large export back
-// into memory just to cover that overlap window.
+// Seed a de-dup set with saved IDs. Cursor-based exports only need a recent
+// overlap window, but date-range search capture restarts from the beginning of
+// the X search page on resume, so it must preload the whole saved export.
 async function preloadSeenIds(seenIds) {
     if (!currentExport || !currentExport.totalBatches) return;
     try {
+        if (currentExport.dateFrom || currentExport.dateTo) {
+            const savedItems = await XPorterStorage.loadAllTweets();
+            for (const item of savedItems) {
+                if (item?.id) seenIds.add(item.id);
+            }
+            return;
+        }
+
         const startBatch = Math.max(0, currentExport.totalBatches - 3);
         for (let i = startBatch; i < currentExport.totalBatches; i++) {
             const batch = await XPorterStorage.loadTweetBatch(i);
@@ -871,7 +878,7 @@ async function stopExport() {
         await flushExportBuffer();
         currentExport.status = 'stopped';
         await saveCurrentState();
-        broadcastStatus({ running: false, status: 'stopped', tweetCount: currentExport.tweetCount, canResume: true, exportMode: currentExport.exportMode });
+        broadcastStopped();
     }
     await closeSearchCaptureTab();
     return { success: true };
@@ -1106,6 +1113,16 @@ function broadcastStatus(event) {
     }).catch(() => {
         // No listeners — that's fine
     });
+}
+
+// A single stop can otherwise be reported up to three times (stopExport, the
+// loop's !running branch, and the ABORTED catch). Broadcast 'stopped' just once
+// per export instance — the flag lives on currentExport, which is rebuilt fresh
+// on every start/resume, so it resets naturally.
+function broadcastStopped() {
+    if (!currentExport || currentExport._stoppedSent) return;
+    currentExport._stoppedSent = true;
+    broadcastStatus({ running: false, status: 'stopped', tweetCount: currentExport.tweetCount, canResume: true, exportMode: currentExport.exportMode });
 }
 
 // ==================== Auto-Resume on Startup ====================

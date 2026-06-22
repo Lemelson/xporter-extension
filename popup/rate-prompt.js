@@ -11,18 +11,12 @@
 //
 // Public API (window.XPorterRatePrompt):
 //   maybeShow({ translations, onReportBug })  — show only if gating passes
-//   forceShow({ translations, onReportBug })  — reset to pending + show (test)
 //   incrementExports()                        — call once per completed export
 //   rateNow()                                 — open store + mark rated (no UI)
 (function () {
     'use strict';
 
-    // Flip to false for production gating. When true, the prompt shows after
-    // every successful download so the UI is easy to iterate on.
-    const TESTING = false;
-
     const CONFIG = {
-        TESTING, // exposed so the UI can hide test-only controls in production
         // Deep-link straight to the Chrome Web Store reviews section.
         STORE_URL: 'https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja/reviews',
         // Where "Report a problem" sends users on the export page (the popup
@@ -31,11 +25,11 @@
         STORAGE_KEY: 'xporter_rate_prompt',
 
         // First ask: after this many completed exports since install.
-        INITIAL_EXPORTS: TESTING ? 1 : 5,
+        INITIAL_EXPORTS: 5,
         // Days to wait before the 2nd, 3rd and 4th prompt — one entry per
         // deferral, each also requires at least one new export since deferring.
         // Schedule grows so we ask less and less often.
-        REASK_SCHEDULE_DAYS: TESTING ? [0, 0, 0] : [14, 30, 30],
+        REASK_SCHEDULE_DAYS: [14, 30, 30],
         // Hard cap: after this many "Maybe later" deferrals we never ask again.
         // (= the maximum number of times the prompt is ever shown.)
         MAX_DEFERS: 4,
@@ -100,8 +94,7 @@
     // later" we wait a growing window (14 → 30 → 30 days) AND require at least
     // one new export before re-asking. After MAX_DEFERS deferrals (or any
     // "Rate"), we stop forever. So a non-rater sees the prompt at most 4 times.
-    function ready(state, force) {
-        if (force) return true;
+    function ready(state) {
         if (state.status === 'rated' || state.status === 'dismissed') return false;
 
         const defers = state.deferCount || 0;
@@ -264,20 +257,14 @@
         const o = opts || {};
         if (activeOverlay) return false;
         const state = await loadState();
-        if (!ready(state, o.force)) return false;
+        if (!ready(state)) return false;
         await patchState({ lastShownAt: Date.now() });
         buildOverlay(makeT(o.translations), o.onReportBug);
         return true;
     }
 
     function maybeShow(opts) {
-        return show(Object.assign({}, opts, { force: false }));
-    }
-
-    async function forceShow(opts) {
-        // Reset so the test button always works, even after rate/cap.
-        await patchState({ status: 'pending', deferCount: 0, lastDeferAt: 0, exportsAtDefer: 0 });
-        return show(Object.assign({}, opts, { force: true }));
+        return show(opts);
     }
 
     async function incrementExports() {
@@ -291,6 +278,6 @@
     }
 
     window.XPorterRatePrompt = {
-        maybeShow, forceShow, show, incrementExports, rateNow, openStore, openBugChannel, CONFIG
+        maybeShow, show, incrementExports, rateNow, openStore, openBugChannel, CONFIG
     };
 })();

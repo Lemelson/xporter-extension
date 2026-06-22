@@ -265,6 +265,75 @@ function ensureXporterCaptureOverlay() {
     return overlay;
 }
 
+const CAPTURE_POST_LABELS = {
+    en: {
+        postsCollected: { one: 'post collected', other: 'posts collected' },
+        postsUnit: { one: 'post', other: 'posts' }
+    },
+    ru: {
+        postsCollected: { one: 'пост собран', few: 'поста собрано', many: 'постов собрано', other: 'поста собрано' },
+        postsUnit: { one: 'пост', few: 'поста', many: 'постов', other: 'поста' }
+    },
+    ar: {
+        postsCollected: { zero: 'منشورات تم جمعها', one: 'منشور تم جمعه', two: 'منشوران تم جمعهما', few: 'منشورات تم جمعها', many: 'منشورًا تم جمعه', other: 'منشور تم جمعه' },
+        postsUnit: { zero: 'منشورات', one: 'منشور', two: 'منشوران', few: 'منشورات', many: 'منشورًا', other: 'منشور' }
+    },
+    de: {
+        postsCollected: { one: 'Beitrag gesammelt', other: 'Beiträge gesammelt' },
+        postsUnit: { one: 'Beitrag', other: 'Beiträge' }
+    },
+    es: {
+        postsCollected: { one: 'publicación recopilada', other: 'publicaciones recopiladas' },
+        postsUnit: { one: 'publicación', other: 'publicaciones' }
+    },
+    fr: {
+        postsCollected: { one: 'publication collectée', other: 'publications collectées' },
+        postsUnit: { one: 'publication', other: 'publications' }
+    },
+    it: {
+        postsCollected: { one: 'post raccolto', other: 'post raccolti' },
+        postsUnit: { one: 'post', other: 'post' }
+    },
+    pt: {
+        postsCollected: { one: 'publicação coletada', other: 'publicações coletadas' },
+        postsUnit: { one: 'publicação', other: 'publicações' }
+    },
+    tr: {
+        postsCollected: { other: 'gönderi toplandı' },
+        postsUnit: { other: 'gönderi' }
+    },
+    id: {
+        postsCollected: { other: 'postingan terkumpul' },
+        postsUnit: { other: 'postingan' }
+    },
+    hi: {
+        postsCollected: { other: 'पोस्ट एकत्रित' },
+        postsUnit: { other: 'पोस्ट' }
+    },
+    ja: {
+        postsCollected: { other: '件のポスト取得済み' },
+        postsUnit: { other: '件のポスト' }
+    },
+    ko: {
+        postsCollected: { other: '개 게시물 수집됨' },
+        postsUnit: { other: '개 게시물' }
+    },
+    zh: {
+        postsCollected: { other: '条帖子已收集' },
+        postsUnit: { other: '条帖子' }
+    }
+};
+
+function capturePluralLabel(key, count, i) {
+    const lang = String(i.lang || 'en').toLowerCase().split('-')[0];
+    const forms = CAPTURE_POST_LABELS[lang]?.[key] || CAPTURE_POST_LABELS.en[key];
+    let category = (Number(count) === 1) ? 'one' : 'other';
+    try {
+        category = new Intl.PluralRules(lang).select(Math.abs(Number(count) || 0));
+    } catch (_) { /* keep simple fallback */ }
+    return forms?.[category] || forms?.other || i[key] || i.posts || 'posts';
+}
+
 function updateXporterCaptureOverlay(status) {
     const overlay = ensureXporterCaptureOverlay();
     const i = status.i18n || {};
@@ -275,7 +344,7 @@ function updateXporterCaptureOverlay(status) {
     const limit = Number(status.quantityLimit || 0);
     const range = [status.dateFrom, status.dateTo].filter(Boolean).join(' → ');
     const locale = i.lang || undefined;
-    const postsWord = i.posts || 'posts';
+    const postsWord = capturePluralLabel('postsUnit', limit, i);
     const limitText = limit > 0
         ? `${i.limitLabel || 'Limit:'} ${limit.toLocaleString(locale)} ${postsWord}`
         : (i.noLimit || 'No post limit');
@@ -298,7 +367,7 @@ function updateXporterCaptureOverlay(status) {
     overlay.querySelector('[data-xporter-subtitle]').textContent =
         status.phase || i.preparingPage || 'Preparing search page...';
     overlay.querySelector('[data-xporter-count]').textContent =
-        `${count.toLocaleString(locale)} ${i.postsCollected || 'posts collected'}`;
+        `${count.toLocaleString(locale)} ${capturePluralLabel('postsCollected', count, i)}`;
     overlay.querySelector('[data-xporter-range]').textContent = range;
     overlay.querySelector('[data-xporter-limit]').textContent = limitText;
 }

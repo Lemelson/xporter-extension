@@ -149,7 +149,6 @@
   "rateReport": "Laporkan masalah",
   "rateClose": "Tutup",
   "rateThanks": "Terima kasih!",
-  "ratePreview": "Tampilkan jendela rating",
   "rateAbout": "Beri rating XPorter",
   "localizeHeaders": "Lokalkan judul kolom",
   "localizeHeadersHelp": "**Menerjemahkan judul kolom pada file CSV dan XLSX ke bahasamu.** Matikan untuk mempertahankan judul bahasa Inggris; lebih cocok untuk skrip dan templat spreadsheet. Kunci JSON selalu tetap dalam bahasa Inggris."

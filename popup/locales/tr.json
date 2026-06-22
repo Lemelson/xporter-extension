@@ -149,7 +149,6 @@
   "rateReport": "Sorun bildir",
   "rateClose": "Kapat",
   "rateThanks": "Teşekkürler!",
-  "ratePreview": "Değerlendirme penceresini göster",
   "rateAbout": "XPorter'ı değerlendir",
   "localizeHeaders": "Sütun başlıklarını yerelleştir",
   "localizeHeadersHelp": "**CSV ve XLSX dosyalarındaki sütun başlıklarını dilinize çevirir.** Kapatırsan başlıklar İngilizce kalır; bu, betikler ve elektronik tablo şablonları için daha uygundur. JSON anahtarları her zaman İngilizce kalır."
