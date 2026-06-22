@@ -2,21 +2,27 @@
 // Loads translations from per-language JSON files in locales/
 // Falls back to English for any missing keys
 
+// English is pinned first — it's the default/fallback UI language. Everything
+// after it is ordered by real popularity: weekly active users of the extension
+// (see the "Weekly users by language" analytics, most-used first). The two
+// languages with no measured usage (hi, id) are placed last, ranked between
+// themselves by number of speakers (Hindi > Indonesian). NOTE: order is
+// presentation only — 'en' stays the hard-coded fallback in code, not LANGUAGES[0].
 const LANGUAGES = [
-    { code: 'en', flag: '🇺🇸', name: 'English' },
-    { code: 'es', flag: '🇪🇸', name: 'Español' },
-    { code: 'pt', flag: '🇧🇷', name: 'Português' },
-    { code: 'hi', flag: '🇮🇳', name: 'हिन्दी' },
-    { code: 'zh', flag: '🇨🇳', name: '中文' },
-    { code: 'ru', flag: '🇷🇺', name: 'Русский' },
-    { code: 'ar', flag: '🇸🇦', name: 'العربية' },
-    { code: 'fr', flag: '🇫🇷', name: 'Français' },
-    { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
-    { code: 'ja', flag: '🇯🇵', name: '日本語' },
-    { code: 'ko', flag: '🇰🇷', name: '한국어' },
-    { code: 'tr', flag: '🇹🇷', name: 'Türkçe' },
-    { code: 'id', flag: '🇮🇩', name: 'Bahasa Indonesia' },
-    { code: 'it', flag: '🇮🇹', name: 'Italiano' },
+    { code: 'en', flag: '🇺🇸', name: 'English' },          // default / fallback — pinned first
+    { code: 'zh', flag: '🇨🇳', name: '中文' },              // ~88/wk
+    { code: 'ja', flag: '🇯🇵', name: '日本語' },             // ~48/wk
+    { code: 'es', flag: '🇪🇸', name: 'Español' },          // ~28/wk
+    { code: 'ko', flag: '🇰🇷', name: '한국어' },             // ~17/wk
+    { code: 'ru', flag: '🇷🇺', name: 'Русский' },          // ~6/wk — pinned above it/pt by request
+    { code: 'it', flag: '🇮🇹', name: 'Italiano' },         // ~7/wk
+    { code: 'pt', flag: '🇧🇷', name: 'Português' },        // ~6/wk
+    { code: 'tr', flag: '🇹🇷', name: 'Türkçe' },           // ~3/wk
+    { code: 'de', flag: '🇩🇪', name: 'Deutsch' },          // ~2/wk
+    { code: 'ar', flag: '🇸🇦', name: 'العربية' },          // ~1/wk
+    { code: 'fr', flag: '🇫🇷', name: 'Français' },         // <1/wk
+    { code: 'hi', flag: '🇮🇳', name: 'हिन्दी' },            // no usage data — by speakers
+    { code: 'id', flag: '🇮🇩', name: 'Bahasa Indonesia' }, // no usage data — by speakers
 ];
 
 /**
