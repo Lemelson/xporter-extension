@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resumeBtn = document.getElementById('resumeBtn');
     const resumeRow = document.getElementById('resumeRow');
     const resumeQuantity = document.getElementById('resumeQuantity');
+    const resumeLabel = document.querySelector('.resume-label');
     const newExportBtn = document.getElementById('newExportBtn');
     const exportStatus = document.getElementById('exportStatus');
     const statusText = document.getElementById('statusText');
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const autoExpireHours = document.getElementById('autoExpireHours');
     const autoExpireRow = document.getElementById('autoExpireRow');
     const ladybugEnabled = document.getElementById('ladybugEnabled');
+    const localizeExportHeaders = document.getElementById('localizeExportHeaders');
 
     // Settings tab — posts-only elements
     const settingsPostsOnly = document.getElementById('settingsPostsOnly');
@@ -52,6 +54,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const langCode = document.getElementById('langCode');
     const langDropdown = document.getElementById('langDropdown');
     const extensionVersion = document.getElementById('extensionVersion');
+
+    // Rate-prompt elements + counter guard (one finished export counts once).
+    const ratePreviewBtn = document.getElementById('ratePreviewBtn');
+    const rateAboutBtn = document.getElementById('rateAboutBtn');
+    let ratePromptCounted = false;
 
     // Cache values for updateUI — must be declared before any updateUI call
     let lastItemCount = 0;
@@ -174,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.documentElement.lang = code;
         applyLanguageDirection(code); // RTL for Arabic, LTR otherwise
+        updateResumeQuantityLabel();
     }
 
     async function selectLanguage(code) {
@@ -334,6 +342,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             ladybugEnabled.checked = currentSettings.ladybugEnabled !== false;
             window.XPorterLadybug?.setEnabled?.(ladybugEnabled.checked);
         }
+        if (localizeExportHeaders) {
+            localizeExportHeaders.checked = currentSettings.localizeExportHeaders === true;
+        }
     }
 
     quantityLimit.addEventListener('change', () => {
@@ -380,15 +391,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 outputFormat: outputFormat.value,
                 autoExpireEnabled: autoExpireEnabled.checked,
                 autoExpireHours: Math.max(1, Math.min(48, parseInt(autoExpireHours.value) || 4)),
-                ladybugEnabled: ladybugEnabled ? ladybugEnabled.checked : true
+                ladybugEnabled: ladybugEnabled ? ladybugEnabled.checked : true,
+                localizeExportHeaders: localizeExportHeaders ? localizeExportHeaders.checked : false
             }
         });
     }, 500);
+
+    if (localizeExportHeaders) {
+        localizeExportHeaders.addEventListener('change', saveSettingsDebounced);
+    }
 
     [includeRetweets, includeReplies, quantityLimit, cooldownMinutes, cooldownBatch, customQuantity, autoExpireHours].forEach(el => {
         el.addEventListener('change', saveSettingsDebounced);
     });
     customQuantity.addEventListener('input', saveSettingsDebounced);
+    resumeQuantity.addEventListener('input', updateResumeQuantityLabel);
 
     // ==================== Date Range Toggle ====================
     dateCheck.addEventListener('change', () => {
@@ -436,9 +453,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Helper: mode-specific item label ====================
     function itemLabel() {
         const mode = exportMode.value;
-        if (mode === 'followers' || mode === 'verified_followers') return t('usersCollected') || 'users collected';
-        if (mode === 'following') return t('usersCollected') || 'users collected';
-        return t('postsCollected');
+        return collectedLabel(lastItemCount || 0, mode, currentLang, currentTranslations);
+    }
+
+    function updateResumeQuantityLabel() {
+        if (!resumeLabel) return;
+        const count = parseInt(resumeQuantity.value, 10) || 0;
+        resumeLabel.textContent = pluralLabel('morePosts', count, currentLang, currentTranslations);
     }
 
     // Localized, emoji-stripped label for the history mode badge.
@@ -462,6 +483,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setTimeout(() => usernameInput.style.borderColor = '', 2000);
                 return;
             }
+
+            ratePromptCounted = false; // fresh export — allow it to be counted again
 
             const mode = exportMode.value;
             const params = {
@@ -488,7 +511,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Stop Export ====================
     stopBtn.addEventListener('click', async () => {
         await sendMessage({ type: 'STOP_EXPORT' });
-        updateUI({ running: false, status: 'stopped', tweetCount: parseInt(tweetCountEl.textContent) || 0 });
+        updateUI({ running: false, status: 'stopped', tweetCount: lastItemCount || 0 });
     });
 
     // ==================== Download ====================
@@ -501,6 +524,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             showToast(formatError(result.error, t), 'error');
         } else {
             showToast(t('downloadStarted'), 'success');
+            // User just got their file — the natural moment to ask for a rating.
+            setTimeout(() => {
+                window.XPorterRatePrompt?.maybeShow({
+                    translations: currentTranslations,
+                    lang: currentLang,
+                    onReportBug: openAboutTab
+                });
+            }, 800);
         }
         downloadBtn.querySelector('[data-i18n="download"]').textContent = t('download');
     });
@@ -531,6 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     newExportBtn.addEventListener('click', async () => {
         await sendMessage({ type: 'CLEAR_EXPORT' });
         updateUI({ running: false, status: 'idle' });
+        ratePromptCounted = false;
         try {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab?.url) {
@@ -544,6 +576,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         usernameInput.focus();
     });
+
+    // ==================== Rate Prompt ====================
+    // "Report a problem" in the prompt → jump to the About tab (Telegram/email).
+    const openAboutTab = () => document.querySelector('.tab[data-tab="about"]')?.click();
+
+    // Settings: on-demand preview (resets state, so it always shows). This is a
+    // test-only control — hidden in production builds (TESTING = false).
+    if (ratePreviewBtn) {
+        if (!window.XPorterRatePrompt?.CONFIG?.TESTING) {
+            (ratePreviewBtn.closest('.field') || ratePreviewBtn).style.display = 'none';
+        }
+        ratePreviewBtn.addEventListener('click', () => {
+            window.XPorterRatePrompt?.forceShow({
+                translations: currentTranslations,
+                lang: currentLang,
+                onReportBug: openAboutTab
+            });
+        });
+    }
+    // About: low-pressure, always-available link straight to the store.
+    if (rateAboutBtn) {
+        rateAboutBtn.addEventListener('click', () => {
+            window.XPorterRatePrompt?.rateNow();
+        });
+    }
 
     // ==================== Listen for Status Updates ====================
     chrome.runtime.onMessage.addListener((message) => {
@@ -570,7 +627,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (state.quantityLimit !== undefined) lastQuantityLimit = state.quantityLimit;
 
         const itemCount = lastItemCount;
-        const label = (mode === 'posts') ? t('postsCollected') : (t('usersCollected') || 'users collected');
 
         // Show/hide elements
         startBtn.classList.toggle('hidden', isRunning || status === 'complete' || status === 'stopped');
@@ -665,6 +721,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusMessage.textContent = t('canContinue');
                 progressFill.classList.remove('indeterminate');
                 progressFill.style.width = '100%';
+                if (!ratePromptCounted) {
+                    ratePromptCounted = true;
+                    window.XPorterRatePrompt?.incrementExports();
+                }
                 break;
 
             case 'stopped':
@@ -676,7 +736,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Update count display
-        tweetCountEl.innerHTML = `${formatNumber(itemCount, currentLang)} <span>${label}</span>`;
+        tweetCountEl.textContent = formatCollectedCount(itemCount, mode, currentLang, currentTranslations);
     }
 
     // ==================== Export History ====================

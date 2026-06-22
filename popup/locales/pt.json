@@ -141,5 +141,16 @@
   "detailDatesBody": "Exporte publicações de um período específico. As exportações por intervalo de datas abrem uma aba de busca do X e a rolam automaticamente para coletar as publicações correspondentes — basta manter essa aba aberta até a exportação terminar.",
   "detailResumeTitle": "Retomada automática e limitação de taxa",
   "detailResumeBody": "O progresso é salvo enquanto a exportação roda, então você pode pausar, fechar o popup ou até reiniciar o navegador e continuar de onde parou. O XPorter também controla o ritmo das requisições para respeitar os limites do X e evitar bloqueios temporários.",
-  "exportModeHelp": "O que cada modo de exportação coleta:\n**📝 Posts** — todas as publicações do perfil (tweets, respostas, reposts e citações) com todas as estatísticas.\n**👥 Seguidores** — as contas que seguem este perfil.\n**➡️ Seguindo** — as contas que este perfil segue.\n**✓ Seguidores verificados** — apenas os seguidores com o selo de verificado (azul)."
+  "exportModeHelp": "O que cada modo de exportação coleta:\n**📝 Posts** — todas as publicações do perfil (tweets, respostas, reposts e citações) com todas as estatísticas.\n**👥 Seguidores** — as contas que seguem este perfil.\n**➡️ Seguindo** — as contas que este perfil segue.\n**✓ Seguidores verificados** — apenas os seguidores com o selo de verificado (azul).",
+  "rateTitle": "Curtindo o XPorter?",
+  "rateBody": "O XPorter é **gratuito** e **ilimitado**. Estou sempre adicionando novos recursos e corrigindo bugs. Se ele te ajuda, deixe **5 estrelas**, por favor. Isso ajuda muito o projeto e faz mais gente descobri-lo.",
+  "rateCta": "Avaliar na Web Store",
+  "rateLater": "Talvez depois",
+  "rateReport": "Relatar um problema",
+  "rateClose": "Fechar",
+  "rateThanks": "Obrigado!",
+  "ratePreview": "Mostrar janela de avaliação",
+  "rateAbout": "Avaliar o XPorter",
+  "localizeHeaders": "Traduzir títulos das colunas",
+  "localizeHeadersHelp": "**Traduz os cabeçalhos das colunas dos arquivos CSV e XLSX para o seu idioma.** Desative para manter os cabeçalhos em inglês; funcionam melhor com scripts e modelos de planilha. As chaves JSON permanecem sempre em inglês."
 }

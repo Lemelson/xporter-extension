@@ -141,5 +141,16 @@
   "detailDatesBody": "Gönderileri belirli bir zaman aralığından dışa aktarın. Tarih aralığı dışa aktarımları bir X arama sekmesi açar ve eşleşen gönderileri toplamak için sayfayı otomatik olarak kaydırır — bitene kadar bu sekmeyi açık tutmanız yeterli.",
   "detailResumeTitle": "Otomatik devam ve hız sınırlama",
   "detailResumeBody": "İlerleme, dışa aktarma çalışırken kaydedilir; böylece duraklatabilir, açılır pencereyi kapatabilir, hatta tarayıcınızı yeniden başlatıp kaldığınız yerden devam edebilirsiniz. XPorter ayrıca X'in sınırlarına uymak ve geçici engellemeleri önlemek için isteklerini belirli bir hızda gönderir.",
-  "exportModeHelp": "Her dışa aktarma modunun topladıkları:\n**📝 Gönderiler** — profildeki tüm gönderiler (tweetler, yanıtlar, repostlar ve alıntılar) tüm istatistikleriyle.\n**👥 Takipçiler** — bu profili takip eden hesaplar.\n**➡️ Takip Edilenler** — bu profilin takip ettiği hesaplar.\n**✓ Doğrulanmış Takipçiler** — yalnızca onaylı (mavi) rozeti olan takipçiler."
+  "exportModeHelp": "Her dışa aktarma modunun topladıkları:\n**📝 Gönderiler** — profildeki tüm gönderiler (tweetler, yanıtlar, repostlar ve alıntılar) tüm istatistikleriyle.\n**👥 Takipçiler** — bu profili takip eden hesaplar.\n**➡️ Takip Edilenler** — bu profilin takip ettiği hesaplar.\n**✓ Doğrulanmış Takipçiler** — yalnızca onaylı (mavi) rozeti olan takipçiler.",
+  "rateTitle": "XPorter'ı beğendin mi?",
+  "rateBody": "XPorter **ücretsiz** ve **sınırsız**. Sürekli yeni özellikler ekliyor ve hataları düzeltiyorum. İşine yaradıysa lütfen **5 yıldız** ver. Bu, projeye çok yardımcı olur ve başkalarının onu keşfetmesini sağlar.",
+  "rateCta": "Web Store'da değerlendir",
+  "rateLater": "Belki sonra",
+  "rateReport": "Sorun bildir",
+  "rateClose": "Kapat",
+  "rateThanks": "Teşekkürler!",
+  "ratePreview": "Değerlendirme penceresini göster",
+  "rateAbout": "XPorter'ı değerlendir",
+  "localizeHeaders": "Sütun başlıklarını yerelleştir",
+  "localizeHeadersHelp": "**CSV ve XLSX dosyalarındaki sütun başlıklarını dilinize çevirir.** Kapatırsan başlıklar İngilizce kalır; bu, betikler ve elektronik tablo şablonları için daha uygundur. JSON anahtarları her zaman İngilizce kalır."
 }

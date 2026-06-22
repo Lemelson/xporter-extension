@@ -141,5 +141,16 @@
   "detailDatesBody": "Exportiere Beiträge aus einem bestimmten Zeitraum. Exporte nach Datumsbereich öffnen einen X-Suchtab und scrollen ihn automatisch, um passende Beiträge zu sammeln — halte diesen Tab einfach geöffnet, bis er fertig ist.",
   "detailResumeTitle": "Automatische Wiederaufnahme & Ratenbegrenzung",
   "detailResumeBody": "Der Fortschritt wird während des Exports gespeichert, sodass du pausieren, das Popup schließen oder sogar deinen Browser neu starten und dort weitermachen kannst, wo du aufgehört hast. XPorter steuert außerdem das Tempo seiner Anfragen, um die Limits von X einzuhalten und vorübergehende Sperren zu vermeiden.",
-  "exportModeHelp": "Was jeder Export-Modus erfasst:\n**📝 Beiträge** — alle Beiträge des Profils (Tweets, Antworten, Reposts und Zitate) mit allen Statistiken.\n**👥 Follower** — die Konten, die diesem Profil folgen.\n**➡️ Gefolgt** — die Konten, denen dieses Profil folgt.\n**✓ Verifizierte Follower** — nur Follower mit verifiziertem (blauem) Haken."
+  "exportModeHelp": "Was jeder Export-Modus erfasst:\n**📝 Beiträge** — alle Beiträge des Profils (Tweets, Antworten, Reposts und Zitate) mit allen Statistiken.\n**👥 Follower** — die Konten, die diesem Profil folgen.\n**➡️ Gefolgt** — die Konten, denen dieses Profil folgt.\n**✓ Verifizierte Follower** — nur Follower mit verifiziertem (blauem) Haken.",
+  "rateTitle": "Gefällt dir XPorter?",
+  "rateBody": "XPorter ist **kostenlos** und **unbegrenzt**. Ich füge ständig neue Funktionen hinzu und behebe Fehler. Wenn es dir hilft, lass bitte **5 Sterne** da. Das unterstützt das Projekt sehr und hilft anderen, es zu finden.",
+  "rateCta": "Im Web Store bewerten",
+  "rateLater": "Vielleicht später",
+  "rateReport": "Problem melden",
+  "rateClose": "Schließen",
+  "rateThanks": "Danke!",
+  "ratePreview": "Bewertungsdialog anzeigen",
+  "rateAbout": "XPorter bewerten",
+  "localizeHeaders": "Spaltentitel lokalisieren",
+  "localizeHeadersHelp": "**Übersetzt die Spaltenüberschriften in CSV- und XLSX-Dateien in deine Sprache.** Schalte es aus, um die englischen Überschriften zu behalten; sie eignen sich besser für Skripte und Tabellenvorlagen. JSON-Schlüssel bleiben immer Englisch."
 }

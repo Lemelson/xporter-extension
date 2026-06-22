@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exportUsername = document.getElementById('exportUsername');
     const exportExpected = document.getElementById('exportExpected');
     const counter = document.getElementById('counter');
+    const counterLabel = document.querySelector('.counter-label');
     const progressFill = document.getElementById('progressFill');
     const statusDot = document.getElementById('statusDot');
     const statusMsg = document.getElementById('statusMsg');
@@ -44,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Complete state elements
     const completeUser = document.getElementById('completeUser');
     const completeCount = document.getElementById('completeCount');
+    const completePostsLabel = document.querySelector('#completeInfo [data-i18n="posts"]');
 
     // Error state elements
     const errorTitle = document.getElementById('errorTitle');
@@ -52,6 +54,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let exportStartTime = null;
     let timeInterval = null;
     let cooldownInterval = null;
+    // Guards the rating prompt's export counter so one finished export counts
+    // once, even though the 'complete' status can be re-broadcast.
+    let ratePromptCounted = false;
 
     if (exportVersion && chrome.runtime?.getManifest) {
         exportVersion.textContent = `v${chrome.runtime.getManifest().version}`;
@@ -219,6 +224,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Save settings first
         await saveSettings.flush?.() || saveSettings();
 
+        ratePromptCounted = false; // fresh export — allow it to be counted again
+
         const result = await sendMessage({
             type: 'START_EXPORT',
             username,
@@ -283,6 +290,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             showError(t('downloadError'), formatError(result.error, t));
         } else {
             showToast(t('downloadStarted'), 'success');
+            // User just got their file — the natural moment to ask for a rating.
+            setTimeout(() => {
+                window.XPorterRatePrompt?.maybeShow({ translations: currentTranslations, lang: currentLang });
+            }, 800);
         }
     });
 
@@ -293,6 +304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         usernameInput.value = '';
         usernameInput.focus();
         stopTimeCounter();
+        ratePromptCounted = false;
     });
 
     // ==================== Retry Error ====================
@@ -322,10 +334,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showState('active');
                 if (state.username) exportUsername.textContent = `@${state.username}`;
                 exportExpected.textContent = state.expectedTweets
-                    ? `~${formatNumber(state.expectedTweets, currentLang)} ${t('totalTweets')}`
+                    ? `~${formatNumber(state.expectedTweets, currentLang)} ${pluralLabel('totalTweets', state.expectedTweets, currentLang, currentTranslations)}`
                     : '';
 
                 counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
+                if (counterLabel) {
+                    counterLabel.textContent = collectedLabel(state.tweetCount || 0, 'posts', currentLang, currentTranslations);
+                }
                 statusDot.className = 'status-dot green';
                 statusMsg.textContent = `${t('fetching')} (${t('batch')} ${state.batch || '?'})`;
 
@@ -384,7 +399,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showState('complete');
                 completeUser.textContent = `@${state.username || usernameInput.value}`;
                 completeCount.textContent = formatNumber(state.tweetCount || 0, currentLang);
+                if (completePostsLabel) {
+                    completePostsLabel.textContent = ' ' + pluralLabel('postsUnit', state.tweetCount || 0, currentLang, currentTranslations);
+                }
                 stopTimeCounter();
+                if (!ratePromptCounted) {
+                    ratePromptCounted = true;
+                    window.XPorterRatePrompt?.incrementExports();
+                }
                 break;
 
             case 'stopped':
@@ -394,6 +416,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusDot.className = 'status-dot yellow';
                 statusMsg.textContent = t('stoppedClickResume');
                 counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
+                if (counterLabel) {
+                    counterLabel.textContent = collectedLabel(state.tweetCount || 0, 'posts', currentLang, currentTranslations);
+                }
                 stopTimeCounter();
                 break;
         }

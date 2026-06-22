@@ -141,5 +141,16 @@
   "detailDatesBody": "Exportez les publications d'une période précise. Les exports par plage de dates ouvrent un onglet de recherche X et le font défiler automatiquement pour collecter les publications correspondantes — gardez simplement cet onglet ouvert jusqu'à la fin.",
   "detailResumeTitle": "Reprise auto et limitation de débit",
   "detailResumeBody": "La progression est enregistrée pendant l'export : vous pouvez ainsi mettre en pause, fermer la fenêtre ou même redémarrer votre navigateur, puis reprendre là où vous vous étiez arrêté. XPorter régule aussi ses requêtes pour respecter les limites de X et éviter les blocages temporaires.",
-  "exportModeHelp": "Ce que collecte chaque mode d'export :\n**📝 Publications** — toutes les publications du profil (tweets, réponses, reposts et citations) avec toutes leurs statistiques.\n**👥 Abonnés** — les comptes qui suivent ce profil.\n**➡️ Abonnements** — les comptes que ce profil suit.\n**✓ Abonnés vérifiés** — uniquement les abonnés ayant le badge vérifié (bleu)."
+  "exportModeHelp": "Ce que collecte chaque mode d'export :\n**📝 Publications** — toutes les publications du profil (tweets, réponses, reposts et citations) avec toutes leurs statistiques.\n**👥 Abonnés** — les comptes qui suivent ce profil.\n**➡️ Abonnements** — les comptes que ce profil suit.\n**✓ Abonnés vérifiés** — uniquement les abonnés ayant le badge vérifié (bleu).",
+  "rateTitle": "Vous aimez XPorter ?",
+  "rateBody": "XPorter est **gratuit** et **illimité**. J'ajoute sans cesse de nouvelles fonctionnalités et je corrige les bugs. S'il vous est utile, laissez **5 étoiles**, s'il vous plaît. Cela aide beaucoup le projet et permet à d'autres de le découvrir.",
+  "rateCta": "Noter sur le Web Store",
+  "rateLater": "Plus tard",
+  "rateReport": "Signaler un problème",
+  "rateClose": "Fermer",
+  "rateThanks": "Merci !",
+  "ratePreview": "Afficher la fenêtre de notation",
+  "rateAbout": "Noter XPorter",
+  "localizeHeaders": "Traduire les titres de colonnes",
+  "localizeHeadersHelp": "**Traduit les en-têtes de colonnes des fichiers CSV et XLSX dans votre langue.** Désactivez-le pour conserver les en-têtes en anglais ; ils conviennent mieux aux scripts et aux modèles de tableur. Les clés JSON restent toujours en anglais."
 }

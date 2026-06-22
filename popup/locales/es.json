@@ -141,5 +141,16 @@
   "detailDatesBody": "Exporta publicaciones de un periodo de tiempo concreto. Las exportaciones por rango de fechas abren una pestaña de búsqueda de X y la desplazan automáticamente para recopilar las publicaciones que coinciden — solo mantén esa pestaña abierta hasta que termine.",
   "detailResumeTitle": "Reanudación automática y control de frecuencia",
   "detailResumeBody": "El progreso se guarda mientras se ejecuta la exportación, así que puedes pausarla, cerrar la ventana emergente o incluso reiniciar el navegador y continuar donde lo dejaste. XPorter también regula el ritmo de sus solicitudes para respetar los límites de X y evitar bloqueos temporales.",
-  "exportModeHelp": "Qué recopila cada modo de exportación:\n**📝 Publicaciones** — todas las publicaciones del perfil (tuits, respuestas, reposts y citas) con todas sus estadísticas.\n**👥 Seguidores** — las cuentas que siguen a este perfil.\n**➡️ Seguidos** — las cuentas que este perfil sigue.\n**✓ Seguidores verificados** — solo los seguidores con la insignia de verificado (azul)."
+  "exportModeHelp": "Qué recopila cada modo de exportación:\n**📝 Publicaciones** — todas las publicaciones del perfil (tuits, respuestas, reposts y citas) con todas sus estadísticas.\n**👥 Seguidores** — las cuentas que siguen a este perfil.\n**➡️ Seguidos** — las cuentas que este perfil sigue.\n**✓ Seguidores verificados** — solo los seguidores con la insignia de verificado (azul).",
+  "rateTitle": "¿Te gusta XPorter?",
+  "rateBody": "XPorter es **gratis** e **ilimitado**. Sigo añadiendo funciones y corrigiendo errores. Si te resulta útil, deja **5 estrellas**, por favor. Ayuda muchísimo al proyecto y a que otros lo descubran.",
+  "rateCta": "Valorar en la Web Store",
+  "rateLater": "Quizás más tarde",
+  "rateReport": "Informar de un problema",
+  "rateClose": "Cerrar",
+  "rateThanks": "¡Gracias!",
+  "ratePreview": "Mostrar ventana de valoración",
+  "rateAbout": "Valorar XPorter",
+  "localizeHeaders": "Traducir títulos de columnas",
+  "localizeHeadersHelp": "**Traduce los encabezados de columna de los archivos CSV y XLSX a tu idioma.** Desactívalo para mantener los encabezados en inglés; funcionan mejor con scripts y plantillas de hojas de cálculo. Las claves JSON siempre quedan en inglés."
 }

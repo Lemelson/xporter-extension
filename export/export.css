@@ -959,15 +959,15 @@ body.light .help-pop {
 }
 
 .toast-error {
-    border-color: rgba(244, 33, 46, 0.45);
-    background: rgba(244, 33, 46, 0.14);
-    color: var(--danger);
+    border-color: rgba(255, 255, 255, 0.18);
+    background: linear-gradient(135deg, #f4313d, #cf1c27);
+    color: #fff;
 }
 
 .toast-success {
-    border-color: rgba(0, 186, 124, 0.45);
-    background: rgba(0, 186, 124, 0.14);
-    color: var(--success);
+    border-color: rgba(255, 255, 255, 0.18);
+    background: linear-gradient(135deg, #0cc187, #06966a);
+    color: #fff;
 }
 
 /* ========== Reduced motion ========== */
