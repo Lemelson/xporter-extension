@@ -255,8 +255,11 @@ function ensureXporterCaptureOverlay() {
     overlay.querySelector('.xporter-capture-toggle').addEventListener('click', () => {
         const collapsed = overlay.classList.toggle('xporter-capture-collapsed');
         const button = overlay.querySelector('.xporter-capture-toggle');
+        const i = overlay._xporterI18n || {};
         button.textContent = collapsed ? '+' : '−';
-        button.setAttribute('aria-label', collapsed ? 'Expand XPorter status' : 'Collapse XPorter status');
+        button.setAttribute('aria-label', collapsed
+            ? (i.expand || 'Expand XPorter status')
+            : (i.collapse || 'Collapse XPorter status'));
     });
 
     return overlay;
@@ -264,13 +267,35 @@ function ensureXporterCaptureOverlay() {
 
 function updateXporterCaptureOverlay(status) {
     const overlay = ensureXporterCaptureOverlay();
+    const i = status.i18n || {};
+    overlay._xporterI18n = i;
     const count = Number(status.tweetCount || 0);
     const limit = Number(status.quantityLimit || 0);
-    const range = [status.dateFrom, status.dateTo].filter(Boolean).join(' to ');
-    const limitText = limit > 0 ? `Limit: ${limit.toLocaleString()} posts` : 'No post limit';
+    const range = [status.dateFrom, status.dateTo].filter(Boolean).join(' → ');
+    const postsWord = i.posts || 'posts';
+    const limitText = limit > 0
+        ? `${i.limitLabel || 'Limit:'} ${limit.toLocaleString()} ${postsWord}`
+        : (i.noLimit || 'No post limit');
 
-    overlay.querySelector('[data-xporter-subtitle]').textContent = status.phase || `Exporting @${status.username || 'profile'}...`;
-    overlay.querySelector('[data-xporter-count]').textContent = `${count} posts collected`;
+    // Localize static labels once translations arrive.
+    if (status.i18n) {
+        const titleEl = overlay.querySelector('.xporter-capture-title');
+        if (titleEl && i.title) titleEl.textContent = i.title;
+        const noteEl = overlay.querySelector('.xporter-capture-note');
+        if (noteEl && i.note) noteEl.textContent = i.note;
+        const toggle = overlay.querySelector('.xporter-capture-toggle');
+        if (toggle) {
+            const collapsed = overlay.classList.contains('xporter-capture-collapsed');
+            toggle.setAttribute('aria-label', collapsed
+                ? (i.expand || 'Expand XPorter status')
+                : (i.collapse || 'Collapse XPorter status'));
+        }
+    }
+
+    overlay.querySelector('[data-xporter-subtitle]').textContent =
+        status.phase || i.preparingPage || 'Preparing search page...';
+    overlay.querySelector('[data-xporter-count]').textContent =
+        `${count.toLocaleString()} ${i.postsCollected || 'posts collected'}`;
     overlay.querySelector('[data-xporter-range]').textContent = range;
     overlay.querySelector('[data-xporter-limit]').textContent = limitText;
 }

@@ -169,6 +169,35 @@ function applyI18nToDOM(translations) {
     });
 }
 
+// ==================== Direction & Number Formatting ====================
+
+// Languages that read right-to-left. Currently only Arabic is shipped.
+const RTL_LANGUAGES = new Set(['ar', 'fa', 'he', 'ur']);
+
+/**
+ * Apply text direction (LTR/RTL) for the given language to the document.
+ */
+function applyLanguageDirection(langCode) {
+    const dir = RTL_LANGUAGES.has(langCode) ? 'rtl' : 'ltr';
+    if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.dir = dir;
+    }
+    return dir;
+}
+
+/**
+ * Format a number using the selected UI language (not the browser locale).
+ * Falls back gracefully if the locale is unsupported.
+ */
+function formatNumber(value, langCode) {
+    const n = Number(value) || 0;
+    try {
+        return n.toLocaleString(langCode || undefined);
+    } catch (_) {
+        return n.toLocaleString();
+    }
+}
+
 // ==================== General ====================
 
 /**

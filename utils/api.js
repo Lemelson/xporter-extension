@@ -41,6 +41,43 @@ let endpointsCacheTime = 0;
 const ENDPOINTS_CACHE_TTL = _C.ENDPOINT_CACHE_TTL || (30 * 60 * 1000);
 let usingFallbacks = false;
 
+// Persist discovered endpoints across MV3 service-worker restarts.
+// The in-memory cache above is wiped every time the worker sleeps, which made
+// the extension re-scan X's (multi-MB) JS bundles on every wake. Mirroring the
+// cache to chrome.storage.local makes the first export after a wake instant.
+const ENDPOINTS_STORAGE_KEY = 'xporter_discovered_endpoints';
+
+async function _persistEndpoints() {
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local && discoveredEndpoints) {
+      await chrome.storage.local.set({
+        [ENDPOINTS_STORAGE_KEY]: {
+          endpoints: discoveredEndpoints,
+          time: endpointsCacheTime,
+          bearer: activeBearerToken
+        }
+      });
+    }
+  } catch (_) { /* storage best-effort */ }
+}
+
+async function _hydrateEndpoints() {
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      const r = await chrome.storage.local.get(ENDPOINTS_STORAGE_KEY);
+      const cached = r[ENDPOINTS_STORAGE_KEY];
+      if (cached?.endpoints && (Date.now() - (cached.time || 0)) < ENDPOINTS_CACHE_TTL) {
+        discoveredEndpoints = cached.endpoints;
+        endpointsCacheTime = cached.time || 0;
+        if (cached.bearer) activeBearerToken = cached.bearer;
+        XLog.log('Endpoints hydrated from storage cache');
+        return true;
+      }
+    }
+  } catch (_) { /* storage best-effort */ }
+  return false;
+}
+
 // Live queryIds captured from X.com's own network traffic (highest priority)
 const liveQueryIds = {};
 
@@ -54,6 +91,11 @@ const liveQueryIds = {};
  * Falls back to hardcoded values if discovery fails.
  */
 async function discoverEndpoints(forceRefresh = false) {
+  // Try the persisted cache first when memory was wiped by a worker restart.
+  if (!forceRefresh && !discoveredEndpoints) {
+    await _hydrateEndpoints();
+  }
+
   // Return cached if still valid (unless explicitly forcing a refresh)
   if (!forceRefresh && discoveredEndpoints && (Date.now() - endpointsCacheTime) < ENDPOINTS_CACHE_TTL) {
     return discoveredEndpoints;
@@ -182,6 +224,7 @@ async function discoverEndpoints(forceRefresh = false) {
       };
       endpointsCacheTime = Date.now();
       XLog.log('Endpoints discovered successfully');
+      await _persistEndpoints();
       return discoveredEndpoints;
     }
 
@@ -389,9 +432,10 @@ async function getUserByScreenName(screenName) {
 
 // ==================== Followers/Following Fetching ====================
 
-async function fetchFollowers(userId, cursor = null, count = 20) {
+async function fetchFollowers(userId, cursor = null, count = 100) {
   // X has deprecated the GraphQL Followers endpoint (returns 404).
   // Use REST v1.1 /followers/list.json as a reliable alternative.
+  // count=100 is well within the v1.1 page size and cuts request volume ~5x.
   const auth = await getAuthTokens();
 
   let url = `https://x.com/i/api/1.1/followers/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=false`;
@@ -454,11 +498,11 @@ async function fetchFollowers(userId, cursor = null, count = 20) {
   return { users, nextCursor };
 }
 
-async function fetchFollowing(userId, cursor = null, count = 20) {
+async function fetchFollowing(userId, cursor = null, count = 50) {
   return _fetchUserList('Following', userId, cursor, count);
 }
 
-async function fetchVerifiedFollowers(userId, cursor = null, count = 20) {
+async function fetchVerifiedFollowers(userId, cursor = null, count = 50) {
   return _fetchUserList('BlueVerifiedFollowers', userId, cursor, count);
 }
 
@@ -561,7 +605,7 @@ function parseUserObject(result) {
 
 // ==================== Tweet Fetching ====================
 
-async function fetchUserTweets(userId, cursor = null, count = 20) {
+async function fetchUserTweets(userId, cursor = null, count = 40) {
   const variables = {
     userId: userId,
     count: count,

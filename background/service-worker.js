@@ -8,13 +8,60 @@ importScripts(
     '../utils/api.js',
     '../utils/rateLimit.js',
     '../utils/csv.js',
-    '../utils/storage.js'
+    '../utils/storage.js',
+    '../popup/i18n.js' // loadTranslations() — used to localize the in-page capture overlay
 );
 
 // Current export state
 let currentExport = null;
 let rateLimiter = null;
 let searchCapture = null;
+
+// ==================== Overlay i18n (date-range capture overlay) ====================
+// The in-page overlay shown on x.com during a date-range export lives in the page
+// context and can't load the popup locale files itself. The worker loads the user's
+// language here and ships ready-to-render strings to the content script.
+let _overlayI18n = null;
+
+async function getOverlayI18n() {
+    if (_overlayI18n) return _overlayI18n;
+    let lang = 'en';
+    try {
+        const settings = await XPorterStorage.loadSettings();
+        lang = settings.language || (typeof detectBrowserLanguage === 'function' ? detectBrowserLanguage() : 'en');
+    } catch (_) { /* default en */ }
+    let tr = {};
+    try {
+        if (typeof loadTranslations === 'function') tr = await loadTranslations(lang);
+    } catch (_) { /* default en fallbacks below */ }
+    const g = (k, fallback) => (tr[k] !== undefined ? tr[k] : fallback);
+    _overlayI18n = {
+        title: g('ovTitle', 'XPorter date range export'),
+        note: g('ovNote', 'Keep this tab open. XPorter is scrolling it to collect posts.'),
+        collapse: g('ovCollapse', 'Collapse XPorter status'),
+        expand: g('ovExpand', 'Expand XPorter status'),
+        noLimit: g('ovNoLimit', 'No post limit'),
+        limitLabel: g('ovLimit', 'Limit:'),
+        postsCollected: g('postsCollected', 'posts collected'),
+        posts: g('posts', 'posts'),
+        preparingFor: g('ovPreparing', 'Preparing search for'),
+        preparingPage: g('ovPreparingPage', 'Preparing search page...'),
+        exportingFor: g('ovExportingFor', 'Exporting'),
+        scrollingFor: g('ovScrolling', 'Scrolling X search for')
+    };
+    return _overlayI18n;
+}
+
+// Build a localized overlay subtitle for a given phase key.
+function overlayPhase(i18n, phaseKey, username) {
+    const u = username || 'profile';
+    switch (phaseKey) {
+        case 'preparing': return `${i18n.preparingFor} @${u}...`;
+        case 'scrolling': return `${i18n.scrollingFor} @${u}...`;
+        case 'exporting':
+        default: return `${i18n.exportingFor} @${u}...`;
+    }
+}
 
 // ==================== Message Handling ====================
 
@@ -56,6 +103,7 @@ async function handleMessage(message, sender) {
 
         case 'SAVE_SETTINGS':
             await XPorterStorage.saveSettings(message.settings);
+            _overlayI18n = null; // language may have changed — reload overlay strings lazily
             return { success: true };
 
         case 'GET_SETTINGS':
@@ -264,6 +312,20 @@ async function runExportLoop() {
 
 // ==================== Posts Fetch Loop ====================
 
+// Seed a de-dup set with the IDs already saved to storage. On resume the loop
+// starts with a fresh in-memory Set, and X often re-serves items around the
+// saved cursor boundary — without this those overlaps slip into the export as
+// duplicates.
+async function preloadSeenIds(seenIds) {
+    if (!currentExport || !currentExport.totalBatches) return;
+    try {
+        const existing = await XPorterStorage.loadAllTweets();
+        for (const item of existing) {
+            if (item?.id) seenIds.add(item.id);
+        }
+    } catch (_) { /* best-effort dedup */ }
+}
+
 async function _fetchPostsLoop() {
     if (currentExport.dateFrom || currentExport.dateTo) {
         await _fetchPostsByDateRangeLoop();
@@ -273,6 +335,7 @@ async function _fetchPostsLoop() {
     let hasMore = true;
     let emptyPages = 0;
     const seenIds = new Set();
+    await preloadSeenIds(seenIds);
 
     while (hasMore && currentExport.running) {
         // Check quantity limit
@@ -394,6 +457,7 @@ async function _fetchPostsByDateRangeLoop() {
     let hasMore = true;
     let emptyPages = 0;
     const seenIds = new Set();
+    await preloadSeenIds(seenIds);
     const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom, currentExport.dateTo);
     let payload = null;
 
@@ -404,7 +468,7 @@ async function _fetchPostsByDateRangeLoop() {
         if (!payload) {
             throw new Error('SEARCH_CAPTURE_TIMEOUT');
         }
-        await sendSearchCaptureStatus({ phase: `Exporting @${currentExport.username}...` });
+        await sendSearchCaptureStatus({ phaseKey: 'exporting' });
 
         while (hasMore && currentExport.running) {
             if (currentExport.settings.quantityLimit > 0 &&
@@ -450,7 +514,7 @@ async function _fetchPostsByDateRangeLoop() {
 
             if (parsedPayload.nextCursor) {
                 currentExport.cursor = parsedPayload.nextCursor;
-                await sendSearchCaptureStatus({ phase: `Scrolling X search for @${currentExport.username}...` });
+                await sendSearchCaptureStatus({ phaseKey: 'scrolling' });
                 payload = await requestNextSearchCapturePayload();
                 if (!payload) {
                     hasMore = false;
@@ -460,7 +524,7 @@ async function _fetchPostsByDateRangeLoop() {
             }
 
             await saveCurrentState();
-            await sendSearchCaptureStatus({ phase: `Exporting @${currentExport.username}...` });
+            await sendSearchCaptureStatus({ phaseKey: 'exporting' });
 
             broadcastStatus({
                 running: true,
@@ -523,7 +587,7 @@ async function openSearchCaptureTab(rawQuery) {
     };
 
     setTimeout(() => {
-        sendSearchCaptureStatus({ phase: `Preparing search for @${currentExport?.username || 'profile'}...` }, 8);
+        sendSearchCaptureStatus({ phaseKey: 'preparing' }, 8);
     }, 1000);
 }
 
@@ -600,6 +664,9 @@ async function requestNextSearchCapturePayload() {
 async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
     if (!searchCapture?.tabId || !currentExport) return false;
 
+    const i18n = await getOverlayI18n();
+    const { phaseKey, ...rest } = overrides;
+
     const message = {
         type: 'XPORTER_SEARCH_CAPTURE_STATUS',
         username: currentExport.username,
@@ -607,8 +674,12 @@ async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
         quantityLimit: currentExport.settings?.quantityLimit || 0,
         dateFrom: currentExport.dateFrom ? formatDateForSearch(currentExport.dateFrom) : '',
         dateTo: currentExport.dateTo ? formatDateForSearch(currentExport.dateTo) : '',
-        ...overrides
+        i18n,
+        ...rest
     };
+    if (phaseKey) {
+        message.phase = overlayPhase(i18n, phaseKey, currentExport.username);
+    }
 
     for (let attempt = 0; attempt < attempts; attempt++) {
         try {
@@ -660,6 +731,7 @@ async function _fetchUsersLoop() {
     let hasMore = true;
     let emptyPages = 0;
     const seenIds = new Set();
+    await preloadSeenIds(seenIds);
 
     // Pick the right API function
     const fetchFn = {
@@ -771,6 +843,9 @@ async function resumeExport() {
         batchSize: settings.batchSize,
         cooldownDuration: settings.cooldownDuration
     });
+    // Restore request counters so the batch/cooldown rhythm and the "batch N"
+    // indicator stay accurate after resuming (previously reset to zero).
+    rateLimiter.restoreState(savedState.rateLimiterState);
 
     rateLimiter.onStatusChange((event) => {
         broadcastStatus({ ...event, exportMode: savedState.exportMode });

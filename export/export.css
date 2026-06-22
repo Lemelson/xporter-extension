@@ -8,19 +8,20 @@
     --text-primary: #E7E9EA;
     --text-secondary: #8899A6;
     --text-muted: #657786;
-    --accent: #1D9BF0;
-    --accent-hover: #1A8CD8;
-    --accent-glow: rgba(29, 155, 240, 0.15);
-    --accent-glow-lg: rgba(29, 155, 240, 0.25);
+    /* Accent aligned with the popup so both surfaces read as one product. */
+    --accent: #60B8FF;
+    --accent-hover: #3BA0F0;
+    --accent-glow: rgba(96, 184, 255, 0.18);
+    --accent-glow-lg: rgba(96, 184, 255, 0.28);
     --success: #00BA7C;
-    --success-glow: rgba(0, 186, 124, 0.15);
+    --success-glow: rgba(0, 186, 124, 0.18);
     --warning: #FFD166;
     --danger: #F4212E;
     --border: #38444D;
     --input-bg: #253341;
     --shadow: rgba(0, 0, 0, 0.3);
-    --radius: 16px;
-    --radius-sm: 10px;
+    --radius: 12px;
+    --radius-sm: 8px;
 }
 
 body.light {
@@ -31,9 +32,29 @@ body.light {
     --text-primary: #0F1419;
     --text-secondary: #536471;
     --text-muted: #8899A6;
+    /* Darker accent for contrast on light backgrounds (matches popup light). */
+    --accent: #0A6FDB;
+    --accent-hover: #0860C0;
+    --accent-glow: rgba(10, 111, 219, 0.18);
+    --accent-glow-lg: rgba(10, 111, 219, 0.25);
+    --warning: #F59E0B;
     --border: #CFD9DE;
     --input-bg: #EFF3F4;
     --shadow: rgba(0, 0, 0, 0.06);
+}
+
+/* Light theme: invert the select chevron and date-picker indicator so they
+   stay visible on light inputs (parity with the popup). */
+body.light .select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23536471' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+
+body.light .date-row input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: none;
+}
+
+.date-row input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
 }
 
 * {
@@ -603,17 +624,19 @@ body.light .date-help::after {
 }
 
 .progress-fill-lg.indeterminate {
-    width: 100%;
-    animation: progressShimmer 2s infinite linear;
+    width: 100% !important;
+    background: linear-gradient(90deg, transparent, var(--accent), #1DA1F2, transparent);
+    background-size: 300% 100%;
+    animation: progressIndeterminate 1.4s infinite linear;
 }
 
-@keyframes progressShimmer {
+@keyframes progressIndeterminate {
     0% {
-        background-position: 300% 0;
+        background-position: 100% 0;
     }
 
     100% {
-        background-position: -300% 0;
+        background-position: -100% 0;
     }
 }
 
@@ -836,4 +859,91 @@ body.light .date-help::after {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
+}
+
+/* ========== Shared button disabled state ========== */
+.btn:disabled,
+.btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+/* Keep the big counter from shifting the layout as digit count grows. */
+.counter-wrap {
+    min-height: 86px;
+}
+
+/* ========== Keyboard focus ========== */
+.btn:focus-visible,
+.theme-toggle:focus-visible,
+.select:focus-visible,
+.input-small:focus-visible,
+.checkbox-label input[type="checkbox"]:focus-visible,
+.date-row input[type="date"]:focus-visible,
+.link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ========== Toasts ========== */
+.toast-container {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 2000;
+    width: max-content;
+    max-width: calc(100vw - 40px);
+    pointer-events: none;
+}
+
+.toast {
+    padding: 12px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px var(--shadow);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    text-align: center;
+}
+
+.toast.toast-show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-error {
+    border-color: rgba(244, 33, 46, 0.45);
+    background: rgba(244, 33, 46, 0.14);
+    color: var(--danger);
+}
+
+.toast-success {
+    border-color: rgba(0, 186, 124, 0.45);
+    background: rgba(0, 186, 124, 0.14);
+    color: var(--success);
+}
+
+/* ========== Reduced motion ========== */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
 }
