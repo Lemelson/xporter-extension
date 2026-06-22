@@ -515,7 +515,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (state.tweetCount !== undefined && state.tweetCount !== null) {
             lastItemCount = state.tweetCount;
         }
-        if (state.expectedTweets) lastExpectedItems = state.expectedTweets;
+        if (state.expectedTweets !== undefined && state.expectedTweets !== null) {
+            lastExpectedItems = state.expectedTweets;
+        }
         if (state.quantityLimit !== undefined) lastQuantityLimit = state.quantityLimit;
 
         const itemCount = lastItemCount;
@@ -550,6 +552,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusIndicator.className = 'status-dot status-' + color;
         }
 
+        function setMeasuredProgress() {
+            if (hasTarget) {
+                progressFill.classList.remove('indeterminate');
+                progressFill.style.width = progressPct + '%';
+            } else {
+                progressFill.classList.add('indeterminate');
+                progressFill.style.width = '100%';
+            }
+        }
+
         // Status-specific display
         switch (status) {
             case 'resolving_user':
@@ -564,21 +576,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusText.textContent = `${t('exporting')} @${state.username || usernameInput.value}...`;
                 setDotColor('green');
                 statusMessage.textContent = `${t('fetching')} (${t('batch')} ${state.batch || 1})`;
-                if (hasTarget) {
-                    progressFill.classList.remove('indeterminate');
-                    progressFill.style.width = progressPct + '%';
-                } else {
-                    progressFill.classList.add('indeterminate');
-                    progressFill.style.width = '100%';
-                }
+                setMeasuredProgress();
                 break;
 
             case 'cooldown':
                 setDotColor('yellow');
                 const seconds = Math.round((state.duration || 180000) / 1000);
                 statusMessage.textContent = `${t('cooldown')} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-                progressFill.classList.remove('indeterminate');
-                progressFill.style.width = progressPct + '%';
+                setMeasuredProgress();
                 break;
 
             case 'error':
@@ -590,15 +595,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     setDotColor('red');
                     statusMessage.textContent = formatError(state.error, t);
                 }
-                progressFill.classList.remove('indeterminate');
-                progressFill.style.width = progressPct + '%';
+                setMeasuredProgress();
                 break;
 
             case 'retrying':
                 setDotColor('yellow');
                 statusMessage.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
-                progressFill.classList.remove('indeterminate');
-                progressFill.style.width = progressPct + '%';
+                setMeasuredProgress();
                 break;
 
             case 'complete':
@@ -613,8 +616,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusText.innerHTML = ICONS.circlePause + ` ${t('exportStopped')}`;
                 setDotColor('yellow');
                 statusMessage.textContent = t('canBeResumed');
-                progressFill.classList.remove('indeterminate');
-                progressFill.style.width = progressPct + '%';
+                setMeasuredProgress();
                 break;
         }
 

@@ -35,7 +35,10 @@ async function getOverlayI18n() {
         if (typeof loadTranslations === 'function') tr = await loadTranslations(lang);
     } catch (_) { /* default en fallbacks below */ }
     const g = (k, fallback) => (tr[k] !== undefined ? tr[k] : fallback);
+    const dir = ['ar', 'fa', 'he', 'ur'].includes(lang) ? 'rtl' : 'ltr';
     _overlayI18n = {
+        lang,
+        dir,
         title: g('ovTitle', 'XPorter date range export'),
         note: g('ovNote', 'Keep this tab open. XPorter is scrolling it to collect posts.'),
         collapse: g('ovCollapse', 'Collapse XPorter status'),
@@ -233,11 +236,7 @@ async function runExportLoop() {
         await saveCurrentState();
 
         // Determine expected count based on mode
-        const expectedCount = currentExport.exportMode === 'posts'
-            ? userInfo.tweetCount
-            : (currentExport.exportMode === 'following'
-                ? userInfo.followingCount
-                : userInfo.followersCount);
+        const expectedCount = getExpectedItemCount();
 
         broadcastStatus({
             running: true,
@@ -255,12 +254,16 @@ async function runExportLoop() {
             await _fetchUsersLoop();
         }
 
-        // Save remaining buffer
-        if (currentExport.tweetBuffer.length > 0) {
-            await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
-            currentExport.totalBatches++;
-            currentExport.tweetBuffer = [];
+        if (!currentExport.running) {
+            await flushExportBuffer();
+            currentExport.status = 'stopped';
+            await saveCurrentState();
+            broadcastStatus({ running: false, status: 'stopped', tweetCount: currentExport.tweetCount, canResume: true, exportMode: currentExport.exportMode });
+            return;
         }
+
+        // Save remaining buffer
+        await flushExportBuffer();
 
         // Export complete
         currentExport.running = false;
@@ -295,11 +298,7 @@ async function runExportLoop() {
     } catch (error) {
         if (error.message === 'ABORTED') {
             // Flush remaining buffer
-            if (currentExport.tweetBuffer.length > 0) {
-                await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
-                currentExport.totalBatches++;
-                currentExport.tweetBuffer = [];
-            }
+            await flushExportBuffer();
             currentExport.running = false;
             currentExport.status = 'stopped';
             await saveCurrentState();
@@ -312,18 +311,47 @@ async function runExportLoop() {
 
 // ==================== Posts Fetch Loop ====================
 
-// Seed a de-dup set with the IDs already saved to storage. On resume the loop
-// starts with a fresh in-memory Set, and X often re-serves items around the
-// saved cursor boundary — without this those overlaps slip into the export as
-// duplicates.
+// Seed a de-dup set with recent saved IDs. On resume the loop starts with a
+// fresh in-memory Set, and X often re-serves items around the saved cursor
+// boundary. Loading only the latest batches avoids pulling a large export back
+// into memory just to cover that overlap window.
 async function preloadSeenIds(seenIds) {
     if (!currentExport || !currentExport.totalBatches) return;
     try {
-        const existing = await XPorterStorage.loadAllTweets();
-        for (const item of existing) {
-            if (item?.id) seenIds.add(item.id);
+        const startBatch = Math.max(0, currentExport.totalBatches - 3);
+        for (let i = startBatch; i < currentExport.totalBatches; i++) {
+            const batch = await XPorterStorage.loadTweetBatch(i);
+            for (const item of batch) {
+                if (item?.id) seenIds.add(item.id);
+            }
         }
     } catch (_) { /* best-effort dedup */ }
+}
+
+function quantityLimitReached() {
+    const limit = currentExport?.settings?.quantityLimit || 0;
+    return limit > 0 && currentExport.tweetCount >= limit;
+}
+
+function getExpectedItemCount(exportState = currentExport) {
+    const info = exportState?.userInfo || {};
+    switch (exportState?.exportMode) {
+        case 'following':
+            return info.followingCount || 0;
+        case 'followers':
+        case 'verified_followers':
+            return info.followersCount || 0;
+        case 'posts':
+        default:
+            return info.tweetCount || 0;
+    }
+}
+
+async function flushExportBuffer() {
+    if (!currentExport?.tweetBuffer?.length) return;
+    await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
+    currentExport.totalBatches++;
+    currentExport.tweetBuffer = [];
 }
 
 async function _fetchPostsLoop() {
@@ -339,8 +367,7 @@ async function _fetchPostsLoop() {
 
     while (hasMore && currentExport.running) {
         // Check quantity limit
-        if (currentExport.settings.quantityLimit > 0 &&
-            currentExport.tweetCount >= currentExport.settings.quantityLimit) {
+        if (quantityLimitReached()) {
             break;
         }
 
@@ -351,6 +378,7 @@ async function _fetchPostsLoop() {
                 requestCursor
             );
         });
+        if (!currentExport.running) break;
 
         if (!result.tweets || result.tweets.length === 0) {
             const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
@@ -387,6 +415,10 @@ async function _fetchPostsLoop() {
             }
 
             if (seenIds.has(tweet.id)) continue;
+            if (quantityLimitReached()) {
+                hasMore = false;
+                break;
+            }
             seenIds.add(tweet.id);
 
             // Inject author info if missing
@@ -416,11 +448,16 @@ async function _fetchPostsLoop() {
         if (currentExport.dateFrom && newestNonPinnedDate && newestNonPinnedDate < currentExport.dateFrom) {
             hasMore = false;
         }
+        if (quantityLimitReached()) {
+            hasMore = false;
+        }
 
         // Update cursor
-        if (result.nextCursor) {
+        // Keep the current cursor when stopping on a quantity limit so resume
+        // can refetch the same page and skip already-saved IDs.
+        if (hasMore && result.nextCursor) {
             currentExport.cursor = result.nextCursor;
-        } else {
+        } else if (hasMore) {
             hasMore = false;
         }
 
@@ -431,7 +468,7 @@ async function _fetchPostsLoop() {
             status: 'fetching',
             username: currentExport.username,
             tweetCount: currentExport.tweetCount,
-            expectedTweets: currentExport.userInfo?.tweetCount || 0,
+            expectedTweets: getExpectedItemCount(),
             quantityLimit: currentExport.settings?.quantityLimit || 0,
             batch: Math.floor(rateLimiter.totalRequests / rateLimiter.batchSize) + 1,
             totalRequests: rateLimiter.totalRequests,
@@ -471,12 +508,12 @@ async function _fetchPostsByDateRangeLoop() {
         await sendSearchCaptureStatus({ phaseKey: 'exporting' });
 
         while (hasMore && currentExport.running) {
-            if (currentExport.settings.quantityLimit > 0 &&
-                currentExport.tweetCount >= currentExport.settings.quantityLimit) {
+            if (quantityLimitReached()) {
                 break;
             }
 
             const parsedPayload = parseSearchTimelineResponse(JSON.parse(payload.bodyText));
+            if (!currentExport.running) break;
 
             if (!parsedPayload.tweets || parsedPayload.tweets.length === 0) {
                 emptyPages++;
@@ -492,6 +529,10 @@ async function _fetchPostsByDateRangeLoop() {
                 if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
                 if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
                 if (seenIds.has(tweet.id)) continue;
+                if (quantityLimitReached()) {
+                    hasMore = false;
+                    break;
+                }
                 seenIds.add(tweet.id);
 
                 if (!tweet.author_name && currentExport.userInfo) {
@@ -512,7 +553,10 @@ async function _fetchPostsByDateRangeLoop() {
                 }
             }
 
-            if (parsedPayload.nextCursor) {
+            if (quantityLimitReached()) {
+                hasMore = false;
+            }
+            if (hasMore && parsedPayload.nextCursor) {
                 currentExport.cursor = parsedPayload.nextCursor;
                 await sendSearchCaptureStatus({ phaseKey: 'scrolling' });
                 payload = await requestNextSearchCapturePayload();
@@ -531,7 +575,7 @@ async function _fetchPostsByDateRangeLoop() {
                 status: 'fetching',
                 username: currentExport.username,
                 tweetCount: currentExport.tweetCount,
-                expectedTweets: currentExport.userInfo?.tweetCount || 0,
+                expectedTweets: getExpectedItemCount(),
                 quantityLimit: currentExport.settings?.quantityLimit || 0,
                 batch: Math.floor(rateLimiter.totalRequests / rateLimiter.batchSize) + 1,
                 totalRequests: rateLimiter.totalRequests,
@@ -746,8 +790,7 @@ async function _fetchUsersLoop() {
 
     while (hasMore && currentExport.running) {
         // Check quantity limit
-        if (currentExport.settings.quantityLimit > 0 &&
-            currentExport.tweetCount >= currentExport.settings.quantityLimit) {
+        if (quantityLimitReached()) {
             break;
         }
 
@@ -757,6 +800,7 @@ async function _fetchUsersLoop() {
                 currentExport.cursor
             );
         });
+        if (!currentExport.running) break;
 
         if (!result.users || result.users.length === 0) {
             emptyPages++;
@@ -771,6 +815,10 @@ async function _fetchUsersLoop() {
         // Process users
         for (const user of (result.users || [])) {
             if (seenIds.has(user.id)) continue;
+            if (quantityLimitReached()) {
+                hasMore = false;
+                break;
+            }
             seenIds.add(user.id);
 
             currentExport.tweetBuffer.push(user);
@@ -783,8 +831,11 @@ async function _fetchUsersLoop() {
             }
         }
 
+        if (quantityLimitReached()) {
+            hasMore = false;
+        }
         // Update cursor
-        if (result.nextCursor) {
+        if (hasMore && result.nextCursor) {
             currentExport.cursor = result.nextCursor;
         } else {
             hasMore = false;
@@ -792,9 +843,7 @@ async function _fetchUsersLoop() {
 
         await saveCurrentState();
 
-        const expectedCount = currentExport.exportMode === 'following'
-            ? (currentExport.userInfo?.followingCount || 0)
-            : (currentExport.userInfo?.followersCount || 0);
+        const expectedCount = getExpectedItemCount();
 
         broadcastStatus({
             running: true,
@@ -813,18 +862,15 @@ async function _fetchUsersLoop() {
 // ==================== Stop / Resume / Status ====================
 
 async function stopExport() {
-    if (currentExport) {
-        currentExport.running = false;
-        if (currentExport.tweetBuffer && currentExport.tweetBuffer.length > 0) {
-            await XPorterStorage.saveTweetBatch(currentExport.totalBatches, currentExport.tweetBuffer);
-            currentExport.totalBatches++;
-            currentExport.tweetBuffer = [];
-            currentExport.status = 'stopped';
-            await saveCurrentState();
-        }
-    }
     if (rateLimiter) {
         rateLimiter.abort();
+    }
+    if (currentExport) {
+        currentExport.running = false;
+        await flushExportBuffer();
+        currentExport.status = 'stopped';
+        await saveCurrentState();
+        broadcastStatus({ running: false, status: 'stopped', tweetCount: currentExport.tweetCount, canResume: true, exportMode: currentExport.exportMode });
     }
     await closeSearchCaptureTab();
     return { success: true };
@@ -890,7 +936,7 @@ async function getExportStatus() {
             status: currentExport.status,
             username: currentExport.username,
             tweetCount: currentExport.tweetCount,
-            expectedTweets: currentExport.userInfo?.tweetCount || 0,
+            expectedTweets: getExpectedItemCount(currentExport),
             quantityLimit: currentExport.settings?.quantityLimit || 0,
             error: currentExport.error || null,
             startedAt: currentExport.startedAt,
@@ -919,7 +965,7 @@ async function getExportStatus() {
             status: savedState.status,
             username: savedState.username,
             tweetCount: savedState.tweetCount || 0,
-            expectedTweets: savedState.userInfo?.tweetCount || 0,
+            expectedTweets: getExpectedItemCount(savedState),
             quantityLimit: savedSettings?.quantityLimit || 0,
             error: savedState.error || null,
             startedAt: savedState.startedAt,

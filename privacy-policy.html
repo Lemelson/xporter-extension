@@ -187,7 +187,8 @@
                 reads your existing login session to make the same API calls that X.com itself makes in your browser. No
                 credentials are stored or copied.</li>
             <li><strong>X.com API responses</strong> — profile information, posts, follower/following lists retrieved
-                via X.com's public-facing APIs. This data is processed locally to generate export files (CSV).</li>
+                via X.com's public-facing APIs. This data is processed locally to generate export files (CSV, JSON, or
+                XLSX).</li>
             <li><strong>Extension settings</strong> — your preferences (language, theme) are stored locally using
                 Chrome's <code>storage.local</code> API.</li>
         </ul>
@@ -213,7 +214,8 @@
             viewed.</p>
 
         <h3><code>downloads</code></h3>
-        <p>Used to save exported CSV files to your Downloads folder when you click the download button.</p>
+        <p>Used to save exported CSV, JSON, or XLSX files to your Downloads folder when you click the download button.
+        </p>
 
         <h3><code>storage</code></h3>
         <p>Used to save your extension preferences (language, theme, export settings) locally in Chrome's storage.</p>
@@ -225,7 +227,8 @@
         <p>All data is stored locally in your browser:</p>
         <ul>
             <li>Export data is held temporarily in memory during the export process</li>
-            <li>Once downloaded as a CSV file, the data is saved to your local filesystem (Downloads folder)</li>
+            <li>Once downloaded as a CSV, JSON, or XLSX file, the data is saved to your local filesystem (Downloads
+                folder)</li>
             <li>No data is cached or persisted beyond the active export session</li>
             <li>Extension settings are stored in Chrome's <code>storage.local</code> and can be cleared by uninstalling
                 the extension</li>
