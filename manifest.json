@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
   "permissions": [
@@ -19,9 +19,9 @@
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/bolt16.png",
+      "48": "icons/bolt48.png",
+      "128": "icons/bolt128.png"
     }
   },
   "background": {
