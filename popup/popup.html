@@ -158,19 +158,38 @@
         </select>
       </div>
 
-      <!-- Export status (shown when export is active) -->
-      <div class="export-status hidden" id="exportStatus" role="status" aria-live="polite">
-        <div class="status-header" id="statusHeader">
-          <span class="status-text" id="statusText" data-i18n="exporting">Exporting...</span>
+      <!-- Export status + contextual square action (Stop while running, Download when stopped/complete) -->
+      <div class="export-status hidden" id="exportStatus">
+        <div class="status-info" role="status" aria-live="polite">
+          <div class="status-header" id="statusHeader">
+            <span class="status-text" id="statusText" data-i18n="exporting">Exporting...</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="status-detail" id="statusDetail">
+            <span class="status-dot status-green" id="statusIndicator"></span>
+            <span id="statusMessage" data-i18n="starting">Starting...</span>
+          </div>
+          <div class="tweet-count" id="tweetCount">0 <span data-i18n="postsCollected">posts collected</span></div>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <div class="status-detail" id="statusDetail">
-          <span class="status-dot status-green" id="statusIndicator"></span>
-          <span id="statusMessage" data-i18n="starting">Starting...</span>
-        </div>
-        <div class="tweet-count" id="tweetCount">0 <span data-i18n="postsCollected">posts collected</span></div>
+        <button class="btn btn-square btn-danger hidden" id="stopBtn">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <rect x="9" y="9" width="6" height="6" rx="1" />
+          </svg>
+          <span data-i18n="stop">Stop</span>
+        </button>
+        <button class="btn btn-square btn-warning hidden" id="downloadBtn">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15V3" />
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="m7 10 5 5 5-5" />
+          </svg>
+          <span data-i18n="download">Download</span>
+        </button>
       </div>
 
       <!-- Action buttons -->
@@ -182,26 +201,10 @@
           </svg>
           <span data-i18n="startExporting">Start Exporting</span>
         </button>
-        <button class="btn btn-danger hidden" id="stopBtn">
-          <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-          </svg>
-          <span data-i18n="stop">Stop</span>
-        </button>
-        <button class="btn btn-success hidden" id="downloadBtn">
-          <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 15V3" />
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <path d="m7 10 5 5 5-5" />
-          </svg>
-          <span data-i18n="download">Download</span>
-        </button>
         <div class="resume-row hidden" id="resumeRow">
           <input type="number" id="resumeQuantity" class="input-resume" min="1" placeholder="50" value="100">
           <span class="resume-label" data-i18n="morePosts">more posts</span>
-          <button class="btn btn-secondary btn-resume" id="resumeBtn">
+          <button class="btn btn-primary btn-resume" id="resumeBtn">
             <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
@@ -243,7 +246,7 @@
       <div class="field">
         <div class="field-label-row">
           <label class="field-label" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
-          <span class="date-help" tabindex="0" aria-label="Quantity limit controls the maximum number of posts or users to collect. Unlimited keeps going until X stops returning results or rate limits." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
+          <span class="date-help" tabindex="0" aria-label="How many posts (or users) to collect before the export stops. Example: 500 stops at 500 posts. Choose Unlimited to grab everything X will give you." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
         </div>
         <select id="quantityLimit" class="select">
           <option value="0" data-i18n="unlimited">Unlimited</option>
@@ -262,11 +265,11 @@
       <div class="field">
         <div class="field-label-row">
           <label class="field-label" data-i18n="requestCooldown">Request Cooldown</label>
-          <span class="date-help" tabindex="0" aria-label="Cooldown pauses exports after a batch of X API requests. Default: wait 3 minutes after every 20 requests to reduce rate limits." data-i18n-aria-label="requestCooldownHelp" data-i18n-tooltip="requestCooldownHelp">!</span>
+          <span class="date-help" tabindex="0" aria-label="XPorter pulls your data by sending requests to X — each request loads a batch of posts. Request too fast and X temporarily blocks the export, so XPorter pauses after each batch. Default: a 3-minute pause after every 20 requests. A longer pause or smaller batch is safer but slower." data-i18n-aria-label="requestCooldownHelp" data-i18n-tooltip="requestCooldownHelp">!</span>
         </div>
         <div class="cooldown-row">
           <input type="number" id="cooldownMinutes" value="3" min="1" max="15" class="input-small">
-          <span data-i18n="minAfterEvery">min after every</span>
+          <span data-i18n="minAfterEvery">min pause every</span>
           <input type="number" id="cooldownBatch" value="20" min="5" max="50" class="input-small">
           <span data-i18n="requests">requests</span>
         </div>
