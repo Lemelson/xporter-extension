@@ -5,7 +5,7 @@
 <h1 align="center">XPorter</h1>
 
 <p align="center">
-  Free, unlimited export of X (Twitter) posts to CSV.<br/>
+  Free, unlimited export of X (Twitter) posts, followers, and following to CSV, JSON, or XLSX.<br/>
   A Chrome extension — no servers, no subscriptions, no tracking.
 </p>
 
@@ -13,7 +13,7 @@
   <a href="#features">Features</a> ·
   <a href="#installation">Installation</a> ·
   <a href="#how-it-works">How It Works</a> ·
-  <a href="#csv-output">CSV Output</a> ·
+  <a href="#export-output">Export Output</a> ·
   <a href="#configuration">Configuration</a> ·
   <a href="#supported-languages">Languages</a> ·
   <a href="#project-structure">Project Structure</a> ·
@@ -25,6 +25,8 @@
 ## Features
 
 - **Full engagement metrics** — views, likes, retweets, replies, quotes, bookmarks
+- **Multiple export modes** — posts, followers, following, and verified followers
+- **CSV, JSON, and XLSX output** — choose the format that fits your workflow
 - **Date range filtering** — export posts from a specific time window
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — handles X API limits automatically with configurable batch sizes and cooldowns
@@ -54,7 +56,7 @@ git clone https://github.com/Lemelson/xporter.git
 XPorter leverages your existing authenticated X session to access X's internal GraphQL API. No API keys, no OAuth flow — it piggybacks on the cookies you already have.
 
 ```
-Popup UI ──▶ Service Worker ──▶ X GraphQL API ──▶ CSV File
+Popup UI ──▶ Service Worker ──▶ X APIs ──▶ CSV / JSON / XLSX File
                   │
             Chrome Storage
             (incremental saves)
@@ -66,9 +68,9 @@ Content Script ── detects username from active tab
 
 1. **Content script** detects the currently viewed profile from the X tab URL
 2. **Popup** collects the target username and export settings
-3. **Service worker** resolves the username to a user ID via `UserByScreenName`, then fetches tweets in paginated batches via `UserTweets`
-4. Tweets are saved incrementally to Chrome local storage (batches of 50)
-5. On completion (or manual download), tweets are compiled into a UTF-8 CSV with BOM for Excel compatibility
+3. **Service worker** resolves the username to a user ID via `UserByScreenName`, then fetches the selected data type in paginated batches
+4. Items are saved incrementally to Chrome local storage (batches of 50)
+5. On completion (or manual download), items are compiled into CSV, JSON, or XLSX locally in the browser
 
 **Endpoint discovery:**
 
@@ -85,9 +87,9 @@ X periodically rotates its GraphQL `queryId` values. XPorter handles this by:
 - Exponential backoff on 429 responses
 - Automatic retry with fresh endpoints on stale query errors
 
-## CSV Output
+## Export Output
 
-Each row in the exported CSV contains:
+Post exports include:
 
 | Field | Description |
 |---|---|
@@ -111,6 +113,26 @@ Each row in the exported CSV contains:
 | `media_type` | `photo` · `video` · `animated_gif` |
 | `media_urls` | Direct media URLs (highest quality) |
 
+User-list exports include:
+
+| Field | Description |
+|---|---|
+| `id` | User ID |
+| `name` | Display name |
+| `username` | Handle without @ |
+| `bio` | Profile description |
+| `location` | Profile location |
+| `url` | Profile website |
+| `followers_count` | Follower count |
+| `following_count` | Following count |
+| `tweet_count` | Post count |
+| `listed_count` | List count |
+| `verified` | Verification status |
+| `protected` | Protected/private status |
+| `created_at` | Account creation timestamp |
+| `profile_image_url` | Profile image URL |
+| `profile_url` | Direct X profile URL |
+
 ## Configuration
 
 All settings are persisted in Chrome storage and synced between the popup and export page.
@@ -119,7 +141,9 @@ All settings are persisted in Chrome storage and synced between the popup and ex
 |---|---|---|
 | Include retweets | On | Export retweets alongside original posts |
 | Include replies | On | Export replies alongside original posts |
-| Quantity limit | 500 | Maximum posts per export (0 = unlimited) |
+| Export mode | Posts | Data type to export: posts, followers, following, or verified followers |
+| Output format | CSV | File format: CSV, JSON, or XLSX |
+| Quantity limit | 500 | Maximum posts or users per export (0 = unlimited) |
 | Cooldown duration | 3 min | Pause between request batches |
 | Batch size | 20 | Requests before triggering a cooldown |
 
@@ -173,14 +197,14 @@ xporter/
 - **Manifest V3** — service workers instead of persistent background pages
 - **No bundler** — load directly from source; no webpack, no Vite
 - **No npm dependencies** — the entire extension is vanilla JS
-- **Incremental persistence** — tweets are saved in batches of 50 to prevent data loss on service worker termination
+- **Incremental persistence** — export items are saved in batches of 50 to prevent data loss on service worker termination
 - **BOM-prefixed CSV** — ensures correct Unicode rendering in Excel
 
 ## Privacy
 
 - No data leaves your browser
 - No analytics, telemetry, or tracking
-- No external server communication
+- No extension-owned servers, analytics, telemetry, or third-party data collection
 - Authentication uses your existing X session cookies — XPorter never stores or transmits credentials
 
 ## Contributing

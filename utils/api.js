@@ -432,10 +432,9 @@ async function getUserByScreenName(screenName) {
 
 // ==================== Followers/Following Fetching ====================
 
-async function fetchFollowers(userId, cursor = null, count = 100) {
+async function fetchFollowers(userId, cursor = null, count = 20) {
   // X has deprecated the GraphQL Followers endpoint (returns 404).
   // Use REST v1.1 /followers/list.json as a reliable alternative.
-  // count=100 is well within the v1.1 page size and cuts request volume ~5x.
   const auth = await getAuthTokens();
 
   let url = `https://x.com/i/api/1.1/followers/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=false`;
@@ -498,11 +497,11 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
   return { users, nextCursor };
 }
 
-async function fetchFollowing(userId, cursor = null, count = 50) {
+async function fetchFollowing(userId, cursor = null, count = 20) {
   return _fetchUserList('Following', userId, cursor, count);
 }
 
-async function fetchVerifiedFollowers(userId, cursor = null, count = 50) {
+async function fetchVerifiedFollowers(userId, cursor = null, count = 20) {
   return _fetchUserList('BlueVerifiedFollowers', userId, cursor, count);
 }
 
@@ -605,7 +604,7 @@ function parseUserObject(result) {
 
 // ==================== Tweet Fetching ====================
 
-async function fetchUserTweets(userId, cursor = null, count = 40) {
+async function fetchUserTweets(userId, cursor = null, count = 20) {
   const variables = {
     userId: userId,
     count: count,

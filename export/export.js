@@ -171,9 +171,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         body.classList.toggle('dark');
         const isLight = body.classList.contains('light');
         setThemeIcon(isLight);
+        settings.theme = isLight ? 'light' : 'dark';
         await sendMessage({
             type: 'SAVE_SETTINGS',
-            settings: { ...settings, theme: isLight ? 'light' : 'dark' }
+            settings: { ...settings }
         });
     });
 
@@ -184,17 +185,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Save Settings on Change ====================
     const saveSettings = debounce(async () => {
+        Object.assign(settings, {
+            includeRetweets: includeRetweets.checked,
+            includeReplies: includeReplies.checked,
+            quantityLimit: parseInt(quantityLimit.value) || 0,
+            requestDelay: 3000,
+            batchSize: parseInt(cooldownBatch.value) || 20,
+            cooldownDuration: (parseInt(cooldownMinutes.value) || 3) * 60000,
+            theme: body.classList.contains('light') ? 'light' : 'dark'
+        });
         await sendMessage({
             type: 'SAVE_SETTINGS',
-            settings: {
-                includeRetweets: includeRetweets.checked,
-                includeReplies: includeReplies.checked,
-                quantityLimit: parseInt(quantityLimit.value) || 0,
-                requestDelay: 3000,
-                batchSize: parseInt(cooldownBatch.value) || 20,
-                cooldownDuration: (parseInt(cooldownMinutes.value) || 3) * 60000,
-                theme: body.classList.contains('light') ? 'light' : 'dark'
-            }
+            settings: { ...settings }
         });
     }, 500);
 
@@ -319,7 +321,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'fetching':
                 showState('active');
                 if (state.username) exportUsername.textContent = `@${state.username}`;
-                if (state.expectedTweets) exportExpected.textContent = `~${formatNumber(state.expectedTweets, currentLang)} ${t('totalTweets')}`;
+                exportExpected.textContent = state.expectedTweets
+                    ? `~${formatNumber(state.expectedTweets, currentLang)} ${t('totalTweets')}`
+                    : '';
 
                 counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
                 statusDot.className = 'status-dot green';
