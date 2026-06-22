@@ -261,6 +261,7 @@ async function loadSettings() {
         autoExpireEnabled: true,
         autoExpireHours: 4,
         ladybugEnabled: true,
+        localizeExportHeaders: false,
         ...(result[STORAGE_KEYS.SETTINGS] || {})
     };
 }

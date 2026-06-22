@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=350">
   <title>XPorter</title>
   <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="rate-prompt.css">
 </head>
 
 <body>
@@ -294,6 +295,17 @@
           <span data-i18n="hours">hours</span>
         </div>
       </div>
+      <!-- Localize exported column titles -->
+      <div class="field">
+        <div class="date-toggle-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="localizeExportHeaders" class="toggle-input">
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="localizeHeaders">Localize column titles</span>
+          </label>
+          <span class="date-help" tabindex="0" aria-label="Translates the column headers in CSV and XLSX files to your language. Turn it off to keep the original English headers (best for scripts and spreadsheets). JSON keys always stay in English." data-i18n-aria-label="localizeHeadersHelp" data-i18n-tooltip="localizeHeadersHelp">!</span>
+        </div>
+      </div>
       <!-- Ladybug Easter-egg toggle -->
       <div class="field">
         <label class="toggle-label">
@@ -301,6 +313,15 @@
           <span class="toggle-track toggle-track--bug"><span class="toggle-knob"></span></span>
           <span data-i18n="showLadybug">Show ladybug</span>
         </label>
+      </div>
+      <!-- TEMP test trigger for the rating prompt — lets you preview it on demand. -->
+      <div class="field">
+        <button type="button" class="about-rate-btn" id="ratePreviewBtn">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z" />
+          </svg>
+          <span data-i18n="ratePreview">Show rating prompt</span>
+        </button>
       </div>
       <!-- Export History (collapsible) -->
       <div class="field history-field">
@@ -339,7 +360,19 @@
         <h2>XPorter</h2>
         <p class="about-desc" data-i18n="aboutDesc">Free & unlimited export of X (Twitter) data to CSV, JSON, or XLSX.</p>
 
-        <!-- Contact & support — placed first: the most important thing on this tab -->
+        <!-- Prominent, always-available way to rate the extension -->
+        <button type="button" class="about-rate-cta" id="rateAboutBtn">
+          <span class="about-rate-stars" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+          </span>
+          <span class="about-rate-label" data-i18n="rateAbout">Rate XPorter</span>
+        </button>
+
+        <!-- Contact & support -->
         <div class="about-contact">
           <!-- Easter egg: a little ladybug ("a bug") that slowly wanders the top-right corner -->
           <span class="ladybug" aria-hidden="true">
@@ -621,6 +654,7 @@
   <script src="i18n.js"></script>
   <script src="utils.js"></script>
   <script src="theme.js"></script>
+  <script src="rate-prompt.js"></script>
 
   <script src="popup.js"></script>
   <script src="ladybug.js"></script>

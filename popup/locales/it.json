@@ -141,5 +141,16 @@
   "detailDatesBody": "Esporta i post di un periodo di tempo specifico. Le esportazioni per intervallo di date aprono una scheda di ricerca X e la scorrono automaticamente per raccogliere i post corrispondenti — basta tenere aperta quella scheda fino al termine.",
   "detailResumeTitle": "Ripresa automatica e limitazione della frequenza",
   "detailResumeBody": "Lo stato di avanzamento viene salvato mentre l'esportazione è in corso, così puoi metterla in pausa, chiudere il popup o persino riavviare il browser e riprendere da dove avevi interrotto. XPorter regola inoltre il ritmo delle sue richieste per rispettare i limiti di X ed evitare blocchi temporanei.",
-  "exportModeHelp": "Cosa raccoglie ogni modalità di esportazione:\n**📝 Post** — tutti i post del profilo (tweet, risposte, repost e citazioni) con tutte le statistiche.\n**👥 Follower** — gli account che seguono questo profilo.\n**➡️ Seguiti** — gli account che questo profilo segue.\n**✓ Follower verificati** — solo i follower con la spunta di verifica (blu)."
+  "exportModeHelp": "Cosa raccoglie ogni modalità di esportazione:\n**📝 Post** — tutti i post del profilo (tweet, risposte, repost e citazioni) con tutte le statistiche.\n**👥 Follower** — gli account che seguono questo profilo.\n**➡️ Seguiti** — gli account che questo profilo segue.\n**✓ Follower verificati** — solo i follower con la spunta di verifica (blu).",
+  "rateTitle": "Ti piace XPorter?",
+  "rateBody": "XPorter è **gratuito** e **illimitato**. Aggiungo sempre nuove funzioni e correggo i bug. Se ti è utile, lascia **5 stelle**, per favore. È un grande aiuto per il progetto e fa scoprire XPorter ad altri.",
+  "rateCta": "Valuta sul Web Store",
+  "rateLater": "Forse più tardi",
+  "rateReport": "Segnala un problema",
+  "rateClose": "Chiudi",
+  "rateThanks": "Grazie!",
+  "ratePreview": "Mostra la finestra di valutazione",
+  "rateAbout": "Valuta XPorter",
+  "localizeHeaders": "Traduci i titoli delle colonne",
+  "localizeHeadersHelp": "**Traduce le intestazioni delle colonne nei file CSV e XLSX nella tua lingua.** Disattivalo per mantenere le intestazioni in inglese; sono più adatte a script e modelli di fogli di calcolo. Le chiavi JSON restano sempre in inglese."
 }

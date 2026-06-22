@@ -1108,8 +1108,8 @@ body.light .about-icon {
 }
 
 /* Larger glow radius on the light theme so the warm halo is clearly visible. */
-body.light .logo { --zap-glow: 13px; --zap-glow-hi: 21px; }
-body.light .about-icon { --zap-glow: 20px; --zap-glow-hi: 30px; }
+body.light .logo,
+body.light .about-icon { --zap-glow: 13px; --zap-glow-hi: 21px; }
 
 /* Fill the bolt yellow (not just its outline) so it reads as a lit lightning. */
 .logo svg path,
@@ -1734,8 +1734,9 @@ body.light .help-pop {
 .about-icon {
   margin-bottom: 8px;
   color: #ffd60a;
-  --zap-glow: 14px;
-  --zap-glow-hi: 22px;
+  /* Same glow radius as the header bolt (.logo) so the two look identical. */
+  --zap-glow: 8px;
+  --zap-glow-hi: 13px;
   --zap-c1: rgba(255, 200, 36, 0.72);
   --zap-c2: rgba(255, 222, 92, 1);
   --zap-extra: drop-shadow(0 0 0 transparent);
@@ -2349,24 +2350,20 @@ html {
   transform: translateY(0);
 }
 
+/* Solid, high-contrast status toasts (the translucent versions blended into
+   the popup background and were hard to read). */
 .toast-error {
-  border-color: rgba(244, 33, 46, 0.45);
-  color: #ffd7da;
-  background: linear-gradient(135deg, rgba(244, 33, 46, 0.22), rgba(244, 33, 46, 0.12));
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  background: linear-gradient(135deg, #f4313d, #cf1c27);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
 }
 
 .toast-success {
-  border-color: rgba(0, 186, 124, 0.45);
-  color: #c4f5e4;
-  background: linear-gradient(135deg, rgba(0, 186, 124, 0.22), rgba(0, 186, 124, 0.12));
-}
-
-body.light .toast-error {
-  color: #8c1019;
-}
-
-body.light .toast-success {
-  color: #0a6b4c;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  background: linear-gradient(135deg, #0cc187, #06966a);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
 }
 
 /* ========== KEYBOARD FOCUS ========== */

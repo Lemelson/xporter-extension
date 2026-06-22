@@ -141,5 +141,16 @@
   "detailDatesBody": "Ekspor postingan dari rentang waktu tertentu. Ekspor rentang tanggal membuka tab pencarian X dan menggulirkannya secara otomatis untuk mengumpulkan postingan yang cocok — cukup biarkan tab itu terbuka sampai selesai.",
   "detailResumeTitle": "Lanjut otomatis & pembatasan laju",
   "detailResumeBody": "Kemajuan disimpan selama ekspor berjalan, jadi Anda bisa menjeda, menutup popup, atau bahkan memulai ulang browser dan melanjutkan dari titik terakhir. XPorter juga mengatur kecepatan permintaannya untuk menghormati batas X dan menghindari pemblokiran sementara.",
-  "exportModeHelp": "Yang dikumpulkan setiap mode ekspor:\n**📝 Postingan** — semua postingan profil (tweet, balasan, repost, dan kutipan) beserta seluruh metriknya.\n**👥 Pengikut** — akun yang mengikuti profil ini.\n**➡️ Mengikuti** — akun yang diikuti profil ini.\n**✓ Pengikut Terverifikasi** — hanya pengikut yang memiliki lencana terverifikasi (biru)."
+  "exportModeHelp": "Yang dikumpulkan setiap mode ekspor:\n**📝 Postingan** — semua postingan profil (tweet, balasan, repost, dan kutipan) beserta seluruh metriknya.\n**👥 Pengikut** — akun yang mengikuti profil ini.\n**➡️ Mengikuti** — akun yang diikuti profil ini.\n**✓ Pengikut Terverifikasi** — hanya pengikut yang memiliki lencana terverifikasi (biru).",
+  "rateTitle": "Suka dengan XPorter?",
+  "rateBody": "XPorter **gratis** dan **tanpa batas**. Saya terus menambahkan fitur baru dan memperbaiki bug. Kalau ini membantumu, mohon beri **5 bintang**. Ini sangat mendukung proyek dan membantu orang lain menemukannya.",
+  "rateCta": "Beri rating di Web Store",
+  "rateLater": "Mungkin nanti",
+  "rateReport": "Laporkan masalah",
+  "rateClose": "Tutup",
+  "rateThanks": "Terima kasih!",
+  "ratePreview": "Tampilkan jendela rating",
+  "rateAbout": "Beri rating XPorter",
+  "localizeHeaders": "Lokalkan judul kolom",
+  "localizeHeadersHelp": "**Menerjemahkan judul kolom pada file CSV dan XLSX ke bahasamu.** Matikan untuk mempertahankan judul bahasa Inggris; lebih cocok untuk skrip dan templat spreadsheet. Kunci JSON selalu tetap dalam bahasa Inggris."
 }

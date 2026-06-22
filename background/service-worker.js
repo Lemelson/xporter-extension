@@ -7,6 +7,7 @@ importScripts(
     '../utils/api-features.js',
     '../utils/api.js',
     '../utils/rateLimit.js',
+    '../utils/columns-i18n.js',
     '../utils/csv.js',
     '../utils/storage.js',
     '../popup/i18n.js' // loadTranslations() — used to localize the in-page capture overlay
@@ -1028,16 +1029,24 @@ async function downloadItems(allItems, options) {
     const isUsers = (mode !== 'posts');
     let content, mimeType, extension;
 
+    // Localize CSV/XLSX header labels when the user opts in (default on). The
+    // underlying data keys — and all JSON keys — always stay English.
+    const settings = await XPorterStorage.loadSettings();
+    const headerOpts = {
+        localize: settings.localizeExportHeaders === true,
+        lang: settings.language || 'en'
+    };
+
     if (format === 'json') {
         content = JSON.stringify(allItems, null, 2);
         mimeType = 'application/json;charset=utf-8;';
         extension = 'json';
     } else if (format === 'xlsx') {
-        content = XPorterCSV.generateSimpleXLSX(allItems, isUsers);
+        content = XPorterCSV.generateSimpleXLSX(allItems, isUsers, headerOpts);
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         extension = 'xlsx';
     } else {
-        content = XPorterCSV.generateCSV(allItems, isUsers);
+        content = XPorterCSV.generateCSV(allItems, isUsers, headerOpts);
         mimeType = 'text/csv;charset=utf-8;';
         extension = 'csv';
     }

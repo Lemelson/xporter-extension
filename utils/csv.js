@@ -37,16 +37,29 @@ function escapeCSVValue(val) {
  * @param {boolean} isUsers - true for followers/following, false for posts
  * @returns {string} CSV with BOM prefix for Excel compatibility
  */
-function generateCSV(items, isUsers = false) {
-    const headers = isUsers ? USERS_HEADERS : POSTS_HEADERS;
-    let csv = headers.join(',') + '\n';
+function generateCSV(items, isUsers = false, opts = {}) {
+    const keys = isUsers ? USERS_HEADERS : POSTS_HEADERS;
+    const labels = headerLabels(keys, opts);
+    let csv = labels.map(escapeCSVValue).join(',') + '\n';
 
     for (const item of items) {
-        const row = headers.map(h => escapeCSVValue(item[h]));
+        const row = keys.map(h => escapeCSVValue(item[h]));
         csv += row.join(',') + '\n';
     }
 
     return '\uFEFF' + csv; // BOM for correct Unicode in Excel
+}
+
+/**
+ * Resolve the header-row labels. Data keys (`item[key]`) never change; only the
+ * displayed header text is localized, and only when `opts.localize` is set.
+ * @param {string[]} keys
+ * @param {Object} [opts] - { localize?: boolean, lang?: string }
+ * @returns {string[]} labels aligned with `keys`
+ */
+function headerLabels(keys, opts = {}) {
+    if (!opts.localize || typeof XPorterColumns === 'undefined') return keys;
+    return keys.map(k => XPorterColumns.columnLabel(k, opts.lang || 'en'));
 }
 
 // ==================== XLSX (XML SpreadsheetML) ====================
@@ -65,8 +78,9 @@ function escapeXml(str) {
  * @param {boolean} isUsers - true for followers/following, false for posts
  * @returns {string} XML SpreadsheetML string
  */
-function generateSimpleXLSX(items, isUsers = false) {
-    const headers = isUsers ? USERS_HEADERS : POSTS_HEADERS;
+function generateSimpleXLSX(items, isUsers = false, opts = {}) {
+    const keys = isUsers ? USERS_HEADERS : POSTS_HEADERS;
+    const labels = headerLabels(keys, opts);
 
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<?mso-application progid="Excel.Sheet"?>\n';
@@ -76,15 +90,15 @@ function generateSimpleXLSX(items, isUsers = false) {
 
     // Header row
     xml += '<Row>';
-    for (const h of headers) {
-        xml += `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`;
+    for (const label of labels) {
+        xml += `<Cell><Data ss:Type="String">${escapeXml(label)}</Data></Cell>`;
     }
     xml += '</Row>\n';
 
     // Data rows
     for (const item of items) {
         xml += '<Row>';
-        for (const h of headers) {
+        for (const h of keys) {
             const val = String(item[h] ?? '');
             // Keep identifiers and very long digit strings as text — Excel stores
             // numbers as IEEE-754 doubles and would corrupt 17–19 digit tweet/user
