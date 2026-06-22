@@ -35,6 +35,10 @@
   --glass-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
   --glass-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 0 rgba(7, 11, 30, 0.22);
   --glass-shadow: 0 10px 34px rgba(6, 10, 28, 0.46), 0 2px 8px rgba(6, 10, 28, 0.30);
+  /* Contained shadow for in-flow cards (e.g. the export-status panel): a tight
+     ambient shadow that stays close to the card instead of bleeding down onto
+     the action buttons that sit right below it. */
+  --card-shadow: 0 2px 8px rgba(6, 10, 28, 0.30);
 }
 
 /* ========== LIGHT THEME ========== */
@@ -64,6 +68,7 @@ body.light {
   --glass-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.70);
   --glass-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.75), inset 0 -1px 0 0 rgba(30, 41, 89, 0.10);
   --glass-shadow: 0 10px 34px rgba(30, 41, 89, 0.16), 0 2px 8px rgba(30, 41, 89, 0.10);
+  --card-shadow: 0 2px 8px rgba(30, 41, 89, 0.12);
 }
 
 /* Force light theme overrides for elements that use explicit colors */
@@ -223,6 +228,14 @@ body.light .select {
   box-shadow: var(--glass-inner-glow), 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
+/* RTL: move the chevron to the leading (left) edge and pad that side so it
+   doesn't sit under the right-aligned label. */
+[dir="rtl"] .select {
+  background-position: left 12px center;
+  padding-left: 30px;
+  padding-right: 12px;
+}
+
 /* Glass small inputs */
 .input-small {
   background: var(--input-bg);
@@ -253,42 +266,51 @@ body.light .input-small {
 .export-status {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), var(--glass-edge);
+  /* Contained ambient shadow — keeps the panel grounded without bleeding its
+     drop shadow onto the action buttons below it. */
+  box-shadow: var(--card-shadow), var(--glass-edge);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   padding: 14px;
   border-radius: var(--radius);
-  margin-bottom: 14px;
+  /* Match the 8px rhythm of the .actions button stack below so the gap above
+     the Resume row equals the gap between the buttons. */
+  margin-bottom: 8px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 12px; /* direction-agnostic spacing — works in LTR and RTL */
 }
 
 /* Left column flexes to fill remaining width, so the progress bar no longer
-   stretches edge-to-edge when a square button sits beside it. */
+   stretches edge-to-edge and the status text has room before it wraps. */
 .status-info {
   flex: 1;
   min-width: 0;
 }
 
-/* Square contextual button: big icon stacked over a label, fills card height. */
+/* Contextual action: a fixed compact square (icon over a short label), centered
+   beside the status — never stretches tall on long translations. */
 .btn-square {
   flex-direction: column;
-  gap: 6px;
-  width: 96px;
+  gap: 4px;
+  width: 78px;
+  height: 78px;
   flex-shrink: 0;
-  margin-left: 12px;
-  padding: 12px 8px;
-  font-size: 13px;
-  line-height: 1.15;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+  border-radius: var(--radius-sm);
 }
 
 .btn-square span {
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .btn-square svg {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
 }
 
@@ -537,13 +559,20 @@ body.light .date-row input[type="date"]:hover {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, rgba(29, 155, 240, 0.7), rgba(29, 161, 242, 0.85), rgba(79, 195, 247, 0.7));
+  background: linear-gradient(90deg,
+      rgba(29, 155, 240, 0.65) 0%,
+      rgba(96, 184, 255, 0.95) 35%,
+      rgba(133, 207, 255, 1) 50%,
+      rgba(96, 184, 255, 0.95) 65%,
+      rgba(29, 155, 240, 0.65) 100%);
   background-size: 200% 100%;
   border-radius: 4px;
   width: 0%;
   transition: width 0.5s ease;
   position: relative;
-  box-shadow: 0 0 8px rgba(29, 155, 240, 0.4);
+  box-shadow: 0 0 10px rgba(96, 184, 255, 0.55);
+  /* Continuously flow the gradient so the bar visibly shimmers while working. */
+  animation: progressFlow 2.2s linear infinite;
 }
 
 .progress-fill::after {
@@ -555,10 +584,10 @@ body.light .date-row input[type="date"]:hover {
   bottom: 0;
   background: linear-gradient(90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0.55) 50%,
       transparent 100%);
   background-size: 200% 100%;
-  animation: shine 2s infinite linear;
+  animation: shine 1.5s infinite linear;
 }
 
 @keyframes shine {
@@ -568,6 +597,16 @@ body.light .date-row input[type="date"]:hover {
 
   100% {
     background-position: -200% 0;
+  }
+}
+
+@keyframes progressFlow {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: 0% 0;
   }
 }
 
@@ -591,6 +630,23 @@ body.light .date-row input[type="date"]:hover {
   100% {
     background-position: -100% 0;
   }
+}
+
+/* Cooldown — the long between-batch pause. The bar turns amber and flows slowly
+   so it's obvious the export is waiting (not stalled), paired with the yellow
+   pulsing dot and the "Cooldown m:ss" message. */
+.progress-fill.cooldown {
+  background: linear-gradient(90deg,
+      rgba(245, 180, 40, 0.7) 0%,
+      rgba(255, 209, 102, 1) 50%,
+      rgba(245, 180, 40, 0.7) 100%);
+  background-size: 200% 100%;
+  box-shadow: 0 0 10px rgba(245, 180, 40, 0.55);
+  animation: progressFlow 3.4s linear infinite;
+}
+
+.progress-fill.cooldown::after {
+  display: none;
 }
 
 /* Glass footer */
@@ -1134,6 +1190,13 @@ body.light .lang-btn.active {
   padding: 4px;
 }
 
+/* RTL: the selector lives on the left in RTL, so anchor the dropdown to the
+   left edge (it was anchored right and opened off-screen — names got clipped). */
+[dir="rtl"] .lang-dropdown {
+  right: auto;
+  left: 0;
+}
+
 body.light .lang-dropdown {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(0, 0, 0, 0.14);
@@ -1218,7 +1281,7 @@ body.light .lang-option.active {
 
 .lang-option-name {
   flex: 1;
-  text-align: left;
+  text-align: start;
 }
 
 .lang-option-check {
@@ -1388,7 +1451,7 @@ body.light .lang-option.active {
   outline: none;
 }
 
-.date-help::after {
+.help-pop {
   position: absolute;
   left: 0;
   top: calc(100% + 8px);
@@ -1402,14 +1465,20 @@ body.light .lang-option.active {
   -webkit-backdrop-filter: blur(16px);
   color: var(--text-primary);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
-  content: attr(data-tooltip);
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.5;
+  text-align: start;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Bold spans (**...**) carry the gist — they read on their own at a glance. */
+.help-pop strong {
+  font-weight: 700;
+  color: var(--accent);
 }
 
 .date-help:hover,
@@ -1419,13 +1488,13 @@ body.light .lang-option.active {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.date-help:hover::after,
-.date-help:focus-visible::after {
+.date-help:hover .help-pop,
+.date-help:focus-visible .help-pop {
   opacity: 1;
   transform: translateY(0);
 }
 
-body.light .date-help::after {
+body.light .help-pop {
   border-color: rgba(10, 111, 219, 0.32);
   background: rgba(255, 255, 255, 0.98);
   color: var(--text-primary);
@@ -1503,6 +1572,24 @@ body.light .date-help::after {
 .status-red {
   background: var(--danger);
   box-shadow: 0 0 6px rgba(244, 33, 46, 0.5);
+}
+
+/* While the export is actively running (fetching or cooling down), the status
+   dot pulses to signal liveness. Toggled via the .live class from popup.js. */
+.status-dot.live {
+  animation: dotPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.74);
+  }
 }
 
 .tweet-count {
@@ -1606,6 +1693,177 @@ body.light .date-help::after {
   font-size: 10px;
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* ========== CONTACT & SUPPORT ========== */
+.about-contact {
+  text-align: left;
+  margin: 4px 0 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+}
+
+.contact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 7px;
+}
+
+.contact-header .icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.contact-lead {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.contact-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.contact-btn + .contact-btn {
+  margin-top: 8px;
+}
+
+.contact-btn-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.contact-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.contact-btn-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.contact-btn-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.contact-btn-sub {
+  font-size: 10.5px;
+  line-height: 1.35;
+  opacity: 0.9;
+}
+
+/* Telegram — primary, filled */
+.contact-btn--telegram {
+  background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(34, 158, 217, 0.35), var(--glass-edge);
+}
+
+.contact-btn--telegram .contact-btn-icon {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.contact-btn--telegram .contact-btn-sub {
+  color: rgba(255, 255, 255, 0.92);
+  opacity: 1;
+}
+
+.contact-btn--telegram:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(34, 158, 217, 0.5), var(--glass-edge);
+}
+
+.contact-pill {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Email — secondary, glass */
+.contact-btn--email {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+  color: var(--text-primary);
+}
+
+.contact-btn--email .contact-btn-icon {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.contact-btn--email .contact-btn-sub {
+  color: var(--text-muted);
+}
+
+.contact-btn--email:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  background-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(6, 10, 28, 0.42), var(--glass-edge);
+}
+
+body.light .contact-btn--email:hover {
+  background-color: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(30, 41, 89, 0.18), var(--glass-edge);
+}
+
+/* GitHub — tertiary, subtle pill */
+.about-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.about-github:hover {
+  color: var(--text-primary);
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
 }
 
 /* Utility */
