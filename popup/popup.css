@@ -321,7 +321,7 @@ body.light .btn-secondary {
 .about-link:hover,
 .history-toggle:hover,
 .select:hover {
-  background-color: rgba(255, 255, 255, 0.18);
+  background-color: rgba(255, 255, 255, 0.24);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(6, 10, 28, 0.42), var(--glass-edge);
   transform: translateY(-1px);
@@ -331,7 +331,7 @@ body.light .btn-secondary:hover,
 body.light .about-link:hover,
 body.light .history-toggle:hover,
 body.light .select:hover {
-  background-color: rgba(255, 255, 255, 0.82);
+  background-color: rgba(255, 255, 255, 0.74);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(30, 41, 89, 0.18), var(--glass-edge);
   transform: translateY(-1px);
@@ -400,7 +400,7 @@ body.light .input-resume {
 .date-row input[type="date"]:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
-  background-color: rgba(255, 255, 255, 0.11);
+  background-color: rgba(255, 255, 255, 0.14);
 }
 
 body.light .input-group:hover,
@@ -409,7 +409,7 @@ body.light .input-resume:hover,
 body.light .date-row input[type="date"]:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
-  background-color: rgba(255, 255, 255, 0.74);
+  background-color: rgba(255, 255, 255, 0.70);
 }
 
 .input-resume:focus {
@@ -965,20 +965,18 @@ body.light {
 /* Theme toggle button */
 .theme-toggle {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   padding: 6px;
   border-radius: 50%;
-  transition: background 0.2s, color 0.2s;
+  transition: all 0.2s;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.theme-toggle:hover {
-  background: var(--bg-hover);
-}
+/* .theme-toggle hover is unified with .lang-btn below — same whiten + glow. */
 
 /* Language Selector */
 .lang-selector {
@@ -1003,9 +1001,14 @@ body.light {
   letter-spacing: 0.5px;
 }
 
-.lang-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--glass-border);
+/* Header icon buttons (language + theme) share one hover: whiten + accent
+   border + soft glow ring, so they read identically. */
+.lang-btn:hover,
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  color: var(--text-primary);
 }
 
 .lang-btn.active {
@@ -1014,9 +1017,12 @@ body.light {
   color: var(--accent);
 }
 
-body.light .lang-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  border-color: rgba(0, 0, 0, 0.14);
+body.light .lang-btn:hover,
+body.light .theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  color: var(--text-primary);
 }
 
 body.light .lang-btn.active {
@@ -1118,21 +1124,27 @@ body.light .lang-dropdown {
 }
 
 .lang-option:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(96, 184, 255, 0.14);
+  color: var(--text-primary);
 }
 
 body.light .lang-option:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(10, 111, 219, 0.10);
+  color: var(--text-primary);
 }
 
+/* Selected language: clearly the brightest, most-contrasted row — stronger
+   tint, an inner accent ring, and an accent bar down the leading edge. */
 .lang-option.active {
-  background: rgba(96, 184, 255, 0.12);
+  background: rgba(96, 184, 255, 0.26);
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(96, 184, 255, 0.5), inset 3px 0 0 0 var(--accent);
 }
 
 body.light .lang-option.active {
-  background: rgba(10, 111, 219, 0.10);
+  background: rgba(10, 111, 219, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(10, 111, 219, 0.4), inset 3px 0 0 0 var(--accent);
 }
 
 .lang-option-flag {
@@ -1633,12 +1645,16 @@ body.light .toast-success {
 .history-dl-btn:focus-visible,
 .history-del-btn:focus-visible,
 .history-clear-btn:focus-visible,
-.select:focus-visible,
 .input-small:focus-visible,
 .toggle-input:focus-visible + .toggle-track {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Selects deliberately get NO persistent focus ring: a <select> keeps :focus
+   after its dropdown closes, which left a "stuck" blue outline even though
+   there's nothing left to interact with. They now behave like buttons —
+   highlighted only while hovered (see Tier 2). */
 
 /* Tabs are full-bleed rectangles — a snug inner ring reads cleaner than an
    offset outline box. */
