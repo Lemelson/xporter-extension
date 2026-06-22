@@ -248,7 +248,8 @@ body.light .input-small {
   border-color: var(--accent);
 }
 
-/* Glass export status */
+/* Glass export status — info column on the left, a tall square contextual
+   action (Stop while running / Download when stopped) on the right. */
 .export-status {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -258,6 +259,37 @@ body.light .input-small {
   padding: 14px;
   border-radius: var(--radius);
   margin-bottom: 14px;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Left column flexes to fill remaining width, so the progress bar no longer
+   stretches edge-to-edge when a square button sits beside it. */
+.status-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Square contextual button: big icon stacked over a label, fills card height. */
+.btn-square {
+  flex-direction: column;
+  gap: 6px;
+  width: 96px;
+  flex-shrink: 0;
+  margin-left: 12px;
+  padding: 12px 8px;
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.btn-square span {
+  text-align: center;
+}
+
+.btn-square svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
 }
 
 /* Glass buttons */
@@ -315,6 +347,19 @@ body.light .btn-primary:hover {
 .btn-success:hover {
   background: linear-gradient(135deg, rgba(0, 214, 143, 1) 0%, rgba(0, 184, 116, 1) 50%, rgba(20, 224, 153, 1) 100%);
   box-shadow: 0 6px 24px rgba(0, 166, 104, 0.50), 0 0 22px rgba(0, 214, 143, 0.45), var(--glass-edge);
+}
+
+/* Warning / amber — the Download square button. Dark text for contrast on gold. */
+.btn-warning {
+  background: linear-gradient(135deg, #FFD45A 0%, #F5B73C 50%, #FFCB52 100%);
+  border: 1px solid rgba(214, 158, 30, 0.6);
+  box-shadow: 0 4px 16px rgba(214, 158, 30, 0.34), var(--glass-edge);
+  color: #4a3500;
+}
+
+.btn-warning:hover {
+  background: linear-gradient(135deg, #FFDE74 0%, #FFC44E 50%, #FFD968 100%);
+  box-shadow: 0 6px 24px rgba(214, 158, 30, 0.46), 0 0 22px rgba(255, 203, 82, 0.5), var(--glass-edge);
 }
 
 .btn-secondary {
@@ -1497,6 +1542,12 @@ body.light .date-help::after {
 
 .btn:active {
   transform: translateY(0) scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* About */
