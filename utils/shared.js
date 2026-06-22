@@ -236,6 +236,139 @@ function formatNumber(value, langCode) {
     }
 }
 
+const PLURAL_LABELS = {
+    en: {
+        postsCollected: { one: 'post collected', other: 'posts collected' },
+        usersCollected: { one: 'user collected', other: 'users collected' },
+        morePosts: { one: 'more post', other: 'more posts' },
+        totalTweets: { one: 'total post', other: 'total posts' },
+        postsUnit: { one: 'post', other: 'posts' }
+    },
+    ru: {
+        postsCollected: { one: 'пост собран', few: 'поста собрано', many: 'постов собрано', other: 'поста собрано' },
+        usersCollected: { one: 'пользователь собран', few: 'пользователя собрано', many: 'пользователей собрано', other: 'пользователя собрано' },
+        morePosts: { one: 'ещё пост', few: 'ещё поста', many: 'ещё постов', other: 'ещё поста' },
+        totalTweets: { one: 'пост всего', few: 'поста всего', many: 'постов всего', other: 'поста всего' },
+        postsUnit: { one: 'пост', few: 'поста', many: 'постов', other: 'поста' }
+    },
+    ar: {
+        postsCollected: { zero: 'منشورات تم جمعها', one: 'منشور تم جمعه', two: 'منشوران تم جمعهما', few: 'منشورات تم جمعها', many: 'منشورًا تم جمعه', other: 'منشور تم جمعه' },
+        usersCollected: { zero: 'مستخدمون تم جمعهم', one: 'مستخدم تم جمعه', two: 'مستخدمان تم جمعهما', few: 'مستخدمون تم جمعهم', many: 'مستخدمًا تم جمعه', other: 'مستخدم تم جمعه' },
+        morePosts: { zero: 'منشورات إضافية', one: 'منشور إضافي', two: 'منشوران إضافيان', few: 'منشورات إضافية', many: 'منشورًا إضافيًا', other: 'منشور إضافي' },
+        totalTweets: { zero: 'منشورات إجمالًا', one: 'منشور إجمالًا', two: 'منشوران إجمالًا', few: 'منشورات إجمالًا', many: 'منشورًا إجمالًا', other: 'منشور إجمالًا' },
+        postsUnit: { zero: 'منشورات', one: 'منشور', two: 'منشوران', few: 'منشورات', many: 'منشورًا', other: 'منشور' }
+    },
+    de: {
+        postsCollected: { one: 'Beitrag gesammelt', other: 'Beiträge gesammelt' },
+        usersCollected: { one: 'Benutzer gesammelt', other: 'Benutzer gesammelt' },
+        morePosts: { one: 'weiterer Beitrag', other: 'weitere Beiträge' },
+        totalTweets: { one: 'Beitrag insgesamt', other: 'Beiträge insgesamt' },
+        postsUnit: { one: 'Beitrag', other: 'Beiträge' }
+    },
+    es: {
+        postsCollected: { one: 'publicación recopilada', other: 'publicaciones recopiladas' },
+        usersCollected: { one: 'usuario recopilado', other: 'usuarios recopilados' },
+        morePosts: { one: 'publicación más', other: 'publicaciones más' },
+        totalTweets: { one: 'publicación en total', other: 'publicaciones en total' },
+        postsUnit: { one: 'publicación', other: 'publicaciones' }
+    },
+    fr: {
+        postsCollected: { one: 'publication collectée', other: 'publications collectées' },
+        usersCollected: { one: 'utilisateur collecté', other: 'utilisateurs collectés' },
+        morePosts: { one: 'publication supplémentaire', other: 'publications supplémentaires' },
+        totalTweets: { one: 'publication au total', other: 'publications au total' },
+        postsUnit: { one: 'publication', other: 'publications' }
+    },
+    it: {
+        postsCollected: { one: 'post raccolto', other: 'post raccolti' },
+        usersCollected: { one: 'utente raccolto', other: 'utenti raccolti' },
+        morePosts: { one: 'post in più', other: 'post in più' },
+        totalTweets: { one: 'post totale', other: 'post totali' },
+        postsUnit: { one: 'post', other: 'post' }
+    },
+    pt: {
+        postsCollected: { one: 'publicação coletada', other: 'publicações coletadas' },
+        usersCollected: { one: 'usuário coletado', other: 'usuários coletados' },
+        morePosts: { one: 'publicação a mais', other: 'publicações a mais' },
+        totalTweets: { one: 'publicação no total', other: 'publicações no total' },
+        postsUnit: { one: 'publicação', other: 'publicações' }
+    },
+    tr: {
+        postsCollected: { other: 'gönderi toplandı' },
+        usersCollected: { other: 'kullanıcı toplandı' },
+        morePosts: { other: 'daha fazla gönderi' },
+        totalTweets: { other: 'gönderi toplam' },
+        postsUnit: { other: 'gönderi' }
+    },
+    id: {
+        postsCollected: { other: 'postingan terkumpul' },
+        usersCollected: { other: 'pengguna terkumpul' },
+        morePosts: { other: 'postingan lagi' },
+        totalTweets: { other: 'postingan total' },
+        postsUnit: { other: 'postingan' }
+    },
+    hi: {
+        postsCollected: { other: 'पोस्ट एकत्रित' },
+        usersCollected: { other: 'उपयोगकर्ता एकत्र' },
+        morePosts: { other: 'और पोस्ट' },
+        totalTweets: { other: 'पोस्ट कुल' },
+        postsUnit: { other: 'पोस्ट' }
+    },
+    ja: {
+        postsCollected: { other: '件のポスト取得済み' },
+        usersCollected: { other: '人のユーザー取得済み' },
+        morePosts: { other: '件追加' },
+        totalTweets: { other: '件のポスト合計' },
+        postsUnit: { other: '件のポスト' }
+    },
+    ko: {
+        postsCollected: { other: '개 게시물 수집됨' },
+        usersCollected: { other: '명 사용자 수집됨' },
+        morePosts: { other: '개 게시물 추가' },
+        totalTweets: { other: '개 게시물 전체' },
+        postsUnit: { other: '개 게시물' }
+    },
+    zh: {
+        postsCollected: { other: '条帖子已收集' },
+        usersCollected: { other: '位用户已收集' },
+        morePosts: { other: '条帖子' },
+        totalTweets: { other: '条帖子总计' },
+        postsUnit: { other: '条帖子' }
+    }
+};
+
+function baseLanguage(langCode) {
+    return String(langCode || 'en').toLowerCase().split('-')[0];
+}
+
+function pluralCategory(count, langCode) {
+    try {
+        return new Intl.PluralRules(baseLanguage(langCode)).select(Math.abs(Number(count) || 0));
+    } catch (_) {
+        return (Number(count) === 1) ? 'one' : 'other';
+    }
+}
+
+function pluralLabel(key, count, langCode, translations) {
+    const lang = baseLanguage(langCode);
+    const forms = PLURAL_LABELS[lang]?.[key] || PLURAL_LABELS.en[key];
+    const category = pluralCategory(count, lang);
+    if (forms?.[category]) return forms[category];
+    if (forms?.other) return forms.other;
+    if (translations?.[key]) return translations[key];
+    if (key === 'postsUnit' && translations?.posts) return translations.posts;
+    return key;
+}
+
+function collectedLabel(count, mode, langCode, translations) {
+    const key = (mode === 'posts') ? 'postsCollected' : 'usersCollected';
+    return pluralLabel(key, count, langCode, translations);
+}
+
+function formatCollectedCount(count, mode, langCode, translations) {
+    return `${formatNumber(count, langCode)} ${collectedLabel(count, mode, langCode, translations)}`;
+}
+
 // ==================== General ====================
 
 /**

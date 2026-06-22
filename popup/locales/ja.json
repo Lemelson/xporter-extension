@@ -149,7 +149,6 @@
   "rateReport": "問題を報告",
   "rateClose": "閉じる",
   "rateThanks": "ありがとうございます！",
-  "ratePreview": "評価ダイアログを表示",
   "rateAbout": "XPorter を評価",
   "localizeHeaders": "列見出しをローカライズ",
   "localizeHeadersHelp": "**CSV と XLSX の列見出しをあなたの言語に翻訳します。** オフにすると英語の見出しのままになり、スクリプトや表計算のテンプレートに適しています。JSON のキーは常に英語のままです。"

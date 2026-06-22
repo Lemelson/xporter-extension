@@ -149,7 +149,6 @@
   "rateReport": "Problem melden",
   "rateClose": "Schließen",
   "rateThanks": "Danke!",
-  "ratePreview": "Bewertungsdialog anzeigen",
   "rateAbout": "XPorter bewerten",
   "localizeHeaders": "Spaltentitel lokalisieren",
   "localizeHeadersHelp": "**Übersetzt die Spaltenüberschriften in CSV- und XLSX-Dateien in deine Sprache.** Schalte es aus, um die englischen Überschriften zu behalten; sie eignen sich besser für Skripte und Tabellenvorlagen. JSON-Schlüssel bleiben immer Englisch."

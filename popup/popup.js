@@ -56,7 +56,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const extensionVersion = document.getElementById('extensionVersion');
 
     // Rate-prompt elements + counter guard (one finished export counts once).
-    const ratePreviewBtn = document.getElementById('ratePreviewBtn');
     const rateAboutBtn = document.getElementById('rateAboutBtn');
     let ratePromptCounted = false;
 
@@ -581,20 +580,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // "Report a problem" in the prompt → jump to the About tab (Telegram/email).
     const openAboutTab = () => document.querySelector('.tab[data-tab="about"]')?.click();
 
-    // Settings: on-demand preview (resets state, so it always shows). This is a
-    // test-only control — hidden in production builds (TESTING = false).
-    if (ratePreviewBtn) {
-        if (!window.XPorterRatePrompt?.CONFIG?.TESTING) {
-            (ratePreviewBtn.closest('.field') || ratePreviewBtn).style.display = 'none';
-        }
-        ratePreviewBtn.addEventListener('click', () => {
-            window.XPorterRatePrompt?.forceShow({
-                translations: currentTranslations,
-                lang: currentLang,
-                onReportBug: openAboutTab
-            });
-        });
-    }
     // About: low-pressure, always-available link straight to the store.
     if (rateAboutBtn) {
         rateAboutBtn.addEventListener('click', () => {

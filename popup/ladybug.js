@@ -20,8 +20,8 @@
   const BUG = 22;                 // bug box size (px)
   const BASE_SPEED = 16;          // px/s on a straight (≈ the old 19 × 0.85 — a touch calmer)
   const TURN_RATE = 2.4;          // rad/s — limited so turns are smooth, never zigzag
-  const SPLAT_VISIBLE = 5000;     // ms the splat stays solid
-  const SPLAT_FADE = 5000;        // ms it then takes to fade out
+  const SPLAT_VISIBLE = 3500;     // ms the splat stays solid
+  const SPLAT_FADE = 3500;        // ms it then takes to fade out
 
   // state: 'gone' | 'walking' | 'static' | 'squashed'
   let state = 'gone';

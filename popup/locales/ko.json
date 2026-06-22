@@ -149,7 +149,6 @@
   "rateReport": "문제 신고",
   "rateClose": "닫기",
   "rateThanks": "감사합니다!",
-  "ratePreview": "평가 창 표시",
   "rateAbout": "XPorter 평가하기",
   "localizeHeaders": "열 제목 현지화",
   "localizeHeadersHelp": "**CSV와 XLSX의 열 제목을 사용 중인 언어로 번역합니다.** 끄면 영어 제목이 그대로 유지되며 스크립트와 스프레드시트 템플릿에 더 적합합니다. JSON 키는 항상 영어로 유지됩니다."

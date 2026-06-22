@@ -25,6 +25,13 @@ const USERS_HEADERS = [
  */
 function escapeCSVValue(val) {
     val = String(val ?? '');
+    // CSV/formula-injection guard: spreadsheet apps may treat a cell starting
+    // with = + - @ as a formula, sometimes after trimming leading whitespace.
+    // Export data is third-party controlled (tweet text, bios, names), so force
+    // those values to plain text before the RFC-4180 quoting below.
+    if (/^\s*[=+\-@]/.test(val)) {
+        val = "'" + val;
+    }
     if (val.includes(',') || val.includes('"') || val.includes('\n') || val.includes('\r')) {
         return '"' + val.replace(/"/g, '""') + '"';
     }

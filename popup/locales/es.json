@@ -149,7 +149,6 @@
   "rateReport": "Informar de un problema",
   "rateClose": "Cerrar",
   "rateThanks": "¡Gracias!",
-  "ratePreview": "Mostrar ventana de valoración",
   "rateAbout": "Valorar XPorter",
   "localizeHeaders": "Traducir títulos de columnas",
   "localizeHeadersHelp": "**Traduce los encabezados de columna de los archivos CSV y XLSX a tu idioma.** Desactívalo para mantener los encabezados en inglés; funcionan mejor con scripts y plantillas de hojas de cálculo. Las claves JSON siempre quedan en inglés."

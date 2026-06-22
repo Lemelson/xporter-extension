@@ -149,7 +149,6 @@
   "rateReport": "Segnala un problema",
   "rateClose": "Chiudi",
   "rateThanks": "Grazie!",
-  "ratePreview": "Mostra la finestra di valutazione",
   "rateAbout": "Valuta XPorter",
   "localizeHeaders": "Traduci i titoli delle colonne",
   "localizeHeadersHelp": "**Traduce le intestazioni delle colonne nei file CSV e XLSX nella tua lingua.** Disattivalo per mantenere le intestazioni in inglese; sono più adatte a script e modelli di fogli di calcolo. Le chiavi JSON restano sempre in inglese."

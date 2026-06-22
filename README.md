@@ -168,28 +168,30 @@ The UI auto-detects your Chrome language on first launch and can be changed at a
 ```
 xporter/
 ├── manifest.json             # Manifest V3 configuration
+├── agent.md / CLAUDE.md      # Developer & AI context docs
 ├── background/
 │   └── service-worker.js     # Export engine, message router, state machine
 ├── content/
-│   └── content.js            # Username detection from active X tab
-├── popup/
-│   ├── popup.html            # Extension popup markup
-│   ├── popup.css             # Glassmorphism styles (dark + light)
-│   ├── popup.js              # UI logic, settings, export controls
-│   └── i18n.js               # Translation strings for 14 languages
+│   ├── content.js            # Username detection from the active X tab
+│   └── interceptor.js        # Page-context hook to capture live GraphQL query IDs
+├── popup/                    # Compact popup UI
+│   ├── popup.html/.css/.js   # Markup, glassmorphism styles (dark + light), logic
+│   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + toggle
+│   ├── i18n.js               # In-app translation engine
+│   ├── utils.js              # Popup-only helpers (most live in utils/shared.js)
+│   ├── ladybug.js            # Easter-egg ladybug on the About tab
+│   └── locales/*.json        # UI strings for 14 languages (en = fallback)
 ├── export/
-│   ├── export.html           # Full-page export interface
-│   ├── export.css            # Export page styles
-│   └── export.js             # Export page logic
+│   └── export.html/.css/.js  # Full-page export interface (mirrors the popup)
 ├── utils/
 │   ├── api.js                # X GraphQL client, endpoint discovery
+│   ├── api-features.js       # GraphQL feature-flag constants
 │   ├── rateLimit.js          # Batch rate limiter with cooldowns
-│   ├── csv.js                # CSV generation (BOM, escaping)
-│   └── storage.js            # Chrome storage abstraction
-└── icons/
-    ├── icon16.png
-    ├── icon48.png
-    └── icon128.png
+│   ├── csv.js                # CSV / JSON / XLSX generation
+│   ├── storage.js            # Chrome storage abstraction + settings
+│   └── shared.js             # Helpers shared by the popup and export pages
+├── _locales/                 # Chrome Web Store metadata translations
+└── icons/                    # icon16/48/128.png
 ```
 
 ### Design Decisions
