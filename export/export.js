@@ -51,22 +51,62 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let exportStartTime = null;
     let timeInterval = null;
+    let cooldownInterval = null;
 
     if (exportVersion && chrome.runtime?.getManifest) {
         exportVersion.textContent = `v${chrome.runtime.getManifest().version}`;
     }
 
+    // ==================== Theme icons (SVG, matches popup) ====================
+    const SUN_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+    const MOON_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>';
+    function setThemeIcon(isLight) {
+        themeIcon.innerHTML = isLight ? MOON_SVG : SUN_SVG;
+    }
+
+    // ==================== Toasts ====================
+    let toastContainer = null;
+    function showToast(message, type = 'info') {
+        if (!message) return;
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container';
+            document.body.appendChild(toastContainer);
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('toast-show'));
+        setTimeout(() => {
+            toast.classList.remove('toast-show');
+            setTimeout(() => toast.remove(), 250);
+        }, type === 'error' ? 4500 : 2800);
+    }
+
     // ==================== i18n ====================
     let currentTranslations = {};
+    let currentLang = 'en';
 
-    // Load saved language preference and apply translations
+    // Load language from saved settings and apply translations.
+    // NOTE: language lives in settings.language (the popup writes it there).
+    // The page previously read a non-existent `xporter_lang` key, so it was
+    // always English regardless of the user's choice.
     async function initI18n() {
-        const stored = await chrome.storage.local.get('xporter_lang');
-        const lang = stored.xporter_lang || 'en';
+        try {
+            const settingsResult = await sendMessage({ type: 'GET_SETTINGS' });
+            currentLang = settingsResult?.settings?.language
+                || (typeof detectBrowserLanguage === 'function' ? detectBrowserLanguage() : 'en');
+        } catch (_) {
+            currentLang = 'en';
+        }
         if (typeof loadTranslations === 'function') {
-            currentTranslations = await loadTranslations(lang);
+            currentTranslations = await loadTranslations(currentLang);
         }
         applyTranslations();
+        document.documentElement.lang = currentLang;
+        applyLanguageDirection(currentLang); // RTL for Arabic
     }
 
     function applyTranslations() {
@@ -93,11 +133,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = settingsResult?.settings || {};
 
     // Apply theme
-    if (settings.theme === 'light') {
+    const isLightInit = settings.theme === 'light';
+    if (isLightInit) {
         body.classList.remove('dark');
         body.classList.add('light');
-        themeIcon.textContent = '🌙';
     }
+    setThemeIcon(isLightInit);
 
     // Apply settings to controls
     includeRetweets.checked = settings.includeRetweets !== false;
@@ -129,7 +170,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         body.classList.toggle('light');
         body.classList.toggle('dark');
         const isLight = body.classList.contains('light');
-        themeIcon.textContent = isLight ? '🌙' : '☀️';
+        setThemeIcon(isLight);
         await sendMessage({
             type: 'SAVE_SETTINGS',
             settings: { ...settings, theme: isLight ? 'light' : 'dark' }
@@ -184,7 +225,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if (result?.error) {
-            showError('Export Error', result.error);
+            showError(t('exportError'), formatError(result.error, t));
             return;
         }
 
@@ -194,7 +235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportUsername.textContent = `@${username}`;
         counter.textContent = '0';
         statusDot.className = 'status-dot green';
-        statusMsg.textContent = 'Resolving user...';
+        statusMsg.textContent = t('resolvingUser');
         progressFill.classList.add('indeterminate');
     });
 
@@ -207,14 +248,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         stopBtn.classList.add('hidden');
         resumeBtn.classList.remove('hidden');
         statusDot.className = 'status-dot yellow';
-        statusMsg.textContent = 'Stopped — can resume';
+        statusMsg.textContent = t('stoppedCanResume');
     });
 
     // ==================== Resume Export ====================
     resumeBtn.addEventListener('click', async () => {
         const result = await sendMessage({ type: 'RESUME_EXPORT' });
         if (result?.error) {
-            showError('Resume Error', result.error);
+            showError(t('resumeError'), formatError(result.error, t));
             return;
         }
 
@@ -222,21 +263,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         stopBtn.classList.remove('hidden');
         startTimeCounter();
         statusDot.className = 'status-dot green';
-        statusMsg.textContent = 'Resuming...';
+        statusMsg.textContent = t('resuming');
     });
 
     // ==================== Download CSV ====================
     downloadBtn.addEventListener('click', async () => {
+        const labelSpan = downloadBtn.querySelector('[data-i18n="downloadCsv"]');
         downloadBtn.disabled = true;
-        downloadBtn.innerHTML = '<span>⏳</span> Preparing...';
+        if (labelSpan) labelSpan.textContent = t('preparing');
 
         const result = await sendMessage({ type: 'DOWNLOAD_CSV' });
 
         downloadBtn.disabled = false;
-        downloadBtn.innerHTML = '<span>📥</span> Download CSV';
+        if (labelSpan) labelSpan.textContent = t('downloadCsv');
 
         if (result?.error) {
-            showError('Download Error', result.error);
+            showError(t('downloadError'), formatError(result.error, t));
+        } else {
+            showToast(t('downloadStarted'), 'success');
         }
     });
 
@@ -267,7 +311,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showState('active');
                 exportUsername.textContent = `@${state.username || usernameInput.value}`;
                 statusDot.className = 'status-dot green';
-                statusMsg.textContent = 'Resolving user...';
+                statusMsg.textContent = t('resolvingUser');
                 progressFill.classList.add('indeterminate');
                 if (!exportStartTime) { exportStartTime = Date.now(); startTimeCounter(); }
                 break;
@@ -275,17 +319,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'fetching':
                 showState('active');
                 if (state.username) exportUsername.textContent = `@${state.username}`;
-                if (state.expectedTweets) exportExpected.textContent = `~${Number(state.expectedTweets).toLocaleString()} total tweets`;
+                if (state.expectedTweets) exportExpected.textContent = `~${formatNumber(state.expectedTweets, currentLang)} ${t('totalTweets')}`;
 
-                counter.textContent = Number(state.tweetCount || 0).toLocaleString();
+                counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
                 statusDot.className = 'status-dot green';
-                statusMsg.textContent = `Fetching... (batch ${state.batch || '?'})`;
-                progressFill.classList.remove('indeterminate');
+                statusMsg.textContent = `${t('fetching')} (${t('batch')} ${state.batch || '?'})`;
 
-                // Calculate approximate progress
-                const expectedCount = state.expectedTweets || 5000;
-                const progress = Math.min(95, ((state.tweetCount || 0) / expectedCount) * 100);
-                progressFill.style.width = progress + '%';
+                // Honest progress: only show a real percentage when we know the
+                // target (an explicit limit or the account's known total).
+                // Otherwise keep the indeterminate shimmer instead of faking a
+                // percentage against a guessed denominator.
+                {
+                    const limit = parseInt(quantityLimit.value) || 0;
+                    const target = limit > 0 ? limit : (state.expectedTweets || 0);
+                    if (target > 0) {
+                        progressFill.classList.remove('indeterminate');
+                        progressFill.style.width = Math.min(95, ((state.tweetCount || 0) / target) * 100) + '%';
+                    } else {
+                        progressFill.classList.add('indeterminate');
+                    }
+                }
 
                 if (state.totalRequests) statRequests.textContent = state.totalRequests;
                 if (state.batch) statBatch.textContent = state.batch;
@@ -300,21 +353,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             case 'cooldown':
                 statusDot.className = 'status-dot yellow';
-                const seconds = Math.round((state.duration || 180000) / 1000);
-                statusMsg.textContent = `Cooldown: ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} — ${state.reason || ''}`;
                 startCooldownTimer(state.duration || 180000);
                 break;
 
             case 'error':
                 if (state.retryIn) {
                     statusDot.className = 'status-dot red';
-                    statusMsg.textContent = `${state.error} — retry in ${Math.round(state.retryIn / 1000)}s`;
+                    statusMsg.textContent = `${formatError(state.error, t)} — ${t('retryIn')} ${Math.round(state.retryIn / 1000)}s`;
                 } else {
                     const errorMsg = formatError(state.error, t);
                     if (state.error === 'NOT_LOGGED_IN') {
                         showState('auth');
                     } else {
-                        showError('Export Error', errorMsg);
+                        showError(t('exportError'), errorMsg);
                     }
                     stopTimeCounter();
                 }
@@ -322,13 +373,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             case 'retrying':
                 statusDot.className = 'status-dot yellow';
-                statusMsg.textContent = `Retrying (attempt ${state.attempt})...`;
+                statusMsg.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
                 break;
 
             case 'complete':
                 showState('complete');
                 completeUser.textContent = `@${state.username || usernameInput.value}`;
-                completeCount.textContent = Number(state.tweetCount || 0).toLocaleString();
+                completeCount.textContent = formatNumber(state.tweetCount || 0, currentLang);
                 stopTimeCounter();
                 break;
 
@@ -337,8 +388,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 stopBtn.classList.add('hidden');
                 resumeBtn.classList.remove('hidden');
                 statusDot.className = 'status-dot yellow';
-                statusMsg.textContent = 'Stopped — click Resume to continue';
-                counter.textContent = Number(state.tweetCount || 0).toLocaleString();
+                statusMsg.textContent = t('stoppedClickResume');
+                counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
                 stopTimeCounter();
                 break;
         }
@@ -397,17 +448,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearInterval(timeInterval);
             timeInterval = null;
         }
+        if (cooldownInterval) {
+            clearInterval(cooldownInterval);
+            cooldownInterval = null;
+        }
     }
 
     function startCooldownTimer(duration) {
+        // Guard against stacked intervals — each cooldown event used to spawn a
+        // new setInterval without clearing the previous one, making the timer
+        // jump.
+        if (cooldownInterval) { clearInterval(cooldownInterval); cooldownInterval = null; }
         let remaining = Math.round(duration / 1000);
-        const cooldownInterval = setInterval(() => {
+        const render = () => {
+            statusMsg.textContent = `${t('cooldown')} ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+        };
+        render();
+        cooldownInterval = setInterval(() => {
             remaining--;
             if (remaining <= 0) {
                 clearInterval(cooldownInterval);
+                cooldownInterval = null;
                 return;
             }
-            statusMsg.textContent = `Cooldown: ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+            render();
         }, 1000);
     }
 

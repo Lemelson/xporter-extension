@@ -86,7 +86,13 @@ function generateSimpleXLSX(items, isUsers = false) {
         xml += '<Row>';
         for (const h of headers) {
             const val = String(item[h] ?? '');
-            const isNum = !isNaN(val) && val !== '' && !val.includes(' ');
+            // Keep identifiers and very long digit strings as text — Excel stores
+            // numbers as IEEE-754 doubles and would corrupt 17–19 digit tweet/user
+            // IDs (losing the last digits). Only treat short, space-free, purely
+            // numeric values as real numbers.
+            const isIdField = h === 'id' || h.endsWith('_id') || h.endsWith('_str');
+            const isNum = !isIdField && val !== '' && !val.includes(' ') &&
+                !isNaN(val) && val.length <= 15;
             xml += `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(val)}</Data></Cell>`;
         }
         xml += '</Row>\n';

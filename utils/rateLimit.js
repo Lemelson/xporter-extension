@@ -52,13 +52,31 @@ class RateLimitManager {
                 return;
             }
 
-            const timer = setTimeout(() => {
+            // Keep the MV3 service worker alive during long waits (e.g. the
+            // multi-minute batch cooldown). Without this, Chrome unloads the
+            // worker after ~30s of inactivity and the export silently dies in
+            // the middle of a cooldown. Touching a chrome API every 20s resets
+            // the idle timer. Only needed for long waits.
+            let keepAlive = null;
+            if (ms > 25000 && typeof chrome !== 'undefined' && chrome.runtime?.getPlatformInfo) {
+                keepAlive = setInterval(() => {
+                    try { chrome.runtime.getPlatformInfo(() => { }); } catch (_) { /* noop */ }
+                }, 20000);
+            }
+
+            const cleanup = () => {
+                if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
                 signal.removeEventListener('abort', onAbort);
+            };
+
+            const timer = setTimeout(() => {
+                cleanup();
                 resolve();
             }, ms);
 
             function onAbort() {
                 clearTimeout(timer);
+                cleanup();
                 reject(new Error('ABORTED'));
             }
 
