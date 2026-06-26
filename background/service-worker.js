@@ -293,7 +293,9 @@ async function runExportLoop() {
             status: 'complete',
             tweetCount: currentExport.tweetCount,
             username: currentExport.username,
-            exportMode: currentExport.exportMode
+            exportMode: currentExport.exportMode,
+            startedAt: currentExport.startedAt,
+            completedAt: currentExport.completedAt
         });
 
     } catch (error) {

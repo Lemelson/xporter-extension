@@ -65,6 +65,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
 
+    function ratePromptExportKey(state) {
+        const completedAt = state?.completedAt || 'complete';
+        const startedAt = state?.startedAt || 'unknown-start';
+        const username = state?.username || usernameInput.value || 'unknown-user';
+        const mode = state?.exportMode || exportMode.value || 'posts';
+        const count = state?.tweetCount ?? lastItemCount ?? 0;
+        return [startedAt, completedAt, username, mode, count].join('|');
+    }
+
     if (extensionVersion && chrome.runtime?.getManifest) {
         extensionVersion.textContent = `v${chrome.runtime.getManifest().version}`;
     }
@@ -708,7 +717,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 progressFill.style.width = '100%';
                 if (!ratePromptCounted) {
                     ratePromptCounted = true;
-                    window.XPorterRatePrompt?.incrementExports();
+                    window.XPorterRatePrompt?.incrementExports(ratePromptExportKey(state));
                 }
                 break;
 
