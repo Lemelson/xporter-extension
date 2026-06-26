@@ -33,7 +33,7 @@
   "aboutDesc": "Ekspor data X (Twitter) ke CSV, JSON, atau XLSX secara gratis dan tak terbatas.",
   "featureMetrics": "Semua metrik keterlibatan",
   "featureDateRange": "Filter rentang tanggal",
-  "featureAutoResume": "Lanjut otomatis & pembatasan",
+  "featureAutoResume": "Lanjut otomatis & pembatasan laju",
   "featureLocal": "100% pemrosesan lokal",
   "aboutNote": "Data Anda tidak pernah keluar dari browser. Ekstensi ini menggunakan sesi X aktif Anda untuk mengambil data publik.",
   "notAffiliated": "Tidak berafiliasi dengan X Corp.",
@@ -83,7 +83,7 @@
   "download": "Unduh",
   "usersCollected": "pengguna terkumpul",
   "quantityLimitHelp": "**Berapa banyak postingan (atau pengguna) yang dikumpulkan sebelum ekspor berhenti.** Contoh: 500 berhenti di 500 postingan. Pilih «**Tidak terbatas**» untuk mengambil semua yang diberikan X.",
-  "requestCooldownHelp": "**Sesekali berhenti sejenak agar X tidak memblokir ekspor karena permintaan terlalu cepat.** XPorter memuat datamu dalam kelompok permintaan: jika terlalu cepat, X memblokir ekspor sementara. Default: **jeda 3 menit setiap 20 permintaan**. Jeda lebih lama atau batch lebih kecil lebih aman tetapi lebih lambat.",
+  "requestCooldownHelp": "**Sesekali berhenti sejenak agar X tidak memblokir ekspor karena permintaan terlalu cepat.** XPorter memuat data Anda dalam kelompok permintaan: jika terlalu cepat, X memblokir ekspor sementara. Default: **jeda 3 menit setiap 20 permintaan**. Jeda lebih lama atau batch lebih kecil lebih aman tetapi lebih lambat.",
   "autoExpireHelp": "**Menghapus otomatis data ekspor tersimpan setelah jumlah jam yang diatur** untuk menghemat ruang. Ekspor sebelumnya tetap ada di riwayat, tetapi yang lama **mungkin tidak bisa lagi diunduh.**",
   "resuming": "Melanjutkan...",
   "stoppedCanResume": "Dihentikan — dapat dilanjutkan",
@@ -143,7 +143,7 @@
   "detailResumeBody": "Kemajuan disimpan selama ekspor berjalan, jadi Anda bisa menjeda, menutup popup, atau bahkan memulai ulang browser dan melanjutkan dari titik terakhir. XPorter juga mengatur kecepatan permintaannya untuk menghormati batas X dan menghindari pemblokiran sementara.",
   "exportModeHelp": "Yang dikumpulkan setiap mode ekspor:\n**📝 Postingan** — semua postingan profil (tweet, balasan, repost, dan kutipan) beserta seluruh metriknya.\n**👥 Pengikut** — akun yang mengikuti profil ini.\n**➡️ Mengikuti** — akun yang diikuti profil ini.\n**✓ Pengikut Terverifikasi** — hanya pengikut yang memiliki lencana terverifikasi (biru).",
   "rateTitle": "Suka dengan XPorter?",
-  "rateBody": "XPorter **gratis** dan **tanpa batas**. Saya terus menambahkan fitur baru dan memperbaiki bug. Kalau ini membantumu, mohon beri **5 bintang**. Ini sangat mendukung proyek dan membantu orang lain menemukannya.",
+  "rateBody": "XPorter **gratis** dan **tanpa batas**. Saya terus menambahkan fitur baru dan memperbaiki bug. Kalau ini membantu Anda, mohon beri **5 bintang**. Ini sangat mendukung proyek dan membantu orang lain menemukannya.",
   "rateCta": "Beri rating di Web Store",
   "rateLater": "Mungkin nanti",
   "rateReport": "Laporkan masalah",
@@ -151,5 +151,5 @@
   "rateThanks": "Terima kasih!",
   "rateAbout": "Beri rating XPorter",
   "localizeHeaders": "Lokalkan judul kolom",
-  "localizeHeadersHelp": "**Menerjemahkan judul kolom pada file CSV dan XLSX ke bahasamu.** Matikan untuk mempertahankan judul bahasa Inggris; lebih cocok untuk skrip dan templat spreadsheet. Kunci JSON selalu tetap dalam bahasa Inggris."
+  "localizeHeadersHelp": "**Menerjemahkan judul kolom pada file CSV dan XLSX ke bahasa Anda.** Matikan untuk mempertahankan judul bahasa Inggris; lebih cocok untuk skrip dan templat spreadsheet. Kunci JSON selalu tetap dalam bahasa Inggris."
 }

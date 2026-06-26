@@ -1617,6 +1617,32 @@ body.light .help-pop {
   color: var(--text-secondary);
 }
 
+/* When a locale empties an inline label (e.g. the CJK auto-clear row puts the
+   whole phrase after the number), drop the empty span so it leaves no gap. */
+.cooldown-row span:empty {
+  display: none;
+}
+
+/* CJK reads "every N requests, pause M min" — the natural order puts the batch
+   count first. Reorder the cooldown inputs/labels for those languages so the
+   localized strings line up grammatically (DOM order is kept for everyone else). */
+:lang(ja) .cooldown-row > #cooldownBatch,
+:lang(ko) .cooldown-row > #cooldownBatch {
+  order: 1;
+}
+:lang(ja) .cooldown-row > [data-i18n="requests"],
+:lang(ko) .cooldown-row > [data-i18n="requests"] {
+  order: 2;
+}
+:lang(ja) .cooldown-row > #cooldownMinutes,
+:lang(ko) .cooldown-row > #cooldownMinutes {
+  order: 3;
+}
+:lang(ja) .cooldown-row > [data-i18n="minAfterEvery"],
+:lang(ko) .cooldown-row > [data-i18n="minAfterEvery"] {
+  order: 4;
+}
+
 /* Status */
 .status-header {
   margin-bottom: 10px;
