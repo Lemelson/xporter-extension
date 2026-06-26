@@ -58,6 +58,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // once, even though the 'complete' status can be re-broadcast.
     let ratePromptCounted = false;
 
+    function ratePromptExportKey(state) {
+        const completedAt = state?.completedAt || 'complete';
+        const startedAt = state?.startedAt || exportStartTime || 'unknown-start';
+        const username = state?.username || usernameInput.value || 'unknown-user';
+        const count = state?.tweetCount ?? 0;
+        return [startedAt, completedAt, username, 'posts', count].join('|');
+    }
+
     if (exportVersion && chrome.runtime?.getManifest) {
         exportVersion.textContent = `v${chrome.runtime.getManifest().version}`;
     }
@@ -405,7 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 stopTimeCounter();
                 if (!ratePromptCounted) {
                     ratePromptCounted = true;
-                    window.XPorterRatePrompt?.incrementExports();
+                    window.XPorterRatePrompt?.incrementExports(ratePromptExportKey(state));
                 }
                 break;
 

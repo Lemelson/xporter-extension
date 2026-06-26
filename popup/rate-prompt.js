@@ -65,7 +65,8 @@
         const state = Object.assign(
             {
                 status: 'pending', exports: 0, firstSeen: 0,
-                deferCount: 0, lastDeferAt: 0, exportsAtDefer: 0, lastShownAt: 0
+                deferCount: 0, lastDeferAt: 0, exportsAtDefer: 0, lastShownAt: 0,
+                lastCountedExportKey: ''
             },
             stored
         );
@@ -267,9 +268,14 @@
         return show(opts);
     }
 
-    async function incrementExports() {
+    async function incrementExports(exportKey) {
         const s = await loadState();
-        await patchState({ exports: (s.exports || 0) + 1 });
+        const key = String(exportKey || '');
+        if (key && s.lastCountedExportKey === key) return;
+        await patchState({
+            exports: (s.exports || 0) + 1,
+            lastCountedExportKey: key || s.lastCountedExportKey || ''
+        });
     }
 
     async function rateNow() {
