@@ -83,7 +83,7 @@
   "download": "İndir",
   "usersCollected": "kullanıcı toplandı",
   "quantityLimitHelp": "**Dışa aktarma durmadan önce kaç gönderi (veya kullanıcı) toplanacağı.** Örnek: 500, 500 gönderide durur. X'in verdiği her şeyi almak için «**Sınırsız**»ı seçin.",
-  "requestCooldownHelp": "**X'in çok hızlı istek yüzünden dışa aktarmayı engellememesi için arada bir duraklar.** XPorter verilerini istek grupları hâlinde yükler: çok hızlı istek gönderirse X dışa aktarmayı geçici olarak engeller. Varsayılan: **her 20 istekte bir 3 dakika ara**. Daha uzun ara veya daha küçük grup daha güvenli ama daha yavaştır.",
+  "requestCooldownHelp": "**X'in çok hızlı istek yüzünden dışa aktarmayı engellememesi için arada bir duraklar.** XPorter verilerinizi istek grupları hâlinde yükler: çok hızlı istek gönderirse X dışa aktarmayı geçici olarak engeller. Varsayılan: **her 20 istekte bir 3 dakika ara**. Daha uzun ara veya daha küçük grup daha güvenli ama daha yavaştır.",
   "autoExpireHelp": "**Kaydedilen dışa aktarma verilerini, belirlenen saat sayısından sonra otomatik siler** ve yer açar. Geçmiş dışa aktarımlarınız listede kalır, ancak eskileri **artık indirilemeyebilir.**",
   "resuming": "Devam ediliyor...",
   "stoppedCanResume": "Durduruldu — devam edilebilir",
@@ -142,8 +142,8 @@
   "detailResumeTitle": "Otomatik devam ve hız sınırlama",
   "detailResumeBody": "İlerleme, dışa aktarma çalışırken kaydedilir; böylece duraklatabilir, açılır pencereyi kapatabilir, hatta tarayıcınızı yeniden başlatıp kaldığınız yerden devam edebilirsiniz. XPorter ayrıca X'in sınırlarına uymak ve geçici engellemeleri önlemek için isteklerini belirli bir hızda gönderir.",
   "exportModeHelp": "Her dışa aktarma modunun topladıkları:\n**📝 Gönderiler** — profildeki tüm gönderiler (tweetler, yanıtlar, repostlar ve alıntılar) tüm istatistikleriyle.\n**👥 Takipçiler** — bu profili takip eden hesaplar.\n**➡️ Takip Edilenler** — bu profilin takip ettiği hesaplar.\n**✓ Doğrulanmış Takipçiler** — yalnızca onaylı (mavi) rozeti olan takipçiler.",
-  "rateTitle": "XPorter'ı beğendin mi?",
-  "rateBody": "XPorter **ücretsiz** ve **sınırsız**. Sürekli yeni özellikler ekliyor ve hataları düzeltiyorum. İşine yaradıysa lütfen **5 yıldız** ver. Bu, projeye çok yardımcı olur ve başkalarının onu keşfetmesini sağlar.",
+  "rateTitle": "XPorter'ı beğendiniz mi?",
+  "rateBody": "XPorter **ücretsiz** ve **sınırsız**. Sürekli yeni özellikler ekliyor ve hataları düzeltiyorum. İşinize yaradıysa lütfen **5 yıldız** verin. Bu, projeye çok yardımcı olur ve başkalarının onu keşfetmesini sağlar.",
   "rateCta": "Web Store'da değerlendir",
   "rateLater": "Belki sonra",
   "rateReport": "Sorun bildir",
@@ -151,5 +151,5 @@
   "rateThanks": "Teşekkürler!",
   "rateAbout": "XPorter'ı değerlendir",
   "localizeHeaders": "Sütun başlıklarını yerelleştir",
-  "localizeHeadersHelp": "**CSV ve XLSX dosyalarındaki sütun başlıklarını dilinize çevirir.** Kapatırsan başlıklar İngilizce kalır; bu, betikler ve elektronik tablo şablonları için daha uygundur. JSON anahtarları her zaman İngilizce kalır."
+  "localizeHeadersHelp": "**CSV ve XLSX dosyalarındaki sütun başlıklarını dilinize çevirir.** Kapatırsanız başlıklar İngilizce kalır; bu, betikler ve elektronik tablo şablonları için daha uygundur. JSON anahtarları her zaman İngilizce kalır."
 }

@@ -33,7 +33,7 @@
   "aboutDesc": "Exportación gratuita e ilimitada de datos de X (Twitter) a CSV, JSON o XLSX.",
   "featureMetrics": "Todas las métricas de interacción",
   "featureDateRange": "Filtro por rango de fechas",
-  "featureAutoResume": "Auto-reanudación y limitación",
+  "featureAutoResume": "Auto-reanudación y límite de velocidad",
   "featureLocal": "100% procesamiento local",
   "aboutNote": "Tus datos nunca salen de tu navegador. Esta extensión usa tu sesión activa de X para obtener datos públicos.",
   "notAffiliated": "No afiliado con X Corp.",
