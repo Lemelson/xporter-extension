@@ -18,7 +18,7 @@
     (function () {
       try {
         var t = localStorage.getItem('xporter_theme');
-        if (!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+        if (!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
     })();
@@ -229,8 +229,8 @@
     :root[data-theme="light"] .mbtn { color: #fff; }
 
     /* ---------- sections ---------- */
-    section { padding-top: 76px; padding-bottom: 76px; position: relative; z-index: 1; }
-    .section-head { text-align: center; max-width: 640px; margin: 0 auto 50px; }
+    section { padding-top: 40px; padding-bottom: 40px; position: relative; z-index: 1; }
+    .section-head { text-align: center; max-width: 640px; margin: 0 auto 34px; }
     .eyebrow { display: inline-block; font-size: 12.5px; font-weight: 750; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
     .section-head h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -1px; font-weight: 850; line-height: 1.1; }
     .section-head p { color: var(--text-secondary); font-size: 17px; margin-top: 13px; }
@@ -334,7 +334,7 @@
     .foot-links a:hover { color: var(--text-primary); }
     .disclaimer { font-size: 12.5px; color: var(--text-muted); margin-top: 18px; max-width: 780px; }
 
-    @media (max-width: 560px) { section { padding-top: 56px; padding-bottom: 56px; } .privacy-box { padding: 36px 22px; } }
+    @media (max-width: 560px) { section { padding-top: 34px; padding-bottom: 34px; } .privacy-box { padding: 32px 20px; } }
   </style>
 </head>
 
@@ -406,7 +406,7 @@
   </header>
 
   <!-- STATS -->
-  <section class="wrap" style="padding-top: 28px;">
+  <section class="wrap" style="padding-top: 8px;">
     <div class="stats reveal">
       <div class="stat"><div class="n" data-count="4">4</div><div class="l" data-i18n="stat_types">Export types</div></div>
       <div class="stat"><div class="n" data-count="3">3</div><div class="l" data-i18n="stat_formats">File formats</div></div>
