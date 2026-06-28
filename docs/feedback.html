@@ -611,9 +611,10 @@
     });
 
     /* ---------------- build UI ---------------- */
-    // language switcher
+    // language switcher — same order as the extension's language list
     const langSelect = document.getElementById("langSelect");
-    Object.keys(I18N).sort((a, b) => (LANG_NAMES[a] || a).localeCompare(LANG_NAMES[b] || b))
+    const LANG_ORDER = ["en", "zh_CN", "ja", "es", "ko", "ru", "it", "pt_BR", "tr", "de", "ar", "fr", "hi", "id"];
+    LANG_ORDER.filter(c => I18N[c])
       .forEach(code => {
         const o = document.createElement("option");
         o.value = code; o.textContent = LANG_NAMES[code] || code;
