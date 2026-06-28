@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
     SETTINGS: 'xporter_settings',
     USERNAME: 'xporter_detected_username',
     TWEETS_PREFIX: 'xporter_tweets_batch_',
-    EXPORT_HISTORY: 'xporter_export_history'
+    EXPORT_HISTORY: 'xporter_export_history',
+    USAGE: 'xporter_usage'
 };
 
 const MAX_HISTORY_ENTRIES = 20;
@@ -283,6 +284,78 @@ async function loadDetectedUsername() {
     return result[STORAGE_KEYS.USERNAME] || '';
 }
 
+// ==================== Usage Stats (for uninstall feedback) ====================
+// Anonymous, non-personal counters. Used only to build the uninstall feedback
+// URL so churn can be understood. No X data, nothing identifying. Cleared on
+// uninstall like all other storage. Disclosed in the privacy policy.
+
+function defaultUsage() {
+    return {
+        installedAt: 0,
+        installVersion: '',
+        exportsStarted: 0,
+        exportsOk: 0,
+        exportsErr: 0,
+        byMode: { posts: 0, followers: 0, following: 0, verifiedFollowers: 0 },
+        byFormat: { csv: 0, json: 0, xlsx: 0 },
+        itemsTotal: 0,
+        lastExportAt: 0,
+        lastError: ''
+    };
+}
+
+async function loadUsage() {
+    const result = await safeGet(STORAGE_KEYS.USAGE);
+    return { ...defaultUsage(), ...(result[STORAGE_KEYS.USAGE] || {}) };
+}
+
+async function saveUsage(usage) {
+    return safeSet({ [STORAGE_KEYS.USAGE]: usage });
+}
+
+/** Record the first install time + version (no-op if already set). */
+async function markInstalled(version) {
+    const usage = await loadUsage();
+    if (!usage.installedAt) {
+        usage.installedAt = Date.now();
+        usage.installVersion = version || '';
+        await saveUsage(usage);
+    }
+    return usage;
+}
+
+/** Bump counters when an export begins (mode + output format known up front). */
+async function recordExportStart(mode, format) {
+    const usage = await loadUsage();
+    usage.exportsStarted += 1;
+    const m = mode || 'posts';
+    usage.byMode[m] = (usage.byMode[m] || 0) + 1;
+    const f = (format || 'csv').toLowerCase();
+    usage.byFormat[f] = (usage.byFormat[f] || 0) + 1;
+    await saveUsage(usage);
+    return usage;
+}
+
+/** Bump counters on successful completion. */
+async function recordExportComplete(itemCount) {
+    const usage = await loadUsage();
+    usage.exportsOk += 1;
+    usage.itemsTotal += (itemCount || 0);
+    usage.lastExportAt = Date.now();
+    await saveUsage(usage);
+    return usage;
+}
+
+/** Bump counters on failure (stores a short error code, no personal data). */
+async function recordExportError(error) {
+    const usage = await loadUsage();
+    usage.exportsErr += 1;
+    usage.lastError = String(error || '').slice(0, 80);
+    usage.lastExportAt = Date.now();
+    await saveUsage(usage);
+    return usage;
+}
+
 if (typeof globalThis !== 'undefined') {
     globalThis.XPorterStorage = {
         saveExportState, loadExportState,
@@ -293,6 +366,8 @@ if (typeof globalThis !== 'undefined') {
         saveExportHistory, loadExportHistory, loadExportHistoryEntry,
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
+        loadUsage, saveUsage, markInstalled,
+        recordExportStart, recordExportComplete, recordExportError,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH
     };
 }

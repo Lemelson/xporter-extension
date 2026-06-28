@@ -176,8 +176,9 @@
     <div class="container">
         <h2>Overview</h2>
         <div class="highlight">
-            <p>XPorter does not collect, store, or transmit any personal data to external servers. All data processing
-                happens entirely within your browser.</p>
+            <p>Your X (Twitter) data never leaves your browser — XPorter has no servers and no account. The only thing it
+                ever sends is an anonymous, non-personal usage summary when you uninstall, used solely to understand why
+                people leave and to improve the extension. No personal data and none of your exported content is included.</p>
         </div>
 
         <h2>What Data the Extension Accesses</h2>
@@ -196,12 +197,32 @@
         <h2>What the Extension Does NOT Do</h2>
         <ul>
             <li>Does <strong>not</strong> collect or store your X.com password</li>
-            <li>Does <strong>not</strong> send any data to third-party servers or analytics services</li>
+            <li>Does <strong>not</strong> send your exported data, X content, usernames, or browsing history anywhere</li>
+            <li>Does <strong>not</strong> use any analytics, advertising, or tracking SDKs during normal use</li>
             <li>Does <strong>not</strong> track your browsing history or activity</li>
             <li>Does <strong>not</strong> modify your X.com account in any way (no posting, following, or liking)</li>
             <li>Does <strong>not</strong> inject ads or promotional content</li>
             <li>Does <strong>not</strong> use any remote code — all code runs locally within the extension package</li>
         </ul>
+
+        <h2>Anonymous Uninstall Feedback</h2>
+        <p>When you uninstall XPorter, Chrome opens a short feedback page. To understand why people leave and what to
+            fix, XPorter attaches an <strong>anonymous, non-personal usage summary</strong> to that page. It contains
+            only aggregate product stats:</p>
+        <ul>
+            <li>Extension version and how many days it was installed</li>
+            <li>Interface language and theme (light/dark)</li>
+            <li>How many exports you ran, how many succeeded or failed, and a short error code for the last failure</li>
+            <li>Counts per export type (posts, followers, following, verified followers) and per format (CSV / JSON / XLSX)</li>
+            <li>The approximate total number of items exported and a few non-identifying settings (e.g. include
+                retweets/replies, quantity limit)</li>
+        </ul>
+        <p>This summary contains <strong>no usernames, no exported content, no X data, and nothing that identifies
+            you.</strong> If you choose to leave a written comment on the feedback page, that text is sent too — only what
+            you type. The data is stored in a private spreadsheet via Google Apps Script / Google Sheets (Google acts as
+            the data processor). It is used only to improve XPorter and is never sold or shared.</p>
+        <p>This is the only data XPorter ever transmits anywhere other than X.com. The anonymous summary is recorded when
+            the feedback page loads; any written comment is sent only if you choose to submit one.</p>
 
         <h2>Permissions Explained</h2>
 
@@ -232,11 +253,14 @@
             <li>No data is cached or persisted beyond the active export session</li>
             <li>Extension settings are stored in Chrome's <code>storage.local</code> and can be cleared by uninstalling
                 the extension</li>
+            <li>A small anonymous usage counter (export counts, install date, last error code) is kept in
+                <code>storage.local</code> to build the uninstall summary, and is removed when you uninstall</li>
         </ul>
 
         <h2>Third-Party Services</h2>
-        <p>XPorter does not integrate with any third-party services, analytics platforms, advertising networks, or
-            external APIs. The only network communication is between your browser and X.com's servers.</p>
+        <p>XPorter does not integrate with any analytics platforms, advertising networks, or trackers. Apart from X.com
+            (used to fetch the data you export), the only external communication is the anonymous uninstall feedback
+            described above, which is stored via Google (Apps Script / Google Sheets). XPorter loads no remote code.</p>
 
         <h2>Data Security</h2>
         <p>All communication with X.com's servers uses HTTPS encryption. Authentication tokens are handled in memory and
@@ -250,11 +274,12 @@
             Significant changes will be noted in the extension's changelog.</p>
 
         <h2>Contact</h2>
-        <p>If you have questions about this privacy policy, please open an issue on the <a
-                href="https://github.com/Lemelson/xporter">GitHub repository</a>.</p>
+        <p>Questions about this policy or the extension? Message me on <a href="https://t.me/Lemelson">Telegram</a>
+            (fastest reply), email <a href="mailto:art.lemelson@gmail.com">art.lemelson@gmail.com</a> (I check it
+            rarely, so I may be slow), or open an issue on <a href="https://github.com/Lemelson/xporter">GitHub</a>.</p>
 
         <p style="margin-top: 32px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong>
-            February 17, 2026</p>
+            June 28, 2026</p>
     </div>
 
     <div class="footer">

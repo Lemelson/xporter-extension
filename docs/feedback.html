@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>XPorter — Feedback</title>
+  <link rel="icon" type="image/png" href="assets/icon128.png" />
+  <style>
+    /* ============================================================
+       XPorter feedback page — brand-matched glassmorphism.
+       Theme tokens mirror the extension popup (popup.css).
+       ============================================================ */
+    :root {
+      --bg-0: #0a1420;
+      --bg-1: #0e1d2c;
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.74);
+      --text-muted: rgba(255, 255, 255, 0.55);
+      --accent: #60B8FF;
+      --accent-hover: #8DCFFF;
+      --accent-glow: rgba(96, 184, 255, 0.20);
+      --glass-bg: rgba(255, 255, 255, 0.06);
+      --glass-bg-hover: rgba(255, 255, 255, 0.10);
+      --glass-border: rgba(255, 255, 255, 0.20);
+      --glass-border-strong: rgba(255, 255, 255, 0.34);
+      --input-bg: rgba(255, 255, 255, 0.07);
+      --card-shadow: 0 24px 70px rgba(4, 8, 20, 0.55), 0 2px 8px rgba(4, 8, 20, 0.35);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --ok: #3fb950;
+    }
+
+    body.light {
+      --bg-0: #eaf1f8;
+      --bg-1: #f7f9fb;
+      --text-primary: rgba(0, 0, 0, 0.90);
+      --text-secondary: rgba(0, 0, 0, 0.66);
+      --text-muted: rgba(0, 0, 0, 0.50);
+      --accent: #0A6FDB;
+      --accent-hover: #0860C0;
+      --accent-glow: rgba(10, 111, 219, 0.18);
+      --glass-bg: rgba(255, 255, 255, 0.55);
+      --glass-bg-hover: rgba(255, 255, 255, 0.78);
+      --glass-border: rgba(0, 0, 0, 0.12);
+      --glass-border-strong: rgba(0, 0, 0, 0.22);
+      --input-bg: rgba(255, 255, 255, 0.70);
+      --card-shadow: 0 24px 70px rgba(30, 41, 89, 0.18), 0 2px 8px rgba(30, 41, 89, 0.10);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans', Helvetica, Arial, sans-serif;
+      color: var(--text-primary);
+      background:
+        radial-gradient(1100px 600px at 15% -10%, var(--accent-glow), transparent 60%),
+        radial-gradient(900px 500px at 110% 10%, rgba(96, 184, 255, 0.10), transparent 55%),
+        linear-gradient(160deg, var(--bg-0), var(--bg-1));
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 18px 56px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* top bar */
+    .topbar {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 700;
+      font-size: 17px;
+      letter-spacing: -0.2px;
+      color: var(--text-primary);
+    }
+    .logo .bolt { color: var(--accent); display: inline-flex; }
+    .lang-wrap { position: relative; }
+    .lang-select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 13px;
+      padding: 7px 30px 7px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .lang-wrap::after {
+      content: "";
+      position: absolute;
+      top: 50%; right: 13px;
+      width: 7px; height: 7px;
+      border-right: 2px solid var(--text-muted);
+      border-bottom: 2px solid var(--text-muted);
+      transform: translateY(-65%) rotate(45deg);
+      pointer-events: none;
+    }
+    html[dir="rtl"] .lang-select { padding: 7px 12px 7px 30px; }
+    html[dir="rtl"] .lang-wrap::after { right: auto; left: 13px; }
+
+    /* card */
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      box-shadow: var(--card-shadow);
+      backdrop-filter: blur(22px) saturate(140%);
+      -webkit-backdrop-filter: blur(22px) saturate(140%);
+      padding: 30px 28px;
+      animation: rise .5s cubic-bezier(.2, .8, .2, 1) both;
+    }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+    h1 {
+      font-size: 23px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 14.5px;
+      margin-bottom: 22px;
+    }
+    .q {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 12px;
+    }
+
+    /* reason chips */
+    .reasons { display: flex; flex-direction: column; gap: 9px; }
+    .reason {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: start;
+      background: var(--input-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      font: inherit;
+      font-size: 14.5px;
+      padding: 13px 15px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color .15s, background .15s, transform .08s;
+    }
+    .reason:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-strong); }
+    .reason:active { transform: scale(.99); }
+    .reason.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+      background: var(--glass-bg-hover);
+    }
+    .reason .emoji { font-size: 17px; line-height: 1; flex: none; }
+
+    /* step 2 */
+    .step2 { display: none; margin-top: 22px; }
+    .step2.show { display: block; animation: rise .35s ease both; }
+    textarea {
+      width: 100%;
+      min-height: 92px;
+      resize: vertical;
+      background: var(--input-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font: inherit;
+      font-size: 14.5px;
+      padding: 12px 14px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    textarea::placeholder { color: var(--text-muted); }
+
+    .actions { display: flex; gap: 10px; margin-top: 14px; }
+    .btn {
+      font: inherit;
+      font-size: 14.5px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: filter .15s, background .15s, border-color .15s, opacity .15s;
+    }
+    .btn-primary { background: var(--accent); color: #04121f; flex: 1; }
+    body.light .btn-primary { color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: .6; cursor: default; }
+    .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--glass-border); }
+    .btn-ghost:hover { color: var(--text-secondary); border-color: var(--glass-border-strong); }
+
+    /* thanks */
+    .thanks { display: none; text-align: center; padding: 8px 0 4px; }
+    .thanks.show { display: block; animation: rise .4s ease both; }
+    .thanks .check {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--ok);
+      margin-bottom: 16px;
+    }
+    .thanks h1 { font-size: 21px; }
+    .thanks p { color: var(--text-secondary); font-size: 14.5px; margin-bottom: 4px; }
+
+    .reinstall {
+      display: inline-block;
+      margin-top: 18px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .reinstall:hover { text-decoration: underline; }
+
+    /* contact block */
+    .contact {
+      margin-top: 26px;
+      padding-top: 22px;
+      border-top: 1px solid var(--glass-border);
+    }
+    .contact h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .contact .lead { color: var(--text-secondary); font-size: 13.5px; margin-bottom: 14px; }
+    .contact-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .contact-link {
+      flex: 1 1 180px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      text-decoration: none;
+      color: var(--text-primary);
+      background: var(--input-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 11px 13px;
+      transition: border-color .15s, background .15s;
+      cursor: pointer;
+    }
+    .contact-link:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-strong); }
+    .contact-link .ico {
+      width: 32px; height: 32px; flex: none;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 9px;
+      background: var(--accent-glow);
+      color: var(--accent);
+    }
+    .contact-link .txt { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+    .contact-link .txt b { font-size: 13.5px; font-weight: 600; }
+    .contact-link .txt small { font-size: 11.5px; color: var(--text-muted); }
+    .contact-link .badge {
+      margin-inline-start: auto;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: var(--accent);
+      background: var(--accent-glow);
+      padding: 2px 7px; border-radius: 999px;
+      align-self: center;
+    }
+
+    .privacy-note {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+    .privacy-note a { color: var(--text-secondary); }
+
+    .toast {
+      position: fixed;
+      bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--ok); color: #04121f;
+      font-size: 13px; font-weight: 600;
+      padding: 9px 16px; border-radius: 999px;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s, transform .2s;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 18px; }
+      h1 { font-size: 21px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <span class="logo">
+      <span class="bolt" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+        </svg>
+      </span>
+      XPorter
+    </span>
+    <span class="lang-wrap">
+      <select class="lang-select" id="langSelect" aria-label="Language"></select>
+    </span>
+  </div>
+
+  <main class="card">
+    <!-- Step 1 + 2 -->
+    <section id="form">
+      <h1 data-i18n="title"></h1>
+      <p class="subtitle" data-i18n="subtitle"></p>
+
+      <p class="q" data-i18n="q1"></p>
+      <div class="reasons" id="reasons"></div>
+
+      <div class="step2" id="step2">
+        <p class="q" data-i18n="q2"></p>
+        <textarea id="detail" data-i18n-ph="detailPlaceholder"></textarea>
+        <div class="actions">
+          <button class="btn btn-primary" id="submitBtn" data-i18n="submit"></button>
+          <button class="btn btn-ghost" id="skipBtn" data-i18n="skip"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Thanks -->
+    <section class="thanks" id="thanks">
+      <div class="check" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+      </div>
+      <h1 data-i18n="thanks"></h1>
+      <p data-i18n="thanksSub"></p>
+      <a class="reinstall" id="reinstallLink" target="_blank" rel="noopener" data-i18n="reinstall"></a>
+    </section>
+
+    <!-- Contact (always visible) -->
+    <div class="contact">
+      <h2 data-i18n="contactTitle"></h2>
+      <p class="lead" data-i18n="contactLead"></p>
+      <div class="contact-row">
+        <a class="contact-link" id="tgLink" target="_blank" rel="noopener">
+          <span class="ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.94 4.3 18.6 20.02c-.25 1.1-.9 1.37-1.83.86l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1.02.5l.36-5.16L17.1 6.6c.4-.36-.09-.56-.63-.2L6.06 13.2l-4.96-1.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.86c.9-.33 1.69.2 1.44 1.44Z" />
+            </svg>
+          </span>
+          <span class="txt">
+            <b data-i18n="contactTelegram"></b>
+            <small data-i18n="contactTelegramSub"></small>
+          </span>
+        </a>
+        <a class="contact-link" id="emailLink">
+          <span class="ico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <path d="m3 7 9 6 9-6" />
+            </svg>
+          </span>
+          <span class="txt">
+            <b data-i18n="contactEmail"></b>
+            <small data-i18n="contactEmailSub"></small>
+          </span>
+        </a>
+      </div>
+      <p class="privacy-note">
+        <span data-i18n="privacyNote"></span>
+        <a href="privacy-policy.html" target="_blank" rel="noopener" data-i18n="privacyLink"></a>
+      </p>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* ============================================================
+       CONFIG — edit these two before deploying.
+       ============================================================ */
+    // Google Apps Script Web App URL (see README → "Backend setup").
+    // Until you paste it, submissions are logged to the console only.
+    const ENDPOINT = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+    const TELEGRAM_URL = "https://t.me/Lemelson";
+    const EMAIL = "art.lemelson@gmail.com";
+    const STORE_URL = "https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja";
+
+    /* ============================================================
+       i18n — keys mirror the extension. en + ru below;
+       the other 12 locales are merged in the I18N_EXTRA block.
+       ============================================================ */
+    const I18N = {
+      en: {
+        title: "Before you go…",
+        subtitle: "You just removed XPorter. Mind telling me why? It's anonymous and takes 10 seconds — it genuinely shapes what I fix next.",
+        q1: "What's the main reason?",
+        r_broken: "It didn't work / had errors",
+        r_confusing: "I couldn't figure it out",
+        r_slow: "Too slow or rate-limited",
+        r_missing: "Missing a feature I needed",
+        r_once: "I only needed it once",
+        r_alt: "Found a better alternative",
+        r_privacy: "Privacy or permissions concerns",
+        r_other: "Something else",
+        q2: "Thanks. Anything you'd like to add?",
+        detailPlaceholder: "What happened, or what would have made you stay? (optional)",
+        submit: "Send feedback",
+        sending: "Sending…",
+        skip: "Skip",
+        thanks: "Thank you — feedback sent.",
+        thanksSub: "This really helps. You can close this tab now.",
+        contactTitle: "Need help or want a reply?",
+        contactLead: "Message me on Telegram — I read and reply to every message.",
+        contactTelegram: "Message on Telegram",
+        contactTelegramSub: "Fastest reply",
+        contactEmail: "Email me",
+        contactEmailSub: "I rarely check it, might miss your email",
+        reinstall: "Changed your mind? Reinstall XPorter",
+        privacyNote: "Anonymous — no personal data and none of your X content, just product usage stats.",
+        privacyLink: "How this data is used",
+        langLabel: "Language",
+        errorMsg: "Couldn't send — please try again or message me on Telegram."
+      },
+      ru: {
+        title: "Перед тем как уйти…",
+        subtitle: "Ты только что удалил XPorter. Подскажешь почему? Это анонимно и займёт 10 секунд — и реально влияет на то, что я починю дальше.",
+        q1: "Главная причина?",
+        r_broken: "Не работало / были ошибки",
+        r_confusing: "Не разобрался, как пользоваться",
+        r_slow: "Слишком медленно или упёрся в лимиты",
+        r_missing: "Не хватило нужной функции",
+        r_once: "Нужно было всего один раз",
+        r_alt: "Нашёл вариант получше",
+        r_privacy: "Сомнения в приватности или правах доступа",
+        r_other: "Другое",
+        q2: "Спасибо. Хочешь что-то добавить?",
+        detailPlaceholder: "Что случилось или что заставило бы тебя остаться? (необязательно)",
+        submit: "Отправить",
+        sending: "Отправляю…",
+        skip: "Пропустить",
+        thanks: "Спасибо — отзыв отправлен.",
+        thanksSub: "Это правда помогает. Можешь закрыть вкладку.",
+        contactTitle: "Нужна помощь или хочешь ответ?",
+        contactLead: "Напиши мне в Telegram — я читаю и отвечаю на каждое сообщение.",
+        contactTelegram: "Написать в Telegram",
+        contactTelegramSub: "Отвечаю быстрее всего",
+        contactEmail: "Написать на почту",
+        contactEmailSub: "Захожу редко, могу пропустить письмо",
+        reinstall: "Передумал? Вернуть XPorter",
+        privacyNote: "Анонимно — никаких личных данных и ничего из твоих данных X, только статистика использования.",
+        privacyLink: "Как используются эти данные",
+        langLabel: "Язык",
+        errorMsg: "Не удалось отправить — попробуй ещё раз или напиши мне в Telegram."
+      },
+      "de":{"title":"Bevor du gehst …","subtitle":"Du hast XPorter gerade entfernt. Magst du mir sagen, warum? Es ist anonym und dauert 10 Sekunden — und es bestimmt wirklich, was ich als Nächstes verbessere.","q1":"Was ist der Hauptgrund?","r_broken":"Es funktionierte nicht / hatte Fehler","r_confusing":"Ich kam nicht damit zurecht","r_slow":"Zu langsam oder ratenbegrenzt","r_missing":"Eine Funktion, die ich brauchte, fehlte","r_once":"Ich brauchte es nur einmal","r_alt":"Bessere Alternative gefunden","r_privacy":"Bedenken zu Datenschutz oder Berechtigungen","r_other":"Etwas anderes","q2":"Danke. Möchtest du noch etwas hinzufügen?","detailPlaceholder":"Was ist passiert, oder was hätte dich zum Bleiben bewegt? (optional)","submit":"Feedback senden","sending":"Wird gesendet …","skip":"Überspringen","thanks":"Danke — Feedback gesendet.","thanksSub":"Das hilft wirklich. Du kannst diesen Tab jetzt schließen.","contactTitle":"Brauchst du Hilfe oder eine Antwort?","contactLead":"Schreib mir auf Telegram — ich lese jede Nachricht und antworte.","contactTelegram":"Auf Telegram schreiben","contactTelegramSub":"Schnellste Antwort","contactEmail":"E-Mail senden","contactEmailSub":"Ich lese sie selten, kann sie übersehen","reinstall":"Meinung geändert? XPorter neu installieren","privacyNote":"Anonym — keine persönlichen Daten und nichts von deinen X-Inhalten, nur Nutzungsstatistiken zum Produkt.","privacyLink":"Wie diese Daten verwendet werden","langLabel":"Sprache","errorMsg":"Senden fehlgeschlagen — bitte versuche es erneut oder schreib mir auf Telegram."},
+      "es":{"title":"Antes de irte…","subtitle":"Acabas de eliminar XPorter. ¿Me cuentas por qué? Es anónimo y toma 10 segundos, y de verdad decide qué arreglo a continuación.","q1":"¿Cuál es la razón principal?","r_broken":"No funcionaba / daba errores","r_confusing":"No supe usarlo","r_slow":"Demasiado lento o con límite de velocidad","r_missing":"Le faltaba una función que necesitaba","r_once":"Solo lo necesitaba una vez","r_alt":"Encontré una mejor alternativa","r_privacy":"Dudas sobre privacidad o permisos","r_other":"Otra cosa","q2":"Gracias. ¿Quieres añadir algo más?","detailPlaceholder":"¿Qué pasó, o qué te habría hecho quedarte? (opcional)","submit":"Enviar comentarios","sending":"Enviando…","skip":"Omitir","thanks":"Gracias — comentarios enviados.","thanksSub":"Esto ayuda muchísimo. Ya puedes cerrar esta pestaña.","contactTitle":"¿Necesitas ayuda o una respuesta?","contactLead":"Escríbeme por Telegram — leo y respondo cada mensaje.","contactTelegram":"Escríbeme por Telegram","contactTelegramSub":"Respuesta más rápida","contactEmail":"Enviarme un correo","contactEmailSub":"Lo reviso poco, podría perder el mensaje","reinstall":"¿Cambiaste de opinión? Reinstala XPorter","privacyNote":"Anónimo — sin datos personales ni nada de tu contenido de X, solo estadísticas de uso del producto.","privacyLink":"Cómo se usan estos datos","langLabel":"Idioma","errorMsg":"No se pudo enviar — inténtalo de nuevo o escríbeme por Telegram."},
+      "fr":{"title":"Avant de partir…","subtitle":"Vous venez de supprimer XPorter. Vous me dites pourquoi ? C'est anonyme et ça prend 10 secondes — et ça oriente vraiment ce que je corrige ensuite.","q1":"Quelle est la raison principale ?","r_broken":"Ça ne marchait pas / il y avait des erreurs","r_confusing":"Je n'ai pas réussi à l'utiliser","r_slow":"Trop lent ou limité en débit","r_missing":"Il manquait une fonctionnalité dont j'avais besoin","r_once":"Je n'en avais besoin qu'une fois","r_alt":"J'ai trouvé une meilleure alternative","r_privacy":"Inquiétudes sur la confidentialité ou les autorisations","r_other":"Autre chose","q2":"Merci. Souhaitez-vous ajouter quelque chose ?","detailPlaceholder":"Que s'est-il passé, ou qu'est-ce qui vous aurait fait rester ? (facultatif)","submit":"Envoyer mon avis","sending":"Envoi…","skip":"Passer","thanks":"Merci — avis envoyé.","thanksSub":"Ça aide vraiment. Vous pouvez fermer cet onglet maintenant.","contactTitle":"Besoin d'aide ou d'une réponse ?","contactLead":"Écrivez-moi sur Telegram — je lis et réponds à chaque message.","contactTelegram":"Écrire sur Telegram","contactTelegramSub":"Réponse la plus rapide","contactEmail":"M'envoyer un e-mail","contactEmailSub":"Je le consulte rarement, je peux le manquer","reinstall":"Vous avez changé d'avis ? Réinstaller XPorter","privacyNote":"Anonyme — aucune donnée personnelle ni aucun de vos contenus X, seulement des statistiques d'utilisation du produit.","privacyLink":"Comment ces données sont utilisées","langLabel":"Langue","errorMsg":"Échec de l'envoi — réessayez ou écrivez-moi sur Telegram."},
+      "it":{"title":"Prima di andare…","subtitle":"Hai appena rimosso XPorter. Mi dici perché? È anonimo e richiede 10 secondi — e decide davvero cosa sistemo dopo.","q1":"Qual è il motivo principale?","r_broken":"Non funzionava / dava errori","r_confusing":"Non sono riuscito a usarlo","r_slow":"Troppo lento o con limite di frequenza","r_missing":"Mancava una funzione che mi serviva","r_once":"Mi serviva solo una volta","r_alt":"Ho trovato un'alternativa migliore","r_privacy":"Dubbi su privacy o permessi","r_other":"Altro","q2":"Grazie. Vuoi aggiungere qualcosa?","detailPlaceholder":"Cosa è successo, o cosa ti avrebbe fatto restare? (facoltativo)","submit":"Invia feedback","sending":"Invio…","skip":"Salta","thanks":"Grazie — feedback inviato.","thanksSub":"Questo aiuta davvero. Ora puoi chiudere questa scheda.","contactTitle":"Ti serve aiuto o una risposta?","contactLead":"Scrivimi su Telegram — leggo e rispondo a ogni messaggio.","contactTelegram":"Scrivimi su Telegram","contactTelegramSub":"Risposta più veloce","contactEmail":"Inviami un'email","contactEmailSub":"La controllo di rado, potrei perderla","reinstall":"Cambiato idea? Reinstalla XPorter","privacyNote":"Anonimo — nessun dato personale e nessun tuo contenuto di X, solo statistiche d'uso del prodotto.","privacyLink":"Come vengono usati questi dati","langLabel":"Lingua","errorMsg":"Invio non riuscito — riprova o scrivimi su Telegram."},
+      "pt_BR":{"title":"Antes de ir…","subtitle":"Você acabou de remover o XPorter. Me conta por quê? É anônimo e leva 10 segundos — e isso realmente define o que eu conserto a seguir.","q1":"Qual é o motivo principal?","r_broken":"Não funcionava / dava erros","r_confusing":"Não consegui entender como usar","r_slow":"Muito lento ou com limite de taxa","r_missing":"Faltava um recurso de que eu precisava","r_once":"Só precisei dele uma vez","r_alt":"Encontrei uma alternativa melhor","r_privacy":"Preocupações com privacidade ou permissões","r_other":"Outro motivo","q2":"Obrigado. Quer acrescentar algo?","detailPlaceholder":"O que aconteceu, ou o que teria feito você ficar? (opcional)","submit":"Enviar feedback","sending":"Enviando…","skip":"Pular","thanks":"Obrigado — feedback enviado.","thanksSub":"Isso ajuda muito mesmo. Você já pode fechar esta aba.","contactTitle":"Precisa de ajuda ou quer uma resposta?","contactLead":"Me chame no Telegram — leio e respondo todas as mensagens.","contactTelegram":"Falar no Telegram","contactTelegramSub":"Resposta mais rápida","contactEmail":"Enviar um e-mail","contactEmailSub":"Vejo pouco, posso perder a mensagem","reinstall":"Mudou de ideia? Reinstale o XPorter","privacyNote":"Anônimo — nenhum dado pessoal e nada do seu conteúdo do X, apenas estatísticas de uso do produto.","privacyLink":"Como esses dados são usados","langLabel":"Idioma","errorMsg":"Não foi possível enviar — tente novamente ou me chame no Telegram."},
+      "tr":{"title":"Gitmeden önce…","subtitle":"XPorter'ı az önce kaldırdın. Nedenini söyler misin? Anonim ve 10 saniye sürüyor — gerçekten bundan sonra neyi düzelteceğimi belirliyor.","q1":"Ana neden ne?","r_broken":"Çalışmadı / hata verdi","r_confusing":"Nasıl kullanacağımı çözemedim","r_slow":"Çok yavaş ya da hız sınırlı","r_missing":"İhtiyacım olan bir özellik eksikti","r_once":"Yalnızca bir kez ihtiyacım vardı","r_alt":"Daha iyi bir alternatif buldum","r_privacy":"Gizlilik veya izin endişeleri","r_other":"Başka bir şey","q2":"Teşekkürler. Eklemek istediğin bir şey var mı?","detailPlaceholder":"Ne oldu ya da kalmanı ne sağlardı? (isteğe bağlı)","submit":"Geri bildirim gönder","sending":"Gönderiliyor…","skip":"Atla","thanks":"Teşekkürler — geri bildirim gönderildi.","thanksSub":"Bu gerçekten çok yardımcı oluyor. Bu sekmeyi artık kapatabilirsin.","contactTitle":"Yardım mı lazım ya da yanıt mı istiyorsun?","contactLead":"Bana Telegram'dan yaz — her mesajı okur ve yanıtlarım.","contactTelegram":"Telegram'dan yaz","contactTelegramSub":"En hızlı yanıt","contactEmail":"E-posta gönder","contactEmailSub":"Nadiren bakarım, gözden kaçabilir","reinstall":"Fikrini mi değiştirdin? XPorter'ı yeniden yükle","privacyNote":"Anonim — kişisel veri yok ve X içeriğinden hiçbir şey yok, yalnızca ürün kullanım istatistikleri.","privacyLink":"Bu veriler nasıl kullanılıyor","langLabel":"Dil","errorMsg":"Gönderilemedi — lütfen tekrar dene ya da bana Telegram'dan yaz."},
+      "id":{"title":"Sebelum pergi…","subtitle":"Anda baru saja menghapus XPorter. Boleh tahu kenapa? Ini anonim dan hanya butuh 10 detik — dan benar-benar menentukan apa yang saya perbaiki berikutnya.","q1":"Apa alasan utamanya?","r_broken":"Tidak berfungsi / ada error","r_confusing":"Saya tidak paham cara memakainya","r_slow":"Terlalu lambat atau dibatasi laju","r_missing":"Kurang fitur yang saya butuhkan","r_once":"Saya hanya butuh sekali","r_alt":"Menemukan alternatif yang lebih baik","r_privacy":"Khawatir soal privasi atau izin","r_other":"Lainnya","q2":"Terima kasih. Ada yang ingin ditambahkan?","detailPlaceholder":"Apa yang terjadi, atau apa yang akan membuat Anda bertahan? (opsional)","submit":"Kirim masukan","sending":"Mengirim…","skip":"Lewati","thanks":"Terima kasih — masukan terkirim.","thanksSub":"Ini sangat membantu. Anda bisa menutup tab ini sekarang.","contactTitle":"Butuh bantuan atau ingin dibalas?","contactLead":"Kirim pesan ke saya di Telegram — saya membaca dan membalas setiap pesan.","contactTelegram":"Kirim pesan di Telegram","contactTelegramSub":"Balasan tercepat","contactEmail":"Kirim email","contactEmailSub":"Jarang saya cek, bisa terlewat","reinstall":"Berubah pikiran? Pasang ulang XPorter","privacyNote":"Anonim — tanpa data pribadi dan tanpa konten X Anda, hanya statistik penggunaan produk.","privacyLink":"Bagaimana data ini digunakan","langLabel":"Bahasa","errorMsg":"Tidak dapat mengirim — silakan coba lagi atau kirim pesan ke saya di Telegram."},
+      "ar":{"title":"قبل أن تغادر…","subtitle":"لقد أزلت XPorter للتو. هل تخبرني لماذا؟ الأمر مجهول الهوية ويستغرق 10 ثوانٍ — وهو فعلاً يحدد ما سأصلحه تالياً.","q1":"ما السبب الرئيسي؟","r_broken":"لم يعمل / ظهرت أخطاء","r_confusing":"لم أعرف كيف أستخدمه","r_slow":"بطيء جداً أو محدود المعدل","r_missing":"تنقصه ميزة كنت أحتاجها","r_once":"احتجته مرة واحدة فقط","r_alt":"وجدت بديلاً أفضل","r_privacy":"مخاوف بشأن الخصوصية أو الأذونات","r_other":"شيء آخر","q2":"شكراً. هل تود إضافة شيء؟","detailPlaceholder":"ماذا حدث، أو ما الذي كان سيجعلك تبقى؟ (اختياري)","submit":"إرسال الملاحظات","sending":"جاري الإرسال…","skip":"تخطٍّ","thanks":"شكراً — تم إرسال ملاحظاتك.","thanksSub":"هذا يساعد كثيراً حقاً. يمكنك إغلاق هذا التبويب الآن.","contactTitle":"تحتاج مساعدة أو ترغب في رد؟","contactLead":"راسلني على Telegram — أقرأ كل رسالة وأرد عليها.","contactTelegram":"راسلني على Telegram","contactTelegramSub":"أسرع رد","contactEmail":"أرسل لي بريداً إلكترونياً","contactEmailSub":"نادراً ما أتفقّده، وقد تفوتني الرسالة","reinstall":"غيّرت رأيك؟ أعد تثبيت XPorter","privacyNote":"مجهول الهوية — لا بيانات شخصية ولا أي شيء من محتواك على X، فقط إحصاءات استخدام المنتج.","privacyLink":"كيف تُستخدم هذه البيانات","langLabel":"اللغة","errorMsg":"تعذّر الإرسال — يرجى المحاولة مرة أخرى أو مراسلتي على Telegram."},
+      "hi":{"title":"जाने से पहले…","subtitle":"आपने अभी XPorter हटाया। बताएंगे क्यों? यह गुमनाम है और 10 सेकंड लेता है — और यह वाकई तय करता है कि मैं आगे क्या ठीक करूँ।","q1":"मुख्य कारण क्या है?","r_broken":"यह काम नहीं किया / त्रुटियाँ थीं","r_confusing":"मैं इसे समझ नहीं पाया","r_slow":"बहुत धीमा या दर-सीमित","r_missing":"मुझे जो सुविधा चाहिए थी वह नहीं थी","r_once":"मुझे यह सिर्फ़ एक बार चाहिए था","r_alt":"बेहतर विकल्प मिल गया","r_privacy":"गोपनीयता या अनुमतियों को लेकर चिंता","r_other":"कुछ और","q2":"धन्यवाद। कुछ और जोड़ना चाहेंगे?","detailPlaceholder":"क्या हुआ, या किस वजह से आप रुकते? (वैकल्पिक)","submit":"फ़ीडबैक भेजें","sending":"भेजा जा रहा है…","skip":"छोड़ें","thanks":"धन्यवाद — फ़ीडबैक भेज दिया गया।","thanksSub":"इससे सचमुच बहुत मदद मिलती है। अब आप यह टैब बंद कर सकते हैं।","contactTitle":"मदद चाहिए या जवाब चाहते हैं?","contactLead":"मुझे Telegram पर लिखें — मैं हर संदेश पढ़ता हूँ और जवाब देता हूँ।","contactTelegram":"Telegram पर संदेश भेजें","contactTelegramSub":"सबसे तेज़ जवाब","contactEmail":"ईमेल भेजें","contactEmailSub":"मैं इसे कम देखता हूँ, छूट सकता है","reinstall":"मन बदल गया? XPorter फिर से इंस्टॉल करें","privacyNote":"गुमनाम — कोई निजी डेटा नहीं और आपका कोई X कंटेंट नहीं, सिर्फ़ प्रोडक्ट उपयोग के आँकड़े।","privacyLink":"यह डेटा कैसे इस्तेमाल होता है","langLabel":"भाषा","errorMsg":"भेजा नहीं जा सका — कृपया दोबारा कोशिश करें या मुझे Telegram पर लिखें।"},
+      "ja":{"title":"離れる前に…","subtitle":"XPorter を削除しましたね。理由を教えてもらえますか？匿名で10秒ほどです — 次に何を直すかは本当にこれで決まります。","q1":"主な理由は何ですか？","r_broken":"動かなかった／エラーが出た","r_confusing":"使い方が分からなかった","r_slow":"遅すぎる、またはレート制限がかかった","r_missing":"必要な機能が足りなかった","r_once":"一度だけ使えればよかった","r_alt":"もっと良い代替を見つけた","r_privacy":"プライバシーや権限が気になった","r_other":"その他","q2":"ありがとうございます。ほかに何かありますか？","detailPlaceholder":"何が起きましたか、または何があれば使い続けましたか？（任意）","submit":"フィードバックを送る","sending":"送信中…","skip":"スキップ","thanks":"ありがとうございます — フィードバックを送信しました。","thanksSub":"とても助かります。このタブは閉じて大丈夫です。","contactTitle":"困りごとや返信が必要ですか？","contactLead":"Telegram までご連絡ください — すべて目を通して返信します。","contactTelegram":"Telegram で連絡する","contactTelegramSub":"最も早い返信","contactEmail":"メールを送る","contactEmailSub":"あまり見ないので、見落とすことがあります","reinstall":"気が変わりましたか？ XPorter を再インストール","privacyNote":"匿名 — 個人データも X のコンテンツも一切なく、製品の利用統計のみです。","privacyLink":"このデータの使われ方","langLabel":"言語","errorMsg":"送信できませんでした — もう一度お試しいただくか、Telegram までご連絡ください。"},
+      "ko":{"title":"떠나기 전에…","subtitle":"방금 XPorter를 삭제하셨네요. 이유를 알려주시겠어요? 익명이고 10초면 됩니다 — 다음에 무엇을 고칠지 정하는 데 정말 큰 도움이 됩니다.","q1":"가장 큰 이유는 무엇인가요?","r_broken":"작동하지 않음 / 오류가 있었음","r_confusing":"사용법을 몰랐음","r_slow":"너무 느리거나 속도 제한에 걸림","r_missing":"필요한 기능이 없었음","r_once":"한 번만 필요했음","r_alt":"더 나은 대안을 찾음","r_privacy":"개인정보나 권한이 걱정됨","r_other":"기타","q2":"감사합니다. 더 남기고 싶은 말씀이 있나요?","detailPlaceholder":"무슨 일이 있었나요, 또는 무엇이 있었다면 계속 쓰셨을까요? (선택)","submit":"피드백 보내기","sending":"보내는 중…","skip":"건너뛰기","thanks":"감사합니다 — 피드백을 보냈습니다.","thanksSub":"정말 큰 도움이 됩니다. 이제 이 탭을 닫으셔도 됩니다.","contactTitle":"도움이 필요하거나 답장을 원하시나요?","contactLead":"Telegram으로 메시지를 보내주세요 — 모든 메시지를 읽고 답장합니다.","contactTelegram":"Telegram으로 메시지 보내기","contactTelegramSub":"가장 빠른 답장","contactEmail":"이메일 보내기","contactEmailSub":"이메일은 가끔 확인해서 놓칠 수 있어요","reinstall":"마음이 바뀌셨나요? XPorter 다시 설치하기","privacyNote":"익명 — 개인 정보도, 회원님의 X 콘텐츠도 전혀 없고 제품 사용 통계만 수집합니다.","privacyLink":"이 데이터가 사용되는 방식","langLabel":"언어","errorMsg":"보내지 못했습니다 — 다시 시도하거나 Telegram으로 메시지를 보내주세요."},
+      "zh_CN":{"title":"在你离开之前…","subtitle":"你刚刚卸载了 XPorter。可以告诉我原因吗？匿名，只需 10 秒——它真的会决定我接下来修复什么。","q1":"主要原因是什么？","r_broken":"无法使用／出现错误","r_confusing":"我没弄明白怎么用","r_slow":"太慢或受到速率限制","r_missing":"缺少我需要的功能","r_once":"我只需要用一次","r_alt":"找到了更好的替代品","r_privacy":"对隐私或权限有顾虑","r_other":"其他原因","q2":"谢谢。还有什么想补充的吗？","detailPlaceholder":"发生了什么，或者怎样你才会继续使用？（可选）","submit":"发送反馈","sending":"发送中…","skip":"跳过","thanks":"谢谢——反馈已发送。","thanksSub":"这真的很有帮助。现在你可以关闭此标签页了。","contactTitle":"需要帮助或想要回复？","contactLead":"通过 Telegram 联系我——我会阅读每条消息并回复。","contactTelegram":"通过 Telegram 联系","contactTelegramSub":"回复最快","contactEmail":"给我发邮件","contactEmailSub":"我很少看邮件，可能会错过","reinstall":"改主意了？重新安装 XPorter","privacyNote":"匿名——不收集任何个人数据，也不收集你的任何 X 内容，仅收集产品使用统计。","privacyLink":"这些数据如何使用","langLabel":"语言","errorMsg":"发送失败——请重试或通过 Telegram 联系我。"}
+    };
+
+    // Native language names for the switcher.
+    const LANG_NAMES = {
+      en: "English", ru: "Русский", de: "Deutsch", es: "Español", fr: "Français",
+      it: "Italiano", pt_BR: "Português", tr: "Türkçe", id: "Indonesia",
+      ar: "العربية", hi: "हिन्दी", ja: "日本語", ko: "한국어", zh_CN: "中文"
+    };
+    const RTL = ["ar"];
+
+    const REASON_KEYS = [
+      ["r_broken", "🛠"], ["r_confusing", "🤔"], ["r_slow", "🐢"], ["r_missing", "🧩"],
+      ["r_once", "1️⃣"], ["r_alt", "🔁"], ["r_privacy", "🔒"], ["r_other", "💬"]
+    ];
+
+    /* ---------------- helpers ---------------- */
+    const params = Object.fromEntries(new URLSearchParams(location.search));
+
+    function pickLang() {
+      const valid = (c) => c && I18N[c];
+      // 1) explicit locale from the extension (it passes ui_lang; ?lang= also accepted)
+      let l = params.ui_lang || params.lang;
+      if (valid(l)) return l;
+      // normalise: the extension sends short codes (e.g. "pt", "zh"); also accept
+      // "pt-BR"/"pt_BR" forms. Map Portuguese/Chinese to our regional keys.
+      if (l) {
+        const norm = l.replace("-", "_");
+        if (valid(norm)) return norm;
+        const base = l.split(/[-_]/)[0];
+        if (base === "pt") return "pt_BR";
+        if (base === "zh") return "zh_CN";
+        if (valid(base)) return base;
+      }
+      // 2) browser language
+      for (const nav of navigator.languages || [navigator.language || "en"]) {
+        const n = nav.replace("-", "_");
+        if (valid(n)) return n;
+        const b = nav.split(/[-_]/)[0];
+        if (b === "pt") return "pt_BR";
+        if (b === "zh") return "zh_CN";
+        if (valid(b)) return b;
+      }
+      return "en";
+    }
+
+    let lang = pickLang();
+
+    function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key; }
+
+    function applyI18n() {
+      const isRtl = RTL.includes(lang);
+      document.documentElement.lang = lang.replace("_", "-");
+      document.documentElement.dir = isRtl ? "rtl" : "ltr";
+      document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+    }
+
+    /* ---------------- theme ---------------- */
+    (function initTheme() {
+      let theme = params.theme;
+      if (theme !== "light" && theme !== "dark") {
+        theme = (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+      }
+      if (theme === "light") document.body.classList.add("light");
+    })();
+
+    /* ---------------- build UI ---------------- */
+    // language switcher
+    const langSelect = document.getElementById("langSelect");
+    Object.keys(I18N).sort((a, b) => (LANG_NAMES[a] || a).localeCompare(LANG_NAMES[b] || b))
+      .forEach(code => {
+        const o = document.createElement("option");
+        o.value = code; o.textContent = LANG_NAMES[code] || code;
+        if (code === lang) o.selected = true;
+        langSelect.appendChild(o);
+      });
+    langSelect.addEventListener("change", e => { lang = e.target.value; applyI18n(); renderReasons(); });
+
+    // reason chips
+    const reasonsEl = document.getElementById("reasons");
+    function renderReasons() {
+      reasonsEl.innerHTML = "";
+      REASON_KEYS.forEach(([key, emoji]) => {
+        const b = document.createElement("button");
+        b.className = "reason";
+        b.dataset.reason = key;
+        if (key === selectedReason) b.classList.add("selected");
+        b.innerHTML = `<span class="emoji" aria-hidden="true">${emoji}</span><span>${t(key)}</span>`;
+        b.addEventListener("click", () => onReason(key));
+        reasonsEl.appendChild(b);
+      });
+    }
+
+    // contact links
+    document.getElementById("tgLink").href = TELEGRAM_URL;
+    document.getElementById("emailLink").href = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("XPorter feedback");
+    document.getElementById("reinstallLink").href = STORE_URL;
+
+    /* ---------------- state + sending ---------------- */
+    const sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+    let selectedReason = null;
+    let reasonSent = false;
+
+    function basePayload() {
+      return {
+        sessionId,
+        source: params.src || (Object.keys(params).length ? "uninstall" : "direct"),
+        pageLang: lang,
+        // forward every stat the extension appended to the URL, verbatim:
+        stats: params,
+        ts: new Date().toISOString(),
+        ua: navigator.userAgent
+      };
+    }
+
+    function send(payload) {
+      if (!ENDPOINT || ENDPOINT.startsWith("PASTE_")) {
+        console.warn("[XPorter feedback] ENDPOINT not configured. Payload:", payload);
+        return Promise.resolve(false);
+      }
+      // text/plain avoids a CORS preflight against Apps Script.
+      return fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).then(() => true).catch(() => false);
+    }
+
+    function onReason(key) {
+      selectedReason = key;
+      renderReasons();
+      document.getElementById("step2").classList.add("show");
+      document.getElementById("detail").focus({ preventScroll: true });
+      document.getElementById("step2").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // Save the reason immediately (so we keep it even if they bounce).
+      if (!reasonSent) {
+        reasonSent = true;
+        send(Object.assign(basePayload(), { type: "reason", reason: key }));
+      } else {
+        // reason changed before submitting — update.
+        send(Object.assign(basePayload(), { type: "reason_update", reason: key }));
+      }
+    }
+
+    function finish() {
+      document.getElementById("form").style.display = "none";
+      document.getElementById("thanks").classList.add("show");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.getElementById("submitBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("submitBtn");
+      const detail = document.getElementById("detail").value.trim();
+      btn.disabled = true;
+      btn.textContent = t("sending");
+      const ok = await send(Object.assign(basePayload(), { type: "detail", reason: selectedReason, detail }));
+      if (!ok && !(ENDPOINT.startsWith("PASTE_"))) {
+        btn.disabled = false;
+        btn.textContent = t("submit");
+        showToast(t("errorMsg"));
+        return;
+      }
+      finish();
+    });
+
+    document.getElementById("skipBtn").addEventListener("click", finish);
+
+    /* email copy on click */
+    document.getElementById("emailLink").addEventListener("click", (e) => {
+      // let mailto work, but also copy for convenience
+      if (navigator.clipboard) navigator.clipboard.writeText(EMAIL).then(() => showToast(EMAIL)).catch(() => {});
+    });
+
+    const toastEl = document.getElementById("toast");
+    let toastTimer;
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200);
+    }
+
+    /* ---------------- init ---------------- */
+    applyI18n();
+    renderReasons();
+
+    // Auto-capture the anonymous usage snapshot on load, so churn is recorded
+    // even if the visitor closes the tab without picking a reason. Reason/detail
+    // (if given) enrich this same row later via the sessionId upsert.
+    send(Object.assign(basePayload(), { type: "open" }));
+  </script>
+</body>
+
+</html>

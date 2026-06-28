@@ -18,6 +18,74 @@ let currentExport = null;
 let rateLimiter = null;
 let searchCapture = null;
 
+// ==================== Uninstall feedback ====================
+// When the user removes XPorter, Chrome opens this page in a new tab. We append an
+// anonymous, non-personal usage snapshot (version, install age, language, theme,
+// per-mode/format counts, success/error totals, a few settings) so the feedback
+// form can ask the right follow-up and so churn can be understood.
+// NO X data, no usernames, nothing identifying is ever sent. Disclosed in the
+// privacy policy. EDIT this if your GitHub Pages URL differs.
+const FEEDBACK_URL_BASE = 'https://lemelson.github.io/xporter/feedback.html';
+
+async function refreshUninstallURL() {
+    try {
+        const [settings, usage] = await Promise.all([
+            XPorterStorage.loadSettings(),
+            XPorterStorage.loadUsage()
+        ]);
+        const now = Date.now();
+        const days = usage.installedAt ? Math.floor((now - usage.installedAt) / 86400000) : '';
+        const lastDays = usage.lastExportAt ? Math.floor((now - usage.lastExportAt) / 86400000) : '';
+        let lang = settings.language;
+        if (!lang && typeof detectBrowserLanguage === 'function') {
+            try { lang = detectBrowserLanguage(); } catch (_) { /* ignore */ }
+        }
+        const m = usage.byMode || {};
+        const f = usage.byFormat || {};
+        const p = {
+            src: 'uninstall',
+            v: chrome.runtime.getManifest().version,
+            days,
+            ui_lang: lang || 'en',
+            theme: settings.theme || '',
+            exp_started: usage.exportsStarted || 0,
+            exp_ok: usage.exportsOk || 0,
+            exp_err: usage.exportsErr || 0,
+            m_posts: m.posts || 0,
+            m_followers: m.followers || 0,
+            m_following: m.following || 0,
+            m_verified: m.verifiedFollowers || 0,
+            f_csv: f.csv || 0,
+            f_json: f.json || 0,
+            f_xlsx: f.xlsx || 0,
+            items: usage.itemsTotal || 0,
+            last_days: lastDays,
+            last_err: usage.lastError || '',
+            s_retweets: settings.includeRetweets ? 1 : 0,
+            s_replies: settings.includeReplies ? 1 : 0,
+            s_limit: settings.quantityLimit,
+            s_localize: settings.localizeExportHeaders ? 1 : 0
+        };
+        const qs = Object.keys(p)
+            .filter(k => p[k] !== '' && p[k] !== undefined && p[k] !== null)
+            .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(p[k]))
+            .join('&');
+        chrome.runtime.setUninstallURL(FEEDBACK_URL_BASE + '?' + qs);
+    } catch (e) {
+        // Always keep a working URL so the feedback page still opens.
+        try { chrome.runtime.setUninstallURL(FEEDBACK_URL_BASE + '?src=uninstall'); } catch (_) { /* ignore */ }
+    }
+}
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+    if (details.reason === 'install') {
+        await XPorterStorage.markInstalled(chrome.runtime.getManifest().version);
+    }
+    refreshUninstallURL();
+});
+
+chrome.runtime.onStartup.addListener(() => { refreshUninstallURL(); });
+
 // ==================== Overlay i18n (date-range capture overlay) ====================
 // The in-page overlay shown on x.com during a date-range export lives in the page
 // context and can't load the popup locale files itself. The worker loads the user's
@@ -108,6 +176,7 @@ async function handleMessage(message, sender) {
         case 'SAVE_SETTINGS':
             await XPorterStorage.saveSettings(message.settings);
             _overlayI18n = null; // language may have changed — reload overlay strings lazily
+            refreshUninstallURL(); // keep language/theme/settings snapshot fresh
             return { success: true };
 
         case 'GET_SETTINGS':
@@ -196,6 +265,9 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
     // Save initial state
     await saveCurrentState();
 
+    // Anonymous usage counter (for uninstall feedback) — fire and forget
+    XPorterStorage.recordExportStart(mode, outputFormat).then(refreshUninstallURL).catch(() => {});
+
     // Start the export process (non-blocking)
     runExportLoop().catch(err => {
         XLog.error('Export loop error:', err.message);
@@ -205,6 +277,7 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
             currentExport.error = err.message.startsWith('API_ERROR_400') ? 'STALE_QUERY_ID' : err.message;
             saveCurrentState();
             broadcastStatus({ running: false, status: 'error', error: err.message, exportMode: currentExport.exportMode });
+            XPorterStorage.recordExportError(currentExport.error).then(refreshUninstallURL).catch(() => {});
         }
     });
 
@@ -287,6 +360,9 @@ async function runExportLoop() {
             completedAt: Date.now(),
             items: historyItems
         });
+
+        // Anonymous usage counter (for uninstall feedback) — fire and forget
+        XPorterStorage.recordExportComplete(currentExport.tweetCount).then(refreshUninstallURL).catch(() => {});
 
         broadcastStatus({
             running: false,
@@ -933,6 +1009,7 @@ async function resumeExport() {
             currentExport.error = err.message;
             saveCurrentState();
             broadcastStatus({ running: false, status: 'error', error: err.message, exportMode: currentExport.exportMode });
+            XPorterStorage.recordExportError(currentExport.error).then(refreshUninstallURL).catch(() => {});
         }
     });
 
