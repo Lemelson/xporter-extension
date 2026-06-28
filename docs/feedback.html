@@ -220,7 +220,13 @@
     /* action area — slides in directly under the selected reason */
     .action { display: none; margin: 6px 0 8px; }
     .action.show { display: block; animation: rise .3s ease both; }
-    .opt-label { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px; }
+    .opt-label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    .opt-badge {
+      display: inline-block; margin-inline-start: 8px; font-size: 10.5px; font-weight: 800;
+      letter-spacing: .6px; text-transform: uppercase; color: var(--ok);
+      background: rgba(63, 185, 80, 0.14); border: 1px solid rgba(63, 185, 80, 0.32);
+      padding: 2px 9px; border-radius: 999px; vertical-align: middle;
+    }
     .action-row { display: flex; gap: 12px; align-items: stretch; }
     textarea {
       flex: 1; min-width: 0; min-height: 92px; resize: vertical;
@@ -233,21 +239,27 @@
 
     /* ~1/4-width tall green CTA next to the comment box (no empty space) */
     .btn-send {
-      flex: 0 0 30%; min-width: 148px;
+      position: relative; flex: 0 0 30%; min-width: 148px;
       font: inherit; font-size: 16px; font-weight: 750; cursor: pointer; color: #fff; border: none;
       border-radius: var(--radius-sm); padding: 12px 16px;
       display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
       background: linear-gradient(135deg, #36d65f 0%, #1fa34a 100%);
-      box-shadow: 0 12px 30px rgba(33, 163, 74, 0.42);
+      box-shadow: 0 12px 30px rgba(33, 163, 74, 0.45);
       transition: transform .12s, box-shadow .2s, filter .15s;
-      animation: send-pulse 2.6s ease-in-out infinite;
     }
+    /* pulsing halo to pull the eye to the button ("just press me") */
+    .btn-send::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      box-shadow: 0 0 0 0 rgba(54, 214, 95, 0.55);
+      animation: send-ring 1.9s ease-out infinite;
+    }
+    @keyframes send-ring { 0% { box-shadow: 0 0 0 0 rgba(54,214,95,.55); } 70%, 100% { box-shadow: 0 0 0 14px rgba(54,214,95,0); } }
     .btn-send svg { width: 22px; height: 22px; }
-    .btn-send:hover { transform: translateY(-2px); box-shadow: 0 18px 44px rgba(33, 163, 74, 0.55); filter: brightness(1.06); }
+    .btn-send:hover { transform: translateY(-2px); box-shadow: 0 18px 44px rgba(33, 163, 74, 0.6); filter: brightness(1.06); }
+    .btn-send:hover::after, .btn-send:disabled::after { animation: none; }
     .btn-send:active { transform: translateY(0) scale(.98); }
-    .btn-send:disabled { opacity: .7; cursor: default; animation: none; }
-    @keyframes send-pulse { 0%, 100% { box-shadow: 0 12px 30px rgba(33,163,74,.38); } 50% { box-shadow: 0 14px 40px rgba(33,163,74,.62); } }
-    @media (prefers-reduced-motion: reduce) { .btn-send { animation: none; } }
+    .btn-send:disabled { opacity: .7; cursor: default; }
+    @media (prefers-reduced-motion: reduce) { .btn-send::after { animation: none; } }
     @media (max-width: 520px) { .action-row { flex-direction: column; } .btn-send { flex-basis: auto; width: 100%; flex-direction: row; padding: 14px; } }
 
     /* thanks */
@@ -376,7 +388,7 @@
       <div class="reasons" id="reasons"></div>
 
       <div class="action" id="action">
-        <label class="opt-label" for="detail" data-i18n="q2"></label>
+        <label class="opt-label" for="detail"><span data-i18n="q2"></span><span class="opt-badge" data-i18n="optional"></span></label>
         <div class="action-row">
           <textarea id="detail" data-i18n-ph="detailPlaceholder"></textarea>
           <button class="btn-send" id="submitBtn">
@@ -574,6 +586,10 @@
       }
       return "en";
     }
+
+    // The word "optional" per locale (shown as a badge next to the comment label).
+    const OPTIONAL = { en: "optional", ru: "необязательно", de: "optional", es: "opcional", fr: "facultatif", it: "facoltativo", pt_BR: "opcional", tr: "isteğe bağlı", id: "opsional", ar: "اختياري", hi: "वैकल्पिक", ja: "任意", ko: "선택 사항", zh_CN: "可选" };
+    Object.keys(OPTIONAL).forEach(function (k) { if (I18N[k]) I18N[k].optional = OPTIONAL[k]; });
 
     let lang = pickLang();
 
