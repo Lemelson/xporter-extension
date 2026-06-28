@@ -2,264 +2,188 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XPorter — Privacy Policy</title>
-    <link rel="icon" type="image/png" href="icon128.png">
-    <style>
-        :root {
-            --bg: #0d1117;
-            --surface: #161b22;
-            --border: #30363d;
-            --text: #e6edf3;
-            --text-muted: #8b949e;
-            --accent: #58a6ff;
-            --accent-soft: rgba(88, 166, 255, 0.1);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XPorter — Privacy Policy</title>
+  <meta name="description" content="How XPorter handles your data. Your X data never leaves your browser; only an anonymous, non-personal usage summary is sent on uninstall." />
+  <link rel="icon" type="image/png" href="assets/icon128.png" />
+  <style>
+    :root {
+      --bg-0: #0a1420;
+      --bg-1: #0e1d2c;
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.74);
+      --text-muted: rgba(255, 255, 255, 0.55);
+      --accent: #60B8FF;
+      --accent-hover: #8DCFFF;
+      --accent-glow: rgba(96, 184, 255, 0.20);
+      --glass-bg: rgba(255, 255, 255, 0.055);
+      --glass-bg-hover: rgba(255, 255, 255, 0.10);
+      --glass-border: rgba(255, 255, 255, 0.16);
+      --glass-border-strong: rgba(255, 255, 255, 0.30);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans', Helvetica, Arial, sans-serif;
+      color: var(--text-primary);
+      background:
+        radial-gradient(1100px 600px at 12% -8%, var(--accent-glow), transparent 58%),
+        linear-gradient(170deg, var(--bg-0), var(--bg-1));
+      background-attachment: fixed;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .bolt { color: var(--accent); display: inline-flex; vertical-align: middle; }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+      background: rgba(10, 20, 32, 0.55); border-bottom: 1px solid var(--glass-border);
+    }
+    .nav-inner { max-width: 760px; margin: 0 auto; padding: 0 22px; height: 62px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -0.3px; color: var(--text-primary); }
+    .nav-inner a.back { color: var(--text-secondary); font-size: 14.5px; }
+    .nav-inner a.back:hover { color: var(--text-primary); text-decoration: none; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.7;
-            min-height: 100vh;
-        }
+    .container { max-width: 760px; margin: 0 auto; padding: 48px 22px 90px; }
 
-        .header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            padding: 24px 0;
-        }
+    .hero-card {
+      background: linear-gradient(135deg, rgba(96,184,255,0.10), rgba(180,141,255,0.05));
+      border: 1px solid rgba(96,184,255,0.22); border-radius: 18px; padding: 26px 28px; margin-bottom: 40px;
+    }
+    .hero-card h1 { font-size: 28px; letter-spacing: -0.6px; margin-bottom: 8px; }
+    .hero-card p { color: var(--text-secondary); font-size: 15.5px; }
+    .badge { display: inline-block; background: rgba(63,185,80,0.16); color: #58d977; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-inline-start: 8px; vertical-align: middle; }
 
-        .header-inner {
-            max-width: 720px;
-            margin: 0 auto;
-            padding: 0 24px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+    h2 { font-size: 21px; font-weight: 700; margin: 38px 0 14px; padding-bottom: 9px; border-bottom: 1px solid var(--glass-border); letter-spacing: -0.3px; }
+    h3 { font-size: 15.5px; font-weight: 600; margin: 22px 0 6px; color: var(--text-primary); }
+    p, li { color: var(--text-secondary); font-size: 15px; margin-bottom: 12px; }
+    ul { padding-inline-start: 22px; margin-bottom: 16px; }
+    li { margin-bottom: 6px; }
+    strong { color: var(--text-primary); }
+    code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; font-size: 13px; }
 
-        .header img {
-            width: 48px;
-            height: 48px;
-            border-radius: 10px;
-        }
+    .callout { background: var(--accent-glow); border: 1px solid rgba(96,184,255,0.22); border-radius: 12px; padding: 16px 20px; margin: 18px 0; }
+    .callout p { color: var(--text-primary); margin: 0; font-weight: 500; }
 
-        .header h1 {
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        .header span {
-            color: var(--text-muted);
-            font-size: 14px;
-        }
-
-        .container {
-            max-width: 720px;
-            margin: 0 auto;
-            padding: 48px 24px 80px;
-        }
-
-        h2 {
-            font-size: 22px;
-            font-weight: 600;
-            margin: 40px 0 16px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        h2:first-of-type {
-            margin-top: 0;
-        }
-
-        h3 {
-            font-size: 16px;
-            font-weight: 600;
-            margin: 24px 0 8px;
-        }
-
-        p,
-        li {
-            color: var(--text-muted);
-            font-size: 15px;
-            margin-bottom: 12px;
-        }
-
-        ul {
-            padding-left: 24px;
-            margin-bottom: 16px;
-        }
-
-        li {
-            margin-bottom: 6px;
-        }
-
-        .highlight {
-            background: var(--accent-soft);
-            border: 1px solid rgba(88, 166, 255, 0.2);
-            border-radius: 8px;
-            padding: 16px 20px;
-            margin: 20px 0;
-        }
-
-        .highlight p {
-            color: var(--accent);
-            margin-bottom: 0;
-            font-weight: 500;
-        }
-
-        .badge {
-            display: inline-block;
-            background: rgba(63, 185, 80, 0.15);
-            color: #3fb950;
-            padding: 2px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 32px 24px;
-            color: var(--text-muted);
-            font-size: 13px;
-            border-top: 1px solid var(--border);
-        }
-
-        .footer a {
-            color: var(--accent);
-            text-decoration: none;
-        }
-
-        a {
-            color: var(--accent);
-            text-decoration: none;
-        }
-
-        a:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 32px 16px 60px;
-            }
-
-            h2 {
-                font-size: 19px;
-            }
-        }
-    </style>
+    footer { border-top: 1px solid var(--glass-border); padding: 30px 22px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    footer a { color: var(--text-secondary); }
+  </style>
 </head>
 
 <body>
-    <div class="header">
-        <div class="header-inner">
-            <img src="icon128.png" alt="XPorter icon">
-            <div>
-                <h1>XPorter <span class="badge">Privacy Policy</span></h1>
-                <span>Chrome Extension for Exporting X (Twitter) Data</span>
-            </div>
-        </div>
+  <nav>
+    <div class="nav-inner">
+      <a class="brand" href="index.html">
+        <span class="bolt"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+          </svg></span> XPorter
+      </a>
+      <a class="back" href="index.html">← Back to site</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="hero-card">
+      <h1>Privacy Policy <span class="badge">Plain English</span></h1>
+      <p>Your X (Twitter) data never leaves your browser — XPorter has no servers and no account. The only thing it ever
+        sends is an anonymous, non-personal usage summary when you uninstall, used solely to understand why people leave
+        and to improve the extension. No personal data and none of your exported content is included.</p>
     </div>
 
-    <div class="container">
-        <h2>Overview</h2>
-        <div class="highlight">
-            <p>XPorter does not collect, store, or transmit any personal data to external servers. All data processing
-                happens entirely within your browser.</p>
-        </div>
+    <h2>What the extension accesses</h2>
+    <p>XPorter accesses the following only to perform the exports you start:</p>
+    <ul>
+      <li><strong>X.com session cookies</strong> — to authenticate API requests on your behalf, making the same calls
+        X.com already makes in your browser. No credentials are stored or copied.</li>
+      <li><strong>X.com API responses</strong> — profile info, posts and follower/following lists, processed locally to
+        build your export file (CSV, JSON or XLSX).</li>
+      <li><strong>Extension settings</strong> — your preferences (language, theme, export options) stored locally via
+        Chrome's <code>storage.local</code>.</li>
+    </ul>
 
-        <h2>What Data the Extension Accesses</h2>
-        <p>XPorter accesses the following data solely to perform exports that you initiate:</p>
-        <ul>
-            <li><strong>X.com session cookies</strong> — used to authenticate API requests on your behalf. The extension
-                reads your existing login session to make the same API calls that X.com itself makes in your browser. No
-                credentials are stored or copied.</li>
-            <li><strong>X.com API responses</strong> — profile information, posts, follower/following lists retrieved
-                via X.com's public-facing APIs. This data is processed locally to generate export files (CSV, JSON, or
-                XLSX).</li>
-            <li><strong>Extension settings</strong> — your preferences (language, theme) are stored locally using
-                Chrome's <code>storage.local</code> API.</li>
-        </ul>
+    <h2>What XPorter does NOT do</h2>
+    <ul>
+      <li>Does <strong>not</strong> collect or store your X.com password</li>
+      <li>Does <strong>not</strong> send your exported data, X content, usernames, or browsing history anywhere</li>
+      <li>Does <strong>not</strong> use analytics, advertising, or tracking SDKs during normal use</li>
+      <li>Does <strong>not</strong> modify your X.com account (no posting, following or liking)</li>
+      <li>Does <strong>not</strong> inject ads or promotional content</li>
+      <li>Does <strong>not</strong> load any remote code — everything runs from the extension package</li>
+    </ul>
 
-        <h2>What the Extension Does NOT Do</h2>
-        <ul>
-            <li>Does <strong>not</strong> collect or store your X.com password</li>
-            <li>Does <strong>not</strong> send any data to third-party servers or analytics services</li>
-            <li>Does <strong>not</strong> track your browsing history or activity</li>
-            <li>Does <strong>not</strong> modify your X.com account in any way (no posting, following, or liking)</li>
-            <li>Does <strong>not</strong> inject ads or promotional content</li>
-            <li>Does <strong>not</strong> use any remote code — all code runs locally within the extension package</li>
-        </ul>
-
-        <h2>Permissions Explained</h2>
-
-        <h3><code>cookies</code></h3>
-        <p>Required to read authentication tokens (CSRF token) from your X.com session to make authenticated API
-            requests.</p>
-
-        <h3><code>activeTab</code> and <code>tabs</code></h3>
-        <p>Used to detect when you are on an X.com profile page and to identify the username of the profile being
-            viewed.</p>
-
-        <h3><code>downloads</code></h3>
-        <p>Used to save exported CSV, JSON, or XLSX files to your Downloads folder when you click the download button.
-        </p>
-
-        <h3><code>storage</code></h3>
-        <p>Used to save your extension preferences (language, theme, export settings) locally in Chrome's storage.</p>
-
-        <h3><code>host_permissions</code> for x.com</h3>
-        <p>Required to make API calls to X.com's servers to retrieve the data you've requested to export.</p>
-
-        <h2>Data Storage</h2>
-        <p>All data is stored locally in your browser:</p>
-        <ul>
-            <li>Export data is held temporarily in memory during the export process</li>
-            <li>Once downloaded as a CSV, JSON, or XLSX file, the data is saved to your local filesystem (Downloads
-                folder)</li>
-            <li>No data is cached or persisted beyond the active export session</li>
-            <li>Extension settings are stored in Chrome's <code>storage.local</code> and can be cleared by uninstalling
-                the extension</li>
-        </ul>
-
-        <h2>Third-Party Services</h2>
-        <p>XPorter does not integrate with any third-party services, analytics platforms, advertising networks, or
-            external APIs. The only network communication is between your browser and X.com's servers.</p>
-
-        <h2>Data Security</h2>
-        <p>All communication with X.com's servers uses HTTPS encryption. Authentication tokens are handled in memory and
-            are never written to disk or transmitted to any server other than X.com.</p>
-
-        <h2>Children's Privacy</h2>
-        <p>XPorter is not directed at children under 13 and does not knowingly collect information from minors.</p>
-
-        <h2>Changes to This Policy</h2>
-        <p>If this privacy policy is updated, the changes will be reflected on this page with an updated effective date.
-            Significant changes will be noted in the extension's changelog.</p>
-
-        <h2>Contact</h2>
-        <p>If you have questions about this privacy policy, please open an issue on the <a
-                href="https://github.com/Lemelson/xporter">GitHub repository</a>.</p>
-
-        <p style="margin-top: 32px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong>
-            February 17, 2026</p>
+    <h2>Anonymous uninstall feedback</h2>
+    <p>When you uninstall XPorter, Chrome opens a short feedback page. To understand why people leave and what to fix,
+      XPorter attaches an <strong>anonymous, non-personal usage summary</strong> to that page. It contains only aggregate
+      product stats:</p>
+    <ul>
+      <li>Extension version and how many days it was installed</li>
+      <li>Interface language and theme (light/dark)</li>
+      <li>How many exports you ran, how many succeeded or failed, and a short error code for the last failure</li>
+      <li>Counts per export type (posts, followers, following, verified followers) and per format (CSV / JSON / XLSX)</li>
+      <li>The approximate total number of items exported and a few non-identifying settings (e.g. include
+        retweets/replies, quantity limit)</li>
+    </ul>
+    <div class="callout">
+      <p>This summary contains no usernames, no exported content, no X data, and nothing that identifies you. If you
+        choose to leave a written comment on the feedback page, only the text you type is sent.</p>
     </div>
+    <p>The data is stored in a private spreadsheet via Google Apps Script / Google Sheets (Google acts as the data
+      processor). It is used only to improve XPorter and is never sold or shared. This is the only data XPorter ever
+      transmits anywhere other than X.com. The anonymous summary is recorded when the feedback page loads; any written
+      comment is sent only if you choose to submit one.</p>
 
-    <div class="footer">
-        <p>XPorter &copy; 2026 &mdash; <a href="https://github.com/Lemelson/xporter">GitHub</a></p>
-    </div>
+    <h2>Permissions explained</h2>
+    <h3><code>cookies</code></h3>
+    <p>Reads authentication tokens (CSRF token) from your X.com session to make authenticated API requests.</p>
+    <h3><code>activeTab</code> &amp; <code>tabs</code></h3>
+    <p>Detects when you're on an X.com profile and identifies the username being viewed.</p>
+    <h3><code>downloads</code></h3>
+    <p>Saves the exported CSV, JSON or XLSX file to your Downloads folder when you click download.</p>
+    <h3><code>storage</code></h3>
+    <p>Stores your preferences and a small anonymous usage counter locally in Chrome's storage.</p>
+    <h3>Host access to x.com</h3>
+    <p>Required to make API calls to X.com to retrieve the data you asked to export.</p>
+
+    <h2>Data storage</h2>
+    <ul>
+      <li>Export data is held in memory during the export and saved to your Downloads folder when you download it</li>
+      <li>Settings are stored in Chrome's <code>storage.local</code> and cleared when you uninstall</li>
+      <li>A small anonymous usage counter (export counts, install date, last error code) is kept in
+        <code>storage.local</code> to build the uninstall summary, and removed when you uninstall</li>
+    </ul>
+
+    <h2>Third-party services</h2>
+    <p>XPorter integrates with no analytics platforms, ad networks or trackers. Apart from X.com (used to fetch the data
+      you export), the only external communication is the anonymous uninstall feedback above, stored via Google (Apps
+      Script / Google Sheets). XPorter loads no remote code.</p>
+
+    <h2>Data security</h2>
+    <p>All communication with X.com uses HTTPS. Authentication tokens are handled in memory and are never written to disk
+      or sent to any server other than X.com.</p>
+
+    <h2>Children's privacy</h2>
+    <p>XPorter is not directed at children under 13 and does not knowingly collect information from minors.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>Updates will be reflected on this page with a new effective date. Significant changes will be noted in the
+      extension's changelog.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy or the extension? Message me on <a href="https://t.me/Lemelson">Telegram</a> (fastest
+      reply), email <a href="mailto:art.lemelson@gmail.com">art.lemelson@gmail.com</a> (I check it rarely, so I may be
+      slow), or open an issue on <a href="https://github.com/Lemelson/xporter">GitHub</a>.</p>
+
+    <p style="margin-top: 30px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong> June 28, 2026</p>
+  </div>
+
+  <footer>
+    XPorter © 2026 — <a href="index.html">Home</a> · <a href="https://github.com/Lemelson/xporter" target="_blank" rel="noopener">GitHub</a>
+  </footer>
 </body>
 
 </html>
