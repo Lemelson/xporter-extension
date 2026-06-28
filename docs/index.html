@@ -117,7 +117,7 @@
     @keyframes drift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-50px) scale(1.15); } }
     @media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
 
-    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; position: relative; z-index: 1; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding-left: 22px; padding-right: 22px; position: relative; z-index: 1; }
     a { color: inherit; text-decoration: none; }
 
     /* ---------- glowing yellow bolt ---------- */
@@ -185,7 +185,7 @@
     @media (max-width: 860px) { .nav-links a.minor { display: none; } }
 
     /* ---------- hero ---------- */
-    .hero { padding: 76px 0 40px; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
+    .hero { padding-top: 76px; padding-bottom: 40px; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
     .pill {
       display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--text-primary);
       background: var(--glass-bg-2); border: 1px solid var(--glass-border-strong); padding: 7px 14px 7px 11px; border-radius: 999px; margin-bottom: 22px;
@@ -199,7 +199,7 @@
     .trust { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 9px 24px; color: var(--text-muted); font-size: 14px; }
     .trust span { display: inline-flex; align-items: center; gap: 7px; }
     .trust .dot { color: var(--accent); }
-    @media (max-width: 920px) { .hero { grid-template-columns: 1fr; padding: 48px 0 24px; gap: 40px; } .mock-wrap { order: -1; } }
+    @media (max-width: 920px) { .hero { grid-template-columns: 1fr; padding-top: 48px; padding-bottom: 24px; gap: 40px; } .mock-wrap { order: -1; } }
 
     /* ---------- popup mock ---------- */
     .mock-wrap { display: flex; justify-content: center; perspective: 1500px; position: relative; }
@@ -229,7 +229,7 @@
     :root[data-theme="light"] .mbtn { color: #fff; }
 
     /* ---------- sections ---------- */
-    section { padding: 74px 0; position: relative; z-index: 1; }
+    section { padding-top: 76px; padding-bottom: 76px; position: relative; z-index: 1; }
     .section-head { text-align: center; max-width: 640px; margin: 0 auto 50px; }
     .eyebrow { display: inline-block; font-size: 12.5px; font-weight: 750; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
     .section-head h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -1px; font-weight: 850; line-height: 1.1; }
@@ -259,7 +259,7 @@
       padding: 28px; overflow: hidden; box-shadow: var(--card-shadow);
       transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s, background .25s;
     }
-    .fcard::after { content: ""; position: absolute; top: -40%; right: -30%; width: 60%; height: 80%; background: radial-gradient(circle, var(--accent-glow), transparent 70%); opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .fcard::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, var(--accent-glow), transparent 62%); opacity: 0; transition: opacity .25s; pointer-events: none; }
     .fcard:hover { transform: translateY(-5px); border-color: var(--glass-border-strong); background: var(--glass-bg-2); }
     .fcard:hover::after { opacity: 1; }
     .fcard.wide { grid-column: 1 / -1; }
@@ -275,7 +275,7 @@
     .fcard.wide .inner > div:first-child { flex: 1 1 320px; }
     .metric-pills { display: flex; flex-wrap: wrap; gap: 9px; flex: 1 1 280px; }
     .mpill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; padding: 9px 13px; border-radius: 999px; background: var(--glass-bg-2); border: 1px solid var(--glass-border); }
-    .mpill svg { color: var(--accent); }
+    .mpill svg { color: var(--accent); width: 15px; height: 15px; flex: none; }
     @media (max-width: 720px) { .bento { grid-template-columns: 1fr; } }
 
     /* ---------- chips (any data any format) ---------- */
@@ -287,7 +287,7 @@
 
     /* ---------- steps ---------- */
     .steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
-    .steps::before { content: ""; position: absolute; top: 50px; left: 12%; right: 12%; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); opacity: .4; z-index: 0; }
+    /* connecting line removed — it bled through the translucent cards */
     .step { position: relative; z-index: 1; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 26px 22px; box-shadow: var(--card-shadow); transition: transform .25s, border-color .25s; }
     .step:hover { transform: translateY(-5px); border-color: var(--glass-border-strong); }
     .step-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -302,10 +302,13 @@
 
     /* ---------- privacy ---------- */
     .privacy-box {
-      background: linear-gradient(135deg, var(--accent-glow), rgba(168,85,247,0.08));
+      background: var(--glass-bg-2);
       border: 1px solid var(--glass-border-strong); border-radius: 26px; padding: 48px 40px; text-align: center;
       box-shadow: var(--card-shadow); position: relative; overflow: hidden;
+      backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%);
     }
+    .privacy-box::before { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% -10%, var(--accent-glow), transparent 60%); pointer-events: none; }
+    .privacy-box > * { position: relative; z-index: 1; }
     .privacy-box .shield { width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(140deg, var(--accent), var(--accent-2)); color: #fff; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 10px 28px var(--accent-glow); }
     .privacy-box h2 { font-size: clamp(24px, 3vw, 34px); letter-spacing: -0.8px; font-weight: 850; }
     .privacy-box p { color: var(--text-secondary); max-width: 640px; margin: 16px auto 0; font-size: 16px; }
@@ -331,7 +334,7 @@
     .foot-links a:hover { color: var(--text-primary); }
     .disclaimer { font-size: 12.5px; color: var(--text-muted); margin-top: 18px; max-width: 780px; }
 
-    @media (max-width: 560px) { section { padding: 56px 0; } .privacy-box { padding: 36px 22px; } }
+    @media (max-width: 560px) { section { padding-top: 56px; padding-bottom: 56px; } .privacy-box { padding: 36px 22px; } }
   </style>
 </head>
 
@@ -432,7 +435,7 @@
             <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg> <span data-i18n="m_likes">Likes</span></span>
             <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg> <span data-i18n="m_reposts">Reposts</span></span>
             <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> <span data-i18n="m_replies">Replies</span></span>
-            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21v-4a4 4 0 0 1 4-4h14"/><path d="M3 7l4-4 4 4"/><path d="M7 3v10"/></svg> <span data-i18n="m_quotes">Quotes</span></span>
+            <span class="mpill"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 17h3l2-4V7H5v6h2zm9 0h3l2-4V7h-7v6h2z"/></svg> <span data-i18n="m_quotes">Quotes</span></span>
             <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> <span data-i18n="m_bookmarks">Bookmarks</span></span>
           </div>
         </div>
@@ -536,13 +539,13 @@
       <p data-i18n="lang_sub">Auto-detects your browser language on first launch — switchable any time.</p>
     </div>
     <div class="langs reveal">
-      <span class="lang"><span class="fl">🇺🇸</span> English</span><span class="lang"><span class="fl">🇷🇺</span> Русский</span>
-      <span class="lang"><span class="fl">🇪🇸</span> Español</span><span class="lang"><span class="fl">🇫🇷</span> Français</span>
-      <span class="lang"><span class="fl">🇩🇪</span> Deutsch</span><span class="lang"><span class="fl">🇮🇹</span> Italiano</span>
-      <span class="lang"><span class="fl">🇧🇷</span> Português</span><span class="lang"><span class="fl">🇯🇵</span> 日本語</span>
-      <span class="lang"><span class="fl">🇰🇷</span> 한국어</span><span class="lang"><span class="fl">🇨🇳</span> 中文</span>
-      <span class="lang"><span class="fl">🇸🇦</span> العربية</span><span class="lang"><span class="fl">🇮🇳</span> हिन्दी</span>
-      <span class="lang"><span class="fl">🇮🇩</span> Bahasa Indonesia</span><span class="lang"><span class="fl">🇹🇷</span> Türkçe</span>
+      <span class="lang"><span class="fl">🇺🇸</span> English</span><span class="lang"><span class="fl">🇨🇳</span> 中文</span>
+      <span class="lang"><span class="fl">🇯🇵</span> 日本語</span><span class="lang"><span class="fl">🇪🇸</span> Español</span>
+      <span class="lang"><span class="fl">🇰🇷</span> 한국어</span><span class="lang"><span class="fl">🇷🇺</span> Русский</span>
+      <span class="lang"><span class="fl">🇮🇹</span> Italiano</span><span class="lang"><span class="fl">🇧🇷</span> Português</span>
+      <span class="lang"><span class="fl">🇹🇷</span> Türkçe</span><span class="lang"><span class="fl">🇩🇪</span> Deutsch</span>
+      <span class="lang"><span class="fl">🇸🇦</span> العربية</span><span class="lang"><span class="fl">🇫🇷</span> Français</span>
+      <span class="lang"><span class="fl">🇮🇳</span> हिन्दी</span><span class="lang"><span class="fl">🇮🇩</span> Bahasa Indonesia</span>
     </div>
   </section>
 
@@ -689,7 +692,9 @@
       document.querySelectorAll("[data-i18n-html]").forEach(function (el) { el.innerHTML = t(el.getAttribute("data-i18n-html")); });
     }
     var langSelect = document.getElementById("langSelect");
-    Object.keys(I18N).sort(function (a, b) { return (LANG_NAMES[a] || a).localeCompare(LANG_NAMES[b] || b); }).forEach(function (code) {
+    // Same order as the extension's language list.
+    var LANG_ORDER = ["en", "zh_CN", "ja", "es", "ko", "ru", "it", "pt_BR", "tr", "de", "ar", "fr", "hi", "id"];
+    LANG_ORDER.filter(function (c) { return I18N[c]; }).forEach(function (code) {
       var o = document.createElement("option"); o.value = code; o.textContent = LANG_NAMES[code] || code;
       if (code === lang) o.selected = true; langSelect.appendChild(o);
     });
@@ -699,7 +704,15 @@
     /* ---------------- scroll reveal ---------------- */
     if ("IntersectionObserver" in window) {
       var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          var el = en.target;
+          el.classList.add("in");
+          io.unobserve(el);
+          // After the reveal animation, drop the reveal class + stagger delay so
+          // hover transitions (cards/steps) are instant, not delayed/slow.
+          setTimeout(function () { el.classList.remove("reveal"); el.style.transitionDelay = ""; }, 1000);
+        });
       }, { threshold: 0.12 });
       document.querySelectorAll(".reveal").forEach(function (el, i) { el.style.transitionDelay = (Math.min(i % 6, 5) * 0.06) + "s"; io.observe(el); });
     } else {
