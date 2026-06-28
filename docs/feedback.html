@@ -608,9 +608,13 @@
         console.warn("[XPorter feedback] ENDPOINT not configured. Payload:", payload);
         return Promise.resolve(false);
       }
-      // text/plain avoids a CORS preflight against Apps Script.
+      // Apps Script doesn't return CORS headers, so a normal cors-mode fetch
+      // would reject even though the POST succeeds server-side. Use no-cors:
+      // the request is still sent (and the row written); the response is opaque
+      // and we don't need to read it. text/plain keeps it a simple request.
       return fetch(ENDPOINT, {
         method: "POST",
+        mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
         keepalive: true
