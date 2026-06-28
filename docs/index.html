@@ -13,23 +13,69 @@
   <meta property="og:description"
     content="Export posts, followers & following from any X profile to CSV, JSON or Excel. Free, unlimited, private." />
   <meta property="og:type" content="website" />
+  <!-- anti-FOUC theme: set before paint -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('xporter_theme');
+        if (!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
   <style>
+    /* ============================================================
+       XPorter site — brand-matched to the extension.
+       Dark default + light theme; backgrounds, accent and the
+       glowing yellow bolt are copied from popup.css.
+       ============================================================ */
     :root {
-      --bg-0: #0a1420;
-      --bg-1: #0e1d2c;
       --text-primary: #FFFFFF;
-      --text-secondary: rgba(255, 255, 255, 0.74);
-      --text-muted: rgba(255, 255, 255, 0.55);
+      --text-secondary: rgba(255, 255, 255, 0.76);
+      --text-muted: rgba(255, 255, 255, 0.56);
       --accent: #60B8FF;
+      --accent-2: #a855f7;
       --accent-hover: #8DCFFF;
-      --accent-glow: rgba(96, 184, 255, 0.20);
+      --accent-glow: rgba(96, 184, 255, 0.22);
       --glass-bg: rgba(255, 255, 255, 0.055);
-      --glass-bg-hover: rgba(255, 255, 255, 0.10);
-      --glass-border: rgba(255, 255, 255, 0.16);
+      --glass-bg-2: rgba(255, 255, 255, 0.085);
+      --glass-bg-hover: rgba(255, 255, 255, 0.11);
+      --glass-border: rgba(255, 255, 255, 0.14);
       --glass-border-strong: rgba(255, 255, 255, 0.30);
-      --radius: 18px;
-      --radius-sm: 12px;
-      --maxw: 1080px;
+      --card-shadow: 0 18px 50px rgba(4, 8, 22, 0.45);
+      --nav-bg: rgba(13, 21, 38, 0.6);
+      --radius: 20px;
+      --radius-sm: 13px;
+      --maxw: 1120px;
+      /* yellow bolt (from popup.css) */
+      --zap-glow: 9px;
+      --zap-glow-hi: 15px;
+      --zap-c1: rgba(255, 200, 36, 0.72);
+      --zap-c2: rgba(255, 222, 92, 1);
+      --zap-extra: drop-shadow(0 0 0 transparent);
+    }
+
+    :root[data-theme="light"] {
+      --text-primary: rgba(13, 22, 41, 0.94);
+      --text-secondary: rgba(13, 22, 41, 0.70);
+      --text-muted: rgba(13, 22, 41, 0.55);
+      --accent: #0A6FDB;
+      --accent-2: #7c3aed;
+      --accent-hover: #0860C0;
+      --accent-glow: rgba(10, 111, 219, 0.16);
+      --glass-bg: rgba(255, 255, 255, 0.5);
+      --glass-bg-2: rgba(255, 255, 255, 0.66);
+      --glass-bg-hover: rgba(255, 255, 255, 0.8);
+      --glass-border: rgba(255, 255, 255, 0.65);
+      --glass-border-strong: rgba(13, 22, 41, 0.18);
+      --card-shadow: 0 18px 50px rgba(40, 50, 110, 0.16);
+      --nav-bg: rgba(232, 239, 250, 0.62);
+      /* bolt keeps yellow but gets a violet separation on the pale bg */
+      --zap-glow: 13px;
+      --zap-glow-hi: 21px;
+      --zap-c1: rgba(255, 184, 24, 0.7);
+      --zap-c2: rgba(255, 204, 48, 0.95);
+      --zap-extra: drop-shadow(0 0 4px rgba(72, 46, 132, 0.42)) drop-shadow(0 2px 10px rgba(99, 70, 229, 0.3));
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -38,277 +84,318 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans', Helvetica, Arial, sans-serif;
       color: var(--text-primary);
-      background:
-        radial-gradient(1200px 700px at 12% -8%, var(--accent-glow), transparent 58%),
-        radial-gradient(1000px 600px at 108% 4%, rgba(96, 184, 255, 0.10), transparent 55%),
-        linear-gradient(170deg, var(--bg-0), var(--bg-1));
-      background-attachment: fixed;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      min-height: 100vh;
+      /* sunrise gradient — exact values from the extension (dark) */
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
+        linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      background-attachment: fixed;
+    }
+    :root[data-theme="light"] body {
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.14) 0%, transparent 70%),
+        linear-gradient(135deg, #adc6e8 0%, #c3b2dc 50%, #aacfe9 100%);
+      background-attachment: fixed;
     }
 
-    a { color: inherit; text-decoration: none; }
-    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+    /* liquid-glass drifting orbs */
+    .orbs { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; will-change: transform; }
+    .orb.o1 { width: 520px; height: 520px; top: -120px; left: -100px; background: radial-gradient(circle, rgba(59,130,246,.55), transparent 70%); animation: drift1 22s ease-in-out infinite; }
+    .orb.o2 { width: 460px; height: 460px; top: 5%; right: -120px; background: radial-gradient(circle, rgba(168,85,247,.45), transparent 70%); animation: drift2 26s ease-in-out infinite; }
+    .orb.o3 { width: 600px; height: 600px; bottom: -200px; left: 30%; background: radial-gradient(circle, rgba(14,165,233,.30), transparent 70%); animation: drift3 30s ease-in-out infinite; }
+    :root[data-theme="light"] .orb { opacity: .4; }
+    @keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(60px,40px) scale(1.12); } }
+    @keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-50px,60px) scale(1.1); } }
+    @keyframes drift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-50px) scale(1.15); } }
+    @media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
 
-    .bolt { color: var(--accent); display: inline-flex; vertical-align: middle; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; position: relative; z-index: 1; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ---------- glowing yellow bolt ---------- */
+    .bolt {
+      display: inline-flex; align-items: center; color: #ffd60a;
+      filter: drop-shadow(0 0 var(--zap-glow) var(--zap-c1)) var(--zap-extra);
+      animation: zap-glow 5s ease-in-out infinite, zap-flicker 7s linear infinite;
+    }
+    .bolt svg path { fill: currentColor; stroke: none; }
+    @keyframes zap-glow {
+      0%, 100% { filter: drop-shadow(0 0 var(--zap-glow) var(--zap-c1)) var(--zap-extra); }
+      50% { filter: drop-shadow(0 0 var(--zap-glow-hi) var(--zap-c2)) var(--zap-extra); }
+    }
+    @keyframes zap-flicker {
+      0%, 37%, 100% { opacity: 1; }
+      37.6% { opacity: .45; } 38.2% { opacity: 1; } 38.9% { opacity: .65; } 39.5% { opacity: 1; }
+      71% { opacity: 1; } 71.5% { opacity: .5; } 72% { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) { .bolt { animation: none; } }
 
     /* ---------- nav ---------- */
     nav {
       position: sticky; top: 0; z-index: 50;
-      backdrop-filter: blur(14px) saturate(140%);
-      -webkit-backdrop-filter: blur(14px) saturate(140%);
-      background: rgba(10, 20, 32, 0.55);
-      border-bottom: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+      background: var(--nav-bg); border-bottom: 1px solid var(--glass-border);
     }
-    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; }
-    .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -0.3px; }
-    .nav-links { display: flex; align-items: center; gap: 26px; }
-    .nav-links a.minor { color: var(--text-secondary); font-size: 14.5px; }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+    .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 18px; letter-spacing: -0.4px; }
+    .nav-links { display: flex; align-items: center; gap: 22px; }
+    .nav-links a.minor { color: var(--text-secondary); font-size: 14.5px; font-weight: 500; transition: color .15s; }
     .nav-links a.minor:hover { color: var(--text-primary); }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      font: inherit; font-size: 14.5px; font-weight: 600;
-      border-radius: 999px; padding: 10px 18px; cursor: pointer;
-      border: 1px solid transparent; transition: background .15s, border-color .15s, transform .08s, filter .15s;
+    .nav-tools { display: flex; align-items: center; gap: 10px; }
+
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 11px; cursor: pointer;
+      background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary);
+      transition: background .15s, border-color .15s, color .15s, transform .08s;
     }
-    .btn:active { transform: scale(.98); }
-    .btn-primary { background: var(--accent); color: #04121f; }
-    .btn-primary:hover { background: var(--accent-hover); }
+    .icon-btn:hover { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-strong); }
+    .icon-btn:active { transform: scale(.94); }
+    .sun, .moon { display: none; }
+    :root[data-theme="dark"] .moon { display: block; }
+    :root[data-theme="light"] .sun { display: block; }
+
+    .lang-wrap { position: relative; display: inline-flex; }
+    .lang-select {
+      appearance: none; -webkit-appearance: none;
+      background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary);
+      font: inherit; font-size: 13.5px; font-weight: 500; padding: 9px 30px 9px 13px; border-radius: 11px; cursor: pointer;
+    }
+    .lang-wrap::after { content: ""; position: absolute; top: 50%; right: 13px; width: 6px; height: 6px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: translateY(-65%) rotate(45deg); pointer-events: none; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 14.5px; font-weight: 650;
+      border-radius: 999px; padding: 10px 18px; cursor: pointer; border: 1px solid transparent;
+      transition: background .15s, border-color .15s, transform .08s, box-shadow .2s, filter .15s; white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #04121f; box-shadow: 0 6px 22px var(--accent-glow); }
+    :root[data-theme="light"] .btn-primary { color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 10px 30px var(--accent-glow); }
     .btn-ghost { border-color: var(--glass-border-strong); color: var(--text-primary); background: var(--glass-bg); }
     .btn-ghost:hover { background: var(--glass-bg-hover); }
-    @media (max-width: 720px) { .nav-links a.minor { display: none; } }
+    @media (max-width: 860px) { .nav-links a.minor { display: none; } }
 
     /* ---------- hero ---------- */
-    .hero { padding: 72px 0 36px; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
+    .hero { padding: 76px 0 40px; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
     .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-size: 13px; font-weight: 600; color: var(--accent);
-      background: var(--accent-glow); border: 1px solid rgba(96,184,255,0.25);
-      padding: 6px 13px; border-radius: 999px; margin-bottom: 20px;
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--text-primary);
+      background: var(--glass-bg-2); border: 1px solid var(--glass-border-strong); padding: 7px 14px 7px 11px; border-radius: 999px; margin-bottom: 22px;
     }
-    .hero h1 { font-size: clamp(34px, 5vw, 52px); line-height: 1.08; letter-spacing: -1.4px; font-weight: 800; }
-    .hero h1 .grad {
-      background: linear-gradient(100deg, var(--accent), #b48dff);
-      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    }
-    .hero p.lead { color: var(--text-secondary); font-size: 18px; margin: 18px 0 28px; max-width: 520px; }
+    .hero h1 { font-size: clamp(36px, 5.2vw, 58px); line-height: 1.04; letter-spacing: -1.8px; font-weight: 850; }
+    .hero h1 .grad { background: linear-gradient(100deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p.lead { color: var(--text-secondary); font-size: 18.5px; margin: 20px 0 30px; max-width: 530px; }
     .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .hero .btn-primary { padding: 13px 24px; font-size: 15.5px; }
-    .hero .btn-ghost { padding: 13px 22px; font-size: 15.5px; }
-    .trust { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--text-muted); font-size: 14px; }
+    .hero .btn-primary { padding: 14px 26px; font-size: 15.5px; }
+    .hero .btn-ghost { padding: 14px 24px; font-size: 15.5px; }
+    .trust { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 9px 24px; color: var(--text-muted); font-size: 14px; }
     .trust span { display: inline-flex; align-items: center; gap: 7px; }
     .trust .dot { color: var(--accent); }
-
-    @media (max-width: 900px) {
-      .hero { grid-template-columns: 1fr; padding: 48px 0 24px; gap: 36px; }
-      .mock-wrap { order: -1; }
-    }
+    @media (max-width: 920px) { .hero { grid-template-columns: 1fr; padding: 48px 0 24px; gap: 40px; } .mock-wrap { order: -1; } }
 
     /* ---------- popup mock ---------- */
-    .mock-wrap { display: flex; justify-content: center; perspective: 1400px; }
+    .mock-wrap { display: flex; justify-content: center; perspective: 1500px; position: relative; }
+    .mock-wrap::before { content: ""; position: absolute; inset: -40px; background: radial-gradient(circle at 60% 40%, var(--accent-glow), transparent 65%); filter: blur(20px); z-index: 0; }
     .mock {
-      width: 330px;
-      background: rgba(18, 30, 44, 0.72);
-      border: 1px solid var(--glass-border-strong);
-      border-radius: 20px;
-      box-shadow: 0 30px 80px rgba(4, 8, 20, 0.6), 0 0 0 1px rgba(255,255,255,0.02) inset;
-      backdrop-filter: blur(22px) saturate(150%);
-      -webkit-backdrop-filter: blur(22px) saturate(150%);
-      overflow: hidden;
-      transform: rotateY(-9deg) rotateX(3deg);
-      transition: transform .4s ease;
+      position: relative; z-index: 1; width: 340px;
+      background: linear-gradient(160deg, rgba(20,33,52,.82), rgba(15,24,40,.82));
+      border: 1px solid var(--glass-border-strong); border-radius: 22px;
+      box-shadow: 0 34px 90px rgba(4, 8, 22, 0.6);
+      backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
+      overflow: hidden; transform: rotateY(-10deg) rotateX(4deg); transition: transform .5s ease;
     }
-    .mock:hover { transform: rotateY(0deg) rotateX(0deg); }
-    .mock-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--glass-border); }
-    .mock-head .b { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
-    .mock-head .meta { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 12px; }
+    :root[data-theme="light"] .mock { background: linear-gradient(160deg, rgba(255,255,255,.72), rgba(255,255,255,.5)); }
+    .mock:hover { transform: rotateY(0) rotateX(0); }
+    .mock-head { display: flex; align-items: center; justify-content: space-between; padding: 15px 16px; border-bottom: 1px solid var(--glass-border); }
+    .mock-head .b { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; }
+    .mock-head .meta { color: var(--text-muted); font-size: 12px; }
     .mock-tabs { display: flex; gap: 4px; padding: 10px 12px 0; }
     .mock-tab { flex: 1; text-align: center; font-size: 12.5px; padding: 8px; color: var(--text-muted); border-bottom: 2px solid transparent; }
-    .mock-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .mock-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 650; }
     .mock-body { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
     .mlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 6px; }
-    .mfield {
-      background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);
-      border-radius: 10px; padding: 11px 13px; font-size: 14px; display: flex; align-items: center; justify-content: space-between;
-    }
+    .mfield { background: var(--glass-bg-2); border: 1px solid var(--glass-border); border-radius: 10px; padding: 11px 13px; font-size: 14px; display: flex; align-items: center; justify-content: space-between; }
     .mfield .muted { color: var(--text-muted); }
     .mfield .chev { width: 7px; height: 7px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(45deg); }
-    .mbtn { margin-top: 4px; background: var(--accent); color: #04121f; font-weight: 700; text-align: center; padding: 12px; border-radius: 10px; font-size: 14.5px; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .mbtn { margin-top: 4px; background: var(--accent); color: #04121f; font-weight: 750; text-align: center; padding: 12px; border-radius: 10px; font-size: 14.5px; box-shadow: 0 6px 20px var(--accent-glow); }
+    :root[data-theme="light"] .mbtn { color: #fff; }
 
     /* ---------- sections ---------- */
-    section { padding: 60px 0; }
-    .section-head { text-align: center; max-width: 620px; margin: 0 auto 44px; }
-    .section-head h2 { font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -0.8px; font-weight: 800; }
-    .section-head p { color: var(--text-secondary); font-size: 16.5px; margin-top: 12px; }
+    section { padding: 74px 0; position: relative; z-index: 1; }
+    .section-head { text-align: center; max-width: 640px; margin: 0 auto 50px; }
+    .eyebrow { display: inline-block; font-size: 12.5px; font-weight: 750; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+    .section-head h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -1px; font-weight: 850; line-height: 1.1; }
+    .section-head p { color: var(--text-secondary); font-size: 17px; margin-top: 13px; }
 
-    .grid { display: grid; gap: 16px; }
-    .cols-3 { grid-template-columns: repeat(3, 1fr); }
-    .cols-2 { grid-template-columns: repeat(2, 1fr); }
-    @media (max-width: 820px) { .cols-3 { grid-template-columns: 1fr; } .cols-2 { grid-template-columns: 1fr; } }
+    /* reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
-    .card {
-      background: var(--glass-bg); border: 1px solid var(--glass-border);
-      border-radius: var(--radius); padding: 24px;
-      transition: border-color .18s, transform .18s, background .18s;
+    /* ---------- stats ---------- */
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius);
+      box-shadow: var(--card-shadow); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow: hidden;
     }
-    .card:hover { border-color: var(--glass-border-strong); transform: translateY(-3px); background: var(--glass-bg-hover); }
-    .card .ico {
-      width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
-      background: var(--accent-glow); color: var(--accent); margin-bottom: 16px;
-    }
-    .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 7px; }
-    .card p { color: var(--text-secondary); font-size: 14.5px; }
+    .stat { text-align: center; padding: 34px 16px; position: relative; }
+    .stat + .stat::before { content: ""; position: absolute; left: 0; top: 22%; height: 56%; width: 1px; background: linear-gradient(var(--glass-border), transparent); }
+    .stat .n { font-size: clamp(34px, 4.5vw, 48px); font-weight: 850; line-height: 1; letter-spacing: -2px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .stat .l { color: var(--text-muted); font-size: 13.5px; margin-top: 10px; font-weight: 550; }
+    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(3)::before, .stat:nth-child(2)::before { background: transparent; } }
 
-    /* stats strip */
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .stat { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 14px 22px; }
-    .stat .si {
-      width: 40px; height: 40px; border-radius: 11px; margin-bottom: 12px;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--accent-glow); color: var(--accent);
+    /* ---------- features (bento) ---------- */
+    .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .fcard {
+      position: relative; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius);
+      padding: 28px; overflow: hidden; box-shadow: var(--card-shadow);
+      transition: transform .25s cubic-bezier(.2,.8,.2,1), border-color .25s, background .25s;
     }
-    .stat .n { font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; color: var(--text-primary); }
-    .stat .l { color: var(--text-muted); font-size: 13.5px; margin-top: 7px; }
-    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .fcard::after { content: ""; position: absolute; top: -40%; right: -30%; width: 60%; height: 80%; background: radial-gradient(circle, var(--accent-glow), transparent 70%); opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .fcard:hover { transform: translateY(-5px); border-color: var(--glass-border-strong); background: var(--glass-bg-2); }
+    .fcard:hover::after { opacity: 1; }
+    .fcard.wide { grid-column: 1 / -1; }
+    .ftile {
+      width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+      color: #fff; margin-bottom: 18px;
+      background: linear-gradient(140deg, var(--accent), var(--accent-2));
+      box-shadow: 0 8px 22px var(--accent-glow);
+    }
+    .fcard h3 { font-size: 18px; font-weight: 750; margin-bottom: 8px; letter-spacing: -0.3px; }
+    .fcard p { color: var(--text-secondary); font-size: 14.5px; max-width: 52ch; }
+    .fcard.wide .inner { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+    .fcard.wide .inner > div:first-child { flex: 1 1 320px; }
+    .metric-pills { display: flex; flex-wrap: wrap; gap: 9px; flex: 1 1 280px; }
+    .mpill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; padding: 9px 13px; border-radius: 999px; background: var(--glass-bg-2); border: 1px solid var(--glass-border); }
+    .mpill svg { color: var(--accent); }
+    @media (max-width: 720px) { .bento { grid-template-columns: 1fr; } }
 
-    /* chips (export types / formats) */
+    /* ---------- chips (any data any format) ---------- */
     .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 9px;
-      background: var(--glass-bg); border: 1px solid var(--glass-border);
-      padding: 11px 18px; border-radius: 999px; font-size: 15px; font-weight: 500;
-    }
+    .chip { display: inline-flex; align-items: center; gap: 9px; background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 11px 19px; border-radius: 999px; font-size: 15px; font-weight: 600; transition: transform .12s, border-color .15s; }
+    .chip:hover { transform: translateY(-2px); border-color: var(--glass-border-strong); }
     .chip .em { font-size: 17px; }
+    .chips.sub .chip { font-size: 14px; padding: 9px 16px; color: var(--text-secondary); }
 
-    /* steps */
-    .steps { counter-reset: step; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-    .step { position: relative; padding: 24px 20px 22px; }
-    .step .step-top { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
-    .step .num {
-      counter-increment: step; flex: none;
-      display: flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px; border-radius: 50%;
-      background: var(--accent); color: #04121f; font-weight: 800; font-size: 14px;
-    }
+    /* ---------- steps ---------- */
+    .steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .steps::before { content: ""; position: absolute; top: 50px; left: 12%; right: 12%; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); opacity: .4; z-index: 0; }
+    .step { position: relative; z-index: 1; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 26px 22px; box-shadow: var(--card-shadow); transition: transform .25s, border-color .25s; }
+    .step:hover { transform: translateY(-5px); border-color: var(--glass-border-strong); }
+    .step-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .step .num { counter-increment: step; flex: none; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; font-weight: 850; font-size: 16px; color: #fff; background: linear-gradient(140deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px var(--accent-glow); }
     .step .num::before { content: counter(step); }
-    .step .step-ico { color: var(--accent); display: flex; opacity: .85; }
-    .step h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .step .step-ico { color: var(--accent); display: flex; opacity: .9; }
+    .step h3 { font-size: 16.5px; font-weight: 750; margin-bottom: 7px; }
     .step p { color: var(--text-secondary); font-size: 14px; }
-    @media (max-width: 820px) { .steps { grid-template-columns: 1fr 1fr; } }
+    .steps-wrap { counter-reset: step; }
+    @media (max-width: 860px) { .steps { grid-template-columns: 1fr 1fr; } .steps::before { display: none; } }
     @media (max-width: 480px) { .steps { grid-template-columns: 1fr; } }
 
-    /* privacy callout */
+    /* ---------- privacy ---------- */
     .privacy-box {
-      background: linear-gradient(135deg, rgba(96,184,255,0.10), rgba(180,141,255,0.06));
-      border: 1px solid rgba(96,184,255,0.22);
-      border-radius: 22px; padding: 40px; text-align: center;
+      background: linear-gradient(135deg, var(--accent-glow), rgba(168,85,247,0.08));
+      border: 1px solid var(--glass-border-strong); border-radius: 26px; padding: 48px 40px; text-align: center;
+      box-shadow: var(--card-shadow); position: relative; overflow: hidden;
     }
-    .privacy-box .ico { width: 56px; height: 56px; border-radius: 14px; background: var(--accent-glow); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-    .privacy-box h2 { font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.6px; }
-    .privacy-box p { color: var(--text-secondary); max-width: 620px; margin: 14px auto 0; font-size: 16px; }
-    .privacy-box a { color: var(--accent); font-weight: 600; }
+    .privacy-box .shield { width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(140deg, var(--accent), var(--accent-2)); color: #fff; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 10px 28px var(--accent-glow); }
+    .privacy-box h2 { font-size: clamp(24px, 3vw, 34px); letter-spacing: -0.8px; font-weight: 850; }
+    .privacy-box p { color: var(--text-secondary); max-width: 640px; margin: 16px auto 0; font-size: 16px; }
+    .privacy-box a { color: var(--accent); font-weight: 650; }
 
-    /* languages */
-    .langs { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 780px; margin: 0 auto; }
-    .lang {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--glass-bg); border: 1px solid var(--glass-border);
-      padding: 9px 16px; border-radius: 999px; font-size: 14px; color: var(--text-primary);
-      transition: border-color .15s, background .15s, transform .08s;
-    }
-    .lang:hover { border-color: var(--glass-border-strong); background: var(--glass-bg-hover); transform: translateY(-2px); }
+    /* ---------- languages ---------- */
+    .langs { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 800px; margin: 0 auto; }
+    .lang { display: inline-flex; align-items: center; gap: 8px; background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 9px 16px; border-radius: 999px; font-size: 14px; transition: transform .12s, border-color .15s, background .15s; }
+    .lang:hover { transform: translateY(-2px); border-color: var(--glass-border-strong); background: var(--glass-bg-hover); }
     .lang .fl { font-size: 16px; line-height: 1; }
 
-    /* final CTA */
+    /* ---------- final cta ---------- */
     .final { text-align: center; }
-    .final h2 { font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -1px; font-weight: 800; }
-    .final p { color: var(--text-secondary); font-size: 17px; margin: 14px 0 26px; }
+    .final h2 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -1.2px; font-weight: 850; }
+    .final p { color: var(--text-secondary); font-size: 17.5px; margin: 14px 0 28px; }
+    .final .btn-primary { padding: 16px 32px; font-size: 16.5px; }
 
-    /* footer */
-    footer { border-top: 1px solid var(--glass-border); padding: 40px 0; margin-top: 40px; color: var(--text-muted); }
+    /* ---------- footer ---------- */
+    footer { border-top: 1px solid var(--glass-border); padding: 42px 0; margin-top: 30px; position: relative; z-index: 1; }
     .foot-inner { display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; align-items: center; }
     .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
-    .foot-links a { color: var(--text-secondary); font-size: 14.5px; }
+    .foot-links a { color: var(--text-secondary); font-size: 14.5px; transition: color .15s; }
     .foot-links a:hover { color: var(--text-primary); }
-    .disclaimer { font-size: 12.5px; color: var(--text-muted); margin-top: 18px; max-width: 760px; }
+    .disclaimer { font-size: 12.5px; color: var(--text-muted); margin-top: 18px; max-width: 780px; }
+
+    @media (max-width: 560px) { section { padding: 56px 0; } .privacy-box { padding: 36px 22px; } }
   </style>
 </head>
 
 <body>
+  <div class="orbs"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
+
   <!-- NAV -->
   <nav>
     <div class="wrap nav-inner">
       <a class="brand" href="#top">
-        <span class="bolt">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
-          </svg>
+        <span class="bolt" aria-hidden="true">
+          <svg width="23" height="23" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>
         </span>
         XPorter
       </a>
       <div class="nav-links">
-        <a class="minor" href="#features">Features</a>
-        <a class="minor" href="#how">How it works</a>
-        <a class="minor" href="#privacy">Privacy</a>
-        <a class="minor" href="https://github.com/Lemelson/xporter" target="_blank" rel="noopener">GitHub</a>
-        <a class="btn btn-primary" id="navInstall" href="#" target="_blank" rel="noopener">Add to Chrome</a>
+        <a class="minor" href="#features" data-i18n="nav_features">Features</a>
+        <a class="minor" href="#how" data-i18n="nav_how">How it works</a>
+        <a class="minor" href="#privacy" data-i18n="nav_privacy">Privacy</a>
+        <a class="minor" href="https://github.com/Lemelson" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="nav-tools">
+        <span class="lang-wrap"><select class="lang-select" id="langSelect" aria-label="Language"></select></span>
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle theme">
+          <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <a class="btn btn-primary" id="navInstall" href="#" target="_blank" rel="noopener" data-i18n="nav_install">Add to Chrome</a>
       </div>
     </div>
   </nav>
 
   <!-- HERO -->
   <header class="wrap hero" id="top">
-    <div>
-      <span class="pill">⚡ Free &amp; unlimited — no account, no API keys</span>
-      <h1>Export <span class="grad">anything</span> from X / Twitter</h1>
-      <p class="lead">Posts, followers, following and verified followers from any profile — straight to CSV, JSON or
-        Excel. One click. Your data never leaves your browser.</p>
+    <div class="reveal">
+      <span class="pill"><span class="bolt" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> <span data-i18n="hero_pill">Free &amp; unlimited — no account, no API keys</span></span>
+      <h1 data-i18n-html="hero_h1">Export <span class="grad">anything</span> from X / Twitter</h1>
+      <p class="lead" data-i18n="hero_lead">Posts, followers, following and verified followers from any profile — straight to CSV, JSON or Excel. One click. Your data never leaves your browser.</p>
       <div class="hero-cta">
         <a class="btn btn-primary" id="heroInstall" href="#" target="_blank" rel="noopener">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-          Add to Chrome — it's free
+          <span class="bolt" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
+          <span data-i18n="hero_cta1">Add to Chrome — it's free</span>
         </a>
-        <a class="btn btn-ghost" href="https://github.com/Lemelson/xporter" target="_blank" rel="noopener">⭐ Star on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/Lemelson" target="_blank" rel="noopener" data-i18n="hero_cta2">View on GitHub</a>
       </div>
       <div class="trust">
-        <span><span class="dot">✦</span> 100% local &amp; private</span>
-        <span><span class="dot">✦</span> Unlimited exports</span>
+        <span><span class="dot">✦</span> <span data-i18n="trust_local">100% local &amp; private</span></span>
+        <span><span class="dot">✦</span> <span data-i18n="trust_unlimited">Unlimited exports</span></span>
         <span><span class="dot">✦</span> CSV · JSON · XLSX</span>
-        <span><span class="dot">✦</span> 14 languages</span>
+        <span><span class="dot">✦</span> <span data-i18n="trust_langs">14 languages</span></span>
       </div>
     </div>
 
-    <!-- popup mock -->
-    <div class="mock-wrap">
+    <div class="mock-wrap reveal">
       <div class="mock" aria-hidden="true">
         <div class="mock-head">
-          <span class="b"><span class="bolt"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
-              </svg></span> XPorter</span>
-          <span class="meta">EN · ☀</span>
+          <span class="b"><span class="bolt"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> XPorter</span>
+          <span class="meta">EN · ☾</span>
         </div>
-        <div class="mock-tabs">
-          <div class="mock-tab active">Home</div>
-          <div class="mock-tab">Settings</div>
-          <div class="mock-tab">About</div>
-        </div>
+        <div class="mock-tabs"><div class="mock-tab active">Home</div><div class="mock-tab">Settings</div><div class="mock-tab">About</div></div>
         <div class="mock-body">
-          <div>
-            <div class="mlabel">Export mode</div>
-            <div class="mfield"><span>👥 Followers</span><span class="chev"></span></div>
-          </div>
-          <div>
-            <div class="mlabel">Twitter username</div>
-            <div class="mfield"><span class="muted">elonmusk</span></div>
-          </div>
-          <div>
-            <div class="mlabel">Output format</div>
-            <div class="mfield"><span>CSV</span><span class="chev"></span></div>
-          </div>
+          <div><div class="mlabel">Export mode</div><div class="mfield"><span>👥 Followers</span><span class="chev"></span></div></div>
+          <div><div class="mlabel">Twitter username</div><div class="mfield"><span class="muted">elonmusk</span></div></div>
+          <div><div class="mlabel">Output format</div><div class="mfield"><span>CSV</span><span class="chev"></span></div></div>
           <div class="mbtn">▶ Start Exporting</div>
         </div>
       </div>
@@ -316,162 +403,156 @@
   </header>
 
   <!-- STATS -->
-  <section class="wrap" style="padding-top: 24px;">
-    <div class="stats">
-      <div class="stat card">
-        <span class="si"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></span>
-        <div class="n">4</div><div class="l">Export types</div>
-      </div>
-      <div class="stat card">
-        <span class="si"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
-        <div class="n">3</div><div class="l">File formats</div>
-      </div>
-      <div class="stat card">
-        <span class="si"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></svg></span>
-        <div class="n">14</div><div class="l">Languages</div>
-      </div>
-      <div class="stat card">
-        <span class="si"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.6 6.6a5.5 5.5 0 1 0 0 10.8c1.7 0 3-1 4.2-2.6L12 7.2C10.8 5.6 9.5 4.6 7.8 4.6a5.5 5.5 0 1 0 0 10.8"/></svg></span>
-        <div class="n">∞</div><div class="l">Unlimited &amp; free</div>
-      </div>
+  <section class="wrap" style="padding-top: 28px;">
+    <div class="stats reveal">
+      <div class="stat"><div class="n" data-count="4">4</div><div class="l" data-i18n="stat_types">Export types</div></div>
+      <div class="stat"><div class="n" data-count="3">3</div><div class="l" data-i18n="stat_formats">File formats</div></div>
+      <div class="stat"><div class="n" data-count="14">14</div><div class="l" data-i18n="stat_langs">Languages</div></div>
+      <div class="stat"><div class="n">∞</div><div class="l" data-i18n="stat_unlimited">Unlimited &amp; free</div></div>
     </div>
   </section>
 
   <!-- FEATURES -->
   <section id="features" class="wrap">
-    <div class="section-head">
-      <h2>Everything you need to get X data out</h2>
-      <p>Built for marketers, researchers, analysts and creators who need real data — not a 150-tweet preview.</p>
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="feat_eyebrow">Features</span>
+      <h2 data-i18n="feat_head">Everything you need to get X data out</h2>
+      <p data-i18n="feat_sub">Built for marketers, researchers, analysts and creators who need real data — not a 150-tweet preview.</p>
     </div>
-    <div class="grid cols-3">
-      <div class="card">
-        <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/></svg></div>
-        <h3>Full engagement metrics</h3>
-        <p>Views, likes, reposts, replies, quotes and bookmarks — plus dates, links, media and hashtags on every post.</p>
+    <div class="bento">
+      <div class="fcard wide reveal">
+        <div class="inner">
+          <div>
+            <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/></svg></div>
+            <h3 data-i18n="f_engage_t">Full engagement metrics</h3>
+            <p data-i18n="f_engage_d">Every post comes with the numbers that matter — plus dates, links, media and hashtags.</p>
+          </div>
+          <div class="metric-pills">
+            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> <span data-i18n="m_views">Views</span></span>
+            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg> <span data-i18n="m_likes">Likes</span></span>
+            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg> <span data-i18n="m_reposts">Reposts</span></span>
+            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> <span data-i18n="m_replies">Replies</span></span>
+            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21v-4a4 4 0 0 1 4-4h14"/><path d="M3 7l4-4 4 4"/><path d="M7 3v10"/></svg> <span data-i18n="m_quotes">Quotes</span></span>
+            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> <span data-i18n="m_bookmarks">Bookmarks</span></span>
+          </div>
+        </div>
       </div>
-      <div class="card">
-        <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <h3>Four export types</h3>
-        <p>Posts, followers, following and verified followers from any public profile.</p>
+
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <h3 data-i18n="f_types_t">Four export types</h3>
+        <p data-i18n="f_types_d">Posts, followers, following and verified followers from any public profile.</p>
       </div>
-      <div class="card">
-        <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg></div>
-        <h3>CSV, JSON &amp; XLSX</h3>
-        <p>CSV for any spreadsheet, XLSX for Excel, JSON for developers. Built locally and downloaded straight to you.</p>
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg></div>
+        <h3 data-i18n="f_formats_t">CSV, JSON &amp; XLSX</h3>
+        <p data-i18n="f_formats_d">CSV for any spreadsheet, XLSX for Excel, JSON for developers — built locally and downloaded straight to you.</p>
       </div>
-      <div class="card">
-        <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
-        <h3>Date-range filtering</h3>
-        <p>Export posts from a specific time window — XPorter gathers exactly the period you need.</p>
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+        <h3 data-i18n="f_dates_t">Date-range filtering</h3>
+        <p data-i18n="f_dates_d">Export posts from a specific time window — XPorter gathers exactly the period you need.</p>
       </div>
-      <div class="card">
-        <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
-        <h3>Auto-resume &amp; rate limiting</h3>
-        <p>Progress is saved as it runs. Pause, close, or restart your browser and pick up where you left off — while
-          respecting X's limits.</p>
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
+        <h3 data-i18n="f_resume_t">Auto-resume &amp; rate limiting</h3>
+        <p data-i18n="f_resume_d">Progress is saved as it runs. Pause, close or restart your browser and pick up where you left off — while respecting X's limits.</p>
       </div>
-      <div class="card">
-        <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-        <h3>100% local processing</h3>
-        <p>Uses your own logged-in X session. No password, no API keys, no account. Your exported data never leaves your
-          browser.</p>
+
+      <div class="fcard wide reveal">
+        <div class="inner">
+          <div>
+            <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <h3 data-i18n="f_local_t">100% local &amp; private</h3>
+            <p data-i18n="f_local_d">Uses your own logged-in X session — no password, no API keys, no account. Your exported data goes straight from X into your file and never passes through us.</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- EXPORT TYPES / FORMATS -->
+  <!-- ANY DATA ANY FORMAT -->
   <section class="wrap">
-    <div class="section-head">
-      <h2>Any data, any format</h2>
-      <p>Pick what to export and how you want it.</p>
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="fmt_eyebrow">Flexible</span>
+      <h2 data-i18n="fmt_head">Any data, any format</h2>
+      <p data-i18n="fmt_sub">Pick what to export and how you want it.</p>
     </div>
-    <div class="chips" style="margin-bottom: 16px;">
-      <span class="chip"><span class="em">📝</span> Posts</span>
-      <span class="chip"><span class="em">👥</span> Followers</span>
-      <span class="chip"><span class="em">➡️</span> Following</span>
-      <span class="chip"><span class="em">✓</span> Verified followers</span>
+    <div class="chips reveal" style="margin-bottom: 14px;">
+      <span class="chip"><span class="em">📝</span> <span data-i18n="chip_posts">Posts</span></span>
+      <span class="chip"><span class="em">👥</span> <span data-i18n="chip_followers">Followers</span></span>
+      <span class="chip"><span class="em">➡️</span> <span data-i18n="chip_following">Following</span></span>
+      <span class="chip"><span class="em">✓</span> <span data-i18n="chip_verified">Verified followers</span></span>
     </div>
-    <div class="chips">
-      <span class="chip">CSV</span>
-      <span class="chip">JSON</span>
-      <span class="chip">Excel (XLSX)</span>
+    <div class="chips sub reveal">
+      <span class="chip">CSV</span><span class="chip">JSON</span><span class="chip">Excel (XLSX)</span>
     </div>
   </section>
 
   <!-- HOW IT WORKS -->
   <section id="how" class="wrap">
-    <div class="section-head">
-      <h2>Exporting takes four clicks</h2>
-      <p>No setup, no sign-up. Install and go.</p>
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="how_eyebrow">How it works</span>
+      <h2 data-i18n="how_head">Exporting takes four clicks</h2>
+      <p data-i18n="how_sub">No setup, no sign-up. Install and go.</p>
     </div>
-    <div class="steps">
-      <div class="step card">
-        <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg></span></div>
-        <h3>Open XPorter</h3><p>Click the XPorter icon in your toolbar while logged in to X.</p>
-      </div>
-      <div class="step card">
-        <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span></div>
-        <h3>Enter a username</h3><p>Type any profile handle, e.g. <code>elonmusk</code>.</p>
-      </div>
-      <div class="step card">
-        <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span></div>
-        <h3>Pick type &amp; format</h3><p>Posts, followers, following or verified — as CSV, JSON or Excel.</p>
-      </div>
-      <div class="step card">
-        <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
-        <h3>Start exporting</h3><p>Hit start and download your file. That's it.</p>
+    <div class="steps-wrap">
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg></span></div>
+          <h3 data-i18n="s1_t">Open XPorter</h3><p data-i18n="s1_d">Click the XPorter icon in your toolbar while logged in to X.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span></div>
+          <h3 data-i18n="s2_t">Enter a username</h3><p data-i18n-html="s2_d">Type any profile handle, e.g. <code>elonmusk</code>.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span></div>
+          <h3 data-i18n="s3_t">Pick type &amp; format</h3><p data-i18n="s3_d">Posts, followers, following or verified — as CSV, JSON or Excel.</p>
+        </div>
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+          <h3 data-i18n="s4_t">Start exporting</h3><p data-i18n="s4_d">Hit start and download your file. That's it.</p>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- PRIVACY -->
   <section id="privacy" class="wrap">
-    <div class="privacy-box">
-      <div class="ico">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-      </div>
-      <h2>Your data stays yours</h2>
-      <p>XPorter runs entirely in your browser using the X session you're already logged into. There are no XPorter
-        servers, no account, and no trackers during use — your exported data goes straight from X into your file and
-        never passes through us. The only thing XPorter ever sends is an anonymous, non-personal usage summary when you
-        uninstall, so churn can be understood and the extension improved.
-        <br /><a href="privacy-policy.html">Read the full privacy policy →</a></p>
+    <div class="privacy-box reveal">
+      <div class="shield"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <h2 data-i18n="priv_t">Your data stays yours</h2>
+      <p data-i18n="priv_d">XPorter runs entirely in your browser using the X session you're already logged into. There are no XPorter servers, no account, and no trackers during use — your exported data goes straight from X into your file and never passes through us. The only thing XPorter ever sends is an anonymous, non-personal usage summary when you uninstall, so churn can be understood and the extension improved.</p>
+      <p><a href="privacy-policy.html" data-i18n="priv_link">Read the full privacy policy →</a></p>
     </div>
   </section>
 
   <!-- LANGUAGES -->
   <section class="wrap">
-    <div class="section-head">
-      <h2>Speaks your language</h2>
-      <p>Auto-detects your browser language on first launch — switchable any time.</p>
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="lang_eyebrow">Global</span>
+      <h2 data-i18n="lang_head">Speaks your language</h2>
+      <p data-i18n="lang_sub">Auto-detects your browser language on first launch — switchable any time.</p>
     </div>
-    <div class="langs">
-      <span class="lang"><span class="fl">🇺🇸</span> English</span>
-      <span class="lang"><span class="fl">🇷🇺</span> Русский</span>
-      <span class="lang"><span class="fl">🇪🇸</span> Español</span>
-      <span class="lang"><span class="fl">🇫🇷</span> Français</span>
-      <span class="lang"><span class="fl">🇩🇪</span> Deutsch</span>
-      <span class="lang"><span class="fl">🇮🇹</span> Italiano</span>
-      <span class="lang"><span class="fl">🇧🇷</span> Português</span>
-      <span class="lang"><span class="fl">🇯🇵</span> 日本語</span>
-      <span class="lang"><span class="fl">🇰🇷</span> 한국어</span>
-      <span class="lang"><span class="fl">🇨🇳</span> 中文</span>
-      <span class="lang"><span class="fl">🇸🇦</span> العربية</span>
-      <span class="lang"><span class="fl">🇮🇳</span> हिन्दी</span>
-      <span class="lang"><span class="fl">🇮🇩</span> Bahasa Indonesia</span>
-      <span class="lang"><span class="fl">🇹🇷</span> Türkçe</span>
+    <div class="langs reveal">
+      <span class="lang"><span class="fl">🇺🇸</span> English</span><span class="lang"><span class="fl">🇷🇺</span> Русский</span>
+      <span class="lang"><span class="fl">🇪🇸</span> Español</span><span class="lang"><span class="fl">🇫🇷</span> Français</span>
+      <span class="lang"><span class="fl">🇩🇪</span> Deutsch</span><span class="lang"><span class="fl">🇮🇹</span> Italiano</span>
+      <span class="lang"><span class="fl">🇧🇷</span> Português</span><span class="lang"><span class="fl">🇯🇵</span> 日本語</span>
+      <span class="lang"><span class="fl">🇰🇷</span> 한국어</span><span class="lang"><span class="fl">🇨🇳</span> 中文</span>
+      <span class="lang"><span class="fl">🇸🇦</span> العربية</span><span class="lang"><span class="fl">🇮🇳</span> हिन्दी</span>
+      <span class="lang"><span class="fl">🇮🇩</span> Bahasa Indonesia</span><span class="lang"><span class="fl">🇹🇷</span> Türkçe</span>
     </div>
   </section>
 
   <!-- FINAL CTA -->
-  <section class="wrap final">
-    <h2>Get your X data in seconds</h2>
-    <p>Free, unlimited, and private. No reason not to.</p>
-    <a class="btn btn-primary" id="finalInstall" href="#" target="_blank" rel="noopener" style="padding: 14px 28px; font-size: 16px;">
-      ⚡ Add XPorter to Chrome
+  <section class="wrap final reveal">
+    <h2 data-i18n="cta_t">Get your X data in seconds</h2>
+    <p data-i18n="cta_d">Free, unlimited, and private. No reason not to.</p>
+    <a class="btn btn-primary" id="finalInstall" href="#" target="_blank" rel="noopener">
+      <span class="bolt" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
+      <span data-i18n="cta_btn">Add XPorter to Chrome</span>
     </a>
   </section>
 
@@ -480,31 +561,164 @@
     <div class="wrap">
       <div class="foot-inner">
         <a class="brand" href="#top">
-          <span class="bolt"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
-            </svg></span> XPorter
+          <span class="bolt" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> XPorter
         </a>
         <div class="foot-links">
           <a href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener">Chrome Web Store</a>
           <a href="https://t.me/Lemelson" target="_blank" rel="noopener">Telegram</a>
           <a href="mailto:art.lemelson@gmail.com">Email</a>
-          <a href="https://github.com/Lemelson/xporter" target="_blank" rel="noopener">GitHub</a>
-          <a href="privacy-policy.html">Privacy</a>
+          <a href="https://github.com/Lemelson" target="_blank" rel="noopener">GitHub</a>
+          <a href="privacy-policy.html" data-i18n="foot_privacy">Privacy</a>
         </div>
       </div>
-      <p class="disclaimer">X and Twitter are trademarks of X Corp. XPorter is an independent tool and is not
-        affiliated with, endorsed by, or connected to X Corp. or Twitter, Inc. © 2026 XPorter.</p>
+      <p class="disclaimer" data-i18n="foot_disclaimer">X and Twitter are trademarks of X Corp. XPorter is an independent tool and is not affiliated with, endorsed by, or connected to X Corp. or Twitter, Inc. © 2026 XPorter.</p>
     </div>
   </footer>
 
   <script>
-    // Single source of truth for the Chrome Web Store link.
     var STORE_URL = "https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja";
-    ["navInstall", "heroInstall", "finalInstall"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.href = STORE_URL;
+    ["navInstall", "heroInstall", "finalInstall"].forEach(function (id) { var el = document.getElementById(id); if (el) el.href = STORE_URL; });
+
+    /* ---------------- theme toggle ---------------- */
+    document.getElementById("themeToggle").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", cur);
+      try { localStorage.setItem("xporter_theme", cur); } catch (e) {}
     });
+
+    /* ---------------- i18n ---------------- */
+    var I18N = {
+      en: {
+        nav_features: "Features", nav_how: "How it works", nav_privacy: "Privacy", nav_install: "Add to Chrome",
+        hero_pill: "Free & unlimited — no account, no API keys",
+        hero_h1: 'Export <span class="grad">anything</span> from X / Twitter',
+        hero_lead: "Posts, followers, following and verified followers from any profile — straight to CSV, JSON or Excel. One click. Your data never leaves your browser.",
+        hero_cta1: "Add to Chrome — it's free", hero_cta2: "View on GitHub",
+        trust_local: "100% local & private", trust_unlimited: "Unlimited exports", trust_langs: "14 languages",
+        stat_types: "Export types", stat_formats: "File formats", stat_langs: "Languages", stat_unlimited: "Unlimited & free",
+        feat_eyebrow: "Features", feat_head: "Everything you need to get X data out",
+        feat_sub: "Built for marketers, researchers, analysts and creators who need real data — not a 150-tweet preview.",
+        f_engage_t: "Full engagement metrics", f_engage_d: "Every post comes with the numbers that matter — plus dates, links, media and hashtags.",
+        m_views: "Views", m_likes: "Likes", m_reposts: "Reposts", m_replies: "Replies", m_quotes: "Quotes", m_bookmarks: "Bookmarks",
+        f_types_t: "Four export types", f_types_d: "Posts, followers, following and verified followers from any public profile.",
+        f_formats_t: "CSV, JSON & XLSX", f_formats_d: "CSV for any spreadsheet, XLSX for Excel, JSON for developers — built locally and downloaded straight to you.",
+        f_dates_t: "Date-range filtering", f_dates_d: "Export posts from a specific time window — XPorter gathers exactly the period you need.",
+        f_resume_t: "Auto-resume & rate limiting", f_resume_d: "Progress is saved as it runs. Pause, close or restart your browser and pick up where you left off — while respecting X's limits.",
+        f_local_t: "100% local & private", f_local_d: "Uses your own logged-in X session — no password, no API keys, no account. Your exported data goes straight from X into your file and never passes through us.",
+        fmt_eyebrow: "Flexible", fmt_head: "Any data, any format", fmt_sub: "Pick what to export and how you want it.",
+        chip_posts: "Posts", chip_followers: "Followers", chip_following: "Following", chip_verified: "Verified followers",
+        how_eyebrow: "How it works", how_head: "Exporting takes four clicks", how_sub: "No setup, no sign-up. Install and go.",
+        s1_t: "Open XPorter", s1_d: "Click the XPorter icon in your toolbar while logged in to X.",
+        s2_t: "Enter a username", s2_d: "Type any profile handle, e.g. <code>elonmusk</code>.",
+        s3_t: "Pick type & format", s3_d: "Posts, followers, following or verified — as CSV, JSON or Excel.",
+        s4_t: "Start exporting", s4_d: "Hit start and download your file. That's it.",
+        priv_t: "Your data stays yours",
+        priv_d: "XPorter runs entirely in your browser using the X session you're already logged into. There are no XPorter servers, no account, and no trackers during use — your exported data goes straight from X into your file and never passes through us. The only thing XPorter ever sends is an anonymous, non-personal usage summary when you uninstall, so churn can be understood and the extension improved.",
+        priv_link: "Read the full privacy policy →",
+        lang_eyebrow: "Global", lang_head: "Speaks your language", lang_sub: "Auto-detects your browser language on first launch — switchable any time.",
+        cta_t: "Get your X data in seconds", cta_d: "Free, unlimited, and private. No reason not to.", cta_btn: "Add XPorter to Chrome",
+        foot_privacy: "Privacy",
+        foot_disclaimer: "X and Twitter are trademarks of X Corp. XPorter is an independent tool and is not affiliated with, endorsed by, or connected to X Corp. or Twitter, Inc. © 2026 XPorter."
+      },
+      ru: {
+        nav_features: "Возможности", nav_how: "Как это работает", nav_privacy: "Приватность", nav_install: "Установить в Chrome",
+        hero_pill: "Бесплатно и без лимитов — без аккаунта и API-ключей",
+        hero_h1: 'Экспортируй <span class="grad">что угодно</span> из X / Twitter',
+        hero_lead: "Посты, подписчики, подписки и verified-подписчики любого профиля — сразу в CSV, JSON или Excel. В один клик. Данные не покидают твой браузер.",
+        hero_cta1: "Установить в Chrome — бесплатно", hero_cta2: "Открыть на GitHub",
+        trust_local: "100% локально и приватно", trust_unlimited: "Безлимитный экспорт", trust_langs: "14 языков",
+        stat_types: "Типа экспорта", stat_formats: "Формата файлов", stat_langs: "Языков", stat_unlimited: "Бесплатно и без лимитов",
+        feat_eyebrow: "Возможности", feat_head: "Всё, чтобы вытащить данные из X",
+        feat_sub: "Для маркетологов, исследователей, аналитиков и авторов, которым нужны реальные данные — а не превью на 150 твитов.",
+        f_engage_t: "Все метрики вовлечённости", f_engage_d: "К каждому посту — все важные цифры, плюс даты, ссылки, медиа и хэштеги.",
+        m_views: "Просмотры", m_likes: "Лайки", m_reposts: "Репосты", m_replies: "Ответы", m_quotes: "Цитаты", m_bookmarks: "Закладки",
+        f_types_t: "Четыре типа экспорта", f_types_d: "Посты, подписчики, подписки и verified-подписчики любого публичного профиля.",
+        f_formats_t: "CSV, JSON и XLSX", f_formats_d: "CSV для любой таблицы, XLSX для Excel, JSON для разработчиков — собирается локально и сразу скачивается тебе.",
+        f_dates_t: "Фильтр по датам", f_dates_d: "Экспортируй посты за нужный период — XPorter соберёт ровно тот промежуток, что нужен.",
+        f_resume_t: "Авто-продолжение и лимиты", f_resume_d: "Прогресс сохраняется на ходу. Поставь на паузу, закрой или перезапусти браузер и продолжи с того же места — с учётом лимитов X.",
+        f_local_t: "100% локально и приватно", f_local_d: "Использует твою уже залогиненную сессию X — без пароля, без API-ключей, без аккаунта. Данные идут напрямую из X в твой файл и не проходят через нас.",
+        fmt_eyebrow: "Гибко", fmt_head: "Любые данные, любой формат", fmt_sub: "Выбирай, что экспортировать и в каком виде.",
+        chip_posts: "Посты", chip_followers: "Подписчики", chip_following: "Подписки", chip_verified: "Verified-подписчики",
+        how_eyebrow: "Как это работает", how_head: "Экспорт — это четыре клика", how_sub: "Никакой настройки и регистрации. Установил и поехали.",
+        s1_t: "Открой XPorter", s1_d: "Нажми иконку XPorter на панели, будучи залогиненным в X.",
+        s2_t: "Введи имя пользователя", s2_d: "Впиши любой хэндл профиля, например <code>elonmusk</code>.",
+        s3_t: "Выбери тип и формат", s3_d: "Посты, подписчики, подписки или verified — в CSV, JSON или Excel.",
+        s4_t: "Запусти экспорт", s4_d: "Нажми старт и скачай файл. Вот и всё.",
+        priv_t: "Твои данные остаются твоими",
+        priv_d: "XPorter работает полностью в твоём браузере, используя сессию X, в которой ты уже залогинен. Нет серверов XPorter, нет аккаунта и нет трекеров при использовании — данные идут напрямую из X в твой файл и не проходят через нас. Единственное, что XPorter когда-либо отправляет, — анонимная обезличенная статистика при удалении, чтобы понять отток и улучшить расширение.",
+        priv_link: "Читать полную политику конфиденциальности →",
+        lang_eyebrow: "Глобально", lang_head: "Говорит на твоём языке", lang_sub: "Определяет язык браузера при первом запуске — переключается в любой момент.",
+        cta_t: "Получи данные из X за секунды", cta_d: "Бесплатно, без лимитов и приватно. Нет причин не попробовать.", cta_btn: "Установить XPorter в Chrome",
+        foot_privacy: "Приватность",
+        foot_disclaimer: "X и Twitter — товарные знаки X Corp. XPorter — независимый инструмент, не аффилирован с X Corp. или Twitter, Inc. и не связан с ними. © 2026 XPorter."
+      },
+      "de": {"nav_features": "Funktionen", "nav_how": "So funktioniert's", "nav_privacy": "Datenschutz", "nav_install": "Zu Chrome hinzufügen", "hero_pill": "Kostenlos & unbegrenzt — kein Konto, keine API-Schlüssel", "hero_h1": "Exportiere <span class=\"grad\">alles</span> aus X / Twitter", "hero_lead": "Beiträge, Follower, Gefolgte und verifizierte Follower von jedem Profil — direkt als CSV, JSON oder Excel. Ein Klick. Deine Daten verlassen nie deinen Browser.", "hero_cta1": "Zu Chrome hinzufügen — kostenlos", "hero_cta2": "Auf GitHub ansehen", "trust_local": "100% lokal & privat", "trust_unlimited": "Unbegrenzte Exporte", "trust_langs": "14 Sprachen", "stat_types": "Export-Typen", "stat_formats": "Dateiformate", "stat_langs": "Sprachen", "stat_unlimited": "Unbegrenzt & kostenlos", "feat_eyebrow": "Funktionen", "feat_head": "Alles, was du brauchst, um X-Daten herauszuholen", "feat_sub": "Gebaut für Marketer, Forscher, Analysten und Creator, die echte Daten brauchen — keine Vorschau mit 150 Tweets.", "f_engage_t": "Vollständige Engagement-Metriken", "f_engage_d": "Jeder Beitrag kommt mit den Zahlen, die zählen — plus Datum, Links, Medien und Hashtags.", "m_views": "Aufrufe", "m_likes": "Likes", "m_reposts": "Reposts", "m_replies": "Antworten", "m_quotes": "Zitate", "m_bookmarks": "Lesezeichen", "f_types_t": "Vier Export-Typen", "f_types_d": "Beiträge, Follower, Gefolgte und verifizierte Follower von jedem öffentlichen Profil.", "f_formats_t": "CSV, JSON & XLSX", "f_formats_d": "CSV für jede Tabellenkalkulation, XLSX für Excel, JSON für Entwickler — lokal erstellt und direkt zu dir heruntergeladen.", "f_dates_t": "Filterung nach Datumsbereich", "f_dates_d": "Exportiere Beiträge aus einem bestimmten Zeitraum — XPorter sammelt genau die Periode, die du brauchst.", "f_resume_t": "Auto-Wiederaufnahme & Ratenbegrenzung", "f_resume_d": "Der Fortschritt wird während des Laufs gespeichert. Pausiere, schließe oder starte deinen Browser neu und mach dort weiter, wo du aufgehört hast — und zwar unter Einhaltung der Limits von X.", "f_local_t": "100% lokal & privat", "f_local_d": "Nutzt deine eigene angemeldete X-Sitzung — kein Passwort, keine API-Schlüssel, kein Konto. Deine exportierten Daten gehen direkt von X in deine Datei und laufen nie über uns.", "fmt_eyebrow": "Flexibel", "fmt_head": "Beliebige Daten, beliebiges Format", "fmt_sub": "Wähle, was du exportierst und wie du es haben willst.", "chip_posts": "Beiträge", "chip_followers": "Follower", "chip_following": "Gefolgte", "chip_verified": "Verifizierte Follower", "how_eyebrow": "So funktioniert's", "how_head": "Exportieren dauert vier Klicks", "how_sub": "Keine Einrichtung, keine Anmeldung. Installieren und loslegen.", "s1_t": "XPorter öffnen", "s1_d": "Klicke auf das XPorter-Symbol in deiner Symbolleiste, während du bei X angemeldet bist.", "s2_t": "Benutzernamen eingeben", "s2_d": "Gib ein beliebiges Profil-Handle ein, z. B. <code>elonmusk</code>.", "s3_t": "Typ & Format wählen", "s3_d": "Beiträge, Follower, Gefolgte oder verifizierte — als CSV, JSON oder Excel.", "s4_t": "Export starten", "s4_d": "Auf Start klicken und Datei herunterladen. Das war's.", "priv_t": "Deine Daten bleiben deine", "priv_d": "XPorter läuft vollständig in deinem Browser und nutzt die X-Sitzung, in der du bereits angemeldet bist. Es gibt keine XPorter-Server, kein Konto und keine Tracker während der Nutzung — deine exportierten Daten gehen direkt von X in deine Datei und laufen nie über uns. Das Einzige, was XPorter je sendet, ist eine anonyme, nicht-personenbezogene Nutzungszusammenfassung bei der Deinstallation, damit Abwanderung verstanden und die Erweiterung verbessert werden kann.", "priv_link": "Vollständige Datenschutzerklärung lesen →", "lang_eyebrow": "Global", "lang_head": "Spricht deine Sprache", "lang_sub": "Erkennt beim ersten Start automatisch deine Browsersprache — jederzeit umschaltbar.", "cta_t": "Hol dir deine X-Daten in Sekunden", "cta_d": "Kostenlos, unbegrenzt und privat. Kein Grund, es nicht zu tun.", "cta_btn": "XPorter zu Chrome hinzufügen", "foot_privacy": "Datenschutz", "foot_disclaimer": "X und Twitter sind Marken der X Corp. XPorter ist ein unabhängiges Tool und steht in keiner Verbindung zu X Corp. oder Twitter, Inc., wird von ihnen nicht unterstützt und ist nicht mit ihnen verbunden. © 2026 XPorter."},
+      "es": {"nav_features": "Funciones", "nav_how": "Cómo funciona", "nav_privacy": "Privacidad", "nav_install": "Añadir a Chrome", "hero_pill": "Gratis e ilimitado — sin cuenta, sin claves de API", "hero_h1": "Exporta <span class=\"grad\">cualquier cosa</span> de X / Twitter", "hero_lead": "Publicaciones, seguidores, seguidos y seguidores verificados de cualquier perfil — directo a CSV, JSON o Excel. Un clic. Tus datos nunca salen de tu navegador.", "hero_cta1": "Añadir a Chrome — es gratis", "hero_cta2": "Ver en GitHub", "trust_local": "100% local y privado", "trust_unlimited": "Exportaciones ilimitadas", "trust_langs": "14 idiomas", "stat_types": "Tipos de exportación", "stat_formats": "Formatos de archivo", "stat_langs": "Idiomas", "stat_unlimited": "Ilimitado y gratis", "feat_eyebrow": "Funciones", "feat_head": "Todo lo que necesitas para sacar tus datos de X", "feat_sub": "Creado para marketers, investigadores, analistas y creadores que necesitan datos reales — no una vista previa de 150 tuits.", "f_engage_t": "Métricas de interacción completas", "f_engage_d": "Cada publicación viene con las cifras que importan — además de fechas, enlaces, contenido multimedia y hashtags.", "m_views": "Visualizaciones", "m_likes": "Me gusta", "m_reposts": "Reposts", "m_replies": "Respuestas", "m_quotes": "Citas", "m_bookmarks": "Guardados", "f_types_t": "Cuatro tipos de exportación", "f_types_d": "Publicaciones, seguidores, seguidos y seguidores verificados de cualquier perfil público.", "f_formats_t": "CSV, JSON y XLSX", "f_formats_d": "CSV para cualquier hoja de cálculo, XLSX para Excel, JSON para desarrolladores — generados localmente y descargados directamente a ti.", "f_dates_t": "Filtro por rango de fechas", "f_dates_d": "Exporta publicaciones de un periodo de tiempo concreto — XPorter recopila exactamente el periodo que necesitas.", "f_resume_t": "Reanudación automática y control de frecuencia", "f_resume_d": "El progreso se guarda mientras se ejecuta. Pausa, cierra o reinicia tu navegador y continúa donde lo dejaste — respetando los límites de X.", "f_local_t": "100% local y privado", "f_local_d": "Usa tu propia sesión de X iniciada — sin contraseña, sin claves de API, sin cuenta. Tus datos exportados pasan directamente de X a tu archivo y nunca pasan por nosotros.", "fmt_eyebrow": "Flexible", "fmt_head": "Cualquier dato, cualquier formato", "fmt_sub": "Elige qué exportar y cómo lo quieres.", "chip_posts": "Publicaciones", "chip_followers": "Seguidores", "chip_following": "Seguidos", "chip_verified": "Seguidores verificados", "how_eyebrow": "Cómo funciona", "how_head": "Exportar lleva cuatro clics", "how_sub": "Sin configuración, sin registro. Instala y listo.", "s1_t": "Abre XPorter", "s1_d": "Haz clic en el icono de XPorter en tu barra de herramientas mientras tienes la sesión iniciada en X.", "s2_t": "Introduce un usuario", "s2_d": "Escribe el identificador de cualquier perfil, p. ej. <code>elonmusk</code>.", "s3_t": "Elige tipo y formato", "s3_d": "Publicaciones, seguidores, seguidos o verificados — como CSV, JSON o Excel.", "s4_t": "Inicia la exportación", "s4_d": "Pulsa iniciar y descarga tu archivo. Eso es todo.", "priv_t": "Tus datos siguen siendo tuyos", "priv_d": "XPorter funciona por completo en tu navegador usando la sesión de X en la que ya estás conectado. No hay servidores de XPorter, ni cuenta, ni rastreadores durante el uso — tus datos exportados pasan directamente de X a tu archivo y nunca pasan por nosotros. Lo único que XPorter envía es un resumen de uso anónimo y no personal cuando lo desinstalas, para entender la pérdida de usuarios y mejorar la extensión.", "priv_link": "Lee la política de privacidad completa →", "lang_eyebrow": "Global", "lang_head": "Habla tu idioma", "lang_sub": "Detecta automáticamente el idioma de tu navegador al iniciarse — cambiable en cualquier momento.", "cta_t": "Consigue tus datos de X en segundos", "cta_d": "Gratis, ilimitado y privado. No hay razón para no hacerlo.", "cta_btn": "Añadir XPorter a Chrome", "foot_privacy": "Privacidad", "foot_disclaimer": "X y Twitter son marcas registradas de X Corp. XPorter es una herramienta independiente y no está afiliada, respaldada ni conectada con X Corp. ni Twitter, Inc. © 2026 XPorter."},
+      "fr": {"nav_features": "Fonctionnalités", "nav_how": "Comment ça marche", "nav_privacy": "Confidentialité", "nav_install": "Ajouter à Chrome", "hero_pill": "Gratuit et illimité — pas de compte, pas de clés API", "hero_h1": "Exportez <span class=\"grad\">tout</span> depuis X / Twitter", "hero_lead": "Publications, abonnés, abonnements et abonnés vérifiés de n'importe quel profil — directement en CSV, JSON ou Excel. Un clic. Vos données ne quittent jamais votre navigateur.", "hero_cta1": "Ajouter à Chrome — c'est gratuit", "hero_cta2": "Voir sur GitHub", "trust_local": "100% local et privé", "trust_unlimited": "Exports illimités", "trust_langs": "14 langues", "stat_types": "Types d'export", "stat_formats": "Formats de fichier", "stat_langs": "Langues", "stat_unlimited": "Illimité et gratuit", "feat_eyebrow": "Fonctionnalités", "feat_head": "Tout ce qu'il faut pour extraire vos données de X", "feat_sub": "Conçu pour les marketeurs, chercheurs, analystes et créateurs qui ont besoin de vraies données — pas d'un aperçu de 150 tweets.", "f_engage_t": "Métriques d'engagement complètes", "f_engage_d": "Chaque publication s'accompagne des chiffres qui comptent — ainsi que dates, liens, médias et hashtags.", "m_views": "Vues", "m_likes": "J'aime", "m_reposts": "Reposts", "m_replies": "Réponses", "m_quotes": "Citations", "m_bookmarks": "Signets", "f_types_t": "Quatre types d'export", "f_types_d": "Publications, abonnés, abonnements et abonnés vérifiés de n'importe quel profil public.", "f_formats_t": "CSV, JSON et XLSX", "f_formats_d": "CSV pour n'importe quel tableur, XLSX pour Excel, JSON pour les développeurs — générés localement et téléchargés directement chez vous.", "f_dates_t": "Filtrage par plage de dates", "f_dates_d": "Exportez les publications d'une période précise — XPorter récupère exactement la période dont vous avez besoin.", "f_resume_t": "Reprise auto et limitation de débit", "f_resume_d": "La progression est enregistrée pendant l'exécution. Mettez en pause, fermez ou redémarrez votre navigateur et reprenez là où vous vous étiez arrêté — tout en respectant les limites de X.", "f_local_t": "100% local et privé", "f_local_d": "Utilise votre propre session X connectée — pas de mot de passe, pas de clés API, pas de compte. Vos données exportées passent directement de X à votre fichier et ne transitent jamais par nous.", "fmt_eyebrow": "Flexible", "fmt_head": "N'importe quelles données, n'importe quel format", "fmt_sub": "Choisissez quoi exporter et comment vous le voulez.", "chip_posts": "Publications", "chip_followers": "Abonnés", "chip_following": "Abonnements", "chip_verified": "Abonnés vérifiés", "how_eyebrow": "Comment ça marche", "how_head": "Exporter prend quatre clics", "how_sub": "Aucune configuration, aucune inscription. Installez et c'est parti.", "s1_t": "Ouvrir XPorter", "s1_d": "Cliquez sur l'icône XPorter dans votre barre d'outils en étant connecté à X.", "s2_t": "Saisir un nom d'utilisateur", "s2_d": "Tapez l'identifiant de n'importe quel profil, p. ex. <code>elonmusk</code>.", "s3_t": "Choisir type et format", "s3_d": "Publications, abonnés, abonnements ou vérifiés — en CSV, JSON ou Excel.", "s4_t": "Lancer l'export", "s4_d": "Cliquez sur démarrer et téléchargez votre fichier. C'est tout.", "priv_t": "Vos données restent les vôtres", "priv_d": "XPorter s'exécute entièrement dans votre navigateur en utilisant la session X à laquelle vous êtes déjà connecté. Il n'y a aucun serveur XPorter, aucun compte et aucun traqueur pendant l'utilisation — vos données exportées passent directement de X à votre fichier et ne transitent jamais par nous. La seule chose que XPorter envoie est un résumé d'utilisation anonyme et non personnel lors de la désinstallation, afin de comprendre le désabonnement et d'améliorer l'extension.", "priv_link": "Lire la politique de confidentialité complète →", "lang_eyebrow": "Mondial", "lang_head": "Parle votre langue", "lang_sub": "Détecte automatiquement la langue de votre navigateur au premier lancement — modifiable à tout moment.", "cta_t": "Obtenez vos données X en quelques secondes", "cta_d": "Gratuit, illimité et privé. Aucune raison de s'en priver.", "cta_btn": "Ajouter XPorter à Chrome", "foot_privacy": "Confidentialité", "foot_disclaimer": "X et Twitter sont des marques de X Corp. XPorter est un outil indépendant et n'est ni affilié, ni approuvé, ni lié à X Corp. ou Twitter, Inc. © 2026 XPorter."},
+      "it": {"nav_features": "Funzionalità", "nav_how": "Come funziona", "nav_privacy": "Privacy", "nav_install": "Aggiungi a Chrome", "hero_pill": "Gratis e illimitato — niente account, niente chiavi API", "hero_h1": "Esporta <span class=\"grad\">qualsiasi cosa</span> da X / Twitter", "hero_lead": "Post, follower, seguiti e follower verificati da qualsiasi profilo — direttamente in CSV, JSON o Excel. Un clic. I tuoi dati non lasciano mai il tuo browser.", "hero_cta1": "Aggiungi a Chrome — è gratis", "hero_cta2": "Vedi su GitHub", "trust_local": "100% locale e privato", "trust_unlimited": "Esportazioni illimitate", "trust_langs": "14 lingue", "stat_types": "Tipi di esportazione", "stat_formats": "Formati file", "stat_langs": "Lingue", "stat_unlimited": "Illimitato e gratis", "feat_eyebrow": "Funzionalità", "feat_head": "Tutto ciò che serve per estrarre i dati da X", "feat_sub": "Pensato per marketer, ricercatori, analisti e creator che hanno bisogno di dati veri — non di un'anteprima di 150 tweet.", "f_engage_t": "Metriche di engagement complete", "f_engage_d": "Ogni post arriva con i numeri che contano — oltre a date, link, media e hashtag.", "m_views": "Visualizzazioni", "m_likes": "Mi piace", "m_reposts": "Repost", "m_replies": "Risposte", "m_quotes": "Citazioni", "m_bookmarks": "Segnalibri", "f_types_t": "Quattro tipi di esportazione", "f_types_d": "Post, follower, seguiti e follower verificati da qualsiasi profilo pubblico.", "f_formats_t": "CSV, JSON e XLSX", "f_formats_d": "CSV per qualsiasi foglio di calcolo, XLSX per Excel, JSON per sviluppatori — generati localmente e scaricati direttamente a te.", "f_dates_t": "Filtro per intervallo di date", "f_dates_d": "Esporta i post di un periodo specifico — XPorter raccoglie esattamente il periodo che ti serve.", "f_resume_t": "Ripresa automatica e limitazione della frequenza", "f_resume_d": "Lo stato di avanzamento viene salvato mentre l'esportazione è in corso. Metti in pausa, chiudi o riavvia il browser e riprendi da dove avevi lasciato — rispettando i limiti di X.", "f_local_t": "100% locale e privato", "f_local_d": "Usa la tua sessione X già attiva — niente password, niente chiavi API, niente account. I tuoi dati esportati passano direttamente da X al tuo file e non passano mai da noi.", "fmt_eyebrow": "Flessibile", "fmt_head": "Qualsiasi dato, qualsiasi formato", "fmt_sub": "Scegli cosa esportare e come lo vuoi.", "chip_posts": "Post", "chip_followers": "Follower", "chip_following": "Seguiti", "chip_verified": "Follower verificati", "how_eyebrow": "Come funziona", "how_head": "Esportare richiede quattro clic", "how_sub": "Nessuna configurazione, nessuna registrazione. Installa e vai.", "s1_t": "Apri XPorter", "s1_d": "Clicca sull'icona di XPorter nella barra degli strumenti mentre sei connesso a X.", "s2_t": "Inserisci un nome utente", "s2_d": "Digita l'handle di un qualsiasi profilo, ad es. <code>elonmusk</code>.", "s3_t": "Scegli tipo e formato", "s3_d": "Post, follower, seguiti o verificati — come CSV, JSON o Excel.", "s4_t": "Avvia l'esportazione", "s4_d": "Premi avvia e scarica il tuo file. Tutto qui.", "priv_t": "I tuoi dati restano tuoi", "priv_d": "XPorter funziona interamente nel tuo browser usando la sessione X a cui sei già connesso. Non ci sono server XPorter, nessun account e nessun tracker durante l'uso — i tuoi dati esportati passano direttamente da X al tuo file e non passano mai da noi. L'unica cosa che XPorter invia è un riepilogo d'uso anonimo e non personale al momento della disinstallazione, così da capire l'abbandono e migliorare l'estensione.", "priv_link": "Leggi l'informativa sulla privacy completa →", "lang_eyebrow": "Globale", "lang_head": "Parla la tua lingua", "lang_sub": "Rileva automaticamente la lingua del browser al primo avvio — modificabile in qualsiasi momento.", "cta_t": "Ottieni i tuoi dati X in pochi secondi", "cta_d": "Gratis, illimitato e privato. Nessun motivo per non farlo.", "cta_btn": "Aggiungi XPorter a Chrome", "foot_privacy": "Privacy", "foot_disclaimer": "X e Twitter sono marchi di X Corp. XPorter è uno strumento indipendente e non è affiliato, approvato o collegato a X Corp. o Twitter, Inc. © 2026 XPorter."},
+      "pt_BR": {"nav_features": "Recursos", "nav_how": "Como funciona", "nav_privacy": "Privacidade", "nav_install": "Adicionar ao Chrome", "hero_pill": "Grátis e ilimitado — sem conta, sem chaves de API", "hero_h1": "Exporte <span class=\"grad\">qualquer coisa</span> do X / Twitter", "hero_lead": "Publicações, seguidores, seguindo e seguidores verificados de qualquer perfil — direto para CSV, JSON ou Excel. Um clique. Seus dados nunca saem do seu navegador.", "hero_cta1": "Adicionar ao Chrome — é grátis", "hero_cta2": "Ver no GitHub", "trust_local": "100% local e privado", "trust_unlimited": "Exportações ilimitadas", "trust_langs": "14 idiomas", "stat_types": "Tipos de exportação", "stat_formats": "Formatos de arquivo", "stat_langs": "Idiomas", "stat_unlimited": "Ilimitado e grátis", "feat_eyebrow": "Recursos", "feat_head": "Tudo o que você precisa para extrair seus dados do X", "feat_sub": "Feito para profissionais de marketing, pesquisadores, analistas e criadores que precisam de dados reais — não de uma prévia de 150 tweets.", "f_engage_t": "Métricas de engajamento completas", "f_engage_d": "Cada publicação vem com os números que importam — além de datas, links, mídia e hashtags.", "m_views": "Visualizações", "m_likes": "Curtidas", "m_reposts": "Reposts", "m_replies": "Respostas", "m_quotes": "Citações", "m_bookmarks": "Itens salvos", "f_types_t": "Quatro tipos de exportação", "f_types_d": "Publicações, seguidores, seguindo e seguidores verificados de qualquer perfil público.", "f_formats_t": "CSV, JSON e XLSX", "f_formats_d": "CSV para qualquer planilha, XLSX para Excel, JSON para desenvolvedores — gerados localmente e baixados direto para você.", "f_dates_t": "Filtro por intervalo de datas", "f_dates_d": "Exporte publicações de um período específico — o XPorter coleta exatamente o período de que você precisa.", "f_resume_t": "Retomada automática e controle de frequência", "f_resume_d": "O progresso é salvo enquanto roda. Pause, feche ou reinicie seu navegador e continue de onde parou — respeitando os limites do X.", "f_local_t": "100% local e privado", "f_local_d": "Usa a sua própria sessão do X já conectada — sem senha, sem chaves de API, sem conta. Seus dados exportados vão direto do X para o seu arquivo e nunca passam por nós.", "fmt_eyebrow": "Flexível", "fmt_head": "Qualquer dado, qualquer formato", "fmt_sub": "Escolha o que exportar e como você quer.", "chip_posts": "Publicações", "chip_followers": "Seguidores", "chip_following": "Seguindo", "chip_verified": "Seguidores verificados", "how_eyebrow": "Como funciona", "how_head": "Exportar leva quatro cliques", "how_sub": "Sem configuração, sem cadastro. Instale e use.", "s1_t": "Abra o XPorter", "s1_d": "Clique no ícone do XPorter na sua barra de ferramentas enquanto está conectado ao X.", "s2_t": "Digite um nome de usuário", "s2_d": "Digite o identificador de qualquer perfil, ex.: <code>elonmusk</code>.", "s3_t": "Escolha tipo e formato", "s3_d": "Publicações, seguidores, seguindo ou verificados — em CSV, JSON ou Excel.", "s4_t": "Inicie a exportação", "s4_d": "Clique em iniciar e baixe seu arquivo. É só isso.", "priv_t": "Seus dados continuam sendo seus", "priv_d": "O XPorter roda inteiramente no seu navegador usando a sessão do X em que você já está conectado. Não há servidores do XPorter, nem conta, nem rastreadores durante o uso — seus dados exportados vão direto do X para o seu arquivo e nunca passam por nós. A única coisa que o XPorter envia é um resumo de uso anônimo e não pessoal quando você desinstala, para que a desistência possa ser entendida e a extensão aprimorada.", "priv_link": "Leia a política de privacidade completa →", "lang_eyebrow": "Global", "lang_head": "Fala o seu idioma", "lang_sub": "Detecta automaticamente o idioma do seu navegador no primeiro uso — alterável a qualquer momento.", "cta_t": "Obtenha seus dados do X em segundos", "cta_d": "Grátis, ilimitado e privado. Sem motivo para não usar.", "cta_btn": "Adicionar o XPorter ao Chrome", "foot_privacy": "Privacidade", "foot_disclaimer": "X e Twitter são marcas registradas da X Corp. O XPorter é uma ferramenta independente e não é afiliado, endossado ou conectado à X Corp. ou à Twitter, Inc. © 2026 XPorter."},
+      "tr": {"nav_features": "Özellikler", "nav_how": "Nasıl çalışır", "nav_privacy": "Gizlilik", "nav_install": "Chrome'a Ekle", "hero_pill": "Ücretsiz ve sınırsız — hesap yok, API anahtarı yok", "hero_h1": "X / Twitter'dan <span class=\"grad\">her şeyi</span> dışa aktarın", "hero_lead": "Herhangi bir profilden gönderiler, takipçiler, takip edilenler ve doğrulanmış takipçiler — doğrudan CSV, JSON veya Excel'e. Tek tıkla. Verileriniz tarayıcınızdan asla çıkmaz.", "hero_cta1": "Chrome'a Ekle — ücretsiz", "hero_cta2": "GitHub'da Görüntüle", "trust_local": "%100 yerel ve gizli", "trust_unlimited": "Sınırsız dışa aktarma", "trust_langs": "14 dil", "stat_types": "Dışa aktarma türleri", "stat_formats": "Dosya biçimleri", "stat_langs": "Diller", "stat_unlimited": "Sınırsız ve ücretsiz", "feat_eyebrow": "Özellikler", "feat_head": "X verilerini dışa aktarmak için gereken her şey", "feat_sub": "Gerçek veriye ihtiyaç duyan pazarlamacılar, araştırmacılar, analistler ve içerik üreticileri için tasarlandı — 150 tweetlik bir önizleme değil.", "f_engage_t": "Eksiksiz etkileşim metrikleri", "f_engage_d": "Her gönderi önemli sayılarla birlikte gelir — ayrıca tarihler, bağlantılar, medya ve hashtag'ler.", "m_views": "Görüntülenme", "m_likes": "Beğeni", "m_reposts": "Yeniden gönderi", "m_replies": "Yanıtlar", "m_quotes": "Alıntılar", "m_bookmarks": "Yer işaretleri", "f_types_t": "Dört dışa aktarma türü", "f_types_d": "Herhangi bir herkese açık profilden gönderiler, takipçiler, takip edilenler ve doğrulanmış takipçiler.", "f_formats_t": "CSV, JSON ve XLSX", "f_formats_d": "Her elektronik tablo için CSV, Excel için XLSX, geliştiriciler için JSON — yerel olarak oluşturulur ve doğrudan size indirilir.", "f_dates_t": "Tarih aralığı filtreleme", "f_dates_d": "Belirli bir zaman aralığındaki gönderileri dışa aktarın — XPorter tam olarak ihtiyaç duyduğunuz dönemi toplar.", "f_resume_t": "Otomatik devam ettirme ve hız sınırlama", "f_resume_d": "İlerleme çalışırken kaydedilir. Tarayıcınızı duraklatın, kapatın veya yeniden başlatın ve kaldığınız yerden devam edin — hem de X'in sınırlarına uyarak.", "f_local_t": "%100 yerel ve gizli", "f_local_d": "Kendi oturum açtığınız X oturumunuzu kullanır — parola yok, API anahtarı yok, hesap yok. Dışa aktardığınız veriler doğrudan X'ten dosyanıza gider ve asla bizden geçmez.", "fmt_eyebrow": "Esnek", "fmt_head": "Her veri, her biçim", "fmt_sub": "Neyi dışa aktaracağınızı ve nasıl istediğinizi seçin.", "chip_posts": "Gönderiler", "chip_followers": "Takipçiler", "chip_following": "Takip edilenler", "chip_verified": "Doğrulanmış takipçiler", "how_eyebrow": "Nasıl çalışır", "how_head": "Dışa aktarmak dört tık sürer", "how_sub": "Kurulum yok, kayıt yok. Yükle ve başla.", "s1_t": "XPorter'ı aç", "s1_d": "X'te oturum açıkken araç çubuğunuzdaki XPorter simgesine tıklayın.", "s2_t": "Bir kullanıcı adı gir", "s2_d": "Herhangi bir profil kullanıcı adını yazın, ör. <code>elonmusk</code>.", "s3_t": "Tür ve biçim seç", "s3_d": "Gönderiler, takipçiler, takip edilenler veya doğrulanmışlar — CSV, JSON veya Excel olarak.", "s4_t": "Dışa aktarmaya başla", "s4_d": "Başlat'a basın ve dosyanızı indirin. Hepsi bu kadar.", "priv_t": "Verileriniz sizin kalır", "priv_d": "XPorter, zaten oturum açtığınız X oturumunu kullanarak tamamen tarayıcınızda çalışır. XPorter sunucusu, hesap ve kullanım sırasında izleyici yoktur — dışa aktardığınız veriler doğrudan X'ten dosyanıza gider ve asla bizden geçmez. XPorter'ın gönderdiği tek şey, kaldırma sırasında anonim ve kişisel olmayan bir kullanım özetidir; bu sayede kullanıcı kaybı anlaşılabilir ve eklenti geliştirilebilir.", "priv_link": "Tam gizlilik politikasını okuyun →", "lang_eyebrow": "Küresel", "lang_head": "Dilinizi konuşur", "lang_sub": "İlk açılışta tarayıcı dilinizi otomatik algılar — istediğiniz zaman değiştirilebilir.", "cta_t": "X verilerinizi saniyeler içinde alın", "cta_d": "Ücretsiz, sınırsız ve gizli. Kullanmamak için hiçbir neden yok.", "cta_btn": "XPorter'ı Chrome'a Ekle", "foot_privacy": "Gizlilik", "foot_disclaimer": "X ve Twitter, X Corp. şirketinin ticari markalarıdır. XPorter bağımsız bir araçtır; X Corp. veya Twitter, Inc. ile bağlantılı, onlar tarafından onaylanmış veya onlara bağlı değildir. © 2026 XPorter."},
+      "id": {"nav_features": "Fitur", "nav_how": "Cara kerja", "nav_privacy": "Privasi", "nav_install": "Tambahkan ke Chrome", "hero_pill": "Gratis & tanpa batas — tanpa akun, tanpa kunci API", "hero_h1": "Ekspor <span class=\"grad\">apa saja</span> dari X / Twitter", "hero_lead": "Postingan, pengikut, mengikuti, dan pengikut terverifikasi dari profil mana pun — langsung ke CSV, JSON, atau Excel. Satu klik. Data Anda tidak pernah keluar dari browser Anda.", "hero_cta1": "Tambahkan ke Chrome — gratis", "hero_cta2": "Lihat di GitHub", "trust_local": "100% lokal & privat", "trust_unlimited": "Ekspor tanpa batas", "trust_langs": "14 bahasa", "stat_types": "Jenis ekspor", "stat_formats": "Format file", "stat_langs": "Bahasa", "stat_unlimited": "Tanpa batas & gratis", "feat_eyebrow": "Fitur", "feat_head": "Semua yang Anda butuhkan untuk mengeluarkan data X", "feat_sub": "Dibuat untuk pemasar, peneliti, analis, dan kreator yang membutuhkan data nyata — bukan pratinjau 150 tweet.", "f_engage_t": "Metrik interaksi lengkap", "f_engage_d": "Setiap postingan disertai angka yang penting — plus tanggal, tautan, media, dan tagar.", "m_views": "Tayangan", "m_likes": "Suka", "m_reposts": "Repost", "m_replies": "Balasan", "m_quotes": "Kutipan", "m_bookmarks": "Markah", "f_types_t": "Empat jenis ekspor", "f_types_d": "Postingan, pengikut, mengikuti, dan pengikut terverifikasi dari profil publik mana pun.", "f_formats_t": "CSV, JSON & XLSX", "f_formats_d": "CSV untuk spreadsheet apa pun, XLSX untuk Excel, JSON untuk pengembang — dibuat secara lokal dan diunduh langsung ke Anda.", "f_dates_t": "Pemfilteran rentang tanggal", "f_dates_d": "Ekspor postingan dari rentang waktu tertentu — XPorter mengumpulkan persis periode yang Anda butuhkan.", "f_resume_t": "Lanjut otomatis & pembatasan laju", "f_resume_d": "Progres disimpan saat berjalan. Jeda, tutup, atau mulai ulang browser Anda lalu lanjutkan dari titik terakhir — sembari menghormati batasan X.", "f_local_t": "100% lokal & privat", "f_local_d": "Menggunakan sesi X Anda sendiri yang sudah login — tanpa kata sandi, tanpa kunci API, tanpa akun. Data ekspor Anda langsung dari X ke file Anda dan tidak pernah melewati kami.", "fmt_eyebrow": "Fleksibel", "fmt_head": "Data apa pun, format apa pun", "fmt_sub": "Pilih apa yang akan diekspor dan bagaimana Anda menginginkannya.", "chip_posts": "Postingan", "chip_followers": "Pengikut", "chip_following": "Mengikuti", "chip_verified": "Pengikut terverifikasi", "how_eyebrow": "Cara kerja", "how_head": "Mengekspor butuh empat klik", "how_sub": "Tanpa penyiapan, tanpa pendaftaran. Pasang dan jalan.", "s1_t": "Buka XPorter", "s1_d": "Klik ikon XPorter di bilah alat Anda saat login ke X.", "s2_t": "Masukkan nama pengguna", "s2_d": "Ketik handel profil mana pun, mis. <code>elonmusk</code>.", "s3_t": "Pilih jenis & format", "s3_d": "Postingan, pengikut, mengikuti, atau terverifikasi — sebagai CSV, JSON, atau Excel.", "s4_t": "Mulai ekspor", "s4_d": "Tekan mulai dan unduh file Anda. Selesai.", "priv_t": "Data Anda tetap milik Anda", "priv_d": "XPorter berjalan sepenuhnya di browser Anda menggunakan sesi X tempat Anda sudah login. Tidak ada server XPorter, tidak ada akun, dan tidak ada pelacak selama pemakaian — data ekspor Anda langsung dari X ke file Anda dan tidak pernah melewati kami. Satu-satunya hal yang pernah dikirim XPorter adalah ringkasan penggunaan yang anonim dan non-pribadi saat Anda menghapus instalasi, agar churn dapat dipahami dan ekstensi disempurnakan.", "priv_link": "Baca kebijakan privasi lengkap →", "lang_eyebrow": "Global", "lang_head": "Berbicara dalam bahasa Anda", "lang_sub": "Mendeteksi otomatis bahasa browser Anda saat pertama dijalankan — dapat diganti kapan saja.", "cta_t": "Dapatkan data X Anda dalam hitungan detik", "cta_d": "Gratis, tanpa batas, dan privat. Tidak ada alasan untuk tidak.", "cta_btn": "Tambahkan XPorter ke Chrome", "foot_privacy": "Privasi", "foot_disclaimer": "X dan Twitter adalah merek dagang dari X Corp. XPorter adalah alat independen dan tidak berafiliasi dengan, didukung oleh, atau terhubung ke X Corp. atau Twitter, Inc. © 2026 XPorter."},
+      "ar": {"nav_features": "الميزات", "nav_how": "كيف يعمل", "nav_privacy": "الخصوصية", "nav_install": "إضافة إلى Chrome", "hero_pill": "مجاني وغير محدود — بدون حساب، بدون مفاتيح API", "hero_h1": "صدّر <span class=\"grad\">أي شيء</span> من X / Twitter", "hero_lead": "المنشورات والمتابِعون والمتابَعون والمتابِعون الموثّقون من أي حساب — مباشرةً إلى CSV أو JSON أو Excel. بنقرة واحدة. بياناتك لا تغادر متصفحك أبداً.", "hero_cta1": "إضافة إلى Chrome — مجاناً", "hero_cta2": "عرض على GitHub", "trust_local": "محلي وخاص 100%", "trust_unlimited": "تصديرات غير محدودة", "trust_langs": "14 لغة", "stat_types": "أنواع التصدير", "stat_formats": "صيغ الملفات", "stat_langs": "اللغات", "stat_unlimited": "غير محدود ومجاني", "feat_eyebrow": "الميزات", "feat_head": "كل ما تحتاجه لإخراج بيانات X", "feat_sub": "مصمَّم للمسوّقين والباحثين والمحلّلين وصنّاع المحتوى الذين يحتاجون بيانات حقيقية — لا معاينة من 150 تغريدة.", "f_engage_t": "مقاييس تفاعل كاملة", "f_engage_d": "كل منشور يأتي مع الأرقام التي تهمّ — إضافةً إلى التواريخ والروابط والوسائط والوسوم.", "m_views": "المشاهدات", "m_likes": "الإعجابات", "m_reposts": "إعادات النشر", "m_replies": "الردود", "m_quotes": "الاقتباسات", "m_bookmarks": "الإشارات المرجعية", "f_types_t": "أربعة أنواع تصدير", "f_types_d": "المنشورات والمتابِعون والمتابَعون والمتابِعون الموثّقون من أي حساب عام.", "f_formats_t": "CSV وJSON وXLSX", "f_formats_d": "CSV لأي جدول بيانات، وXLSX لـ Excel، وJSON للمطوّرين — تُبنى محلياً وتُنزَّل إليك مباشرةً.", "f_dates_t": "التصفية حسب نطاق التاريخ", "f_dates_d": "صدّر المنشورات من نطاق زمني محدّد — يجمع XPorter الفترة التي تحتاجها بالضبط.", "f_resume_t": "استئناف تلقائي وتحديد المعدّل", "f_resume_d": "يُحفظ التقدّم أثناء التشغيل. أوقف مؤقتاً أو أغلق أو أعد تشغيل متصفحك ثم تابع من حيث توقفت — مع احترام حدود X.", "f_local_t": "محلي وخاص 100%", "f_local_d": "يستخدم جلسة X الخاصة بك التي سجّلت دخولها بالفعل — بدون كلمة مرور، بدون مفاتيح API، بدون حساب. تنتقل بياناتك المصدَّرة مباشرة من X إلى ملفك ولا تمرّ عبرنا أبداً.", "fmt_eyebrow": "مرن", "fmt_head": "أي بيانات، أي صيغة", "fmt_sub": "اختر ما تريد تصديره وكيف تريده.", "chip_posts": "المنشورات", "chip_followers": "المتابِعون", "chip_following": "المتابَعون", "chip_verified": "متابعون موثقون", "how_eyebrow": "كيف يعمل", "how_head": "التصدير يستغرق أربع نقرات", "how_sub": "بدون إعداد، بدون تسجيل. ثبّته وابدأ.", "s1_t": "افتح XPorter", "s1_d": "انقر على أيقونة XPorter في شريط الأدوات وأنت مسجّل الدخول إلى X.", "s2_t": "أدخل اسم مستخدم", "s2_d": "اكتب معرّف أي حساب، مثل <code>elonmusk</code>.", "s3_t": "اختر النوع والصيغة", "s3_d": "المنشورات أو المتابِعون أو المتابَعون أو الموثّقون — بصيغة CSV أو JSON أو Excel.", "s4_t": "ابدأ التصدير", "s4_d": "اضغط على بدء ونزّل ملفك. هذا كل شيء.", "priv_t": "بياناتك تبقى ملكك", "priv_d": "يعمل XPorter بالكامل داخل متصفحك مستخدماً جلسة X التي سجّلت دخولها بالفعل. لا توجد خوادم لـ XPorter، ولا حساب، ولا أدوات تتبّع أثناء الاستخدام — تنتقل بياناتك المصدَّرة مباشرة من X إلى ملفك ولا تمرّ عبرنا أبداً. الشيء الوحيد الذي يرسله XPorter هو ملخّص استخدام مجهول الهوية وغير شخصي عند إلغاء التثبيت، حتى يمكن فهم معدّل التوقّف وتحسين الامتداد.", "priv_link": "اقرأ سياسة الخصوصية الكاملة →", "lang_eyebrow": "عالمي", "lang_head": "يتحدّث لغتك", "lang_sub": "يكتشف لغة متصفحك تلقائياً عند أول تشغيل — قابلة للتبديل في أي وقت.", "cta_t": "احصل على بيانات X في ثوانٍ", "cta_d": "مجاني وغير محدود وخاص. لا سبب يمنعك.", "cta_btn": "أضف XPorter إلى Chrome", "foot_privacy": "الخصوصية", "foot_disclaimer": "X وTwitter علامتان تجاريتان لـ X Corp. إن XPorter أداة مستقلة وغير تابعة لـ X Corp. أو Twitter, Inc.، وغير معتمدة منهما أو مرتبطة بهما. © 2026 XPorter."},
+      "hi": {"nav_features": "विशेषताएँ", "nav_how": "यह कैसे काम करता है", "nav_privacy": "गोपनीयता", "nav_install": "Chrome में जोड़ें", "hero_pill": "मुफ़्त और असीमित — न खाता, न API कुंजियाँ", "hero_h1": "X / Twitter से <span class=\"grad\">कुछ भी</span> एक्सपोर्ट करें", "hero_lead": "किसी भी प्रोफ़ाइल से पोस्ट, फ़ॉलोअर्स, फ़ॉलोइंग और सत्यापित फ़ॉलोअर्स — सीधे CSV, JSON या Excel में। एक क्लिक। आपका डेटा कभी आपके ब्राउज़र से बाहर नहीं जाता।", "hero_cta1": "Chrome में जोड़ें — यह मुफ़्त है", "hero_cta2": "GitHub पर देखें", "trust_local": "100% लोकल और निजी", "trust_unlimited": "असीमित एक्सपोर्ट", "trust_langs": "14 भाषाएँ", "stat_types": "एक्सपोर्ट प्रकार", "stat_formats": "फ़ाइल फ़ॉर्मेट", "stat_langs": "भाषाएँ", "stat_unlimited": "असीमित और मुफ़्त", "feat_eyebrow": "विशेषताएँ", "feat_head": "X डेटा बाहर निकालने के लिए ज़रूरी हर चीज़", "feat_sub": "उन मार्केटर्स, शोधकर्ताओं, विश्लेषकों और क्रिएटर्स के लिए बनाया गया जिन्हें असली डेटा चाहिए — 150 ट्वीट का प्रीव्यू नहीं।", "f_engage_t": "पूर्ण एंगेजमेंट मेट्रिक्स", "f_engage_d": "हर पोस्ट के साथ वे आँकड़े आते हैं जो मायने रखते हैं — साथ ही तारीखें, लिंक, मीडिया और हैशटैग।", "m_views": "व्यूज़", "m_likes": "लाइक", "m_reposts": "रिपोस्ट", "m_replies": "जवाब", "m_quotes": "उद्धरण", "m_bookmarks": "बुकमार्क", "f_types_t": "चार एक्सपोर्ट प्रकार", "f_types_d": "किसी भी सार्वजनिक प्रोफ़ाइल से पोस्ट, फ़ॉलोअर्स, फ़ॉलोइंग और सत्यापित फ़ॉलोअर्स।", "f_formats_t": "CSV, JSON और XLSX", "f_formats_d": "किसी भी स्प्रेडशीट के लिए CSV, Excel के लिए XLSX, डेवलपर्स के लिए JSON — लोकल रूप से बनाए जाते हैं और सीधे आपके पास डाउनलोड होते हैं।", "f_dates_t": "तारीख-सीमा फ़िल्टरिंग", "f_dates_d": "किसी खास समयावधि की पोस्ट एक्सपोर्ट करें — XPorter ठीक उसी अवधि को इकट्ठा करता है जिसकी आपको ज़रूरत है।", "f_resume_t": "ऑटो-रिज़्यूम और रेट लिमिटिंग", "f_resume_d": "चलते समय प्रगति सहेजी जाती है। अपने ब्राउज़र को रोकें, बंद करें या फिर से शुरू करें और जहाँ छोड़ा था वहीं से जारी रखें — और वह भी X की सीमाओं का सम्मान करते हुए।", "f_local_t": "100% लोकल और निजी", "f_local_d": "आपके अपने लॉग-इन किए हुए X सेशन का उपयोग करता है — कोई पासवर्ड नहीं, कोई API कुंजी नहीं, कोई खाता नहीं। आपका एक्सपोर्ट किया गया डेटा सीधे X से आपकी फ़ाइल में जाता है और कभी हमारे ज़रिए नहीं गुज़रता।", "fmt_eyebrow": "लचीला", "fmt_head": "कोई भी डेटा, कोई भी फ़ॉर्मेट", "fmt_sub": "चुनें कि क्या एक्सपोर्ट करना है और कैसे चाहिए।", "chip_posts": "पोस्ट", "chip_followers": "फ़ॉलोअर्स", "chip_following": "फ़ॉलोइंग", "chip_verified": "सत्यापित फ़ॉलोअर्स", "how_eyebrow": "यह कैसे काम करता है", "how_head": "एक्सपोर्ट में चार क्लिक लगते हैं", "how_sub": "कोई सेटअप नहीं, कोई साइन-अप नहीं। इंस्टॉल करें और चल पड़ें।", "s1_t": "XPorter खोलें", "s1_d": "X में लॉग-इन रहते हुए अपने टूलबार में XPorter आइकन पर क्लिक करें।", "s2_t": "एक यूज़रनेम डालें", "s2_d": "किसी भी प्रोफ़ाइल का हैंडल टाइप करें, जैसे <code>elonmusk</code>।", "s3_t": "प्रकार और फ़ॉर्मेट चुनें", "s3_d": "पोस्ट, फ़ॉलोअर्स, फ़ॉलोइंग या सत्यापित — CSV, JSON या Excel के रूप में।", "s4_t": "एक्सपोर्ट शुरू करें", "s4_d": "शुरू करें पर क्लिक करें और अपनी फ़ाइल डाउनलोड करें। बस इतना ही।", "priv_t": "आपका डेटा आपका ही रहता है", "priv_d": "XPorter पूरी तरह आपके ब्राउज़र में चलता है और उसी X सेशन का उपयोग करता है जिसमें आप पहले से लॉग-इन हैं। न कोई XPorter सर्वर है, न कोई खाता, और न उपयोग के दौरान कोई ट्रैकर — आपका एक्सपोर्ट किया गया डेटा सीधे X से आपकी फ़ाइल में जाता है और कभी हमारे ज़रिए नहीं गुज़रता। XPorter सिर्फ़ एक चीज़ भेजता है: अनइंस्टॉल करते समय एक अनाम, गैर-व्यक्तिगत उपयोग सारांश, ताकि चर्न को समझा जा सके और एक्सटेंशन को बेहतर बनाया जा सके।", "priv_link": "पूरी गोपनीयता नीति पढ़ें →", "lang_eyebrow": "वैश्विक", "lang_head": "आपकी भाषा बोलता है", "lang_sub": "पहली बार शुरू होने पर आपके ब्राउज़र की भाषा अपने आप पहचानता है — कभी भी बदला जा सकता है।", "cta_t": "सेकंडों में अपना X डेटा पाएँ", "cta_d": "मुफ़्त, असीमित और निजी। न करने की कोई वजह नहीं।", "cta_btn": "XPorter को Chrome में जोड़ें", "foot_privacy": "गोपनीयता", "foot_disclaimer": "X और Twitter, X Corp. के ट्रेडमार्क हैं। XPorter एक स्वतंत्र टूल है और X Corp. या Twitter, Inc. से संबद्ध, समर्थित या जुड़ा हुआ नहीं है। © 2026 XPorter."},
+      "ja": {"nav_features": "機能", "nav_how": "使い方", "nav_privacy": "プライバシー", "nav_install": "Chrome に追加", "hero_pill": "無料・無制限 — アカウント不要、APIキー不要", "hero_h1": "X / Twitter から<span class=\"grad\">なんでも</span>エクスポート", "hero_lead": "どんなプロフィールからも、ポスト・フォロワー・フォロー中・認証済みフォロワーを — そのまま CSV、JSON、Excel へ。ワンクリックで。あなたのデータがブラウザの外に出ることはありません。", "hero_cta1": "Chrome に追加 — 無料", "hero_cta2": "GitHub で見る", "trust_local": "100% ローカルでプライベート", "trust_unlimited": "無制限のエクスポート", "trust_langs": "14言語", "stat_types": "エクスポート種別", "stat_formats": "ファイル形式", "stat_langs": "言語", "stat_unlimited": "無制限・無料", "feat_eyebrow": "機能", "feat_head": "X のデータを取り出すのに必要なすべて", "feat_sub": "150件のプレビューではなく、本物のデータを必要とするマーケター・研究者・アナリスト・クリエイターのために作りました。", "f_engage_t": "完全なエンゲージメント指標", "f_engage_d": "すべてのポストに、重要な数値が付いてきます — さらに日付・リンク・メディア・ハッシュタグも。", "m_views": "表示数", "m_likes": "いいね", "m_reposts": "リポスト", "m_replies": "返信", "m_quotes": "引用", "m_bookmarks": "ブックマーク", "f_types_t": "4つのエクスポート種別", "f_types_d": "どんな公開プロフィールからも、ポスト・フォロワー・フォロー中・認証済みフォロワーを取得。", "f_formats_t": "CSV・JSON・XLSX", "f_formats_d": "どんな表計算ソフトにも使える CSV、Excel 向けの XLSX、開発者向けの JSON — ローカルで作成し、そのままあなたにダウンロード。", "f_dates_t": "日付範囲フィルタ", "f_dates_d": "特定の期間のポストをエクスポート — XPorter は必要な期間だけを正確に集めます。", "f_resume_t": "自動再開とレート制限", "f_resume_d": "実行中も進行状況を保存。ブラウザを一時停止・終了・再起動しても、中断したところから再開できます — しかも X の制限を守りながら。", "f_local_t": "100% ローカルでプライベート", "f_local_d": "あなた自身のログイン済み X セッションを使用 — パスワード不要、APIキー不要、アカウント不要。エクスポートしたデータは X からあなたのファイルへ直接渡され、私たちを経由することは一切ありません。", "fmt_eyebrow": "柔軟", "fmt_head": "どんなデータも、どんな形式でも", "fmt_sub": "何をエクスポートするか、どう欲しいかを選ぶだけ。", "chip_posts": "ポスト", "chip_followers": "フォロワー", "chip_following": "フォロー中", "chip_verified": "認証済みフォロワー", "how_eyebrow": "使い方", "how_head": "エクスポートは4クリック", "how_sub": "セットアップも登録も不要。インストールしてすぐ使えます。", "s1_t": "XPorter を開く", "s1_d": "X にログインした状態で、ツールバーの XPorter アイコンをクリックします。", "s2_t": "ユーザー名を入力", "s2_d": "任意のプロフィールのハンドルを入力します。例：<code>elonmusk</code>。", "s3_t": "種別と形式を選ぶ", "s3_d": "ポスト・フォロワー・フォロー中・認証済み — CSV、JSON、Excel で。", "s4_t": "エクスポート開始", "s4_d": "開始を押してファイルをダウンロード。それだけです。", "priv_t": "あなたのデータはあなたのもの", "priv_d": "XPorter は、すでにログイン済みの X セッションを使い、すべてあなたのブラウザ内で動作します。XPorter のサーバーもアカウントも、使用中のトラッカーもありません — エクスポートしたデータは X からあなたのファイルへ直接渡され、私たちを経由することは一切ありません。XPorter が送るのは、アンインストール時の匿名・非個人的な利用サマリーのみで、これは離脱を把握し、拡張機能を改善するためのものです。", "priv_link": "プライバシーポリシー全文を読む →", "lang_eyebrow": "グローバル", "lang_head": "あなたの言語を話します", "lang_sub": "初回起動時にブラウザの言語を自動検出 — いつでも切り替え可能。", "cta_t": "X のデータを数秒で手に入れる", "cta_d": "無料・無制限・プライベート。使わない理由がありません。", "cta_btn": "XPorter を Chrome に追加", "foot_privacy": "プライバシー", "foot_disclaimer": "X および Twitter は X Corp. の商標です。XPorter は独立したツールであり、X Corp. または Twitter, Inc. と提携・承認・関連はありません。© 2026 XPorter。"},
+      "ko": {"nav_features": "기능", "nav_how": "작동 방식", "nav_privacy": "개인정보", "nav_install": "Chrome에 추가", "hero_pill": "무료 & 무제한 — 계정 불필요, API 키 불필요", "hero_h1": "X / Twitter에서 <span class=\"grad\">무엇이든</span> 내보내기", "hero_lead": "어떤 프로필에서든 게시물, 팔로워, 팔로잉, 인증된 팔로워를 — 바로 CSV, JSON 또는 Excel로. 한 번의 클릭. 데이터는 절대 브라우저를 벗어나지 않습니다.", "hero_cta1": "Chrome에 추가 — 무료", "hero_cta2": "GitHub에서 보기", "trust_local": "100% 로컬 및 비공개", "trust_unlimited": "무제한 내보내기", "trust_langs": "14개 언어", "stat_types": "내보내기 유형", "stat_formats": "파일 형식", "stat_langs": "언어", "stat_unlimited": "무제한 & 무료", "feat_eyebrow": "기능", "feat_head": "X 데이터를 빼내는 데 필요한 모든 것", "feat_sub": "150개 트윗 미리보기가 아니라 진짜 데이터가 필요한 마케터, 연구자, 분석가, 크리에이터를 위해 만들었습니다.", "f_engage_t": "완전한 참여 지표", "f_engage_d": "모든 게시물에 중요한 수치가 함께 제공됩니다 — 날짜, 링크, 미디어, 해시태그까지.", "m_views": "조회수", "m_likes": "좋아요", "m_reposts": "리포스트", "m_replies": "답글", "m_quotes": "인용", "m_bookmarks": "북마크", "f_types_t": "네 가지 내보내기 유형", "f_types_d": "어떤 공개 프로필에서든 게시물, 팔로워, 팔로잉, 인증된 팔로워.", "f_formats_t": "CSV, JSON & XLSX", "f_formats_d": "어떤 스프레드시트에도 쓸 수 있는 CSV, Excel용 XLSX, 개발자용 JSON — 로컬에서 생성되어 바로 다운로드됩니다.", "f_dates_t": "날짜 범위 필터링", "f_dates_d": "특정 기간의 게시물을 내보냅니다 — XPorter는 필요한 기간만 정확히 수집합니다.", "f_resume_t": "자동 재개 & 속도 제한", "f_resume_d": "실행 중에 진행 상황이 저장됩니다. 브라우저를 일시정지, 종료 또는 재시작해도 멈춘 지점부터 이어집니다 — X의 제한을 지키면서요.", "f_local_t": "100% 로컬 및 비공개", "f_local_d": "이미 로그인된 내 X 세션을 사용합니다 — 비밀번호도, API 키도, 계정도 없습니다. 내보낸 데이터는 X에서 곧장 파일로 전달되며 저희를 거치는 일은 전혀 없습니다.", "fmt_eyebrow": "유연함", "fmt_head": "어떤 데이터든, 어떤 형식이든", "fmt_sub": "무엇을 내보낼지, 어떻게 받을지 선택하세요.", "chip_posts": "게시물", "chip_followers": "팔로워", "chip_following": "팔로잉", "chip_verified": "인증된 팔로워", "how_eyebrow": "작동 방식", "how_head": "내보내기는 네 번의 클릭", "how_sub": "설정도, 가입도 없습니다. 설치하면 바로 시작.", "s1_t": "XPorter 열기", "s1_d": "X에 로그인한 상태에서 도구 모음의 XPorter 아이콘을 클릭하세요.", "s2_t": "사용자 이름 입력", "s2_d": "아무 프로필의 핸들을 입력하세요. 예: <code>elonmusk</code>.", "s3_t": "유형 & 형식 선택", "s3_d": "게시물, 팔로워, 팔로잉 또는 인증됨 — CSV, JSON 또는 Excel로.", "s4_t": "내보내기 시작", "s4_d": "시작을 누르고 파일을 다운로드하세요. 그게 전부입니다.", "priv_t": "데이터는 당신의 것으로 남습니다", "priv_d": "XPorter는 이미 로그인된 X 세션을 사용해 전적으로 당신의 브라우저 안에서 실행됩니다. XPorter 서버도, 계정도, 사용 중 추적기도 없습니다 — 내보낸 데이터는 X에서 곧장 파일로 전달되며 저희를 거치는 일은 전혀 없습니다. XPorter가 보내는 유일한 것은 제거 시 익명의 비개인적 사용 요약뿐이며, 이는 이탈을 이해하고 확장 프로그램을 개선하기 위함입니다.", "priv_link": "전체 개인정보 보호정책 읽기 →", "lang_eyebrow": "글로벌", "lang_head": "당신의 언어로 말합니다", "lang_sub": "처음 실행할 때 브라우저 언어를 자동 감지합니다 — 언제든 변경 가능.", "cta_t": "X 데이터를 몇 초 만에 받으세요", "cta_d": "무료, 무제한, 비공개. 안 할 이유가 없습니다.", "cta_btn": "XPorter를 Chrome에 추가", "foot_privacy": "개인정보", "foot_disclaimer": "X와 Twitter는 X Corp.의 상표입니다. XPorter는 독립적인 도구이며 X Corp. 또는 Twitter, Inc.와 제휴, 보증 또는 연결되어 있지 않습니다. © 2026 XPorter."},
+      "zh_CN": {"nav_features": "功能", "nav_how": "工作原理", "nav_privacy": "隐私", "nav_install": "添加到 Chrome", "hero_pill": "免费且无限制 — 无需账户，无需 API 密钥", "hero_h1": "从 X / Twitter 导出<span class=\"grad\">一切</span>", "hero_lead": "从任意主页导出帖子、关注者、正在关注和已认证关注者 — 直接生成 CSV、JSON 或 Excel。一键搞定。你的数据永远不会离开浏览器。", "hero_cta1": "添加到 Chrome — 免费", "hero_cta2": "在 GitHub 查看", "trust_local": "100% 本地且私密", "trust_unlimited": "无限次导出", "trust_langs": "14 种语言", "stat_types": "导出类型", "stat_formats": "文件格式", "stat_langs": "语言", "stat_unlimited": "无限制且免费", "feat_eyebrow": "功能", "feat_head": "导出 X 数据所需的一切", "feat_sub": "专为需要真实数据的营销人员、研究者、分析师和创作者打造 — 不是只能看 150 条推文的预览。", "f_engage_t": "完整互动指标", "f_engage_d": "每条帖子都附带真正重要的数字 — 还有日期、链接、媒体和话题标签。", "m_views": "浏览量", "m_likes": "点赞", "m_reposts": "转发", "m_replies": "回复", "m_quotes": "引用", "m_bookmarks": "书签", "f_types_t": "四种导出类型", "f_types_d": "从任意公开主页导出帖子、关注者、正在关注和已认证关注者。", "f_formats_t": "CSV、JSON 和 XLSX", "f_formats_d": "CSV 适用于任何电子表格，XLSX 适用于 Excel，JSON 适用于开发者 — 在本地生成并直接下载给你。", "f_dates_t": "日期范围筛选", "f_dates_d": "导出特定时间段内的帖子 — XPorter 只精确收集你需要的那段时间。", "f_resume_t": "自动恢复与速率限制", "f_resume_d": "运行时会保存进度。暂停、关闭或重启浏览器后，都可从中断处继续 — 同时遵守 X 的限制。", "f_local_t": "100% 本地且私密", "f_local_d": "使用你自己已登录的 X 会话 — 无需密码、无需 API 密钥、无需账户。导出的数据直接从 X 进入你的文件，绝不会经过我们。", "fmt_eyebrow": "灵活", "fmt_head": "任意数据，任意格式", "fmt_sub": "选择导出什么，以及你想要的方式。", "chip_posts": "帖子", "chip_followers": "关注者", "chip_following": "正在关注", "chip_verified": "已认证关注者", "how_eyebrow": "工作原理", "how_head": "导出只需四次点击", "how_sub": "无需设置，无需注册。装好即用。", "s1_t": "打开 XPorter", "s1_d": "在登录 X 的状态下，点击工具栏中的 XPorter 图标。", "s2_t": "输入用户名", "s2_d": "输入任意主页的用户名，例如 <code>elonmusk</code>。", "s3_t": "选择类型和格式", "s3_d": "帖子、关注者、正在关注或已认证 — 导出为 CSV、JSON 或 Excel。", "s4_t": "开始导出", "s4_d": "点击开始并下载文件。就这么简单。", "priv_t": "你的数据始终属于你", "priv_d": "XPorter 完全在你的浏览器中运行，使用你已经登录的 X 会话。没有 XPorter 服务器，无需账户，使用期间也没有任何追踪器 — 导出的数据直接从 X 进入你的文件，绝不会经过我们。XPorter 唯一发送的，是在你卸载时的一份匿名、非个人化使用摘要，以便了解流失情况并改进扩展。", "priv_link": "阅读完整隐私政策 →", "lang_eyebrow": "全球", "lang_head": "说你的语言", "lang_sub": "首次启动时自动检测你的浏览器语言 — 随时可切换。", "cta_t": "几秒内获取你的 X 数据", "cta_d": "免费、无限制且私密。没有理由不用。", "cta_btn": "将 XPorter 添加到 Chrome", "foot_privacy": "隐私", "foot_disclaimer": "X 和 Twitter 是 X Corp. 的商标。XPorter 是一款独立工具，与 X Corp. 或 Twitter, Inc. 无任何隶属、背书或关联关系。© 2026 XPorter。"}
+    };
+
+    var LANG_NAMES = { en: "English", ru: "Русский", de: "Deutsch", es: "Español", fr: "Français", it: "Italiano", pt_BR: "Português", tr: "Türkçe", id: "Indonesia", ar: "العربية", hi: "हिन्दी", ja: "日本語", ko: "한국어", zh_CN: "中文" };
+    var RTL = ["ar"];
+
+    function pickLang() {
+      var valid = function (c) { return c && I18N[c]; };
+      try { var saved = localStorage.getItem("xporter_lang"); if (valid(saved)) return saved; } catch (e) {}
+      var navs = navigator.languages || [navigator.language || "en"];
+      for (var i = 0; i < navs.length; i++) {
+        var n = navs[i].replace("-", "_"); if (valid(n)) return n;
+        var b = navs[i].split(/[-_]/)[0];
+        if (b === "pt") return "pt_BR"; if (b === "zh") return "zh_CN"; if (valid(b)) return b;
+      }
+      return "en";
+    }
+    var lang = pickLang();
+    function t(k) { return (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k; }
+    function applyI18n() {
+      document.documentElement.lang = lang.replace("_", "-");
+      document.documentElement.dir = RTL.indexOf(lang) >= 0 ? "rtl" : "ltr";
+      document.querySelectorAll("[data-i18n]").forEach(function (el) { el.textContent = t(el.getAttribute("data-i18n")); });
+      document.querySelectorAll("[data-i18n-html]").forEach(function (el) { el.innerHTML = t(el.getAttribute("data-i18n-html")); });
+    }
+    var langSelect = document.getElementById("langSelect");
+    Object.keys(I18N).sort(function (a, b) { return (LANG_NAMES[a] || a).localeCompare(LANG_NAMES[b] || b); }).forEach(function (code) {
+      var o = document.createElement("option"); o.value = code; o.textContent = LANG_NAMES[code] || code;
+      if (code === lang) o.selected = true; langSelect.appendChild(o);
+    });
+    langSelect.addEventListener("change", function (e) { lang = e.target.value; try { localStorage.setItem("xporter_lang", lang); } catch (err) {} applyI18n(); });
+    applyI18n();
+
+    /* ---------------- scroll reveal ---------------- */
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+      }, { threshold: 0.12 });
+      document.querySelectorAll(".reveal").forEach(function (el, i) { el.style.transitionDelay = (Math.min(i % 6, 5) * 0.06) + "s"; io.observe(el); });
+    } else {
+      document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
+    }
+
+    /* ---------------- count-up ---------------- */
+    function countUp(el) {
+      var target = parseInt(el.getAttribute("data-count"), 10); if (!target) return;
+      var start = null, dur = 900;
+      function step(ts) { if (!start) start = ts; var p = Math.min((ts - start) / dur, 1); el.textContent = Math.round(p * target); if (p < 1) requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+    }
+    if ("IntersectionObserver" in window) {
+      var io2 = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) { if (en.isIntersecting) { countUp(en.target); io2.unobserve(en.target); } });
+      }, { threshold: 0.5 });
+      document.querySelectorAll("[data-count]").forEach(function (el) { io2.observe(el); });
+    }
   </script>
 </body>
 
