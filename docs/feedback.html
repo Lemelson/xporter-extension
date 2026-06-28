@@ -197,68 +197,54 @@
     }
 
     /* reason chips */
-    .reasons { display: flex; flex-direction: column; gap: 9px; }
+    .reasons { display: flex; flex-direction: column; gap: 10px; }
     .reason {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      text-align: start;
-      background: var(--input-bg);
-      border: 1px solid var(--glass-border);
-      color: var(--text-primary);
-      font: inherit;
-      font-size: 14.5px;
-      padding: 13px 15px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: border-color .15s, background .15s, transform .08s;
+      display: flex; align-items: center; gap: 12px; width: 100%; text-align: start;
+      background: var(--input-bg); border: 1px solid var(--glass-border); color: var(--text-primary);
+      font: inherit; font-size: 15px; padding: 14px 16px; border-radius: var(--radius-sm); cursor: pointer;
+      transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .2s, background .2s, border-color .2s;
     }
-    .reason:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-strong); }
+    .reason:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-strong); transform: translateX(3px); }
     .reason:active { transform: scale(.99); }
     .reason.selected {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-      background: var(--glass-bg-hover);
+      background: linear-gradient(100deg, var(--accent-glow), transparent 85%);
+      box-shadow: 0 10px 28px var(--accent-glow), inset 0 0 0 1px var(--accent);
+      transform: translateY(-2px) scale(1.025);
+      font-weight: 650;
     }
-    .reason .emoji { font-size: 17px; line-height: 1; flex: none; }
+    .reason .emoji { font-size: 18px; line-height: 1; flex: none; }
+    .reason .check { margin-inline-start: auto; color: var(--accent); display: none; flex: none; }
+    .reason.selected .check { display: inline-flex; }
 
-    /* step 2 */
-    .step2 { display: none; margin-top: 22px; }
-    .step2.show { display: block; animation: rise .35s ease both; }
+    /* action area — revealed once a reason is picked */
+    .action { display: none; margin-top: 24px; }
+    .action.show { display: block; animation: rise .35s ease both; }
+    .opt-label { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px; }
     textarea {
-      width: 100%;
-      min-height: 92px;
-      resize: vertical;
-      background: var(--input-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm);
-      color: var(--text-primary);
-      font: inherit;
-      font-size: 14.5px;
-      padding: 12px 14px;
+      width: 100%; min-height: 66px; resize: vertical;
+      background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
+      color: var(--text-primary); font: inherit; font-size: 14.5px; padding: 11px 14px;
       transition: border-color .15s, box-shadow .15s;
     }
     textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
     textarea::placeholder { color: var(--text-muted); }
 
-    .actions { display: flex; gap: 10px; margin-top: 14px; }
-    .btn {
-      font: inherit;
-      font-size: 14.5px;
-      font-weight: 600;
-      border-radius: var(--radius-sm);
-      padding: 12px 18px;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: filter .15s, background .15s, border-color .15s, opacity .15s;
+    .send-row { display: flex; justify-content: flex-end; margin-top: 16px; }
+    .btn-send {
+      font: inherit; font-size: 16px; font-weight: 750; cursor: pointer; color: #fff; border: none;
+      border-radius: 14px; padding: 15px 34px; display: inline-flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, #36d65f 0%, #1fa34a 100%);
+      box-shadow: 0 12px 30px rgba(33, 163, 74, 0.42);
+      transition: transform .12s, box-shadow .2s, filter .15s;
+      animation: send-pulse 2.6s ease-in-out infinite;
     }
-    .btn-primary { background: var(--accent); color: #04121f; flex: 1; }
-    body.light .btn-primary { color: #fff; }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-primary:disabled { opacity: .6; cursor: default; }
-    .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--glass-border); }
-    .btn-ghost:hover { color: var(--text-secondary); border-color: var(--glass-border-strong); }
+    .btn-send:hover { transform: translateY(-2px); box-shadow: 0 18px 44px rgba(33, 163, 74, 0.55); filter: brightness(1.06); }
+    .btn-send:active { transform: translateY(0) scale(.98); }
+    .btn-send:disabled { opacity: .7; cursor: default; animation: none; }
+    @keyframes send-pulse { 0%, 100% { box-shadow: 0 12px 30px rgba(33,163,74,.38); } 50% { box-shadow: 0 14px 40px rgba(33,163,74,.62); } }
+    @media (prefers-reduced-motion: reduce) { .btn-send { animation: none; } }
+    @media (max-width: 520px) { .btn-send { width: 100%; justify-content: center; } .send-row { display: block; } }
 
     /* thanks */
     .thanks { display: none; text-align: center; padding: 8px 0 4px; }
@@ -385,12 +371,14 @@
       <p class="q" data-i18n="q1"></p>
       <div class="reasons" id="reasons"></div>
 
-      <div class="step2" id="step2">
-        <p class="q" data-i18n="q2"></p>
+      <div class="action" id="action">
+        <label class="opt-label" for="detail" data-i18n="q2"></label>
         <textarea id="detail" data-i18n-ph="detailPlaceholder"></textarea>
-        <div class="actions">
-          <button class="btn btn-primary" id="submitBtn" data-i18n="submit"></button>
-          <button class="btn btn-ghost" id="skipBtn" data-i18n="skip"></button>
+        <div class="send-row">
+          <button class="btn-send" id="submitBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            <span data-i18n="submit"></span>
+          </button>
         </div>
       </div>
     </section>
@@ -601,7 +589,8 @@
       try { theme = localStorage.getItem("xporter_theme"); } catch (e) {}
       if (theme !== "light" && theme !== "dark") theme = params.theme;       // extension may pass ?theme=
       if (theme !== "light" && theme !== "dark") {
-        theme = (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+        // Light is the baseline; go dark only if the browser/OS explicitly prefers dark.
+        theme = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
       }
       if (theme === "light") document.body.classList.add("light");
     })();
@@ -632,7 +621,8 @@
         b.className = "reason";
         b.dataset.reason = key;
         if (key === selectedReason) b.classList.add("selected");
-        b.innerHTML = `<span class="emoji" aria-hidden="true">${emoji}</span><span>${t(key)}</span>`;
+        b.innerHTML = `<span class="emoji" aria-hidden="true">${emoji}</span><span>${t(key)}</span>`
+          + `<span class="check" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>`;
         b.addEventListener("click", () => onReason(key));
         reasonsEl.appendChild(b);
       });
@@ -681,15 +671,16 @@
     function onReason(key) {
       selectedReason = key;
       renderReasons();
-      document.getElementById("step2").classList.add("show");
-      document.getElementById("detail").focus({ preventScroll: true });
-      document.getElementById("step2").scrollIntoView({ behavior: "smooth", block: "nearest" });
-      // Save the reason immediately (so we keep it even if they bounce).
+      const action = document.getElementById("action");
+      action.classList.add("show");
+      // Reveal the green Send + optional comment. Don't auto-focus the textarea —
+      // most people just pick a reason and shouldn't get a keyboard popup on mobile.
+      action.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // Save the reason immediately (so we keep it even if they bounce / never hit Send).
       if (!reasonSent) {
         reasonSent = true;
         send(Object.assign(basePayload(), { type: "reason", reason: key }));
       } else {
-        // reason changed before submitting — update.
         send(Object.assign(basePayload(), { type: "reason_update", reason: key }));
       }
     }
@@ -702,20 +693,19 @@
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
       const btn = document.getElementById("submitBtn");
+      const label = btn.querySelector("span");
       const detail = document.getElementById("detail").value.trim();
       btn.disabled = true;
-      btn.textContent = t("sending");
+      if (label) label.textContent = t("sending");
       const ok = await send(Object.assign(basePayload(), { type: "detail", reason: selectedReason, detail }));
       if (!ok && !(ENDPOINT.startsWith("PASTE_"))) {
         btn.disabled = false;
-        btn.textContent = t("submit");
+        if (label) label.textContent = t("submit");
         showToast(t("errorMsg"));
         return;
       }
       finish();
     });
-
-    document.getElementById("skipBtn").addEventListener("click", finish);
 
     /* email copy on click */
     document.getElementById("emailLink").addEventListener("click", (e) => {
