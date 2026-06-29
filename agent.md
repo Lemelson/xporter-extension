@@ -144,12 +144,15 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 
 | Constant | Default | Purpose |
 |---|---|---|
-| `DEBUG` | `true` | toggle verbose `[XPorter]` logging |
-| `REQUEST_DELAY` | `3000` | ms between API requests |
-| `COOLDOWN_DURATION` | `180000` | 3-min cooldown after each batch |
-| `BATCH_SIZE` | `20` | requests per batch before cooldown |
+| `DEBUG` | `false` | toggle verbose `[XPorter]` logging |
+| `REQUEST_DELAY` | `3000` | ms between API requests (**fallback** when adaptive pacing off / no headers) |
+| `COOLDOWN_DURATION` | `180000` | 3-min cooldown after each batch (**fallback only**) |
+| `BATCH_SIZE` | `20` | requests per batch before cooldown (fallback) |
 | `RATE_LIMIT_PAUSE` | `60000` | base 429 wait (exponential backoff) |
 | `MAX_RETRIES` | `5` | retries per request |
+| `ADAPTIVE_PACING` | `true` | pace from X's `x-rate-limit-*` headers instead of the fixed delay |
+| `ADAPTIVE_MIN_DELAY` / `_PAD` / `_HEADER_TTL` | `5000` / `2000` / `300000` | pacing floor / margin / budget freshness |
+| `FALLBACK_REQUEST_DELAYS` | mode-specific | conservative header-less delay ranges (posts 20–25 s, followers 60 s, following/verified 5–10 s) |
 | `ENDPOINT_CACHE_TTL` | `1800000` | 30-min queryId cache |
 | `TWEETS_PER_BATCH` | `50` | items per storage batch |
 | `FALLBACK_BEARER_TOKEN` | `AAAA…` | static public bearer |
@@ -186,16 +189,19 @@ currentExport = {
 **Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
 
 ### 4.4. `utils/rateLimit.js` — `RateLimitManager`
-Batch cooldowns, request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
+Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
+
+**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. `_computeAdaptiveDelay()` uses `ceil(msLeftInWindow / remaining) + PAD`, floored at `ADAPTIVE_MIN_DELAY`, without shortening a valid wait; when `remaining ≤ 0` or a 429 reports exhausted quota, it waits until the advertised reset. Missing/stale headers use conservative mode-specific fallback delays plus the existing batch cooldown. Long waits emit a `cooldown` status so the UI shows a countdown. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
 
 ### 4.5. `utils/storage.js` — Chrome Storage + Settings
-`chrome.storage.local` (10 MB). Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values:
+`chrome.storage.local` (10 MB). Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by either UI:
 
 | Setting | Default | Notes |
 |---|---|---|
 | `includeRetweets` / `includeReplies` | `true` | posts filter |
 | `quantityLimit` | `500` | 0 = unlimited |
-| `requestDelay` / `batchSize` / `cooldownDuration` | from config | rate limiting |
+| `requestDelay` / `batchSize` / `cooldownDuration` | from config | rate limiting (fallback path) |
+| `adaptivePacing` | `true` | pace from X's `x-rate-limit-*` headers (see §4.4) |
 | `theme` | `'dark'` | `'dark'`/`'light'` |
 | `language` | auto-detected | locale code |
 | `exportMode` / `outputFormat` | posts / csv | |
@@ -319,7 +325,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Both themes; stop/resume (SW resilience); large exports (>1000 → storage batching); CSV in Excel (BOM/escaping); 429 + network-loss recovery; every language; date-range (keep the search tab open).
+Run `node scripts/test-rate-limit.js` for deterministic pacing/retry checks. Also verify both themes; stop/resume (SW resilience); large exports (>1000 → storage batching); CSV in Excel (BOM/escaping); 429 + network-loss recovery; every language; date-range (keep the search tab open).
 
 ---
 

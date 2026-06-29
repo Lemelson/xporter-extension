@@ -18,6 +18,37 @@ let currentExport = null;
 let rateLimiter = null;
 let searchCapture = null;
 
+const RATE_LIMIT_KEYS_BY_MODE = {
+    posts: 'UserTweets',
+    followers: 'Followers',
+    following: 'Following',
+    verified_followers: 'BlueVerifiedFollowers'
+};
+
+function createRateLimiter(settings, mode) {
+    const adaptivePacing = settings.adaptivePacing !== false;
+    const configuredFallback = adaptivePacing
+        ? XPORTER_CONFIG.FALLBACK_REQUEST_DELAYS?.[mode]
+        : null;
+    const fallbackMinDelay = configuredFallback?.[0] || settings.requestDelay;
+    const fallbackMaxDelay = configuredFallback?.[1] || fallbackMinDelay;
+    const endpointKey = RATE_LIMIT_KEYS_BY_MODE[mode];
+
+    return new RateLimitManager({
+        requestDelay: settings.requestDelay,
+        batchSize: settings.batchSize,
+        cooldownDuration: settings.cooldownDuration,
+        adaptivePacing,
+        fallbackMinDelay,
+        fallbackMaxDelay,
+        rateLimitProvider: () => (
+            endpointKey && typeof XPorterAPI?.getRateLimit === 'function'
+                ? XPorterAPI.getRateLimit(endpointKey)
+                : null
+        )
+    });
+}
+
 // ==================== Uninstall feedback ====================
 // When the user removes XPorter, Chrome opens this page in a new tab. We append an
 // anonymous, non-personal usage snapshot (version, install age, language, theme,
@@ -231,12 +262,9 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
         return { error: 'INVALID_DATE_RANGE' };
     }
 
-    // Initialize rate limiter with current settings
-    rateLimiter = new RateLimitManager({
-        requestDelay: settings.requestDelay,
-        batchSize: settings.batchSize,
-        cooldownDuration: settings.cooldownDuration
-    });
+    // Initialize rate limiter with current settings. The provider lets it pace
+    // adaptively from X's live x-rate-limit-* budget (fixed delay is fallback).
+    rateLimiter = createRateLimiter(settings, mode);
 
     rateLimiter.onStatusChange((event) => {
         broadcastStatus({ ...event, exportMode: mode });
@@ -970,11 +998,7 @@ async function resumeExport() {
 
     const settings = await XPorterStorage.loadSettings();
 
-    rateLimiter = new RateLimitManager({
-        requestDelay: settings.requestDelay,
-        batchSize: settings.batchSize,
-        cooldownDuration: settings.cooldownDuration
-    });
+    rateLimiter = createRateLimiter(settings, savedState.exportMode || 'posts');
     // Restore request counters so the batch/cooldown rhythm and the "batch N"
     // indicator stay accurate after resuming (previously reset to zero).
     rateLimiter.restoreState(savedState.rateLimiterState);
@@ -1234,6 +1258,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
             requestDelay: 3000,
             batchSize: 20,
             cooldownDuration: 180000,
+            adaptivePacing: true,
             theme: 'dark',
             exportMode: 'posts',
             outputFormat: 'csv'

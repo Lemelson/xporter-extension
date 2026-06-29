@@ -10,6 +10,26 @@ class RateLimitManager {
         this.rateLimitPause = options.rateLimitPause || C.RATE_LIMIT_PAUSE || 60000;
         this.maxRetries = options.maxRetries || C.MAX_RETRIES || 5;
 
+        // Adaptive pacing: when a provider hands us X's live x-rate-limit-*
+        // budget, we space requests to fit that budget instead of using the
+        // configured fallback delay/cooldown above.
+        this.adaptivePacing = (options.adaptivePacing !== undefined)
+            ? options.adaptivePacing
+            : (C.ADAPTIVE_PACING !== false);
+        this.rateLimitProvider = (typeof options.rateLimitProvider === 'function')
+            ? options.rateLimitProvider
+            : null;
+        this.adaptiveFloor = options.adaptiveFloor || C.ADAPTIVE_MIN_DELAY || 5000;
+        this.adaptivePad = (options.adaptivePad != null)
+            ? options.adaptivePad
+            : (C.ADAPTIVE_PAD != null ? C.ADAPTIVE_PAD : 2000);
+        this.adaptiveHeaderTtl = options.adaptiveHeaderTtl || C.ADAPTIVE_HEADER_TTL || 300000;
+        this.fallbackMinDelay = options.fallbackMinDelay || this.requestDelay;
+        this.fallbackMaxDelay = Math.max(
+            this.fallbackMinDelay,
+            options.fallbackMaxDelay || this.fallbackMinDelay
+        );
+
         this.requestCount = 0;
         this.totalRequests = 0;
         this.status = 'idle'; // idle, fetching, cooldown, error, retrying
@@ -85,23 +105,86 @@ class RateLimitManager {
     }
 
     /**
+     * Work out the wait before the next request from X's advertised budget.
+     * Spreads whatever quota is left evenly across the time remaining in the
+     * window — the same way X's own web client paces itself. Returns null when
+     * adaptive pacing isn't usable (disabled, no provider, or stale/missing
+     * headers) so the caller falls back to its configured delay + batch cooldown.
+     *
+     * @returns {{delay:number, waiting:boolean}|null}
+     */
+    _computeAdaptiveDelay() {
+        if (!this.adaptivePacing || !this.rateLimitProvider) return null;
+
+        let rl;
+        try { rl = this.rateLimitProvider(); } catch (_) { rl = null; }
+        if (!rl) return null;
+
+        const remaining = Number(rl.remaining);
+        const reset = Number(rl.reset);
+        if (!Number.isFinite(remaining) || remaining < 0 || !Number.isFinite(reset) || reset <= 0) {
+            return null;
+        }
+
+        // A budget we read too long ago no longer reflects reality.
+        if (Number.isFinite(rl.at) && (Date.now() - rl.at) > this.adaptiveHeaderTtl) return null;
+
+        const msLeftInWindow = Math.max(0, reset * 1000 - Date.now());
+
+        // Out of quota → hold until the window rolls over, plus a small margin.
+        if (remaining <= 0) {
+            return {
+                delay: msLeftInWindow + this.adaptivePad,
+                waiting: true
+            };
+        }
+
+        // Quota left → fill the rest of the window evenly.
+        let delay = Math.ceil(msLeftInWindow / remaining) + this.adaptivePad;
+        if (delay < this.adaptiveFloor) delay = this.adaptiveFloor;
+        return { delay, waiting: false };
+    }
+
+    _computeFallbackDelay() {
+        if (this.fallbackMaxDelay === this.fallbackMinDelay) return this.fallbackMinDelay;
+        return this.fallbackMinDelay
+            + Math.floor(Math.random() * (this.fallbackMaxDelay - this.fallbackMinDelay + 1));
+    }
+
+    /**
      * Execute a request with rate limiting
      */
     async executeWithRateLimit(requestFn) {
         if (this._aborted) throw new Error('ABORTED');
 
-        // Check if we need a cooldown after batch
-        if (this.requestCount > 0 && this.requestCount % this.batchSize === 0) {
-            this._emitStatus('cooldown', {
-                duration: this.cooldownDuration,
-                reason: `Cooldown after ${this.batchSize} requests`
-            });
-            await this._wait(this.cooldownDuration);
-        }
-
-        // Delay between requests
         if (this.requestCount > 0) {
-            await this._wait(this.requestDelay);
+            const adaptive = this._computeAdaptiveDelay();
+            if (adaptive) {
+                // Header-driven pacing IS the throttle, so we skip the blanket
+                // batch cooldown entirely. Long waits (followers' tight window,
+                // or a reset hold) are surfaced as 'cooldown' so the UI shows a
+                // live countdown instead of looking frozen.
+                if (adaptive.delay >= 8000) {
+                    this._emitStatus('cooldown', {
+                        duration: adaptive.delay,
+                        reason: adaptive.waiting
+                            ? 'Waiting for X rate-limit window to reset'
+                            : 'Pacing to X rate limit'
+                    });
+                }
+                await this._wait(adaptive.delay);
+            } else {
+                // Fallback: no live budget — use the configured per-mode delay
+                // and inject a batch cooldown every N requests as a safety net.
+                if (this.requestCount % this.batchSize === 0) {
+                    this._emitStatus('cooldown', {
+                        duration: this.cooldownDuration,
+                        reason: `Cooldown after ${this.batchSize} requests`
+                    });
+                    await this._wait(this.cooldownDuration);
+                }
+                await this._wait(this._computeFallbackDelay());
+            }
         }
 
         // Execute with retry logic
@@ -124,7 +207,11 @@ class RateLimitManager {
                 lastError = error;
 
                 if (error.message === 'RATE_LIMITED') {
-                    const waitTime = this.rateLimitPause * Math.pow(2, attempt);
+                    if (attempt >= this.maxRetries) break;
+                    const advertised = this._computeAdaptiveDelay();
+                    const waitTime = advertised?.waiting
+                        ? advertised.delay
+                        : this.rateLimitPause * Math.pow(2, attempt);
                     this._emitStatus('error', {
                         error: 'Rate limited (429)',
                         retryIn: waitTime,
@@ -141,6 +228,7 @@ class RateLimitManager {
 
                 // Stale query ID — API changed, retry after delay
                 if (error.message === 'STALE_QUERY_ID') {
+                    if (attempt >= this.maxRetries) break;
                     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
                     const waitTime = (C.STALE_RETRY_BASE_WAIT || 10000) * (attempt + 1);
                     this._emitStatus('error', {
@@ -155,6 +243,7 @@ class RateLimitManager {
 
                 // Network errors — retry
                 if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
+                    if (attempt >= this.maxRetries) break;
                     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
                     const waitTime = (C.NETWORK_RETRY_BASE_WAIT || 30000) * (attempt + 1);
                     this._emitStatus('error', {

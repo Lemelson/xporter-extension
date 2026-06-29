@@ -81,6 +81,43 @@ async function _hydrateEndpoints() {
 // Live queryIds captured from X.com's own network traffic (highest priority)
 const liveQueryIds = {};
 
+// ==================== Rate-limit budget tracking ====================
+// X reports a separate quota for each endpoint via x-rate-limit-* headers.
+// Keep readings keyed by operation so one endpoint can never pace another.
+const rateLimits = Object.create(null);
+
+function captureRateLimit(response, endpointKey) {
+  if (!endpointKey) return;
+  try {
+    if (!response?.headers) {
+      delete rateLimits[endpointKey];
+      return;
+    }
+
+    const remaining = Number.parseInt(response.headers.get('x-rate-limit-remaining'), 10);
+    const reset = Number.parseInt(response.headers.get('x-rate-limit-reset'), 10);
+    const limit = Number.parseInt(response.headers.get('x-rate-limit-limit'), 10);
+
+    if (!Number.isFinite(remaining) || remaining < 0 || !Number.isFinite(reset) || reset <= 0) {
+      delete rateLimits[endpointKey];
+      return;
+    }
+
+    rateLimits[endpointKey] = {
+      remaining,                           // requests left in the current window
+      reset,                               // unix SECONDS when the window resets
+      limit: Number.isFinite(limit) ? limit : null,
+      at: Date.now()                      // when we read it (freshness guard)
+    };
+  } catch (_) {
+    delete rateLimits[endpointKey];
+  }
+}
+
+function getRateLimit(endpointKey) {
+  return rateLimits[endpointKey] || null;
+}
+
 // Feature flag constants (USER_FEATURES, USER_FIELD_TOGGLES, TWEETS_FEATURES,
 // FOLLOWERS_FEATURES, FOLLOWERS_FIELD_TOGGLES) are loaded from /utils/api-features.js
 
@@ -285,6 +322,10 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     credentials: 'include'
   });
 
+  // Read X's advertised budget from this response (even on errors) so the next
+  // wait can be paced to it.
+  captureRateLimit(response, endpoint.operationName);
+
   if (response.status === 429) {
     throw new Error('RATE_LIMITED');
   }
@@ -432,9 +473,11 @@ async function getUserByScreenName(screenName) {
 
 // ==================== Followers/Following Fetching ====================
 
-async function fetchFollowers(userId, cursor = null, count = 20) {
+async function fetchFollowers(userId, cursor = null, count = 100) {
   // X has deprecated the GraphQL Followers endpoint (returns 404).
   // Use REST v1.1 /followers/list.json as a reliable alternative.
+  // count up to 200 is accepted here; 100 keeps each page reasonable while
+  // still cutting the request count 5x vs the old default of 20.
   const auth = await getAuthTokens();
 
   let url = `https://x.com/i/api/1.1/followers/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=false`;
@@ -455,6 +498,8 @@ async function fetchFollowers(userId, cursor = null, count = 20) {
     },
     credentials: 'include'
   });
+
+  captureRateLimit(response, 'Followers');
 
   if (response.status === 429) {
     throw new Error('RATE_LIMITED');
@@ -497,11 +542,11 @@ async function fetchFollowers(userId, cursor = null, count = 20) {
   return { users, nextCursor };
 }
 
-async function fetchFollowing(userId, cursor = null, count = 20) {
+async function fetchFollowing(userId, cursor = null, count = 50) {
   return _fetchUserList('Following', userId, cursor, count);
 }
 
-async function fetchVerifiedFollowers(userId, cursor = null, count = 20) {
+async function fetchVerifiedFollowers(userId, cursor = null, count = 50) {
   return _fetchUserList('BlueVerifiedFollowers', userId, cursor, count);
 }
 
@@ -881,6 +926,7 @@ if (typeof globalThis !== 'undefined') {
     parseUserObject,
     discoverEndpoints,
     setLiveQueryId,
+    getRateLimit,
     get BEARER_TOKEN() { return activeBearerToken; }
   };
 }
