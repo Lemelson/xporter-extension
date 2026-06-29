@@ -393,6 +393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 requestDelay: 3000,
                 batchSize: parseInt(cooldownBatch.value) || 20,
                 cooldownDuration: (parseInt(cooldownMinutes.value) || 3) * 60000,
+                adaptivePacing: currentSettings?.adaptivePacing !== false,
                 theme: document.body.classList.contains('light') ? 'light' : 'dark',
                 language: currentLang,
                 exportMode: exportMode.value,

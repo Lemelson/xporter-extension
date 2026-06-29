@@ -39,6 +39,7 @@
 7. **Date-range posts** use a separate path: open an X **search tab** and scroll it; the user must keep it open. See `agent.md` §5.
 8. **`tweetCount`/`tweetBuffer`** mean item count/buffer even for user exports (historical naming).
 9. **CSS:** never hardcode colours — everything is CSS custom properties with `dark`/`light` (`.light` on `<body>`).
+10. **Rate-limit budgets are endpoint-specific:** use `XPorterAPI.getRateLimit(operationName)` and never reuse one operation's headers for another. Header-less responses must take the mode-specific fallback path.
 
 ## When you change things
-Keep **`agent.md`** and this file in sync (new files, message types, storage keys, settings, export modes). Bump `version` in `manifest.json` for releases.
+Keep **`agent.md`** and this file in sync (new files, message types, storage keys, settings, export modes). Run `node scripts/test-rate-limit.js` after pacing changes. Bump `version` in `manifest.json` for releases.

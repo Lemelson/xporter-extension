@@ -242,7 +242,13 @@ async function clearExportHistory() {
  * Save settings
  */
 async function saveSettings(settings) {
-    return safeSet({ [STORAGE_KEYS.SETTINGS]: settings });
+    const current = await safeGet(STORAGE_KEYS.SETTINGS);
+    return safeSet({
+        [STORAGE_KEYS.SETTINGS]: {
+            ...(current[STORAGE_KEYS.SETTINGS] || {}),
+            ...settings
+        }
+    });
 }
 
 /**
@@ -258,6 +264,7 @@ async function loadSettings() {
         requestDelay: C.REQUEST_DELAY || 3000,
         batchSize: C.BATCH_SIZE || 20,
         cooldownDuration: C.COOLDOWN_DURATION || 180000,
+        adaptivePacing: (C.ADAPTIVE_PACING !== false),
         theme: 'dark',
         autoExpireEnabled: true,
         autoExpireHours: 4,
