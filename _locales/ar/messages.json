@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "XPorter — تصدير X/Twitter مجاني: منشورات، متابعين CSV/JSON",
+    "description": "Extension name for CWS"
+  },
+  "extDescription": {
+    "message": "تصدير المنشورات والمتابعين من أي حساب X (Twitter) إلى CSV، JSON، Excel. مجاني، غير محدود، خصوصية 100%.",
+    "description": "Extension description for CWS"
+  }
+}

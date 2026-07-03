@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "XPorter — Ücretsiz X/Twitter Dışa Aktarma: Gönderiler CSV/JSON",
+    "description": "Extension name for CWS"
+  },
+  "extDescription": {
+    "message": "Herhangi bir X (Twitter) profilinden gönderileri, takipçileri dışa aktarın. CSV, JSON, Excel. Ücretsiz, sınırsız, %100 gizli.",
+    "description": "Extension description for CWS"
+  }
+}

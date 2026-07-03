@@ -1,0 +1,2603 @@
+/* XPorter Popup — Styles */
+/* Glassmorphism design: dark theme by default, light theme via .light class */
+
+:root {
+  /* Dark glass theme (default) */
+  --bg-primary: rgba(255, 255, 255, 0.08);
+  --bg-secondary: rgba(255, 255, 255, 0.06);
+  --bg-secondary-rgb: 25, 39, 52;
+  --bg-tertiary: rgba(255, 255, 255, 0.04);
+  --bg-hover: rgba(255, 255, 255, 0.12);
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.74);
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --accent: #60B8FF;
+  --accent-hover: #8DCFFF;
+  --accent-glow: rgba(96, 184, 255, 0.2);
+  --success: #00BA7C;
+  --warning: #FFD166;
+  --danger: #F4212E;
+  --border: rgba(255, 255, 255, 0.18);
+  --input-bg: rgba(255, 255, 255, 0.07);
+  /* Shadows tinted with the deep-navy backdrop instead of pure black — reads
+     more like real glass casting onto a colored surface. */
+  --shadow: rgba(7, 11, 30, 0.35);
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  /* Glass-specific tokens */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.20);
+  --glass-border-strong: rgba(255, 255, 255, 0.34);
+  --glass-blur: 24px;
+  /* Edge refraction: bright top hairline + faint dark bottom hairline so glass
+     panels catch light on one edge and fall into shadow on the other. */
+  --glass-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+  --glass-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 0 rgba(7, 11, 30, 0.22);
+  --glass-shadow: 0 10px 34px rgba(6, 10, 28, 0.46), 0 2px 8px rgba(6, 10, 28, 0.30);
+  /* Contained shadow for in-flow cards (e.g. the export-status panel): a tight
+     ambient shadow that stays close to the card instead of bleeding down onto
+     the action buttons that sit right below it. */
+  --card-shadow: 0 2px 8px rgba(6, 10, 28, 0.30);
+}
+
+/* ========== LIGHT THEME ========== */
+body.light {
+  --bg-primary: rgba(255, 255, 255, 0.45);
+  --bg-secondary: rgba(255, 255, 255, 0.32);
+  --bg-secondary-rgb: 247, 249, 250;
+  --bg-tertiary: rgba(255, 255, 255, 0.20);
+  --bg-hover: rgba(255, 255, 255, 0.55);
+  --text-primary: rgba(0, 0, 0, 0.90);
+  --text-secondary: rgba(0, 0, 0, 0.66);
+  --text-muted: rgba(0, 0, 0, 0.50);
+  --accent: #0A6FDB;
+  --accent-hover: #0860C0;
+  --accent-glow: rgba(10, 111, 219, 0.22);
+  --success: #00BA7C;
+  --warning: #F59E0B;
+  --danger: #F4212E;
+  --border: rgba(0, 0, 0, 0.18);
+  --input-bg: rgba(255, 255, 255, 0.60);
+  --shadow: rgba(30, 41, 89, 0.16);
+
+  --glass-bg: rgba(255, 255, 255, 0.32);
+  --glass-border: rgba(0, 0, 0, 0.16);
+  --glass-border-strong: rgba(0, 0, 0, 0.26);
+  --glass-blur: 28px;
+  --glass-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.70);
+  --glass-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.75), inset 0 -1px 0 0 rgba(30, 41, 89, 0.10);
+  --glass-shadow: 0 10px 34px rgba(30, 41, 89, 0.16), 0 2px 8px rgba(30, 41, 89, 0.10);
+  --card-shadow: 0 2px 8px rgba(30, 41, 89, 0.12);
+}
+
+/* Force light theme overrides for elements that use explicit colors */
+body.light .header {
+  border-bottom-color: var(--border);
+}
+
+body.light .tab {
+  color: var(--text-secondary);
+}
+
+body.light .tab.active {
+  color: var(--accent);
+  background: rgba(10, 111, 219, 0.08);
+}
+
+body.light .input-group input {
+  color: var(--text-primary);
+}
+
+body.light .select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23536471' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+
+body.light .date-row input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+/* Dark theme: invert the native calendar icon so it isn't dark-on-dark
+   (parity with the export page). */
+.date-row input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+body.light .progress-fill {
+  box-shadow: 0 0 8px rgba(29, 155, 240, 0.3);
+}
+
+body.light .footer {
+  border-top-color: var(--border);
+}
+
+/* ========== GLASS EFFECTS (always active) ========== */
+/* Apple-style frosted glass, displacement blur, inner glow borders */
+
+/* Glass mode: Main popup container */
+.popup {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.6) brightness(1.05);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6) brightness(1.05);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner-glow);
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass header */
+.header {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+body.light .header {
+  background: rgba(255, 255, 255, 0.20);
+}
+
+/* Glass tabs */
+.tabs {
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+body.light .tabs {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Tab hover — clearly brighter (whiten) in both themes, matching the rest of
+   the controls. Tabs are navigation, so they brighten but do NOT lift. */
+.tab:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+}
+
+body.light .tab:hover {
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--text-primary);
+}
+
+/* Active tab — accent-tinted cell + a centered, rounded, glowing indicator
+   bar (replaces the old flat full-width underline for a fresher look). */
+.tab.active {
+  color: var(--accent);
+  background: rgba(96, 184, 255, 0.10);
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* Glass input group */
+.input-group {
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+.input-group:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+/* Glass input group — light specific */
+body.light .input-group {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: var(--glass-inner-glow), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+body.light .input-group:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+/* Glass select */
+.select {
+  background-color: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238899A6' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+/* Glass select — light specific */
+body.light .select {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: var(--glass-inner-glow), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* RTL: move the chevron to the leading (left) edge and pad that side so it
+   doesn't sit under the right-aligned label. */
+[dir="rtl"] .select {
+  background-position: left 12px center;
+  padding-left: 30px;
+  padding-right: 12px;
+}
+
+/* Glass small inputs */
+.input-small {
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner-glow);
+  width: 50px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+body.light .input-small {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: var(--glass-inner-glow), 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.input-small:focus {
+  border-color: var(--accent);
+}
+
+/* Glass export status — info column on the left, a tall square contextual
+   action (Stop while running / Download when stopped) on the right. */
+.export-status {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  /* Contained ambient shadow — keeps the panel grounded without bleeding its
+     drop shadow onto the action buttons below it. */
+  box-shadow: var(--card-shadow), var(--glass-edge);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 14px;
+  border-radius: var(--radius);
+  /* Match the 8px rhythm of the .actions button stack below so the gap above
+     the Resume row equals the gap between the buttons. */
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px; /* direction-agnostic spacing — works in LTR and RTL */
+}
+
+/* Left column flexes to fill remaining width, so the progress bar no longer
+   stretches edge-to-edge and the status text has room before it wraps. */
+.status-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Contextual action: a fixed compact square (icon over a short label), centered
+   beside the status — never stretches tall on long translations. */
+/* NOTE: must be `.btn.btn-square`, not `.btn-square` — the base `.btn` rule is
+   defined LATER in this file, so at equal specificity it was overriding the
+   font-size (15px) and padding (16px) here, which blew the label up and forced
+   it to wrap mid-word. The extra `.btn` class wins regardless of order. */
+.btn.btn-square {
+  flex-direction: column;
+  gap: 4px;
+  width: 78px;
+  height: 78px;
+  flex-shrink: 0;
+  padding: 8px 6px;
+  /* ~the size of the "Can be resumed" status line, bold — fits long labels
+     like "Остановить" on one line in the 78px square. */
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  border-radius: var(--radius-sm);
+}
+
+.btn.btn-square span {
+  text-align: center;
+  /* Constrain to the button so long single words (e.g. German "Herunterladen")
+     wrap instead of overflowing. Without min-width:0 the flex item's auto
+     minimum equals the whole word, so it can't shrink and spills out — CJK
+     wrapped only because its min-content is a single character. */
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.btn.btn-square svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* Glass buttons */
+.btn-primary {
+  background: linear-gradient(135deg, rgba(29, 155, 240, 0.75) 0%, rgba(20, 140, 220, 0.85) 50%, rgba(40, 170, 255, 0.75) 100%);
+  border: 1px solid rgba(29, 155, 240, 0.5);
+  box-shadow: 0 4px 16px rgba(29, 155, 240, 0.30), var(--glass-inner-glow);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgba(56, 175, 255, 1) 0%, rgba(40, 160, 245, 1) 50%, rgba(80, 190, 255, 1) 100%);
+  box-shadow: 0 6px 24px rgba(29, 155, 240, 0.55), 0 0 22px rgba(96, 184, 255, 0.50), var(--glass-edge);
+  transform: translateY(-1px);
+}
+
+body.light .btn-primary {
+  background: linear-gradient(135deg, #0A6FDB 0%, #0879E8 50%, #2B8FF0 100%);
+  border: 1px solid rgba(8, 96, 192, 0.6);
+  box-shadow: 0 4px 16px rgba(10, 111, 219, 0.35), 0 2px 4px rgba(0, 0, 0, 0.12);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.20);
+  color: #fff;
+}
+
+body.light .btn-primary:hover {
+  background: linear-gradient(135deg, #2B8FF0 0%, #1E86EE 50%, #46A0FF 100%);
+  box-shadow: 0 6px 24px rgba(10, 111, 219, 0.50), 0 0 20px rgba(43, 143, 240, 0.45), 0 2px 6px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: rgba(220, 38, 38, 0.78);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.30), var(--glass-edge);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: rgba(232, 50, 50, 0.96);
+  box-shadow: 0 6px 24px rgba(220, 38, 38, 0.46), 0 0 20px rgba(244, 80, 80, 0.42), var(--glass-edge);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, rgba(0, 200, 134, 0.92) 0%, rgba(0, 166, 104, 0.92) 50%, rgba(0, 214, 143, 0.9) 100%);
+  border: 1px solid rgba(52, 211, 153, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 166, 104, 0.34), var(--glass-edge);
+  color: #fff;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, rgba(0, 214, 143, 1) 0%, rgba(0, 184, 116, 1) 50%, rgba(20, 224, 153, 1) 100%);
+  box-shadow: 0 6px 24px rgba(0, 166, 104, 0.50), 0 0 22px rgba(0, 214, 143, 0.45), var(--glass-edge);
+}
+
+/* Warning / amber — the Download square button. Dark text for contrast on gold. */
+.btn-warning {
+  background: linear-gradient(135deg, #FFD45A 0%, #F5B73C 50%, #FFCB52 100%);
+  border: 1px solid rgba(214, 158, 30, 0.6);
+  box-shadow: 0 4px 16px rgba(214, 158, 30, 0.34), var(--glass-edge);
+  color: #4a3500;
+}
+
+.btn-warning:hover {
+  background: linear-gradient(135deg, #FFDE74 0%, #FFC44E 50%, #FFD968 100%);
+  box-shadow: 0 6px 24px rgba(214, 158, 30, 0.46), 0 0 22px rgba(255, 203, 82, 0.5), var(--glass-edge);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  box-shadow: 0 2px 10px rgba(6, 10, 28, 0.30), var(--glass-edge);
+  color: var(--text-primary);
+}
+
+body.light .btn-secondary {
+  background: rgba(255, 255, 255, 0.68);
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow: 0 2px 8px rgba(30, 41, 89, 0.12), var(--glass-edge);
+}
+
+/* ============================================================
+   TIER 2 — glass clickable controls (single source of truth).
+   Resume, New Export, GitHub/Telegram, Export History toggle, and the
+   dropdowns (Export Mode, Output Format, Quantity Limit) all share this hover:
+   whiten + accent glow ring + lift + depth shadow. Edit here → all update.
+   body.light copies are required so light-theme base rules don't out-specify. */
+.btn-secondary:hover,
+.about-link:hover,
+.history-toggle:hover,
+.select:hover {
+  background-color: rgba(255, 255, 255, 0.24);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(6, 10, 28, 0.42), var(--glass-edge);
+  transform: translateY(-1px);
+}
+
+body.light .btn-secondary:hover,
+body.light .about-link:hover,
+body.light .history-toggle:hover,
+body.light .select:hover {
+  background-color: rgba(255, 255, 255, 0.74);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(30, 41, 89, 0.18), var(--glass-edge);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+/* Remove number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Resume row */
+.resume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-resume {
+  width: 70px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.10);
+  box-shadow: var(--glass-edge);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+body.light .input-resume {
+  border-color: rgba(0, 0, 0, 0.16);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+/* ============================================================
+   TIER 3 — text inputs you type into (single source of truth).
+   Username, cooldown numbers, custom quantity, resume count, date pickers.
+   Hover: accent glow ring + a slight lighten, but NO lift — they're fields,
+   not buttons. body.light copies are required for specificity (the light base
+   rules would otherwise cancel the hover). */
+.input-group:hover,
+.input-small:hover,
+.input-resume:hover,
+.date-row input[type="date"]:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+body.light .input-group:hover,
+body.light .input-small:hover,
+body.light .input-resume:hover,
+body.light .date-row input[type="date"]:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-edge);
+  background-color: rgba(255, 255, 255, 0.70);
+}
+
+.input-resume:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.2);
+}
+
+.resume-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.btn-resume {
+  flex: 1;
+  padding: 10px 16px;
+}
+
+/* Glass features / about */
+.feature {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+  font-size: 12px;
+  color: var(--text-primary);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+}
+
+.about-link {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+/* .about-link:hover is handled by the TIER 2 group rule above */
+
+/* Glass progress bar */
+.progress-bar {
+  background: rgba(255, 255, 255, 0.06);
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+/* The white 6% track is invisible on the light backdrop — darken it there. */
+body.light .progress-bar {
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg,
+      rgba(29, 155, 240, 0.65) 0%,
+      rgba(96, 184, 255, 0.95) 35%,
+      rgba(133, 207, 255, 1) 50%,
+      rgba(96, 184, 255, 0.95) 65%,
+      rgba(29, 155, 240, 0.65) 100%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.5s ease;
+  position: relative;
+  box-shadow: 0 0 10px rgba(96, 184, 255, 0.55);
+  /* Continuously flow the gradient so the bar visibly shimmers while working. */
+  animation: progressFlow 2.2s linear infinite;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.55) 50%,
+      transparent 100%);
+  background-size: 200% 100%;
+  animation: shine 1.5s infinite linear;
+}
+
+@keyframes shine {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes progressFlow {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+.progress-fill.indeterminate {
+  width: 100% !important;
+  background: linear-gradient(90deg, transparent, var(--accent), #1DA1F2, transparent);
+  background-size: 300% 100%;
+  animation: indeterminate 1.5s infinite linear;
+  box-shadow: none;
+}
+
+.progress-fill.indeterminate::after {
+  display: none;
+}
+
+@keyframes indeterminate {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Any wait between requests: amber width advances from 0 to 100% over the
+   exact wait duration, paired with the yellow countdown status. */
+.progress-fill.cooldown {
+  background: linear-gradient(90deg,
+      rgba(245, 180, 40, 0.7) 0%,
+      rgba(255, 209, 102, 1) 50%,
+      rgba(245, 180, 40, 0.7) 100%);
+  background-size: 200% 100%;
+  box-shadow: 0 0 10px rgba(245, 180, 40, 0.55);
+  animation: progressFlow 3.4s linear infinite;
+}
+
+.progress-fill.cooldown::after {
+  display: none;
+}
+
+/* Glass footer */
+.footer {
+  border-top: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+body.light .footer {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.footer-separator {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.footer-date {
+  margin-left: 6px;
+  opacity: 0.7;
+}
+
+.custom-quantity-input {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* ========== Seen posts dataset ========== */
+.feed-db-field {
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-edge);
+}
+
+.feed-db-live {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-db-description,
+.feed-db-summary {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.feed-db-summary {
+  color: var(--text-secondary);
+}
+
+.feed-db-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.feed-db-actions .btn {
+  min-height: 34px;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.feed-db-clear {
+  color: var(--danger);
+}
+
+/* ========== Export History ========== */
+.history-field {
+  margin-top: 4px;
+}
+
+.history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--glass-edge);
+}
+
+/* .history-toggle:hover is handled by the TIER 2 group rule above */
+
+.history-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-chevron {
+  transition: transform 0.3s ease;
+  opacity: 0.6;
+}
+
+.history-chevron.open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.history-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 16px 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* History card */
+.history-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  box-shadow: var(--glass-edge);
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.history-card:hover {
+  border-color: var(--glass-border-strong);
+}
+
+.history-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+}
+
+.history-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.history-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-handle {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.history-meta .history-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: rgba(96, 184, 255, 0.15);
+  color: var(--accent);
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.history-dl-btn {
+  background: rgba(0, 186, 124, 0.2);
+  border: 1px solid rgba(0, 186, 124, 0.4);
+  color: var(--success);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.history-dl-btn:hover {
+  background: rgba(0, 186, 124, 0.35);
+  transform: scale(1.08);
+}
+
+.history-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+  opacity: 0;
+}
+
+.history-card:hover .history-del-btn,
+.history-card:focus-within .history-del-btn,
+.history-del-btn:focus-visible {
+  opacity: 1;
+}
+
+.history-del-btn:hover {
+  color: var(--danger);
+  background: rgba(244, 33, 46, 0.1);
+}
+
+.history-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.history-clear-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+
+/* Glass auth warning */
+.auth-warning {
+  background: rgba(244, 33, 46, 0.08);
+  border: 1px solid rgba(244, 33, 46, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.auth-warning a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.auth-warning a:hover {
+  text-decoration: underline;
+}
+
+/* Specular highlight — Apple-style top edge glow */
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0.3),
+      transparent);
+  pointer-events: none;
+}
+
+/* Checkbox / Toggle in glass mode */
+.toggle-track {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 12px;
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  flex-shrink: 0;
+}
+
+.toggle-input:checked+.toggle-track {
+  background: linear-gradient(135deg, #3BA0F0, #60B8FF);
+  border-color: rgba(96, 184, 255, 0.5);
+  box-shadow: 0 0 14px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+body.light .toggle-track {
+  background: rgba(0, 0, 0, 0.10);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.10), 0 1px 0 rgba(255, 255, 255, 0.40);
+}
+
+body.light .toggle-input:checked+.toggle-track {
+  background: linear-gradient(135deg, #0A6FDB, #2B8FF0);
+  border-color: rgba(8, 96, 192, 0.5);
+  box-shadow: 0 0 12px rgba(10, 111, 219, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+/* Ladybug toggle: the same switch, but red when on (to match the bug). */
+.toggle-input:checked+.toggle-track--bug {
+  background: linear-gradient(135deg, #e0392b, #f4584a);
+  border-color: rgba(240, 88, 74, 0.55);
+  box-shadow: 0 0 14px rgba(226, 59, 46, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+body.light .toggle-input:checked+.toggle-track--bug {
+  background: linear-gradient(135deg, #d32a1e, #ea4436);
+  border-color: rgba(211, 42, 30, 0.5);
+  box-shadow: 0 0 12px rgba(211, 42, 30, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+/* Date inputs */
+.date-row input[type="date"] {
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner-glow), 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.date-row input[type="date"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+body.light .date-row input[type="date"] {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: var(--glass-inner-glow), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+body.light .date-row input[type="date"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+/* ========== Gradient background ========== */
+body {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
+    linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  width: 350px;
+  min-height: 200px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+body.light {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.14) 0%, transparent 70%),
+    linear-gradient(135deg, #7fa8dc 0%, #a88bc4 50%, #85b3d8 100%) !important;
+}
+
+/* ========== END GLASS MODE ========== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  position: relative;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  color: #ffd60a;
+  --zap-glow: 8px;
+  --zap-glow-hi: 13px;
+  /* Glow colours are theme-aware. Dark theme: a warm yellow halo. Light theme:
+     the bolt stays the same bright yellow, but a yellow glow would vanish on the
+     pale background — so we add a crisp dark-indigo shadow tight around it plus a
+     soft violet lift. That separates the yellow without changing its colour or
+     drawing a literal outline. (--zap-extra may hold several drop-shadows.) */
+  --zap-c1: rgba(255, 200, 36, 0.72);
+  --zap-c2: rgba(255, 222, 92, 1);
+  --zap-extra: drop-shadow(0 0 0 transparent);
+  filter: drop-shadow(0 0 var(--zap-glow) var(--zap-c1)) var(--zap-extra);
+  /* same periods as .about-icon so the two bolts flicker together
+     (ladybug.js also re-syncs their phase when the About tab opens) */
+  animation: zap-glow 5s ease-in-out infinite, zap-flicker 7s linear infinite;
+}
+
+body.light .logo,
+body.light .about-icon {
+  color: #ffd60a;
+  /* A big, warm golden glow that actually reads on the pale background, plus a
+     SOFT (wide, low-opacity) violet separation instead of a hard edge. */
+  --zap-c1: rgba(255, 184, 24, 0.7);
+  --zap-c2: rgba(255, 204, 48, 0.95);
+  --zap-extra: drop-shadow(0 0 4px rgba(72, 46, 132, 0.42)) drop-shadow(0 2px 10px rgba(99, 70, 229, 0.3));
+}
+
+/* Larger glow radius on the light theme so the warm halo is clearly visible. */
+body.light .logo,
+body.light .about-icon { --zap-glow: 13px; --zap-glow-hi: 21px; }
+
+/* Fill the bolt yellow (not just its outline) so it reads as a lit lightning. */
+.logo svg path,
+.about-icon svg path {
+  fill: currentColor;
+}
+
+/* Lucide icon base */
+.icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  margin-right: 2px;
+}
+
+.icon-feature {
+  color: var(--success);
+  margin-right: 4px;
+}
+
+.brand {
+  font-family: 'Avenir Next', 'Avenir', 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #4DA8FF, var(--accent) 55%, #1DA1F2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Lightning bolt: a slow, very gentle glow breathing, plus an occasional
+   lightbulb-style flicker (quick power-off then a sharp snap back to full).
+   Two animations on slightly different, non-synced periods read as natural. */
+@keyframes zap-glow {
+  0%, 100% { filter: drop-shadow(0 0 var(--zap-glow, 8px) var(--zap-c1, rgba(255, 200, 36, 0.72))) var(--zap-extra, drop-shadow(0 0 0 transparent)); }
+  50% { filter: drop-shadow(0 0 var(--zap-glow-hi, 13px) var(--zap-c2, rgba(255, 222, 92, 1))) var(--zap-extra, drop-shadow(0 0 0 transparent)); }
+}
+
+@keyframes zap-flicker {
+  0%, 37%, 100% { opacity: 1; }
+  37.6% { opacity: 0.4; }
+  38.2% { opacity: 1; }
+  38.9% { opacity: 0.62; }
+  39.5% { opacity: 1; }
+  71% { opacity: 1; }
+  71.5% { opacity: 0.3; }
+  72% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo,
+  .about-icon {
+    animation: none !important;
+  }
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* .theme-toggle hover is unified with .lang-btn below — same whiten + glow. */
+
+/* Header icon link (GitHub) — mirrors .theme-toggle exactly. */
+.header-icon-btn {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  color: var(--text-primary);
+}
+
+body.light .header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  color: var(--text-primary);
+}
+
+/* Language Selector */
+.lang-selector {
+  position: relative;
+  z-index: 1000;
+}
+
+.lang-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 20px;
+  transition: all 0.25s ease;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Header icon buttons (language + theme) share one hover: whiten + accent
+   border + soft glow ring, so they read identically. */
+.lang-btn:hover,
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  color: var(--text-primary);
+}
+
+.lang-btn.active {
+  background: rgba(96, 184, 255, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body.light .lang-btn:hover,
+body.light .theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  color: var(--text-primary);
+}
+
+body.light .lang-btn.active {
+  background: rgba(10, 111, 219, 0.10);
+  border-color: var(--accent);
+}
+
+.lang-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lang-code {
+  text-transform: uppercase;
+}
+
+.lang-chevron {
+  transition: transform 0.25s ease;
+  opacity: 0.6;
+}
+
+.lang-btn.active .lang-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+/* Language Dropdown */
+.lang-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  width: max-content;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: var(--glass-shadow), var(--glass-inner-glow);
+  z-index: 1000;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 320px;
+  animation: langDropdownIn 0.2s ease;
+  padding: 4px;
+}
+
+/* RTL: the selector lives on the left in RTL, so anchor the dropdown to the
+   left edge (it was anchored right and opened off-screen — names got clipped). */
+[dir="rtl"] .lang-dropdown {
+  right: auto;
+  left: 0;
+}
+
+body.light .lang-dropdown {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.10), var(--glass-inner-glow);
+}
+
+.lang-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lang-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lang-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(136, 153, 166, 0.3);
+  border-radius: 4px;
+}
+
+.lang-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(136, 153, 166, 0.5);
+}
+
+@keyframes langDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.lang-option:hover {
+  background: rgba(96, 184, 255, 0.14);
+  color: var(--text-primary);
+}
+
+body.light .lang-option:hover {
+  background: rgba(10, 111, 219, 0.10);
+  color: var(--text-primary);
+}
+
+/* Selected language: clearly the brightest, most-contrasted row — stronger
+   tint, an inner accent ring, and an accent bar down the leading edge. */
+.lang-option.active {
+  background: rgba(96, 184, 255, 0.26);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(96, 184, 255, 0.5), inset 3px 0 0 0 var(--accent);
+}
+
+body.light .lang-option.active {
+  background: rgba(10, 111, 219, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(10, 111, 219, 0.4), inset 3px 0 0 0 var(--accent);
+}
+
+.lang-option-flag {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.lang-option-name {
+  flex: 1;
+  text-align: start;
+}
+
+.lang-option-check {
+  opacity: 0;
+  color: var(--accent);
+  transition: opacity 0.15s ease;
+}
+
+.lang-option.active .lang-option-check {
+  opacity: 1;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Tab content */
+.tab-content {
+  display: none;
+  padding: 12px 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    transform: translateY(4px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Fields */
+.field {
+  margin-bottom: 9px;
+}
+
+.field-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.field-label-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.field-label-row .field-label {
+  margin-bottom: 0;
+}
+
+/* Input prefix */
+.input-prefix {
+  padding: 10px 0 10px 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 15px;
+  user-select: none;
+}
+
+.input-group input {
+  flex: 1;
+  padding: 10px 12px 10px 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+}
+
+.input-group input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Toggle Switch */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-input:checked+.toggle-track .toggle-knob {
+  transform: translateX(16px);
+}
+
+/* RTL: the knob rests on the inline-start (right) edge and travels left when
+   checked — mirror of the LTR geometry above. */
+[dir="rtl"] .toggle-knob {
+  left: auto;
+  right: 2px;
+}
+
+[dir="rtl"] .toggle-input:checked+.toggle-track .toggle-knob {
+  transform: translateX(-16px);
+}
+
+/* TIER 4 — toggles (Date Range, Include retweets/replies, Auto-clear) share
+   one hover: a clearly visible accent glow ring, in both themes. */
+.toggle-label:hover .toggle-track {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), inset 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* Date fields */
+.date-toggle-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  outline: none;
+}
+
+.help-pop {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: min(300px, calc(100vw - 56px));
+  padding: 10px 12px;
+  border: 1px solid rgba(125, 190, 255, 0.38);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(21, 33, 56, 0.98), rgba(37, 43, 80, 0.98));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--text-primary);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: start;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* RTL: anchor the popover to the inline-start (right) edge instead. */
+[dir="rtl"] .help-pop {
+  left: auto;
+  right: 0;
+}
+
+/* Bold spans (**...**) carry the gist — they read on their own at a glance. */
+.help-pop strong {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.date-help:hover,
+.date-help:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.date-help:hover .help-pop,
+.date-help:focus-visible .help-pop {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+body.light .help-pop {
+  border-color: rgba(10, 111, 219, 0.32);
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--text-primary);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+}
+
+.date-fields {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.date-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 40px;
+}
+
+/* Cooldown row */
+.cooldown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Custom export-speed inputs (shown only when the ⚠️ Custom preset is picked) */
+.custom-speed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* When a locale empties an inline label (e.g. the CJK auto-clear row puts the
+   whole phrase after the number), drop the empty span so it leaves no gap. */
+.cooldown-row span:empty {
+  display: none;
+}
+
+/* Status */
+.status-header {
+  margin-bottom: 10px;
+}
+
+.status-text {
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.status-indicator,
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-green {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(0, 186, 124, 0.5);
+}
+
+.status-yellow {
+  background: var(--warning);
+  box-shadow: 0 0 6px rgba(255, 209, 102, 0.5);
+}
+
+.status-red {
+  background: var(--danger);
+  box-shadow: 0 0 6px rgba(244, 33, 46, 0.5);
+}
+
+/* While the export is actively running (fetching or cooling down), the status
+   dot pulses to signal liveness. Toggled via the .live class from popup.js. */
+.status-dot.live {
+  animation: dotPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.74);
+  }
+}
+
+.tweet-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 8px;
+}
+
+/* Buttons base */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+/* Unified button interaction: every clickable button lifts on hover and
+   presses in on click — applied here once so all variants behave identically. */
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* About */
+.about-content {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.about-icon {
+  margin-bottom: 8px;
+  color: #ffd60a;
+  /* Same glow radius as the header bolt (.logo) so the two look identical. */
+  --zap-glow: 8px;
+  --zap-glow-hi: 13px;
+  --zap-c1: rgba(255, 200, 36, 0.72);
+  --zap-c2: rgba(255, 222, 92, 1);
+  --zap-extra: drop-shadow(0 0 0 transparent);
+  filter: drop-shadow(0 0 var(--zap-glow) var(--zap-c1)) var(--zap-extra);
+  display: flex;
+  justify-content: center;
+  /* same periods as the header bolt; ladybug.js re-syncs their phase on tab open */
+  animation: zap-glow 5s ease-in-out infinite, zap-flicker 7s linear infinite;
+}
+
+.about-content h2 {
+  font-family: 'Avenir Next', 'Avenir', 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #4DA8FF, var(--accent) 55%, #1DA1F2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+
+.about-desc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ========== "HOW IT WORKS" ACCORDION ========== */
+.about-details {
+  text-align: start;
+  margin-bottom: 14px;
+}
+
+.details-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 4px 2px 10px;
+}
+
+.detail-item {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-edge);
+  overflow: hidden;
+}
+
+.detail-item + .detail-item {
+  margin-top: 8px;
+}
+
+.detail-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  transition: background 0.18s ease;
+}
+
+.detail-head:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.light .detail-head:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.detail-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.detail-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.25s ease, color 0.18s ease;
+}
+
+.detail-item.open .detail-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.detail-item.open .detail-icon {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Smooth height expand with no fixed max-height (never clips long translations) */
+.detail-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease;
+}
+
+.detail-item.open .detail-body {
+  grid-template-rows: 1fr;
+}
+
+.detail-body-inner {
+  overflow: hidden;
+}
+
+.detail-body-inner p {
+  margin: 0;
+  padding: 0 12px 12px 50px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+[dir="rtl"] .detail-body-inner p {
+  padding: 0 50px 12px 12px;
+}
+
+.about-links {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+/* Open-source card — quiet, outlined (secondary to the filled Rate CTA). */
+.about-source {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.14s ease;
+}
+
+.about-source:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.about-source-logo {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-primary);
+}
+
+.about-source-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+[dir="rtl"] .about-source-text {
+  text-align: right;
+}
+
+.about-source-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.about-source-sub {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.about-source-arrow {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.about-source:hover .about-source-arrow {
+  color: var(--accent);
+  transform: translate(1px, -1px);
+}
+
+[dir="rtl"] .about-source-arrow {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .about-source:hover .about-source-arrow {
+  transform: scaleX(-1) translate(1px, -1px);
+}
+
+.about-disclaimer {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ========== CONTACT & SUPPORT ========== */
+.about-contact {
+  position: relative;
+  text-align: start;
+  margin: 10px 0 16px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+}
+
+/* ===== Easter egg: wandering ladybug ("found a bug?") ===== */
+/* Parked in the top-right corner; the wrapper carries the slow wander path,
+   the SVG body turns to face its heading, and a soft ground shadow follows
+   underneath for a little depth. Purely decorative + non-interactive. */
+/* Position + heading are driven by ladybug.js (it wanders the card, squashes
+   on click, and respawns when you re-enter the About tab). Hidden until JS
+   spawns it. pointer-events:auto so it can be clicked/squashed. */
+.ladybug {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 3;
+  display: none;
+}
+
+.lb-body {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 54%;
+  will-change: transform;
+  /* "Ink" = the dark structural parts (legs, antennae, head). The bug is dark in
+     both themes (the classic look). A soft, barely-there shadow underneath
+     (.lb-shadow) gives just a hint of depth — no outline glow. */
+  --lb-ink: #15100f;
+  --lb-eye: #f4f4f6;
+}
+
+.lb-legs,
+.lb-antennae {
+  fill: none;
+  stroke: var(--lb-ink);
+}
+
+.lb-ink { fill: var(--lb-ink); }
+.lb-head { fill: var(--lb-ink); }
+.lb-eye { fill: var(--lb-eye); }
+
+/* Each leg pivots around its own hip. The six legs run on one stepping cycle
+   but with staggered delays, so they ripple (metachronal gait) and the two
+   alternating tripods (≈0.25s apart) swing out of phase — reads as walking.
+   Step rate (--gait-dur) and pause state are driven by ladybug.js. */
+.leg {
+  transform-box: view-box;
+  animation: lb-step var(--gait-dur, 0.5s) ease-in-out infinite;
+}
+
+/* When the bug stops moving, its legs freeze. */
+.lb-body.gait-paused .leg {
+  animation-play-state: paused;
+}
+
+.leg-l1 { transform-origin: 12px 16px; animation-delay: 0s; }
+.leg-r2 { transform-origin: 29px 22px; animation-delay: -0.05s; }
+.leg-l3 { transform-origin: 12px 28px; animation-delay: -0.10s; }
+.leg-r1 { transform-origin: 28px 16px; animation-delay: -0.25s; }
+.leg-l2 { transform-origin: 11px 22px; animation-delay: -0.30s; }
+.leg-r3 { transform-origin: 28px 28px; animation-delay: -0.35s; }
+
+/* Dark theme: a very soft, barely-there light glow behind the bug — just a hint
+   of separation, not an obvious halo. Sits behind the bug (drawn first). */
+.lb-shadow {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 24px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07) 55%, rgba(255, 255, 255, 0) 100%);
+}
+
+/* Light theme: a small, soft ground shadow under it for a touch of depth. */
+body.light .lb-shadow {
+  top: 76%;
+  width: 17px;
+  height: 6px;
+  transform: translate(-50%, 0);
+  background: radial-gradient(closest-side, rgba(20, 16, 15, 0.28), rgba(0, 0, 0, 0));
+}
+
+/* Squash mark left where a ladybug was clicked. ~bug-sized, translucent so the
+   text underneath stays readable; placed + timed by ladybug.js. */
+.lb-splat {
+  position: absolute;
+  width: 20px;
+  height: 15px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(var(--r, 0deg));
+  border-radius: 58% 42% 60% 40% / 56% 62% 38% 44%;
+  background: radial-gradient(closest-side, rgba(208, 50, 34, 0.78), rgba(150, 28, 18, 0.52) 52%, rgba(90, 16, 12, 0) 100%);
+  box-shadow:
+    5px -2px 0 -1.5px rgba(170, 32, 20, 0.62),
+    -6px 2px 0 -2px rgba(135, 24, 16, 0.55),
+    2px 5px 0 -2px rgba(185, 36, 22, 0.5);
+  transition: opacity 0.4s ease;
+}
+
+body.light .lb-splat {
+  background: radial-gradient(closest-side, rgba(190, 40, 26, 0.6), rgba(140, 26, 16, 0.42) 52%, rgba(90, 16, 12, 0) 100%);
+}
+
+/* One leg swings fore/aft around its hip; staggered delays make the six ripple. */
+@keyframes lb-step {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ladybug,
+  .lb-body,
+  .leg {
+    animation: none !important;
+  }
+}
+
+.contact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 7px;
+}
+
+.contact-header .icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.contact-lead {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.contact-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.contact-btn + .contact-btn {
+  margin-top: 8px;
+}
+
+/* Leading icons — clean badges, no boxed "square in square" nesting */
+.contact-tg-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(7, 11, 30, 0.25));
+}
+
+.contact-email-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.contact-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.contact-btn-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.contact-btn-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.contact-btn-sub {
+  font-size: 10.5px;
+  line-height: 1.35;
+  opacity: 0.9;
+}
+
+/* Telegram — primary, filled. Deeper blue so the white text + white badge pop */
+.contact-btn--telegram {
+  background: linear-gradient(135deg, #2AA3E0 0%, #1483C2 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(20, 131, 194, 0.4), var(--glass-edge);
+}
+
+.contact-btn--telegram .contact-btn-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.contact-btn--telegram .contact-btn-sub {
+  color: rgba(255, 255, 255, 0.95);
+  opacity: 1;
+}
+
+.contact-btn--telegram:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #36B2EA 0%, #1A8FCE 100%);
+  box-shadow: 0 0 0 3px rgba(54, 178, 234, 0.42), 0 12px 28px rgba(20, 131, 194, 0.55), var(--glass-edge);
+}
+
+/* "Preferred" pill — white on blue so it stands out (not blue-on-blue) */
+.contact-pill {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1483C2;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(7, 11, 30, 0.22);
+}
+
+/* Email — a STATIC glass info card (not one big button): address on top, then
+   two full-width, clearly separated actions, so the two options are obvious. */
+.contact-email {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
+}
+
+.contact-email-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.contact-email-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.contact-email-addr {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-primary);
+  word-break: break-all;
+  user-select: all;
+}
+
+.contact-email-note {
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+
+.contact-email-actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.email-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+body.light .email-action {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.email-action svg {
+  flex-shrink: 0;
+}
+
+.email-action:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.email-action .ico-check,
+.email-action .lbl-copied {
+  display: none;
+}
+
+/* Copy button — "Copied!" confirmation */
+.email-action.is-copied {
+  color: var(--success);
+  border-color: var(--success);
+  background: rgba(0, 186, 124, 0.14);
+  transform: none;
+}
+
+.email-action.is-copied .ico-copy,
+.email-action.is-copied .lbl-copy {
+  display: none;
+}
+
+.email-action.is-copied .ico-check {
+  display: inline-block;
+}
+
+.email-action.is-copied .lbl-copied {
+  display: inline;
+}
+
+/* Utility */
+.hidden {
+  display: none !important;
+}
+
+/* Scrollbar — the popup itself scrolls WITHOUT a visible bar. The always-on
+   6px track read as a heavy, ugly stripe against the glass and stole layout
+   width. Trackpad/wheel scrolling still works; inner scroll areas (language
+   dropdown, history list) keep their own slim styled bar via the rules below. */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Firefox: hide the popup's own scrollbar while keeping it scrollable. */
+html {
+  scrollbar-width: none;
+}
+
+/* Inner scroll area (history list) keeps a slim, unobtrusive bar — it has its
+   own max-height and benefits from a visible affordance. */
+.history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+/* ========== TRANSITIONS ========== */
+.header,
+.tabs,
+.tab,
+.field,
+.export-status,
+.feature,
+.footer,
+.toggle-track,
+.toggle-label,
+.date-help,
+.lang-btn,
+.lang-dropdown,
+.lang-option {
+  transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* ========== TOASTS ========== */
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2000;
+  width: max-content;
+  max-width: calc(100% - 28px);
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner-glow);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  text-align: center;
+}
+
+.toast.toast-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Solid, high-contrast status toasts (the translucent versions blended into
+   the popup background and were hard to read). */
+.toast-error {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  background: linear-gradient(135deg, #f4313d, #cf1c27);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+}
+
+.toast-success {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  background: linear-gradient(135deg, #0cc187, #06966a);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+}
+
+/* ========== KEYBOARD FOCUS ========== */
+/* Visible focus ring for keyboard users (mouse clicks don't trigger it). */
+.btn:focus-visible,
+.lang-btn:focus-visible,
+.lang-option:focus-visible,
+.theme-toggle:focus-visible,
+.history-toggle:focus-visible,
+.history-dl-btn:focus-visible,
+.history-del-btn:focus-visible,
+.history-clear-btn:focus-visible,
+.input-small:focus-visible,
+.toggle-input:focus-visible + .toggle-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Selects deliberately get NO persistent :focus ring: a <select> keeps :focus
+   after its dropdown closes, which left a "stuck" blue outline even though
+   there's nothing left to interact with. They now behave like buttons —
+   highlighted only while hovered (see Tier 2).
+   :focus-visible is safe, though: mouse interaction never matches it, so the
+   stuck-outline problem can't occur, while keyboard users still get a ring
+   (same style as the export page's selects). */
+.select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Tabs are full-bleed rectangles — a snug inner ring reads cleaner than an
+   offset outline box. */
+.tab:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ========== REDUCED MOTION ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

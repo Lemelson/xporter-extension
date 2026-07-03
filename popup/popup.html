@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=350">
+  <title>XPorter</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="rate-prompt.css">
+</head>
+
+<body>
+  <script src="theme-init.js"></script>
+
+  <div class="popup" id="popup">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">
+          <svg class="icon icon-zap" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+          </svg>
+        </span>
+        <span class="brand">XPorter</span>
+      </div>
+      <div class="header-right">
+        <!-- Language Selector -->
+        <div class="lang-selector" id="langSelector">
+          <button class="lang-btn" id="langBtn" data-i18n-title="changeLang" title="Change language"
+            aria-expanded="false">
+            <span class="lang-flag" id="langFlag">🇺🇸</span>
+            <span class="lang-code" id="langCode">EN</span>
+            <svg class="lang-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <div class="lang-dropdown hidden" id="langDropdown">
+            <!-- Dynamically populated by JS -->
+          </div>
+        </div>
+        <a class="header-icon-btn" id="githubLink" href="https://github.com/Lemelson/xporter-extension"
+          target="_blank" rel="noopener" data-i18n-title="viewSource" title="View source on GitHub"
+          aria-label="View source on GitHub">
+          <svg class="icon icon-github" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"
+            aria-hidden="true">
+            <path
+              d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+          </svg>
+        </a>
+        <button class="theme-toggle" id="themeToggle" data-i18n-title="toggleTheme" title="Toggle theme">
+          <span class="theme-icon" id="themeIcon">
+            <svg class="icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" />
+            </svg>
+          </span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" id="tabBtnHome" data-tab="home" role="tab" aria-selected="true"
+        aria-controls="tab-home" data-i18n-title="tabHome" title="Home">
+        <svg class="icon icon-tab" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+          <path
+            d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        </svg>
+      </button>
+      <button class="tab" id="tabBtnSettings" data-tab="settings" role="tab" aria-selected="false"
+        aria-controls="tab-settings" data-i18n-title="tabSettings" title="Settings">
+        <svg class="icon icon-tab" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      <button class="tab" id="tabBtnAbout" data-tab="about" role="tab" aria-selected="false"
+        aria-controls="tab-about" data-i18n-title="tabAbout" title="About">
+        <svg class="icon icon-tab" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4" />
+          <path d="M12 8h.01" />
+        </svg>
+      </button>
+    </nav>
+
+    <!-- HOME TAB -->
+    <div class="tab-content active" id="tab-home" role="tabpanel" aria-labelledby="tabBtnHome">
+      <!-- Auth warning -->
+      <div class="auth-warning hidden" id="authWarning">
+        <span class="auth-warning-icon">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+          </svg>
+        </span>
+        <span><span data-i18n="authWarning">Please</span> <a href="https://x.com/login" target="_blank"
+            data-i18n="authLink">log in to X</a> <span data-i18n="authSuffix">first</span></span>
+      </div>
+
+      <!-- Export Mode -->
+      <div class="field">
+        <div class="field-label-row">
+          <label class="field-label" for="exportMode" data-i18n="exportMode">Export Mode</label>
+          <span class="date-help" tabindex="0" aria-label="What each export mode collects." data-i18n-aria-label="exportModeHelp" data-i18n-tooltip="exportModeHelp">!</span>
+        </div>
+        <select id="exportMode" class="select">
+          <option value="posts" data-i18n="modePosts">📝 Posts</option>
+          <option value="followers" data-i18n="modeFollowers">👥 Followers</option>
+          <option value="following" data-i18n="modeFollowing">➡️ Following</option>
+          <option value="verified_followers" data-i18n="modeVerifiedFollowers">✓ Verified Followers</option>
+        </select>
+      </div>
+
+      <!-- Username input -->
+      <div class="field">
+        <label class="field-label" for="usernameInput" data-i18n="fieldUsername">Twitter Username</label>
+        <div class="input-group">
+          <span class="input-prefix">@</span>
+          <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername" placeholder="elonmusk"
+            autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+      <!-- Posts-only options (hidden when mode is followers/following) -->
+      <div id="postsOnlyOptions">
+        <!-- Date range -->
+        <div class="field">
+          <div class="date-toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="dateCheck" class="toggle-input">
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+              <span data-i18n="dateRange">Date Range</span>
+            </label>
+            <span class="date-help" tabindex="0" aria-label="Filters the export to a date range. XPorter opens an X search tab and scrolls it to collect the posts — keep that tab open until the export finishes." data-i18n-aria-label="dateRangeHelp" data-i18n-tooltip="dateRangeHelp">!</span>
+          </div>
+          <div class="date-fields hidden" id="dateFields">
+            <div class="date-row">
+              <label class="date-label" for="dateFrom" data-i18n="dateFrom">From</label>
+              <input type="date" id="dateFrom">
+            </div>
+            <div class="date-row">
+              <label class="date-label" for="dateTo" data-i18n="dateTo">To</label>
+              <input type="date" id="dateTo">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output Format -->
+      <div class="field">
+        <label class="field-label" for="outputFormat" data-i18n="outputFormat">Output Format</label>
+        <select id="outputFormat" class="select">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+          <option value="xlsx">Excel (XLSX)</option>
+        </select>
+      </div>
+
+      <!-- Export status + contextual square action (Stop while running, Download when stopped/complete) -->
+      <div class="export-status hidden" id="exportStatus">
+        <div class="status-info" role="status" aria-live="polite">
+          <div class="status-header" id="statusHeader">
+            <span class="status-text" id="statusText" data-i18n="exporting">Exporting...</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="status-detail" id="statusDetail">
+            <span class="status-dot status-green" id="statusIndicator"></span>
+            <span id="statusMessage" data-i18n="starting">Starting...</span>
+          </div>
+          <div class="tweet-count" id="tweetCount">0 <span data-i18n="postsCollected">posts collected</span></div>
+        </div>
+        <button class="btn btn-square btn-danger hidden" id="stopBtn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="m15 9-6 6" />
+            <path
+              d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z" />
+            <path d="m9 9 6 6" />
+          </svg>
+          <span data-i18n="stop">Stop</span>
+        </button>
+        <button class="btn btn-square btn-warning hidden" id="downloadBtn">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15V3" />
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="m7 10 5 5 5-5" />
+          </svg>
+          <span data-i18n="download">Download</span>
+        </button>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="actions">
+        <button class="btn btn-primary" id="startBtn">
+          <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
+          </svg>
+          <span data-i18n="startExporting">Start Exporting</span>
+        </button>
+        <div class="resume-row hidden" id="resumeRow">
+          <input type="number" id="resumeQuantity" class="input-resume" min="1" placeholder="50" value="100"
+            aria-labelledby="resumeQuantityLabel">
+          <span class="resume-label" id="resumeQuantityLabel" data-i18n="morePosts">more posts</span>
+          <button class="btn btn-primary btn-resume" id="resumeBtn">
+            <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
+            </svg>
+            <span data-i18n="resumeExport">Resume</span>
+          </button>
+        </div>
+        <button class="btn btn-secondary hidden" id="newExportBtn">
+          <svg class="icon icon-btn" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M8 16H3v5" />
+          </svg>
+          <span data-i18n="newExport">New Export</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div class="tab-content" id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings">
+      <div id="settingsPostsOnly">
+        <div class="field">
+          <label class="toggle-label">
+            <input type="checkbox" id="includeRetweets" class="toggle-input" checked>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="includeRetweets">Include retweets</span>
+          </label>
+        </div>
+        <div class="field">
+          <label class="toggle-label">
+            <input type="checkbox" id="includeReplies" class="toggle-input" checked>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="includeReplies">Include replies</span>
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label class="field-label" id="quantityLimitLabel" for="quantityLimit" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
+          <span class="date-help" tabindex="0" aria-label="How many posts (or users) to collect before the export stops. Example: 500 stops at 500 posts. Choose Unlimited to grab everything X will give you." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
+        </div>
+        <select id="quantityLimit" class="select">
+          <option value="0" data-i18n="unlimited">Unlimited</option>
+          <option value="100">100 posts</option>
+          <option value="500">500 posts</option>
+          <option value="1000">1,000 posts</option>
+          <option value="5000">5,000 posts</option>
+          <option value="10000">10,000 posts</option>
+          <option value="custom" data-i18n="custom">Custom</option>
+        </select>
+        <div class="custom-quantity hidden" id="customQuantityRow">
+          <input type="number" id="customQuantity" class="input-small custom-quantity-input" min="1" max="100000"
+            placeholder="e.g. 2500" aria-labelledby="quantityLimitLabel">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="exportSpeed">Export Speed</label>
+          <span class="date-help" tabindex="0" aria-label="For typical post exports, the five presets wait about 2, 3, 4, 7, or 12 seconds between requests. Standard is the recommended 4-second balance. If X's live quota runs low, XPorter pauses until it resets instead of risking a failed export. Custom lets you type your own pause and batch break." data-i18n-aria-label="exportSpeedHelp" data-i18n-tooltip="exportSpeedHelp">!</span>
+        </div>
+        <select id="exportSpeed" class="select">
+          <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ~2 s between requests</option>
+          <option value="fast" data-i18n="speedFast">Fast — ~3 s between requests</option>
+          <option value="standard" data-i18n="speedStandard">Standard — ~4 s (recommended)</option>
+          <option value="careful" data-i18n="speedCareful">Careful — ~7 s between requests</option>
+          <option value="turtle" data-i18n="speedTurtle">🐢 Turtle — ~12 s between requests</option>
+          <option value="custom" data-i18n="speedCustom">⚠️ Custom — your own numbers</option>
+        </select>
+        <div class="custom-speed hidden" id="customSpeedRows">
+          <div class="cooldown-row">
+            <input type="number" id="customDelaySec" value="5" min="2" max="120" class="input-small"
+              aria-labelledby="customDelayLabel">
+            <span id="customDelayLabel" data-i18n="customDelayLabel">sec between requests</span>
+          </div>
+          <div class="cooldown-row">
+            <input type="number" id="customCooldownMin" value="3" min="1" max="30" class="input-small"
+              aria-labelledby="customCooldownLabel">
+            <span id="customCooldownLabel" data-i18n="customCooldownLabel">min pause every</span>
+            <input type="number" id="customBatchSize" value="20" min="5" max="100" class="input-small"
+              aria-labelledby="customBatchLabel">
+            <span id="customBatchLabel" data-i18n="customBatchLabel">requests</span>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="date-toggle-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="autoExpireEnabled" class="toggle-input" checked>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="autoExpireState">Auto-clear old exports</span>
+          </label>
+          <span class="date-help" tabindex="0" aria-label="Auto-deletes saved export data after the set number of hours to free space. Your past exports stay in the history list, but old ones may no longer be downloadable." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp">!</span>
+        </div>
+        <div class="cooldown-row" id="autoExpireRow">
+          <span id="autoExpireLabel" data-i18n="autoExpireAfter">Clear after</span>
+          <input type="number" id="autoExpireHours" value="4" min="1" max="48" class="input-small"
+            aria-labelledby="autoExpireLabel autoExpireUnit">
+          <span id="autoExpireUnit" data-i18n="hours">hours</span>
+        </div>
+      </div>
+      <!-- Localize exported column titles -->
+      <div class="field">
+        <div class="date-toggle-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="localizeExportHeaders" class="toggle-input">
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span data-i18n="localizeHeaders">Localize column titles</span>
+          </label>
+          <span class="date-help" tabindex="0" aria-label="Translates the column headers in CSV and XLSX files to your language. Turn it off to keep the original English headers (best for scripts and spreadsheets). JSON keys always stay in English." data-i18n-aria-label="localizeHeadersHelp" data-i18n-tooltip="localizeHeadersHelp">!</span>
+        </div>
+      </div>
+      <!-- Ladybug Easter-egg toggle -->
+      <div class="field">
+        <label class="toggle-label">
+          <input type="checkbox" id="ladybugEnabled" class="toggle-input" checked>
+          <span class="toggle-track toggle-track--bug"><span class="toggle-knob"></span></span>
+          <span data-i18n="showLadybug">Show ladybug</span>
+        </label>
+      </div>
+      <!-- Passive, local-only dataset of posts seen while browsing X -->
+      <div class="field feed-db-field">
+        <div class="field-label-row">
+          <span class="field-label" data-i18n="feedStatsTitle">Seen posts dataset</span>
+          <span class="feed-db-live" id="feedDbCount">0</span>
+        </div>
+        <p class="feed-db-description" data-i18n="feedStatsDescription">Collects non-reply posts already loaded by X. No extra requests.</p>
+        <div class="feed-db-summary" id="feedDbSummary" data-i18n="feedStatsEmpty">No posts collected yet</div>
+        <div class="feed-db-actions">
+          <button type="button" class="btn btn-secondary" id="downloadFeedCsv" data-i18n="downloadSeenCsv">CSV</button>
+          <button type="button" class="btn btn-secondary" id="downloadFeedJson" data-i18n="downloadSeenJson">JSON</button>
+          <button type="button" class="btn btn-ghost feed-db-clear" id="clearFeedDb" data-i18n="clearSeenData">Clear</button>
+        </div>
+      </div>
+      <!-- Export History (collapsible) -->
+      <div class="field history-field">
+        <button class="history-toggle" id="historyToggle" aria-expanded="false">
+          <span class="history-toggle-left">
+            <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span data-i18n="exportHistory">Export History</span>
+          </span>
+          <svg class="icon history-chevron" id="historyChevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="history-list hidden" id="historyList">
+          <div class="history-empty" id="historyEmpty">
+            <span data-i18n="noExportsYet">No exports yet</span>
+          </div>
+          <!-- cards rendered dynamically by popup.js -->
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-about" role="tabpanel" aria-labelledby="tabBtnAbout">
+      <div class="about-content">
+        <div class="about-icon">
+          <svg class="icon icon-zap-large" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+          </svg>
+        </div>
+        <h2>XPorter</h2>
+        <p class="about-desc" data-i18n="aboutDesc">Free & unlimited export of X (Twitter) data to CSV, JSON, or XLSX.</p>
+
+        <!-- Prominent, always-available way to rate the extension -->
+        <button type="button" class="about-rate-cta" id="rateAboutBtn">
+          <span class="about-rate-stars" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
+          </span>
+          <span class="about-rate-label" data-i18n="rateAbout">Rate XPorter</span>
+        </button>
+
+        <!-- Open source: the code you run is the code you can read -->
+        <a href="https://github.com/Lemelson/xporter-extension" target="_blank" rel="noopener"
+          class="about-source">
+          <span class="about-source-logo">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+            </svg>
+          </span>
+          <span class="about-source-text">
+            <span class="about-source-title" data-i18n="aboutSourceTitle">Open source</span>
+            <span class="about-source-sub" data-i18n="aboutSourceSub">Read every line on GitHub — the code you run
+              is the code you can see</span>
+          </span>
+          <svg class="about-source-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 17 17 7" />
+            <path d="M7 7h10v10" />
+          </svg>
+        </a>
+
+        <!-- Contact & support -->
+        <div class="about-contact">
+          <!-- Easter egg: a little ladybug ("a bug") that slowly wanders the top-right corner -->
+          <span class="ladybug" aria-hidden="true">
+            <span class="lb-shadow"></span>
+            <svg class="lb-body" viewBox="0 0 40 40" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="lbDome" cx="38%" cy="26%" r="78%">
+                  <stop offset="0%" stop-color="#ff7e72" />
+                  <stop offset="42%" stop-color="#ef3b30" />
+                  <stop offset="100%" stop-color="#a81b13" />
+                </radialGradient>
+              </defs>
+              <g class="lb-legs" stroke-width="1.5" stroke-linecap="round">
+                <path class="leg leg-l1" d="M12 16 L4 12" />
+                <path class="leg leg-l2" d="M11 22 L3 22" />
+                <path class="leg leg-l3" d="M12 28 L4 32" />
+                <path class="leg leg-r1" d="M28 16 L36 12" />
+                <path class="leg leg-r2" d="M29 22 L37 22" />
+                <path class="leg leg-r3" d="M28 28 L36 32" />
+              </g>
+              <g class="lb-antennae" stroke-width="1.4" stroke-linecap="round">
+                <path d="M16 7 L12 2" />
+                <path d="M24 7 L28 2" />
+              </g>
+              <circle class="lb-ink" cx="12" cy="2" r="1.4" />
+              <circle class="lb-ink" cx="28" cy="2" r="1.4" />
+              <ellipse class="lb-head" cx="20" cy="10" rx="6" ry="5" />
+              <circle class="lb-eye" cx="17.4" cy="9" r="1.1" opacity="0.92" />
+              <circle class="lb-eye" cx="22.6" cy="9" r="1.1" opacity="0.92" />
+              <ellipse cx="20" cy="22" rx="11.5" ry="12.5" fill="url(#lbDome)" />
+              <path d="M20 11 L20 33.5" stroke="#7a120c" stroke-width="1.3" stroke-linecap="round" />
+              <g fill="#1c0a08">
+                <circle cx="13.5" cy="18" r="2.1" />
+                <circle cx="26.5" cy="18" r="2.1" />
+                <circle cx="14.5" cy="26.5" r="2.4" />
+                <circle cx="25.5" cy="26.5" r="2.4" />
+                <circle cx="20" cy="30.5" r="1.7" />
+              </g>
+              <ellipse cx="15.5" cy="16.5" rx="3.6" ry="2.4" fill="#fff" opacity="0.26" />
+            </svg>
+          </span>
+          <div class="contact-header">
+            <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span data-i18n="contactTitle">Questions or found a bug?</span>
+          </div>
+          <p class="contact-lead" data-i18n="contactLead">Bug reports, ideas, improvements, or collaboration — message me
+            on Telegram. I read every message and reply there personally.</p>
+
+          <a href="https://t.me/Lemelson" target="_blank" rel="noopener" class="contact-btn contact-btn--telegram">
+            <span class="contact-tg-logo">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+              </svg>
+            </span>
+            <span class="contact-btn-text">
+              <span class="contact-btn-titlerow">
+                <span class="contact-btn-title" data-i18n="contactTelegram">Message on Telegram</span>
+                <span class="contact-pill" data-i18n="contactPreferred">Preferred</span>
+              </span>
+              <span class="contact-btn-sub" data-i18n="contactTelegramSub">Fastest reply — I answer personally</span>
+            </span>
+          </a>
+
+          <!-- Email: static info card showing the address + two explicit, separate actions -->
+          <div class="contact-email">
+            <div class="contact-email-head">
+              <span class="contact-email-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+              </span>
+              <div class="contact-email-info">
+                <span class="contact-email-addr">art.lemelson@gmail.com</span>
+                <span class="contact-email-note" data-i18n="contactEmailSub">I don't always check email</span>
+              </div>
+            </div>
+            <div class="contact-email-actions">
+              <button type="button" class="email-action" data-copy="art.lemelson@gmail.com"
+                data-i18n-title="contactCopy" title="Copy email address">
+                <svg class="ico-copy" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                <svg class="ico-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                <span class="lbl-copy" data-i18n="contactCopyShort">Copy</span>
+                <span class="lbl-copied" data-i18n="contactCopied">Copied!</span>
+              </button>
+              <a class="email-action" href="mailto:art.lemelson@gmail.com?subject=XPorter%20feedback"
+                data-i18n-title="contactEmailOpen" title="Open in mail app">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 3h6v6" />
+                  <path d="M10 14 21 3" />
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                </svg>
+                <span data-i18n="contactMailShort">Open in mail</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- How XPorter works — each row expands for more detail -->
+        <div class="about-details">
+          <div class="details-heading" data-i18n="detailsHeading">How XPorter works</div>
+
+          <div class="detail-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                </svg>
+              </span>
+              <span class="detail-title" data-i18n="detailLocalTitle">100% local &amp; private</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner">
+                <p data-i18n="detailLocalBody">Everything runs inside your browser. There are no XPorter servers, no
+                  account, and no analytics or tracking. Your data goes straight from X into the file you download — it
+                  never passes through us.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" />
+                  <path d="m21 2-9.6 9.6" />
+                  <circle cx="7.5" cy="15.5" r="5.5" />
+                </svg>
+              </span>
+              <span class="detail-title" data-i18n="detailSessionTitle">Uses your own X session</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner">
+                <p data-i18n="detailSessionBody">XPorter reads the same public data you already see when you're logged
+                  in, using the X session that's already in your browser. It never asks for your password and never
+                  stores your login.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <ellipse cx="12" cy="5" rx="9" ry="3" />
+                  <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+                  <path d="M3 12a9 3 0 0 0 18 0" />
+                </svg>
+              </span>
+              <span class="detail-title" data-i18n="detailExportsTitle">What you can export</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner">
+                <p data-i18n="detailExportsBody">Posts, followers, following, and verified followers. Post exports
+                  include the full engagement metrics — views, likes, reposts, replies, quotes, and bookmarks — plus
+                  dates, links, media, and hashtags.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
+                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                </svg>
+              </span>
+              <span class="detail-title" data-i18n="detailFormatsTitle">CSV, JSON &amp; XLSX</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner">
+                <p data-i18n="detailFormatsBody">Pick the format that fits your workflow: CSV for any spreadsheet, XLSX
+                  for Excel, or JSON for developers. Files are built locally and download straight to your device.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 2v4" />
+                  <path d="M16 2v4" />
+                  <rect width="18" height="18" x="3" y="4" rx="2" />
+                  <path d="M3 10h18" />
+                </svg>
+              </span>
+              <span class="detail-title" data-i18n="detailDatesTitle">Date range filtering</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner">
+                <p data-i18n="detailDatesBody">Export posts from a specific time window. Date-range exports open an X
+                  search tab and scroll it automatically to gather matching posts — just keep that tab open until it
+                  finishes.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                  <path d="M8 16H3v5" />
+                </svg>
+              </span>
+              <span class="detail-title" data-i18n="detailResumeTitle">Auto-resume &amp; rate limiting</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner">
+                <p data-i18n="detailResumeBody">Progress is saved as the export runs, so you can pause, close the popup,
+                  or even restart your browser and continue where you left off. XPorter also paces its requests to
+                  respect X's limits and avoid temporary blocks.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-disclaimer" data-i18n="notAffiliated">Not affiliated with X Corp.</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span id="extensionVersion">v0.0.0</span>
+      <span class="footer-separator">·</span>
+      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Jul 3, 2026</span></span>
+    </footer>
+  </div>
+
+  <script src="../utils/config.js"></script>
+  <script src="../utils/shared.js"></script>
+  <script src="../utils/usage-tracker.js"></script>
+  <script src="i18n.js"></script>
+  <script src="theme.js"></script>
+  <script src="rate-prompt.js"></script>
+
+  <script src="popup.js"></script>
+  <script src="ladybug.js"></script>
+</body>
+
+</html>

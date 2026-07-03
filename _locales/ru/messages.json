@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "XPorter — Экспорт X/Twitter: посты, подписчики · CSV/JSON/XLSX",
+    "description": "Extension name for CWS"
+  },
+  "extDescription": {
+    "message": "Экспорт постов, подписчиков и подписок из любого профиля X (Twitter) в CSV, JSON, Excel. Бесплатно, безлимитно, приватно.",
+    "description": "Extension description for CWS"
+  }
+}

@@ -1,0 +1,356 @@
+/* XPorter — Rate Prompt overlay
+   Shared by the popup and the full-page export UI. Colours follow the
+   dark/light convention (gotcha #9): the dark palette is the base, `.light`
+   on <body> overrides. We use a dedicated `--rp-*` set rather than the page
+   tokens because the popup's surface tokens are translucent glass — the
+   overlay needs solid, controlled surfaces to look the same on both pages. */
+
+.xrp-overlay {
+  --rp-scrim: rgba(8, 12, 17, 0.66);
+  --rp-card-bg: #192734;
+  --rp-card-border: rgba(255, 255, 255, 0.10);
+  --rp-text: #E7E9EA;
+  --rp-text-dim: #8b98a5;
+  --rp-text-faint: #5b6b78;
+  --rp-accent-a: #4AA8FF;
+  --rp-accent-b: #1B7FD4;
+  --rp-accent-glow: rgba(29, 143, 224, 0.40);
+  --rp-on-accent: #042741;
+  --rp-star: #FFC93C;
+  --rp-star-glow: rgba(255, 200, 70, 0.38);
+  --rp-ghost-hover: rgba(255, 255, 255, 0.07);
+  --rp-shadow: rgba(0, 0, 0, 0.55);
+
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: var(--rp-scrim);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+body.light .xrp-overlay {
+  --rp-scrim: rgba(15, 20, 25, 0.40);
+  --rp-card-bg: #FFFFFF;
+  --rp-card-border: rgba(0, 0, 0, 0.08);
+  --rp-text: #0F1419;
+  --rp-text-dim: #536471;
+  --rp-text-faint: #8b98a5;
+  --rp-accent-a: #1D9BF0;
+  --rp-accent-b: #0A6FDB;
+  --rp-accent-glow: rgba(10, 111, 219, 0.34);
+  --rp-on-accent: #FFFFFF;
+  --rp-star: #FBB024;
+  --rp-star-glow: rgba(245, 158, 11, 0.38);
+  --rp-ghost-hover: rgba(0, 0, 0, 0.04);
+  --rp-shadow: rgba(15, 20, 25, 0.22);
+}
+
+.xrp-overlay.xrp-in { opacity: 1; }
+
+.xrp-card {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  box-sizing: border-box;
+  padding: 30px 26px 20px;
+  text-align: center;
+  background: var(--rp-card-bg);
+  border: 1px solid var(--rp-card-border);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px var(--rp-shadow);
+  color: var(--rp-text);
+  overflow: hidden;
+  transform: translateY(14px) scale(0.94);
+  opacity: 0;
+  transition: transform 0.36s cubic-bezier(0.2, 0.85, 0.3, 1.15), opacity 0.28s ease;
+}
+
+.xrp-overlay.xrp-in .xrp-card { transform: none; opacity: 1; }
+
+/* Soft glow behind the stars — kept subtle */
+.xrp-glow {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  width: 180px;
+  height: 120px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, var(--rp-star-glow), transparent 72%);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+body.light .xrp-glow { opacity: 0.14; }
+
+.xrp-close {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rp-text-faint);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.xrp-close svg { width: 17px; height: 17px; }
+.xrp-close:hover { background: var(--rp-ghost-hover); color: var(--rp-text-dim); }
+
+.xrp-stars {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 16px;
+  color: var(--rp-star);
+}
+
+.xrp-star {
+  width: 28px;
+  height: 28px;
+  transform-origin: center center;
+  filter: drop-shadow(0 1px 4px var(--rp-star-glow));
+}
+
+/* Pop in on open, then twinkle forever in a left-to-right wave. */
+.xrp-overlay.xrp-in .xrp-star {
+  animation: xrp-star-pop 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.5) backwards,
+             xrp-twinkle 2.6s ease-in-out infinite;
+}
+
+.xrp-overlay.xrp-in .xrp-star:nth-child(1) { animation-delay: 0.06s, 1.0s; }
+.xrp-overlay.xrp-in .xrp-star:nth-child(2) { animation-delay: 0.13s, 1.2s; }
+.xrp-overlay.xrp-in .xrp-star:nth-child(3) { animation-delay: 0.20s, 1.4s; }
+.xrp-overlay.xrp-in .xrp-star:nth-child(4) { animation-delay: 0.27s, 1.6s; }
+.xrp-overlay.xrp-in .xrp-star:nth-child(5) { animation-delay: 0.34s, 1.8s; }
+
+@keyframes xrp-star-pop {
+  0% { transform: scale(0) rotate(-26deg); opacity: 0; }
+  60% { transform: scale(1.18) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+/* The wave: each star grows a touch and brightens as the wave passes. */
+@keyframes xrp-twinkle {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 1px 4px var(--rp-star-glow)); }
+  50% { transform: scale(1.16) translateY(-1px); filter: drop-shadow(0 0 7px var(--rp-star-glow)) brightness(1.12); }
+}
+
+.xrp-title {
+  margin: 0 0 9px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--rp-text);
+}
+
+.xrp-body {
+  margin: 0 auto 20px;
+  max-width: 31ch;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--rp-text-dim);
+}
+
+.xrp-body strong { color: var(--rp-text); font-weight: 700; }
+
+/* ---- Primary CTA ---- */
+.xrp-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--rp-on-accent);
+  background: linear-gradient(135deg, var(--rp-accent-a), var(--rp-accent-b));
+  border: none;
+  border-radius: 13px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px var(--rp-accent-glow);
+  transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.15s ease;
+}
+
+/* Gentle idle glow so the button draws the eye without nagging. */
+.xrp-overlay.xrp-in .xrp-btn-primary {
+  animation: xrp-cta-pulse 2.8s ease-in-out 1.2s infinite;
+}
+
+.xrp-btn-primary:hover {
+  transform: translateY(-1px) scale(1.025);
+  filter: brightness(1.05);
+  box-shadow: 0 12px 30px var(--rp-accent-glow);
+  animation: none;
+}
+
+.xrp-btn-primary:active { transform: scale(0.985); }
+
+.xrp-cta-star {
+  width: 18px;
+  height: 18px;
+  transition: color 0.18s ease, filter 0.18s ease;
+}
+
+/* On hover the CTA star turns gold and shimmers. */
+.xrp-btn-primary:hover .xrp-cta-star {
+  color: var(--rp-star);
+  filter: drop-shadow(0 0 6px var(--rp-star-glow));
+  animation: xrp-twinkle 1.1s ease-in-out infinite;
+}
+
+@keyframes xrp-cta-pulse {
+  0%, 100% { box-shadow: 0 6px 18px var(--rp-accent-glow); }
+  50% { box-shadow: 0 6px 26px var(--rp-accent-glow), 0 0 0 4px var(--rp-accent-glow); }
+}
+
+/* ---- "Maybe later": quiet, borderless text link ---- */
+.xrp-later {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--rp-text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.xrp-later:hover { color: var(--rp-text); background: var(--rp-ghost-hover); }
+
+/* ---- Fine print: deflect unhappy users to the bug channel ---- */
+.xrp-report {
+  display: block;
+  margin: 8px auto 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--rp-text-faint);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.xrp-report:hover { color: var(--rp-text-dim); text-decoration: underline; }
+
+/* Thank-you state shown after the user taps "Rate" */
+.xrp-thanks-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0 8px;
+  animation: xrp-fade-up 0.3s ease both;
+}
+
+.xrp-thanks-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  color: #F4477E;
+  background: rgba(244, 71, 126, 0.14);
+}
+
+.xrp-thanks-icon svg { width: 30px; height: 30px; }
+
+@keyframes xrp-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Prominent "Rate XPorter" CTA at the top of the About tab (popup).
+   Reuses the overlay's --rp-accent-* palette; the vars are (re)declared here
+   because the CTA lives outside .xrp-overlay, so it doesn't inherit them. */
+.about-rate-cta {
+  --rp-accent-a: #4AA8FF;
+  --rp-accent-b: #1B7FD4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 14px 0 4px;
+  padding: 13px 16px;
+  font-family: inherit;
+  color: #fff;
+  background: linear-gradient(135deg, var(--rp-accent-a), var(--rp-accent-b));
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(29, 143, 224, 0.32);
+  transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.15s ease;
+}
+
+body.light .about-rate-cta {
+  --rp-accent-a: #1D9BF0;
+  --rp-accent-b: #0A6FDB;
+  box-shadow: 0 6px 18px rgba(10, 111, 219, 0.28);
+}
+
+.about-rate-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 12px 30px rgba(29, 143, 224, 0.42);
+}
+
+.about-rate-cta:active { transform: scale(0.99); }
+
+.about-rate-stars {
+  display: flex;
+  gap: 4px;
+  color: #FFD24A;
+}
+
+.about-rate-stars svg {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 1px 3px rgba(255, 180, 40, 0.5));
+}
+
+.about-rate-cta:hover .about-rate-stars svg {
+  animation: xrp-twinkle 1.4s ease-in-out infinite;
+}
+
+.about-rate-cta:hover .about-rate-stars svg:nth-child(2) { animation-delay: 0.1s; }
+.about-rate-cta:hover .about-rate-stars svg:nth-child(3) { animation-delay: 0.2s; }
+.about-rate-cta:hover .about-rate-stars svg:nth-child(4) { animation-delay: 0.3s; }
+.about-rate-cta:hover .about-rate-stars svg:nth-child(5) { animation-delay: 0.4s; }
+
+.about-rate-label { font-size: 14px; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .xrp-overlay,
+  .xrp-card { transition: opacity 0.15s ease; }
+  .xrp-card { transform: none; }
+  .xrp-overlay.xrp-in .xrp-star,
+  .xrp-overlay.xrp-in .xrp-btn-primary,
+  .xrp-btn-primary:hover .xrp-cta-star,
+  .xrp-thanks-wrap { animation: none; }
+}

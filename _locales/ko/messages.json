@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "XPorter — 무료 X/Twitter 내보내기: 게시물, 팔로워 CSV/JSON/XLSX",
+    "description": "Extension name for CWS"
+  },
+  "extDescription": {
+    "message": "X (Twitter) 프로필에서 게시물, 팔로워, 팔로잉을 CSV, JSON, Excel로 내보내기. 무제한, 무료, 100% 비공개.",
+    "description": "Extension description for CWS"
+  }
+}
