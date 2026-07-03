@@ -1,5 +1,6 @@
 // XPorter — Export Format Generator
-// Single source of truth for CSV, XLSX, and JSON export generation.
+// Single source of truth for CSV and XLSX export generation.
+// (JSON export is generated directly in background/service-worker.js.)
 // Used by service-worker.js via importScripts.
 
 // ==================== Header Definitions ====================
@@ -47,14 +48,13 @@ function escapeCSVValue(val) {
 function generateCSV(items, isUsers = false, opts = {}) {
     const keys = isUsers ? USERS_HEADERS : POSTS_HEADERS;
     const labels = headerLabels(keys, opts);
-    let csv = labels.map(escapeCSVValue).join(',') + '\n';
+    const rows = [labels.map(escapeCSVValue).join(',')];
 
     for (const item of items) {
-        const row = keys.map(h => escapeCSVValue(item[h]));
-        csv += row.join(',') + '\n';
+        rows.push(keys.map(h => escapeCSVValue(item[h])).join(','));
     }
 
-    return '\uFEFF' + csv; // BOM for correct Unicode in Excel
+    return '\uFEFF' + rows.join('\n') + '\n'; // BOM for correct Unicode in Excel
 }
 
 /**
@@ -73,9 +73,12 @@ function headerLabels(keys, opts = {}) {
 
 /**
  * Escape XML special characters.
+ * Also strips control characters that are invalid in XML 1.0 — a single one
+ * (e.g. in tweet text) would make the whole XLSX unopenable.
  */
 function escapeXml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
@@ -89,38 +92,43 @@ function generateSimpleXLSX(items, isUsers = false, opts = {}) {
     const keys = isUsers ? USERS_HEADERS : POSTS_HEADERS;
     const labels = headerLabels(keys, opts);
 
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<?mso-application progid="Excel.Sheet"?>\n';
-    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
-    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
-    xml += '<Worksheet ss:Name="Export">\n<Table>\n';
+    const rows = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<?mso-application progid="Excel.Sheet"?>',
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"',
+        ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">',
+        '<Worksheet ss:Name="Export">',
+        '<Table>'
+    ];
 
     // Header row
-    xml += '<Row>';
+    let headerRow = '<Row>';
     for (const label of labels) {
-        xml += `<Cell><Data ss:Type="String">${escapeXml(label)}</Data></Cell>`;
+        headerRow += `<Cell><Data ss:Type="String">${escapeXml(label)}</Data></Cell>`;
     }
-    xml += '</Row>\n';
+    rows.push(headerRow + '</Row>');
 
     // Data rows
     for (const item of items) {
-        xml += '<Row>';
+        let row = '<Row>';
         for (const h of keys) {
             const val = String(item[h] ?? '');
             // Keep identifiers and very long digit strings as text — Excel stores
             // numbers as IEEE-754 doubles and would corrupt 17–19 digit tweet/user
-            // IDs (losing the last digits). Only treat short, space-free, purely
-            // numeric values as real numbers.
+            // IDs (losing the last digits). Only treat short, space-free, plain
+            // decimal values as real numbers — the strict regex rejects things
+            // JS Number() would accept ('Infinity', '0xBEEF', '1e999') and
+            // leading-zero strings like '007' that Excel would mangle.
             const isIdField = h === 'id' || h.endsWith('_id') || h.endsWith('_str');
             const isNum = !isIdField && val !== '' && !val.includes(' ') &&
-                !isNaN(val) && val.length <= 15;
-            xml += `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(val)}</Data></Cell>`;
+                /^-?(0|[1-9]\d*)(\.\d+)?$/.test(val) && val.length <= 15;
+            row += `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(val)}</Data></Cell>`;
         }
-        xml += '</Row>\n';
+        rows.push(row + '</Row>');
     }
 
-    xml += '</Table>\n</Worksheet>\n</Workbook>';
-    return xml;
+    rows.push('</Table>', '</Worksheet>', '</Workbook>');
+    return rows.join('\n');
 }
 
 // ==================== Filename ====================
@@ -183,6 +191,7 @@ if (typeof globalThis !== 'undefined') {
         generateCSV,
         generateSimpleXLSX,
         generateExportFilename,
+        escapeCSVValue,
         escapeXml,
         POSTS_HEADERS,
         USERS_HEADERS

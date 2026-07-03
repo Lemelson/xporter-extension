@@ -182,7 +182,8 @@
         </div>
 
         <h2>What Data the Extension Accesses</h2>
-        <p>XPorter accesses the following data solely to perform exports that you initiate:</p>
+        <p>XPorter accesses the following data to perform exports that you initiate and to build the local seen-post
+            dataset described below:</p>
         <ul>
             <li><strong>X.com session cookies</strong> — used to authenticate API requests on your behalf. The extension
                 reads your existing login session to make the same API calls that X.com itself makes in your browser. No
@@ -190,6 +191,9 @@
             <li><strong>X.com API responses</strong> — profile information, posts, follower/following lists retrieved
                 via X.com's public-facing APIs. This data is processed locally to generate export files (CSV, JSON, or
                 XLSX).</li>
+            <li><strong>Posts already loaded while you browse X.com</strong> — non-reply posts and their public
+                engagement/profile metrics are deduplicated by post ID and stored locally in IndexedDB. XPorter makes
+                no additional request for this collection and does not store the page URL.</li>
             <li><strong>Extension settings</strong> — your preferences (language, theme) are stored locally using
                 Chrome's <code>storage.local</code> API.</li>
         </ul>
@@ -199,7 +203,8 @@
             <li>Does <strong>not</strong> collect or store your X.com password</li>
             <li>Does <strong>not</strong> send your exported data, X content, usernames, or browsing history anywhere</li>
             <li>Does <strong>not</strong> use any analytics, advertising, or tracking SDKs during normal use</li>
-            <li>Does <strong>not</strong> track your browsing history or activity</li>
+            <li>Does <strong>not</strong> store your browsing history or page URLs; the local dataset contains post data
+                and the X timeline operation that supplied it</li>
             <li>Does <strong>not</strong> modify your X.com account in any way (no posting, following, or liking)</li>
             <li>Does <strong>not</strong> inject ads or promotional content</li>
             <li>Does <strong>not</strong> use any remote code — all code runs locally within the extension package</li>
@@ -210,12 +215,16 @@
             fix, XPorter attaches an <strong>anonymous, non-personal usage summary</strong> to that page. It contains
             only aggregate product stats:</p>
         <ul>
-            <li>Extension version and how many days it was installed</li>
+            <li>Extension version, your operating system (e.g. Windows / macOS / Linux), and how long it was installed
+                (install date and the time elapsed until uninstall)</li>
             <li>Interface language and theme (light/dark)</li>
+            <li>How many times you opened the extension and roughly how much time you actively spent in it</li>
             <li>How many exports you ran, how many succeeded or failed, and a short error code for the last failure</li>
+            <li>How much time had passed since your last export</li>
             <li>Counts per export type (posts, followers, following, verified followers) and per format (CSV / JSON / XLSX)</li>
             <li>The approximate total number of items exported and a few non-identifying settings (e.g. include
                 retweets/replies, quantity limit)</li>
+            <li>How long the feedback page itself was open</li>
         </ul>
         <p>This summary contains <strong>no usernames, no exported content, no X data, and nothing that identifies
             you.</strong> If you choose to leave a written comment on the feedback page, that text is sent too — only what
@@ -230,7 +239,7 @@
         <p>Required to read authentication tokens (CSRF token) from your X.com session to make authenticated API
             requests.</p>
 
-        <h3><code>activeTab</code> and <code>tabs</code></h3>
+        <h3><code>activeTab</code></h3>
         <p>Used to detect when you are on an X.com profile page and to identify the username of the profile being
             viewed.</p>
 
@@ -238,8 +247,11 @@
         <p>Used to save exported CSV, JSON, or XLSX files to your Downloads folder when you click the download button.
         </p>
 
-        <h3><code>storage</code></h3>
-        <p>Used to save your extension preferences (language, theme, export settings) locally in Chrome's storage.</p>
+        <h3><code>storage</code> and <code>unlimitedStorage</code></h3>
+        <p>Used to save extension preferences, resumable export batches, recent export history, and anonymous usage
+            counters locally in Chrome, plus the deduplicated seen-post dataset in IndexedDB.
+            <code>unlimitedStorage</code> prevents larger local datasets and exports from being truncated by Chrome's
+            normal storage quota.</p>
 
         <h3><code>host_permissions</code> for x.com</h3>
         <p>Required to make API calls to X.com's servers to retrieve the data you've requested to export.</p>
@@ -247,13 +259,18 @@
         <h2>Data Storage</h2>
         <p>All data is stored locally in your browser:</p>
         <ul>
-            <li>Export data is held temporarily in memory during the export process</li>
+            <li>Export rows are saved in batches to Chrome's <code>storage.local</code> so an interrupted export can be
+                resumed without losing already saved rows</li>
             <li>Once downloaded as a CSV, JSON, or XLSX file, the data is saved to your local filesystem (Downloads
                 folder)</li>
-            <li>No data is cached or persisted beyond the active export session</li>
+            <li>The current export and data snapshots for up to five recent history entries may remain locally until
+                they expire, you start or clear an export, clear history, or uninstall the extension</li>
+            <li>The seen-post dataset keeps one row per post ID, retains the 50,000 most recently seen unique posts, and
+                remains until you clear it in Settings or uninstall the extension</li>
             <li>Extension settings are stored in Chrome's <code>storage.local</code> and can be cleared by uninstalling
                 the extension</li>
-            <li>A small anonymous usage counter (export counts, install date, last error code) is kept in
+            <li>A small anonymous usage counter (including opens, active time, export counts, install date, and last
+                error code) is kept in
                 <code>storage.local</code> to build the uninstall summary, and is removed when you uninstall</li>
         </ul>
 

@@ -28,6 +28,10 @@ const MAX_TWEETS_PER_BATCH = (typeof XPORTER_CONFIG !== 'undefined')
 async function checkStorageQuota() {
     try {
         const bytesInUse = await chrome.storage.local.getBytesInUse(null);
+        const hasUnlimitedStorage = chrome.runtime?.getManifest?.().permissions?.includes('unlimitedStorage');
+        if (hasUnlimitedStorage) {
+            return { bytesInUse, quota: Infinity, percentUsed: 0, isWarning: false };
+        }
         const quota = chrome.storage.local.QUOTA_BYTES || 10485760; // 10 MB default
         const threshold = (typeof XPORTER_CONFIG !== 'undefined')
             ? XPORTER_CONFIG.STORAGE_WARN_THRESHOLD
@@ -52,9 +56,6 @@ async function checkStorageQuota() {
 async function safeSet(data) {
     try {
         await chrome.storage.local.set(data);
-        if (chrome.runtime.lastError) {
-            throw new Error(chrome.runtime.lastError.message);
-        }
         return true;
     } catch (e) {
         const log = (typeof XLog !== 'undefined') ? XLog : console;
@@ -68,11 +69,7 @@ async function safeSet(data) {
  */
 async function safeGet(keys) {
     try {
-        const result = await chrome.storage.local.get(keys);
-        if (chrome.runtime.lastError) {
-            throw new Error(chrome.runtime.lastError.message);
-        }
-        return result;
+        return await chrome.storage.local.get(keys);
     } catch (e) {
         const log = (typeof XLog !== 'undefined') ? XLog : console;
         log.error('Storage read failed:', e.message);
@@ -157,12 +154,26 @@ async function loadTweetBatch(batchIndex) {
  * Clear all export data
  */
 async function clearExportState() {
-    const state = await loadExportState();
     const keysToRemove = [STORAGE_KEYS.EXPORT_STATE];
 
-    if (state && state.totalBatches) {
-        for (let i = 0; i <= state.totalBatches; i++) {
-            keysToRemove.push(STORAGE_KEYS.TWEETS_PREFIX + i);
+    // Sweep by prefix rather than by the saved totalBatches: a crash between a
+    // batch write and the state update — or a new export state overwriting an
+    // older, larger one — otherwise strands unreachable batch keys that eat
+    // quota forever.
+    try {
+        const all = await chrome.storage.local.get(null);
+        for (const key of Object.keys(all)) {
+            if (key.startsWith(STORAGE_KEYS.TWEETS_PREFIX)) {
+                keysToRemove.push(key);
+            }
+        }
+    } catch (e) {
+        // Prefix sweep unavailable — fall back to the state-derived range.
+        const state = await loadExportState();
+        if (state && state.totalBatches) {
+            for (let i = 0; i <= state.totalBatches; i++) {
+                keysToRemove.push(STORAGE_KEYS.TWEETS_PREFIX + i);
+            }
         }
     }
 
@@ -185,7 +196,11 @@ async function saveExportHistory(entry) {
     const history = await loadExportHistory();
     history.unshift({
         ...entry,
-        id: Date.now(),
+        // Date.now() alone can collide for same-millisecond writes, making
+        // delete-by-id remove two entries.
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         hasData: Array.isArray(entry.items) && entry.items.length > 0
     });
     // Keep only the most recent entries
@@ -199,10 +214,20 @@ async function saveExportHistory(entry) {
         }
     });
     const saved = await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
-    if (!saved && entry.items) {
-        delete history[0].items;
-        history[0].hasData = false;
-        return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+    if (!saved) {
+        // Quota retry: strip item payloads from EVERY entry, not just the new
+        // one — older large entries can be what is actually blocking the write.
+        let stripped = false;
+        history.forEach(item => {
+            if (item.items) {
+                delete item.items;
+                item.hasData = false;
+                stripped = true;
+            }
+        });
+        if (stripped) {
+            return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+        }
     }
     return saved;
 }
@@ -225,7 +250,10 @@ async function loadExportHistoryEntry(id) {
  */
 async function deleteExportHistoryEntry(id) {
     const history = await loadExportHistory();
-    const filtered = history.filter(e => e.id !== id);
+    // Older releases stored numeric Date.now() IDs; DOM dataset/message
+    // transport turns them into strings. Compare canonically so those legacy
+    // entries remain deletable after migrating new entries to UUIDs.
+    const filtered = history.filter(e => String(e.id) !== String(id));
     return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: filtered });
 }
 
@@ -242,10 +270,20 @@ async function clearExportHistory() {
  * Save settings
  */
 async function saveSettings(settings) {
-    const current = await safeGet(STORAGE_KEYS.SETTINGS);
+    // Read directly (not via safeGet): a transient read failure must abort the
+    // save — merging the patch into {} would silently wipe every other setting.
+    let current;
+    try {
+        const result = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
+        current = result[STORAGE_KEYS.SETTINGS] || {};
+    } catch (e) {
+        const log = (typeof XLog !== 'undefined') ? XLog : console;
+        log.error('Settings read failed — aborting save to avoid wiping settings:', e.message);
+        return false;
+    }
     return safeSet({
         [STORAGE_KEYS.SETTINGS]: {
-            ...(current[STORAGE_KEYS.SETTINGS] || {}),
+            ...current,
             ...settings
         }
     });
@@ -262,6 +300,10 @@ async function loadSettings() {
         includeReplies: true,
         quantityLimit: 500,
         requestDelay: C.REQUEST_DELAY || 3000,
+        exportSpeed: 'standard',
+        customDelaySec: C.CUSTOM_SPEED_LIMITS?.delaySec?.[2] ?? 5,
+        customBatchSize: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
+        customCooldownMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
         batchSize: C.BATCH_SIZE || 20,
         cooldownDuration: C.COOLDOWN_DURATION || 180000,
         adaptivePacing: (C.ADAPTIVE_PACING !== false),
@@ -269,7 +311,7 @@ async function loadSettings() {
         autoExpireEnabled: true,
         autoExpireHours: 4,
         ladybugEnabled: true,
-        localizeExportHeaders: false,
+        localizeExportHeaders: true,
         ...(result[STORAGE_KEYS.SETTINGS] || {})
     };
 }
@@ -307,7 +349,13 @@ function defaultUsage() {
         byFormat: { csv: 0, json: 0, xlsx: 0 },
         itemsTotal: 0,
         lastExportAt: 0,
-        lastError: ''
+        lastError: '',
+        // Engagement signals (anonymous): how many times the UI was opened and
+        // how much time was actually spent looking at it. Together they tell
+        // "installed but never really used" from "used a lot then left".
+        opens: 0,
+        activeMs: 0,
+        lastOpenAt: 0
     };
 }
 
@@ -320,47 +368,102 @@ async function saveUsage(usage) {
     return safeSet({ [STORAGE_KEYS.USAGE]: usage });
 }
 
+// All usage mutations are unserialized load→mutate→save; two interleaved
+// message handlers (an active-time tick during recordExportStart) would lose
+// increments. Serialize them through a single promise chain — every mutation
+// happens in the SW context, so an in-process lock is sufficient.
+let _usageLock = Promise.resolve();
+function withUsageLock(fn) {
+    const run = _usageLock.then(fn, fn);
+    _usageLock = run.catch(() => {});
+    return run;
+}
+
 /** Record the first install time + version (no-op if already set). */
-async function markInstalled(version) {
-    const usage = await loadUsage();
-    if (!usage.installedAt) {
-        usage.installedAt = Date.now();
-        usage.installVersion = version || '';
+function markInstalled(version) {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        if (!usage.installedAt) {
+            usage.installedAt = Date.now();
+            usage.installVersion = version || '';
+            await saveUsage(usage);
+        }
+        return usage;
+    });
+}
+
+/** Count one open of the popup / export UI. */
+function recordOpen() {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.opens = (usage.opens || 0) + 1;
+        usage.lastOpenAt = Date.now();
         await saveUsage(usage);
-    }
-    return usage;
+        return usage;
+    });
+}
+
+/** Accumulate active (visible) time spent in the extension UI, in ms. */
+function addActiveMs(ms) {
+    const n = Number(ms) || 0;
+    if (n <= 0) return Promise.resolve();
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.activeMs = (usage.activeMs || 0) + n;
+        await saveUsage(usage);
+        return usage;
+    });
 }
 
 /** Bump counters when an export begins (mode + output format known up front). */
-async function recordExportStart(mode, format) {
-    const usage = await loadUsage();
-    usage.exportsStarted += 1;
-    const m = mode || 'posts';
-    usage.byMode[m] = (usage.byMode[m] || 0) + 1;
-    const f = (format || 'csv').toLowerCase();
-    usage.byFormat[f] = (usage.byFormat[f] || 0) + 1;
-    await saveUsage(usage);
-    return usage;
+function recordExportStart(mode, format) {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.exportsStarted += 1;
+        const m = mode === 'verified_followers' ? 'verifiedFollowers' : (mode || 'posts');
+        usage.byMode[m] = (usage.byMode[m] || 0) + 1;
+        const f = (format || 'csv').toLowerCase();
+        usage.byFormat[f] = (usage.byFormat[f] || 0) + 1;
+        await saveUsage(usage);
+        return usage;
+    });
 }
 
 /** Bump counters on successful completion. */
-async function recordExportComplete(itemCount) {
-    const usage = await loadUsage();
-    usage.exportsOk += 1;
-    usage.itemsTotal += (itemCount || 0);
-    usage.lastExportAt = Date.now();
-    await saveUsage(usage);
-    return usage;
+function recordExportComplete(itemCount) {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.exportsOk += 1;
+        usage.itemsTotal += (itemCount || 0);
+        usage.lastExportAt = Date.now();
+        await saveUsage(usage);
+        return usage;
+    });
 }
 
-/** Bump counters on failure (stores a short error code, no personal data). */
-async function recordExportError(error) {
-    const usage = await loadUsage();
-    usage.exportsErr += 1;
-    usage.lastError = String(error || '').slice(0, 80);
-    usage.lastExportAt = Date.now();
-    await saveUsage(usage);
-    return usage;
+// Error codes allowed into the anonymous uninstall URL. The privacy policy
+// promises "a short error code" — free text could one day carry a username
+// inside a message, so anything unknown is collapsed to UNKNOWN.
+const KNOWN_ERROR_CODES = new Set([
+    'NOT_LOGGED_IN', 'USER_NOT_FOUND', 'USER_SUSPENDED', 'USER_UNAVAILABLE',
+    'ACCOUNT_PRIVATE', 'INVALID_DATE_RANGE', 'RATE_LIMITED', 'STALE_QUERY_ID',
+    'AUTH_ERROR', 'ENDPOINT_DISCOVERY_FAILED', 'MAX_RETRIES_EXCEEDED',
+    'ABORTED', 'STORAGE_FULL', 'SEARCH_CAPTURE_TIMEOUT', 'DOWNLOAD_FAILED'
+]);
+
+/** Bump counters on failure (stores a whitelisted error code, no free text). */
+function recordExportError(error) {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.exportsErr += 1;
+        const code = String(error || '');
+        usage.lastError = KNOWN_ERROR_CODES.has(code)
+            ? code
+            : (/^API_ERROR_\d{3}$/.test(code) ? code : 'UNKNOWN');
+        usage.lastExportAt = Date.now();
+        await saveUsage(usage);
+        return usage;
+    });
 }
 
 if (typeof globalThis !== 'undefined') {
@@ -374,6 +477,7 @@ if (typeof globalThis !== 'undefined') {
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
         loadUsage, saveUsage, markInstalled,
+        recordOpen, addActiveMs,
         recordExportStart, recordExportComplete, recordExportError,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH
     };

@@ -23,6 +23,18 @@ class RateLimitManager {
         this.adaptivePad = (options.adaptivePad != null)
             ? options.adaptivePad
             : (C.ADAPTIVE_PAD != null ? C.ADAPTIVE_PAD : 2000);
+        // Speed-preset knobs (see XPORTER_CONFIG.SPEED_PRESETS):
+        // budgetFraction < 1 paces as if only that share of X's remaining
+        // budget existed; raceReserve > 0 marks a racing preset — hold the
+        // floor pace while the budget lasts, then wait out the window reset.
+        this.budgetFraction = (options.budgetFraction > 0 && options.budgetFraction <= 1)
+            ? options.budgetFraction
+            : 1;
+        this.raceReserve = options.raceReserve || 0;
+        // Custom preset: the user explicitly asked for "pause N min every M
+        // requests", so honor the batch cooldown even while adaptive pacing
+        // is active (normally it only applies on the headerless fallback path).
+        this.alwaysBatchCooldown = !!options.alwaysBatchCooldown;
         this.adaptiveHeaderTtl = options.adaptiveHeaderTtl || C.ADAPTIVE_HEADER_TTL || 300000;
         this.fallbackMinDelay = options.fallbackMinDelay || this.requestDelay;
         this.fallbackMaxDelay = Math.max(
@@ -36,6 +48,8 @@ class RateLimitManager {
         this.listeners = [];
         this._aborted = false;
         this._abortController = null;
+        this.lastRequestAt = null; // wall-clock of the last successful request
+        this.waitUntil = null;     // epoch ms the current _wait() ends (UI countdown)
     }
 
     /**
@@ -51,6 +65,10 @@ class RateLimitManager {
     _emitStatus(status, detail = {}) {
         this.status = status;
         const event = { running: true, status, ...detail, totalRequests: this.totalRequests };
+        // Absolute end-of-wait timestamp so the UI can render a live countdown
+        // that stays correct even when the event itself arrives late.
+        if (Number.isFinite(detail.duration)) event.until = Date.now() + detail.duration;
+        if (Number.isFinite(detail.retryIn)) event.until = Date.now() + detail.retryIn;
         this.listeners.forEach(cb => {
             try { cb(event); } catch (e) { XLog.error('Status listener error:', e); }
         });
@@ -61,6 +79,15 @@ class RateLimitManager {
      * No polling — uses a single event listener for abort.
      */
     async _wait(ms) {
+        this.waitUntil = Date.now() + ms;
+        try {
+            return await this._waitInner(ms);
+        } finally {
+            this.waitUntil = null;
+        }
+    }
+
+    async _waitInner(ms) {
         return new Promise((resolve, reject) => {
             // Create a fresh controller for this wait
             this._abortController = new AbortController();
@@ -78,7 +105,7 @@ class RateLimitManager {
             // the middle of a cooldown. Touching a chrome API every 20s resets
             // the idle timer. Only needed for long waits.
             let keepAlive = null;
-            if (ms > 25000 && typeof chrome !== 'undefined' && chrome.runtime?.getPlatformInfo) {
+            if (ms > 20000 && typeof chrome !== 'undefined' && chrome.runtime?.getPlatformInfo) {
                 keepAlive = setInterval(() => {
                     try { chrome.runtime.getPlatformInfo(() => { }); } catch (_) { /* noop */ }
                 }, 20000);
@@ -139,10 +166,42 @@ class RateLimitManager {
             };
         }
 
-        // Quota left → fill the rest of the window evenly.
-        let delay = Math.ceil(msLeftInWindow / remaining) + this.adaptivePad;
+        // Burst-first presets: hold the promised pace while the budget lasts,
+        // then wait out the window reset. Even-spreading the tail silently
+        // turns a short export into 20+ second pauses; an explicit "X limit
+        // reached" hold is honest and no slower overall. The small reserve
+        // absorbs requests the user's own X tab makes against the same budget.
+        if (this.raceReserve > 0) {
+            if (remaining > this.raceReserve) {
+                return { delay: this.adaptiveFloor + this.adaptivePad, waiting: false };
+            }
+            return { delay: msLeftInWindow + this.adaptivePad, waiting: true };
+        }
+
+        // Quota left → fill the rest of the window evenly. budgetFraction < 1
+        // pretends part of the budget is already spent (extra safety margin).
+        const effectiveRemaining = Math.max(1, Math.floor(remaining * this.budgetFraction));
+        let delay = Math.ceil(msLeftInWindow / effectiveRemaining) + this.adaptivePad;
         if (delay < this.adaptiveFloor) delay = this.adaptiveFloor;
         return { delay, waiting: false };
+    }
+
+    // Batch cooldown: pause after every batchSize-th request, crediting wall
+    // time already spent idle (e.g. resuming hours later with a restored
+    // requestCount) — otherwise a resume starts with a pointless full
+    // cooldown before request #1.
+    async _maybeBatchCooldown() {
+        if (this.requestCount % this.batchSize !== 0) return;
+        const elapsed = this.lastRequestAt ? Date.now() - this.lastRequestAt : Infinity;
+        const cooldownLeft = this.cooldownDuration - elapsed;
+        if (cooldownLeft > 0) {
+            this._emitStatus('cooldown', {
+                duration: cooldownLeft,
+                kind: 'batch',
+                reason: `Cooldown after ${this.batchSize} requests`
+            });
+            await this._wait(cooldownLeft);
+        }
     }
 
     _computeFallbackDelay() {
@@ -160,30 +219,35 @@ class RateLimitManager {
         if (this.requestCount > 0) {
             const adaptive = this._computeAdaptiveDelay();
             if (adaptive) {
-                // Header-driven pacing IS the throttle, so we skip the blanket
-                // batch cooldown entirely. Long waits (followers' tight window,
-                // or a reset hold) are surfaced as 'cooldown' so the UI shows a
-                // live countdown instead of looking frozen.
-                if (adaptive.delay >= 8000) {
-                    this._emitStatus('cooldown', {
-                        duration: adaptive.delay,
-                        reason: adaptive.waiting
-                            ? 'Waiting for X rate-limit window to reset'
-                            : 'Pacing to X rate limit'
-                    });
+                // Header-driven pacing IS the throttle, so we normally skip
+                // the blanket batch cooldown (custom preset opts back in via
+                // alwaysBatchCooldown).
+                if (this.alwaysBatchCooldown) {
+                    await this._maybeBatchCooldown();
+                    if (this._aborted) throw new Error('ABORTED');
                 }
+                // Every wait is visible in the UI, including the 2–7 second
+                // preset pauses. Hiding short waits leaves the status stuck on
+                // "Fetching..." even though no request is in flight.
+                this._emitStatus('cooldown', {
+                    duration: adaptive.delay,
+                    kind: adaptive.waiting ? 'window' : 'pacing',
+                    reason: adaptive.waiting
+                        ? 'Waiting for X rate-limit window to reset'
+                        : 'Pacing to X rate limit'
+                });
                 await this._wait(adaptive.delay);
             } else {
                 // Fallback: no live budget — use the configured per-mode delay
                 // and inject a batch cooldown every N requests as a safety net.
-                if (this.requestCount % this.batchSize === 0) {
-                    this._emitStatus('cooldown', {
-                        duration: this.cooldownDuration,
-                        reason: `Cooldown after ${this.batchSize} requests`
-                    });
-                    await this._wait(this.cooldownDuration);
-                }
-                await this._wait(this._computeFallbackDelay());
+                await this._maybeBatchCooldown();
+                const fallbackDelay = this._computeFallbackDelay();
+                this._emitStatus('cooldown', {
+                    duration: fallbackDelay,
+                    kind: 'pacing',
+                    reason: 'Pacing between requests'
+                });
+                await this._wait(fallbackDelay);
             }
         }
 
@@ -194,13 +258,16 @@ class RateLimitManager {
 
             try {
                 this._emitStatus('fetching', {
-                    batch: Math.floor(this.totalRequests / this.batchSize) + 1,
+                    // User-facing batch = the API page currently being fetched.
+                    // The internal cooldown group remains requestInBatch.
+                    batch: this.totalRequests + 1,
                     requestInBatch: (this.requestCount % this.batchSize) + 1
                 });
 
                 const result = await requestFn();
                 this.requestCount++;
                 this.totalRequests++;
+                this.lastRequestAt = Date.now();
                 return result;
 
             } catch (error) {
@@ -272,7 +339,10 @@ class RateLimitManager {
         if (this._abortController) {
             this._abortController.abort();
         }
-        this._emitStatus('idle', { reason: 'Aborted by user' });
+        // No emit here: _emitStatus events carry running:true, and the SW
+        // broadcasts its own definitive 'stopped' — emitting {running:true,
+        // status:'idle'} right before it flickered the UI back to running.
+        this.status = 'idle';
     }
 
     /**
@@ -296,7 +366,8 @@ class RateLimitManager {
             totalRequests: this.totalRequests,
             requestDelay: this.requestDelay,
             batchSize: this.batchSize,
-            cooldownDuration: this.cooldownDuration
+            cooldownDuration: this.cooldownDuration,
+            lastRequestAt: this.lastRequestAt
         };
     }
 
@@ -310,6 +381,7 @@ class RateLimitManager {
             if (state.requestDelay) this.requestDelay = state.requestDelay;
             if (state.batchSize) this.batchSize = state.batchSize;
             if (state.cooldownDuration) this.cooldownDuration = state.cooldownDuration;
+            if (state.lastRequestAt) this.lastRequestAt = state.lastRequestAt;
         }
     }
 }

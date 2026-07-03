@@ -171,7 +171,7 @@ body {
 }
 
 .panel-controls {
-    border-right: 1px solid var(--border);
+    border-inline-end: 1px solid var(--border);
     background: var(--bg-secondary);
     overflow-y: auto;
     max-height: calc(100vh - 70px - 40px);
@@ -311,6 +311,12 @@ body {
     transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
+/* RTL: anchor the popover to the inline-start (right) edge instead. */
+[dir="rtl"] .help-pop {
+    left: auto;
+    right: 0;
+}
+
 .help-pop strong {
     font-weight: 700;
     color: var(--accent);
@@ -389,6 +395,14 @@ body.light .help-pop {
     background-position: right 14px center;
 }
 
+/* RTL: move the chevron to the leading (left) edge and pad that side so it
+   doesn't sit under the right-aligned label (parity with the popup). */
+[dir="rtl"] .select {
+    background-position: left 14px center;
+    padding-left: 32px;
+    padding-right: 14px;
+}
+
 .cooldown-row {
     display: flex;
     align-items: center;
@@ -397,25 +411,14 @@ body.light .help-pop {
     color: var(--text-secondary);
 }
 
-/* CJK reads "every N requests, pause M min" — reorder the cooldown
-   inputs/labels for those languages so the localized strings line up
-   grammatically (DOM order is kept for every other language). */
-:lang(ja) .cooldown-row > #cooldownBatch,
-:lang(ko) .cooldown-row > #cooldownBatch {
-    order: 1;
+/* Custom export-speed inputs (shown only when the ⚠️ Custom preset is picked) */
+.custom-speed {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
 }
-:lang(ja) .cooldown-row > [data-i18n="requests"],
-:lang(ko) .cooldown-row > [data-i18n="requests"] {
-    order: 2;
-}
-:lang(ja) .cooldown-row > #cooldownMinutes,
-:lang(ko) .cooldown-row > #cooldownMinutes {
-    order: 3;
-}
-:lang(ja) .cooldown-row > [data-i18n="minAfterEvery"],
-:lang(ko) .cooldown-row > [data-i18n="minAfterEvery"] {
-    order: 4;
-}
+
 
 .input-small {
     width: 56px;
@@ -572,7 +575,7 @@ body.light .help-pop {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-    text-align: left;
+    text-align: start;
 }
 
 .idle-feature {
@@ -683,6 +686,11 @@ body.light .help-pop {
     background: linear-gradient(90deg, transparent, var(--accent), #1DA1F2, transparent);
     background-size: 300% 100%;
     animation: progressIndeterminate 1.4s infinite linear;
+}
+
+.progress-fill-lg.cooldown {
+    background: linear-gradient(90deg, #e7a91f, #ffd166);
+    box-shadow: 0 0 10px rgba(245, 180, 40, 0.45);
 }
 
 @keyframes progressIndeterminate {
@@ -853,6 +861,13 @@ body.light .help-pop {
     line-height: 1.5;
 }
 
+.error-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
 .link {
     color: var(--accent);
     text-decoration: none;
@@ -884,7 +899,7 @@ body.light .help-pop {
     }
 
     .panel-controls {
-        border-right: none;
+        border-inline-end: none;
         border-bottom: 1px solid var(--border);
         max-height: none;
     }

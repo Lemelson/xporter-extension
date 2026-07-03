@@ -28,7 +28,8 @@
       <div class="header-right">
         <!-- Language Selector -->
         <div class="lang-selector" id="langSelector">
-          <button class="lang-btn" id="langBtn" data-i18n-title="changeLang" title="Change language">
+          <button class="lang-btn" id="langBtn" data-i18n-title="changeLang" title="Change language"
+            aria-expanded="false">
             <span class="lang-flag" id="langFlag">🇺🇸</span>
             <span class="lang-code" id="langCode">EN</span>
             <svg class="lang-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -40,6 +41,15 @@
             <!-- Dynamically populated by JS -->
           </div>
         </div>
+        <a class="header-icon-btn" id="githubLink" href="https://github.com/Lemelson/xporter-extension"
+          target="_blank" rel="noopener" data-i18n-title="viewSource" title="View source on GitHub"
+          aria-label="View source on GitHub">
+          <svg class="icon icon-github" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"
+            aria-hidden="true">
+            <path
+              d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+          </svg>
+        </a>
         <button class="theme-toggle" id="themeToggle" data-i18n-title="toggleTheme" title="Toggle theme">
           <span class="theme-icon" id="themeIcon">
             <svg class="icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -61,7 +71,8 @@
 
     <!-- Tabs -->
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="home" role="tab" aria-selected="true" data-i18n-title="tabHome" title="Home">
+      <button class="tab active" id="tabBtnHome" data-tab="home" role="tab" aria-selected="true"
+        aria-controls="tab-home" data-i18n-title="tabHome" title="Home">
         <svg class="icon icon-tab" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
@@ -69,7 +80,8 @@
             d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </svg>
       </button>
-      <button class="tab" data-tab="settings" role="tab" aria-selected="false" data-i18n-title="tabSettings" title="Settings">
+      <button class="tab" id="tabBtnSettings" data-tab="settings" role="tab" aria-selected="false"
+        aria-controls="tab-settings" data-i18n-title="tabSettings" title="Settings">
         <svg class="icon icon-tab" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path
@@ -77,7 +89,8 @@
           <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
-      <button class="tab" data-tab="about" role="tab" aria-selected="false" data-i18n-title="tabAbout" title="About">
+      <button class="tab" id="tabBtnAbout" data-tab="about" role="tab" aria-selected="false"
+        aria-controls="tab-about" data-i18n-title="tabAbout" title="About">
         <svg class="icon icon-tab" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10" />
@@ -88,7 +101,7 @@
     </nav>
 
     <!-- HOME TAB -->
-    <div class="tab-content active" id="tab-home">
+    <div class="tab-content active" id="tab-home" role="tabpanel" aria-labelledby="tabBtnHome">
       <!-- Auth warning -->
       <div class="auth-warning hidden" id="authWarning">
         <span class="auth-warning-icon">
@@ -106,7 +119,7 @@
       <!-- Export Mode -->
       <div class="field">
         <div class="field-label-row">
-          <label class="field-label" data-i18n="exportMode">Export Mode</label>
+          <label class="field-label" for="exportMode" data-i18n="exportMode">Export Mode</label>
           <span class="date-help" tabindex="0" aria-label="What each export mode collects." data-i18n-aria-label="exportModeHelp" data-i18n-tooltip="exportModeHelp">!</span>
         </div>
         <select id="exportMode" class="select">
@@ -119,7 +132,7 @@
 
       <!-- Username input -->
       <div class="field">
-        <label class="field-label" data-i18n="fieldUsername">Twitter Username</label>
+        <label class="field-label" for="usernameInput" data-i18n="fieldUsername">Twitter Username</label>
         <div class="input-group">
           <span class="input-prefix">@</span>
           <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername" placeholder="elonmusk"
@@ -141,11 +154,11 @@
           </div>
           <div class="date-fields hidden" id="dateFields">
             <div class="date-row">
-              <span class="date-label" data-i18n="dateFrom">From</span>
+              <label class="date-label" for="dateFrom" data-i18n="dateFrom">From</label>
               <input type="date" id="dateFrom">
             </div>
             <div class="date-row">
-              <span class="date-label" data-i18n="dateTo">To</span>
+              <label class="date-label" for="dateTo" data-i18n="dateTo">To</label>
               <input type="date" id="dateTo">
             </div>
           </div>
@@ -154,7 +167,7 @@
 
       <!-- Output Format -->
       <div class="field">
-        <label class="field-label" data-i18n="outputFormat">Output Format</label>
+        <label class="field-label" for="outputFormat" data-i18n="outputFormat">Output Format</label>
         <select id="outputFormat" class="select">
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
@@ -208,8 +221,9 @@
           <span data-i18n="startExporting">Start Exporting</span>
         </button>
         <div class="resume-row hidden" id="resumeRow">
-          <input type="number" id="resumeQuantity" class="input-resume" min="1" placeholder="50" value="100">
-          <span class="resume-label" data-i18n="morePosts">more posts</span>
+          <input type="number" id="resumeQuantity" class="input-resume" min="1" placeholder="50" value="100"
+            aria-labelledby="resumeQuantityLabel">
+          <span class="resume-label" id="resumeQuantityLabel" data-i18n="morePosts">more posts</span>
           <button class="btn btn-primary btn-resume" id="resumeBtn">
             <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -232,7 +246,7 @@
     </div>
 
     <!-- SETTINGS TAB -->
-    <div class="tab-content" id="tab-settings">
+    <div class="tab-content" id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings">
       <div id="settingsPostsOnly">
         <div class="field">
           <label class="toggle-label">
@@ -251,33 +265,50 @@
       </div>
       <div class="field">
         <div class="field-label-row">
-          <label class="field-label" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
+          <label class="field-label" id="quantityLimitLabel" for="quantityLimit" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
           <span class="date-help" tabindex="0" aria-label="How many posts (or users) to collect before the export stops. Example: 500 stops at 500 posts. Choose Unlimited to grab everything X will give you." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
         </div>
         <select id="quantityLimit" class="select">
           <option value="0" data-i18n="unlimited">Unlimited</option>
-          <option value="100">100 <span data-i18n="posts">posts</span></option>
-          <option value="500">500 <span data-i18n="posts">posts</span></option>
-          <option value="1000">1,000 <span data-i18n="posts">posts</span></option>
-          <option value="5000">5,000 <span data-i18n="posts">posts</span></option>
-          <option value="10000">10,000 <span data-i18n="posts">posts</span></option>
+          <option value="100">100 posts</option>
+          <option value="500">500 posts</option>
+          <option value="1000">1,000 posts</option>
+          <option value="5000">5,000 posts</option>
+          <option value="10000">10,000 posts</option>
           <option value="custom" data-i18n="custom">Custom</option>
         </select>
         <div class="custom-quantity hidden" id="customQuantityRow">
           <input type="number" id="customQuantity" class="input-small custom-quantity-input" min="1" max="100000"
-            placeholder="e.g. 2500">
+            placeholder="e.g. 2500" aria-labelledby="quantityLimitLabel">
         </div>
       </div>
       <div class="field">
         <div class="field-label-row">
-          <label class="field-label" data-i18n="requestCooldown">Request Cooldown</label>
-          <span class="date-help" tabindex="0" aria-label="Pauses now and then so X won't block you for fetching too fast. XPorter loads your data in batches of requests — go too quickly and X temporarily freezes the export. Default: a 3-minute pause after every 20 requests. A longer pause or smaller batch is safer but slower." data-i18n-aria-label="requestCooldownHelp" data-i18n-tooltip="requestCooldownHelp">!</span>
+          <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="exportSpeed">Export Speed</label>
+          <span class="date-help" tabindex="0" aria-label="For typical post exports, the five presets wait about 2, 3, 4, 7, or 12 seconds between requests. Standard is the recommended 4-second balance. If X's live quota runs low, XPorter pauses until it resets instead of risking a failed export. Custom lets you type your own pause and batch break." data-i18n-aria-label="exportSpeedHelp" data-i18n-tooltip="exportSpeedHelp">!</span>
         </div>
-        <div class="cooldown-row">
-          <input type="number" id="cooldownMinutes" value="3" min="1" max="15" class="input-small">
-          <span data-i18n="minAfterEvery">min pause every</span>
-          <input type="number" id="cooldownBatch" value="20" min="5" max="50" class="input-small">
-          <span data-i18n="requests">requests</span>
+        <select id="exportSpeed" class="select">
+          <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ~2 s between requests</option>
+          <option value="fast" data-i18n="speedFast">Fast — ~3 s between requests</option>
+          <option value="standard" data-i18n="speedStandard">Standard — ~4 s (recommended)</option>
+          <option value="careful" data-i18n="speedCareful">Careful — ~7 s between requests</option>
+          <option value="turtle" data-i18n="speedTurtle">🐢 Turtle — ~12 s between requests</option>
+          <option value="custom" data-i18n="speedCustom">⚠️ Custom — your own numbers</option>
+        </select>
+        <div class="custom-speed hidden" id="customSpeedRows">
+          <div class="cooldown-row">
+            <input type="number" id="customDelaySec" value="5" min="2" max="120" class="input-small"
+              aria-labelledby="customDelayLabel">
+            <span id="customDelayLabel" data-i18n="customDelayLabel">sec between requests</span>
+          </div>
+          <div class="cooldown-row">
+            <input type="number" id="customCooldownMin" value="3" min="1" max="30" class="input-small"
+              aria-labelledby="customCooldownLabel">
+            <span id="customCooldownLabel" data-i18n="customCooldownLabel">min pause every</span>
+            <input type="number" id="customBatchSize" value="20" min="5" max="100" class="input-small"
+              aria-labelledby="customBatchLabel">
+            <span id="customBatchLabel" data-i18n="customBatchLabel">requests</span>
+          </div>
         </div>
       </div>
       <div class="field">
@@ -290,9 +321,10 @@
           <span class="date-help" tabindex="0" aria-label="Auto-deletes saved export data after the set number of hours to free space. Your past exports stay in the history list, but old ones may no longer be downloadable." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp">!</span>
         </div>
         <div class="cooldown-row" id="autoExpireRow">
-          <span data-i18n="autoExpireAfter">Clear after</span>
-          <input type="number" id="autoExpireHours" value="4" min="1" max="48" class="input-small">
-          <span data-i18n="hours">hours</span>
+          <span id="autoExpireLabel" data-i18n="autoExpireAfter">Clear after</span>
+          <input type="number" id="autoExpireHours" value="4" min="1" max="48" class="input-small"
+            aria-labelledby="autoExpireLabel autoExpireUnit">
+          <span id="autoExpireUnit" data-i18n="hours">hours</span>
         </div>
       </div>
       <!-- Localize exported column titles -->
@@ -314,9 +346,23 @@
           <span data-i18n="showLadybug">Show ladybug</span>
         </label>
       </div>
+      <!-- Passive, local-only dataset of posts seen while browsing X -->
+      <div class="field feed-db-field">
+        <div class="field-label-row">
+          <span class="field-label" data-i18n="feedStatsTitle">Seen posts dataset</span>
+          <span class="feed-db-live" id="feedDbCount">0</span>
+        </div>
+        <p class="feed-db-description" data-i18n="feedStatsDescription">Collects non-reply posts already loaded by X. No extra requests.</p>
+        <div class="feed-db-summary" id="feedDbSummary" data-i18n="feedStatsEmpty">No posts collected yet</div>
+        <div class="feed-db-actions">
+          <button type="button" class="btn btn-secondary" id="downloadFeedCsv" data-i18n="downloadSeenCsv">CSV</button>
+          <button type="button" class="btn btn-secondary" id="downloadFeedJson" data-i18n="downloadSeenJson">JSON</button>
+          <button type="button" class="btn btn-ghost feed-db-clear" id="clearFeedDb" data-i18n="clearSeenData">Clear</button>
+        </div>
+      </div>
       <!-- Export History (collapsible) -->
       <div class="field history-field">
-        <button class="history-toggle" id="historyToggle">
+        <button class="history-toggle" id="historyToggle" aria-expanded="false">
           <span class="history-toggle-left">
             <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -339,7 +385,7 @@
       </div>
     </div>
 
-    <div class="tab-content" id="tab-about">
+    <div class="tab-content" id="tab-about" role="tabpanel" aria-labelledby="tabBtnAbout">
       <div class="about-content">
         <div class="about-icon">
           <svg class="icon icon-zap-large" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -362,6 +408,27 @@
           </span>
           <span class="about-rate-label" data-i18n="rateAbout">Rate XPorter</span>
         </button>
+
+        <!-- Open source: the code you run is the code you can read -->
+        <a href="https://github.com/Lemelson/xporter-extension" target="_blank" rel="noopener"
+          class="about-source">
+          <span class="about-source-logo">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+            </svg>
+          </span>
+          <span class="about-source-text">
+            <span class="about-source-title" data-i18n="aboutSourceTitle">Open source</span>
+            <span class="about-source-sub" data-i18n="aboutSourceSub">Read every line on GitHub — the code you run
+              is the code you can see</span>
+          </span>
+          <svg class="about-source-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 17 17 7" />
+            <path d="M7 7h10v10" />
+          </svg>
+        </a>
 
         <!-- Contact & support -->
         <div class="about-contact">
@@ -636,14 +703,14 @@
     <footer class="footer">
       <span id="extensionVersion">v0.0.0</span>
       <span class="footer-separator">·</span>
-      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Jun 22, 2026</span></span>
+      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Jul 3, 2026</span></span>
     </footer>
   </div>
 
   <script src="../utils/config.js"></script>
   <script src="../utils/shared.js"></script>
+  <script src="../utils/usage-tracker.js"></script>
   <script src="i18n.js"></script>
-  <script src="utils.js"></script>
   <script src="theme.js"></script>
   <script src="rate-prompt.js"></script>
 

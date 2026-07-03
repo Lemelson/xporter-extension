@@ -671,17 +671,40 @@
     let selectedReason = null;
     let reasonSent = false;
 
+    // How long this feedback page is actively VISIBLE — tells "read it and
+    // answered" from "bounced instantly". Anonymous; counts visible time only.
+    let pageActiveMs = 0;
+    let lastVisibleAt = (document.visibilityState === "visible") ? Date.now() : 0;
+    function pageSeconds() {
+      let total = pageActiveMs;
+      if (lastVisibleAt) total += Date.now() - lastVisibleAt;
+      return Math.round(total / 1000);
+    }
+
     function basePayload() {
       return {
         sessionId,
         source: params.src || (Object.keys(params).length ? "uninstall" : "direct"),
         pageLang: lang,
-        // forward every stat the extension appended to the URL, verbatim:
-        stats: params,
-        ts: new Date().toISOString(),
-        ua: navigator.userAgent
+        // forward every stat the extension appended to the URL, plus the live
+        // dwell time on this page:
+        stats: Object.assign({}, params, { page_s: pageSeconds() }),
+        ts: new Date().toISOString()
       };
     }
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") {
+        lastVisibleAt = Date.now();
+      } else if (lastVisibleAt) {
+        pageActiveMs += Date.now() - lastVisibleAt;
+        lastVisibleAt = 0;
+        // Push the updated dwell time. No `type` → the upsert won't clobber an
+        // already-chosen reason / lastType, it just refreshes page_s.
+        send(basePayload());
+      }
+    });
+    window.addEventListener("pagehide", function () { send(basePayload()); });
 
     function send(payload) {
       if (!ENDPOINT || ENDPOINT.startsWith("PASTE_")) {

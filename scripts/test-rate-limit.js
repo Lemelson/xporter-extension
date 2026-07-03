@@ -24,6 +24,11 @@ globalThis.XLog = {
 };
 
 vm.runInThisContext(
+    fs.readFileSync(path.join(__dirname, '../utils/config.js'), 'utf8'),
+    { filename: 'utils/config.js' }
+);
+
+vm.runInThisContext(
     fs.readFileSync(path.join(__dirname, '../utils/rateLimit.js'), 'utf8'),
     { filename: 'utils/rateLimit.js' }
 );
@@ -54,6 +59,134 @@ async function run() {
     })._computeAdaptiveDelay();
     assert.equal(invalid, null, 'invalid headers must use fallback pacing');
 
+    // The generic non-burst path can still spread a budget evenly.
+    const evenSpread = new RateLimitManager({
+        adaptivePad: 0,
+        rateLimitProvider: () => budget({ remaining: 100, resetInMs: 600000 })
+    })._computeAdaptiveDelay();
+    const careful = new RateLimitManager({
+        adaptivePad: 0,
+        budgetFraction: 0.5,
+        rateLimitProvider: () => budget({ remaining: 100, resetInMs: 600000 })
+    })._computeAdaptiveDelay();
+    assert(careful.delay >= evenSpread.delay * 1.9, 'budgetFraction 0.5 must roughly double the spacing');
+
+    // All five named presets are burst-first. This is the user-facing contract:
+    // small post exports run at 2/3/4/7/12 s instead of silently stretching to
+    // ~20 s as the rate-limit window gets older.
+    const expectedPresetDelays = {
+        turbo: 2000,
+        fast: 3000,
+        standard: 4000,
+        careful: 7000,
+        turtle: 12000
+    };
+    for (const [name, expectedDelay] of Object.entries(expectedPresetDelays)) {
+        const preset = XPORTER_CONFIG.SPEED_PRESETS[name];
+        assert(preset.raceReserve > 0, `${name} must use burst-first pacing`);
+        const pacing = new RateLimitManager({
+            ...preset,
+            rateLimitProvider: () => budget({ remaining: 50, resetInMs: 600000 })
+        })._computeAdaptiveDelay();
+        assert.equal(pacing.delay, expectedDelay, `${name} must keep its advertised delay`);
+        assert.equal(pacing.waiting, false);
+    }
+    assert.deepEqual(
+        XPORTER_CONFIG.FALLBACK_REQUEST_DELAYS.posts,
+        [4000, 5000],
+        'headerless Standard post exports must not fall back to 20–25 s'
+    );
+
+    // A short Standard pause must still reach the UI. Without this event the
+    // popup remains stuck on "Fetching..." throughout the four-second wait.
+    const standardEvents = [];
+    const standard = new RateLimitManager({
+        ...XPORTER_CONFIG.SPEED_PRESETS.standard,
+        rateLimitProvider: () => budget({ remaining: 50, resetInMs: 600000 })
+    });
+    standard.restoreState({ requestCount: 1, totalRequests: 1 });
+    standard.onStatusChange(event => standardEvents.push(event));
+    standard._wait = async () => {};
+    await standard.executeWithRateLimit(async () => 'ok');
+    assert.equal(standardEvents[0]?.status, 'cooldown', 'Standard wait must emit a UI pacing event');
+    assert.equal(standardEvents[0]?.kind, 'pacing');
+    assert.equal(standardEvents[0]?.duration, 4000);
+    assert.equal(standardEvents[1]?.status, 'fetching', 'fetching must follow the visible countdown');
+    assert.equal(standardEvents[1]?.batch, 2, 'the next fetched page must be shown as batch 2');
+
+    // The shared UI helper resumes an in-flight wait at the correct point and
+    // fills smoothly to 100% at the same deadline.
+    const uiContext = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval });
+    vm.runInContext(
+        fs.readFileSync(path.join(__dirname, '../utils/shared.js'), 'utf8'),
+        uiContext,
+        { filename: 'utils/shared.js' }
+    );
+    const waitProgress = vm.runInContext(`(() => {
+        Date.now = () => 1000;
+        const classes = new Set(['indeterminate']);
+        const style = {
+            transition: '',
+            width: '',
+            removeProperty(name) { delete this[name]; }
+        };
+        const element = {
+            classList: { remove(name) { classes.delete(name); } },
+            style,
+            offsetWidth: 100
+        };
+        startWaitProgress(element, 4000, 4000);
+        return {
+            indeterminate: classes.has('indeterminate'),
+            transition: style.transition,
+            width: style.width
+        };
+    })()`, uiContext);
+    assert.equal(waitProgress.indeterminate, false);
+    assert.equal(waitProgress.transition, 'width 3000ms linear');
+    assert.equal(waitProgress.width, '100%');
+
+    // Budget above the reserve → hold the promised floor pace instead of
+    // spreading over the whole window…
+    const race = new RateLimitManager({
+        adaptiveFloor: 2500,
+        adaptivePad: 1000,
+        raceReserve: 5,
+        rateLimitProvider: () => budget({ remaining: 100, resetInMs: 600000 })
+    })._computeAdaptiveDelay();
+    assert.equal(race.delay, 3500, 'racing preset must pace at floor + pad');
+    assert.equal(race.waiting, false);
+    // …and once the budget hits the reserve, wait out the window reset (an
+    // honest hold) — never quietly stretch the pace to 10× the promised one.
+    const raceDrained = new RateLimitManager({
+        adaptiveFloor: 2500,
+        adaptivePad: 0,
+        raceReserve: 5,
+        rateLimitProvider: () => budget({ remaining: 5, resetInMs: 600000 })
+    })._computeAdaptiveDelay();
+    assert.equal(raceDrained.waiting, true, 'drained racing preset must hold for the reset');
+    // (reset is floored to whole seconds, so allow ~1s of slack)
+    assert(raceDrained.delay >= 599000, 'the hold must last until the window rolls over');
+
+    // Custom preset: alwaysBatchCooldown must inject the batch pause even
+    // while adaptive pacing is active (normally adaptive skips it).
+    const customWaits = [];
+    const custom = new RateLimitManager({
+        adaptiveFloor: 2000,
+        adaptivePad: 0,
+        raceReserve: 2,
+        batchSize: 20,
+        cooldownDuration: 180000,
+        alwaysBatchCooldown: true,
+        rateLimitProvider: () => budget({ remaining: 100, resetInMs: 600000 })
+    });
+    custom.restoreState({ requestCount: 20, totalRequests: 20, lastRequestAt: Date.now() });
+    custom._wait = async (ms) => customWaits.push(ms);
+    await custom.executeWithRateLimit(async () => 'ok');
+    assert.equal(customWaits.length, 2, 'custom must wait for batch cooldown AND the adaptive delay');
+    assert(customWaits[0] > 170000, 'first wait must be the (nearly full) batch cooldown');
+    assert.equal(customWaits[1], 2000, 'second wait must be the adaptive burst delay (floor + pad)');
+
     const fallback = new RateLimitManager({
         fallbackMinDelay: 5000,
         fallbackMaxDelay: 10000
@@ -62,6 +195,27 @@ async function run() {
         const delay = fallback._computeFallbackDelay();
         assert(delay >= 5000 && delay <= 10000, 'fallback jitter must stay in range');
     }
+
+    const resumedAfterCooldown = new RateLimitManager({
+        adaptivePacing: false,
+        batchSize: 20,
+        cooldownDuration: 180000,
+        fallbackMinDelay: 3000,
+        fallbackMaxDelay: 3000
+    });
+    resumedAfterCooldown.restoreState({
+        requestCount: 20,
+        totalRequests: 20,
+        lastRequestAt: Date.now() - 181000
+    });
+    const resumedWaits = [];
+    resumedAfterCooldown._wait = async (ms) => resumedWaits.push(ms);
+    await resumedAfterCooldown.executeWithRateLimit(async () => 'ok');
+    assert.deepEqual(
+        resumedWaits,
+        [3000],
+        'resume after elapsed wall-clock cooldown must only use the normal request delay'
+    );
 
     let attempts = 0;
     const waits = [];
@@ -159,10 +313,17 @@ async function run() {
     chrome.storage = {
         local: {
             async get(key) {
+                if (key === null) return { ...storageData };
                 return { [key]: storageData[key] };
             },
             async set(values) {
                 Object.assign(storageData, values);
+            },
+            async remove(keys) {
+                for (const key of [].concat(keys)) delete storageData[key];
+            },
+            async getBytesInUse() {
+                return 0;
             }
         }
     };
@@ -177,6 +338,23 @@ async function run() {
         savedSettings.adaptivePacing,
         false,
         'partial settings saves must preserve adaptivePacing=false'
+    );
+
+    await XPorterStorage.recordExportStart('verified_followers', 'csv');
+    const usage = await XPorterStorage.loadUsage();
+    assert.equal(usage.byMode.verifiedFollowers, 1);
+    assert.equal(
+        usage.byMode.verified_followers,
+        undefined,
+        'verified follower usage must use the uninstall-report field name'
+    );
+
+    storageData.xporter_export_history = [{ id: 123, username: 'legacy' }];
+    await XPorterStorage.deleteExportHistoryEntry('123');
+    assert.deepEqual(
+        storageData.xporter_export_history,
+        [],
+        'legacy numeric history IDs must remain deletable after DOM string conversion'
     );
 
     console.log('Rate-limit tests passed');

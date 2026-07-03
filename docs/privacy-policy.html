@@ -139,12 +139,15 @@
     </div>
 
     <h2>What the extension accesses</h2>
-    <p>XPorter accesses the following only to perform the exports you start:</p>
+    <p>XPorter accesses the following to perform the exports you start and build the local seen-post dataset:</p>
     <ul>
       <li><strong>X.com session cookies</strong> — to authenticate API requests on your behalf, making the same calls
         X.com already makes in your browser. No credentials are stored or copied.</li>
       <li><strong>X.com API responses</strong> — profile info, posts and follower/following lists, processed locally to
         build your export file (CSV, JSON or XLSX).</li>
+      <li><strong>Posts already loaded while you browse X.com</strong> — non-reply posts and their public metrics are
+        deduplicated by post ID and stored locally in IndexedDB. No additional request is made and page URLs are not
+        stored.</li>
       <li><strong>Extension settings</strong> — your preferences (language, theme, export options) stored locally via
         Chrome's <code>storage.local</code>.</li>
     </ul>
@@ -154,6 +157,8 @@
       <li>Does <strong>not</strong> collect or store your X.com password</li>
       <li>Does <strong>not</strong> send your exported data, X content, usernames, or browsing history anywhere</li>
       <li>Does <strong>not</strong> use analytics, advertising, or tracking SDKs during normal use</li>
+      <li>Does <strong>not</strong> store browsing history or page URLs; the local dataset contains post data and the X
+        timeline operation that supplied it</li>
       <li>Does <strong>not</strong> modify your X.com account (no posting, following or liking)</li>
       <li>Does <strong>not</strong> inject ads or promotional content</li>
       <li>Does <strong>not</strong> load any remote code — everything runs from the extension package</li>
@@ -164,12 +169,16 @@
       XPorter attaches an <strong>anonymous, non-personal usage summary</strong> to that page. It contains only aggregate
       product stats:</p>
     <ul>
-      <li>Extension version and how many days it was installed</li>
+      <li>Extension version, your operating system (e.g. Windows / macOS / Linux), and how long it was installed
+        (install date and the time elapsed until uninstall)</li>
       <li>Interface language and theme (light/dark)</li>
+      <li>How many times you opened the extension and roughly how much time you actively spent in it</li>
       <li>How many exports you ran, how many succeeded or failed, and a short error code for the last failure</li>
+      <li>How much time had passed since your last export</li>
       <li>Counts per export type (posts, followers, following, verified followers) and per format (CSV / JSON / XLSX)</li>
       <li>The approximate total number of items exported and a few non-identifying settings (e.g. include
         retweets/replies, quantity limit)</li>
+      <li>How long the feedback page itself was open</li>
     </ul>
     <div class="callout">
       <p>This summary contains no usernames, no exported content, no X data, and nothing that identifies you. If you
@@ -183,20 +192,29 @@
     <h2>Permissions explained</h2>
     <h3><code>cookies</code></h3>
     <p>Reads authentication tokens (CSRF token) from your X.com session to make authenticated API requests.</p>
-    <h3><code>activeTab</code> &amp; <code>tabs</code></h3>
+    <h3><code>activeTab</code></h3>
     <p>Detects when you're on an X.com profile and identifies the username being viewed.</p>
     <h3><code>downloads</code></h3>
     <p>Saves the exported CSV, JSON or XLSX file to your Downloads folder when you click download.</p>
-    <h3><code>storage</code></h3>
-    <p>Stores your preferences and a small anonymous usage counter locally in Chrome's storage.</p>
+    <h3><code>storage</code> &amp; <code>unlimitedStorage</code></h3>
+    <p>Stores preferences, resumable export batches, recent export history, anonymous usage counters, and the
+      deduplicated seen-post dataset locally in Chrome. <code>unlimitedStorage</code> prevents larger local datasets and
+      exports from being truncated by Chrome's normal storage quota.</p>
     <h3>Host access to x.com</h3>
     <p>Required to make API calls to X.com to retrieve the data you asked to export.</p>
 
     <h2>Data storage</h2>
     <ul>
-      <li>Export data is held in memory during the export and saved to your Downloads folder when you download it</li>
+      <li>Export rows are saved in batches to Chrome's <code>storage.local</code> so interrupted exports can be resumed
+        without losing already saved rows</li>
+      <li>Downloaded CSV, JSON, or XLSX files are saved to your local Downloads folder</li>
+      <li>The current export and data snapshots for up to five recent history entries may remain locally until they
+        expire, you start or clear an export, clear history, or uninstall the extension</li>
+      <li>The seen-post dataset keeps one row per post ID, retains the 50,000 most recently seen unique posts, and
+        remains until you clear it in Settings or uninstall the extension</li>
       <li>Settings are stored in Chrome's <code>storage.local</code> and cleared when you uninstall</li>
-      <li>A small anonymous usage counter (export counts, install date, last error code) is kept in
+      <li>A small anonymous usage counter (including opens, active time, export counts, install date, and last error
+        code) is kept in
         <code>storage.local</code> to build the uninstall summary, and removed when you uninstall</li>
     </ul>
 
@@ -219,7 +237,7 @@
     <h2>Contact</h2>
     <p>Questions about this policy or the extension? Message me on <a href="https://t.me/Lemelson">Telegram</a> (fastest
       reply), or email <a href="mailto:art.lemelson@gmail.com">art.lemelson@gmail.com</a> (I check it rarely, so I may be
-      slow). You can also find me on <a href="https://github.com/Lemelson">GitHub</a>.</p>
+      slow). You can also find me on <a href="https://github.com/Lemelson/xporter">GitHub</a>.</p>
 
     <p style="margin-top: 30px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong> June 28, 2026</p>
   </div>
