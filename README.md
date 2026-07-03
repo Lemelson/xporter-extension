@@ -6,7 +6,7 @@
 
 <p align="center">
   Free, unlimited export of X (Twitter) posts, followers, and following to CSV, JSON, or XLSX.<br/>
-  A Chrome extension — no servers, no subscriptions, no tracking.
+  A Chrome extension — no servers or subscriptions; your exported data stays local.
 </p>
 
 <p align="center">
@@ -25,12 +25,13 @@
 ## Features
 
 - **Full engagement metrics** — views, likes, retweets, replies, quotes, bookmarks
+- **Passive seen-post dataset** — stores one local row per non-reply post already loaded while you browse X, with first/latest metrics and no extra API requests
 - **Multiple export modes** — posts, followers, following, and verified followers
 - **CSV, JSON, and XLSX output** — choose the format that fits your workflow
 - **Date range filtering** — export posts from a specific time window
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — handles X API limits automatically with configurable batch sizes and cooldowns
-- **100% local** — all processing happens in your browser; no data is transmitted externally
+- **100% local processing** — everything happens in your browser; your exported data is never transmitted anywhere
 - **Dark and light themes** — glassmorphism UI with a one-click toggle
 - **14 languages** — auto-detects Chrome's UI language on first launch
 - **Dynamic API discovery** — extracts fresh GraphQL query IDs from X's JS bundles at runtime; gracefully falls back to hardcoded IDs
@@ -62,6 +63,7 @@ Popup UI ──▶ Service Worker ──▶ X APIs ──▶ CSV / JSON / XLSX F
             (incremental saves)
                   │
 Content Script ── detects username from active tab
+               └─ records posts already loaded by X into local IndexedDB
 ```
 
 **Export flow:**
@@ -71,6 +73,8 @@ Content Script ── detects username from active tab
 3. **Service worker** resolves the username to a user ID via `UserByScreenName`, then fetches the selected data type in paginated batches
 4. Items are saved incrementally to Chrome local storage (batches of 50)
 5. On completion (or manual download), items are compiled into CSV, JSON, or XLSX locally in the browser
+
+While you browse X, the page hook also extracts non-reply posts from timeline responses X has already loaded. They are deduplicated by post ID in a local IndexedDB database; repeat sightings update metrics and exposure count instead of adding rows. The Settings tab can export this dataset as CSV/JSON or clear it. Collection is capped at the 50,000 most recently seen unique posts.
 
 **Endpoint discovery:**
 
@@ -172,26 +176,33 @@ xporter/
 ├── background/
 │   └── service-worker.js     # Export engine, message router, state machine
 ├── content/
+│   ├── feed-parser.js        # Extracts compact non-reply post rows from page responses
 │   ├── content.js            # Username detection from the active X tab
-│   └── interceptor.js        # Page-context hook to capture live GraphQL query IDs
+│   └── interceptor.js        # Page-context hook for GraphQL IDs and seen-post capture
 ├── popup/                    # Compact popup UI
 │   ├── popup.html/.css/.js   # Markup, glassmorphism styles (dark + light), logic
 │   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + toggle
 │   ├── i18n.js               # In-app translation engine
-│   ├── utils.js              # Popup-only helpers (most live in utils/shared.js)
+│   ├── rate-prompt.js/.css   # "Rate XPorter" prompt (shared by popup + export page)
 │   ├── ladybug.js            # Easter-egg ladybug on the About tab
 │   └── locales/*.json        # UI strings for 14 languages (en = fallback)
 ├── export/
-│   └── export.html/.css/.js  # Full-page export interface (mirrors the popup)
+│   └── export.html/.css/.js  # Full-page export UI
 ├── utils/
 │   ├── api.js                # X GraphQL client, endpoint discovery
 │   ├── api-features.js       # GraphQL feature-flag constants
+│   ├── config.js             # Tunable constants + logger
 │   ├── rateLimit.js          # Batch rate limiter with cooldowns
-│   ├── csv.js                # CSV / JSON / XLSX generation
+│   ├── csv.js                # CSV / XLSX generation (JSON is built in the worker)
+│   ├── columns-i18n.js       # Localized CSV/XLSX column headers
 │   ├── storage.js            # Chrome storage abstraction + settings
+│   ├── post-database.js      # Deduplicated seen-post IndexedDB store
+│   ├── usage-tracker.js      # Anonymous local usage counters (opens, active time)
 │   └── shared.js             # Helpers shared by the popup and export pages
 ├── _locales/                 # Chrome Web Store metadata translations
-└── icons/                    # icon16/48/128.png
+├── icons/                    # icon16/48/128.png + bolt16/48/128.png (toolbar action icons)
+├── docs/                     # GitHub Pages site (landing, feedback, privacy policy)
+└── scripts/                  # Dev/debug scripts + CWS packaging (not shipped)
 ```
 
 ### Design Decisions
@@ -204,10 +215,12 @@ xporter/
 
 ## Privacy
 
-- No data leaves your browser
-- No analytics, telemetry, or tracking
-- No extension-owned servers, analytics, telemetry, or third-party data collection
+- All exported data stays local — your X data never leaves your browser
+- The seen-post dataset is stored only in local IndexedDB and can be exported or cleared from Settings
+- No third-party analytics, advertising, or tracking SDKs
+- No extension-owned backend; normal export traffic goes only to X.com
 - Authentication uses your existing X session cookies — XPorter never stores or transmits credentials
+- **One exception:** when you uninstall XPorter, an anonymous usage summary (no X data, no usernames, nothing that identifies you) is sent once to help improve the extension — see the [privacy policy](privacy-policy.html) for exactly what it contains
 
 ## Contributing
 

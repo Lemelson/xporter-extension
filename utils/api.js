@@ -39,7 +39,6 @@ const FALLBACK_ENDPOINTS = {
 let discoveredEndpoints = null;
 let endpointsCacheTime = 0;
 const ENDPOINTS_CACHE_TTL = _C.ENDPOINT_CACHE_TTL || (30 * 60 * 1000);
-let usingFallbacks = false;
 
 // Persist discovered endpoints across MV3 service-worker restarts.
 // The in-memory cache above is wiped every time the worker sleeps, which made
@@ -270,7 +269,6 @@ async function discoverEndpoints(forceRefresh = false) {
     XLog.warn('Discovery failed, using fallback endpoints:', error.message);
     discoveredEndpoints = { ...FALLBACK_ENDPOINTS };
     endpointsCacheTime = Date.now();
-    usingFallbacks = true;
     return discoveredEndpoints;
   }
 }
@@ -278,6 +276,9 @@ async function discoverEndpoints(forceRefresh = false) {
 // ==================== Auth ====================
 
 async function getAuthTokens() {
+  // Only the csrf token value is ever needed — the browser attaches the
+  // session cookie itself via credentials:'include'. auth_token is checked
+  // for EXISTENCE only; its value is deliberately never read into JS.
   return new Promise((resolve, reject) => {
     chrome.cookies.get({ url: 'https://x.com', name: 'ct0' }, (ct0Cookie) => {
       if (!ct0Cookie) {
@@ -290,8 +291,7 @@ async function getAuthTokens() {
           return;
         }
         resolve({
-          csrfToken: ct0Cookie.value,
-          authToken: authCookie.value
+          csrfToken: ct0Cookie.value
         });
       });
     });
@@ -340,7 +340,6 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     // Invalidate cache so next call tries fresh discovery
     discoveredEndpoints = null;
     endpointsCacheTime = 0;
-    usingFallbacks = false;
     throw new Error('STALE_QUERY_ID');
   }
 
@@ -425,6 +424,11 @@ async function withStaleRetry(endpointKey, makeRequest) {
  * Called from the service worker when the content script intercepts a GraphQL request.
  */
 function setLiveQueryId(operationName, queryId) {
+  // Defense in depth: the value originates from a page-spoofable postMessage
+  // relay. content.js and the SW validate too, but this is the last gate
+  // before the id is interpolated into an authenticated request URL.
+  if (!FALLBACK_ENDPOINTS[operationName]) return;
+  if (typeof queryId !== 'string' || !/^[A-Za-z0-9_-]{10,40}$/.test(queryId)) return;
   liveQueryIds[operationName] = queryId;
   XLog.log(`Live queryId captured: ${operationName} = ${queryId}`);
   // Also update discovered endpoints cache if it exists
@@ -456,16 +460,18 @@ async function getUserByScreenName(screenName) {
     throw new Error('USER_UNAVAILABLE');
   }
 
-  const legacy = userResult.legacy;
+  // X is gradually moving fields out of `legacy`; a profile without it must
+  // not crash with a raw TypeError (parseUserObject guards the same way).
+  const legacy = userResult.legacy || {};
   const core = userResult.core || {};
 
   return {
     id: userResult.rest_id,
-    name: core.name || legacy.name,
-    screenName: core.screen_name || legacy.screen_name,
+    name: core.name || legacy.name || '',
+    screenName: core.screen_name || legacy.screen_name || '',
     profileImageUrl: (legacy.profile_image_url_https || '').replace('_normal', '_200x200'),
     isProtected: legacy.protected || false,
-    tweetCount: legacy.statuses_count,
+    tweetCount: legacy.statuses_count || 0,
     followersCount: legacy.followers_count || 0,
     followingCount: legacy.friends_count || 0
   };
@@ -668,26 +674,6 @@ async function fetchUserTweets(userId, cursor = null, count = 20) {
   );
 
   return parseTimelineResponse(data);
-}
-
-async function fetchSearchTweets(rawQuery, cursor = null, count = 20) {
-  const variables = {
-    rawQuery,
-    count,
-    querySource: 'typed_query',
-    product: 'Latest',
-    withGrokTranslatedBio: false
-  };
-
-  if (cursor) {
-    variables.cursor = cursor;
-  }
-
-  const data = await withStaleRetry('SearchTimeline', (endpoint) =>
-    graphqlRequest(endpoint, variables, SEARCH_FEATURES, SEARCH_FIELD_TOGGLES)
-  );
-
-  return parseSearchTimelineResponse(data);
 }
 
 // ==================== Response Parsing ====================
@@ -918,7 +904,6 @@ if (typeof globalThis !== 'undefined') {
     getAuthTokens,
     getUserByScreenName,
     fetchUserTweets,
-    fetchSearchTweets,
     fetchFollowers,
     fetchFollowing,
     fetchVerifiedFollowers,

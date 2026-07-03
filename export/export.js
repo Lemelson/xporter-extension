@@ -13,8 +13,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const includeRetweets = document.getElementById('includeRetweets');
     const includeReplies = document.getElementById('includeReplies');
     const quantityLimit = document.getElementById('quantityLimit');
-    const cooldownMinutes = document.getElementById('cooldownMinutes');
-    const cooldownBatch = document.getElementById('cooldownBatch');
+    const exportSpeed = document.getElementById('exportSpeed');
+    const customSpeedRows = document.getElementById('customSpeedRows');
+    const customDelaySec = document.getElementById('customDelaySec');
+    const customCooldownMin = document.getElementById('customCooldownMin');
+    const customBatchSize = document.getElementById('customBatchSize');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const resumeBtn = document.getElementById('resumeBtn');
@@ -50,10 +53,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Error state elements
     const errorTitle = document.getElementById('errorTitle');
     const errorMessage = document.getElementById('errorMessage');
+    const errorActions = document.getElementById('errorActions');
+
+    // Download button label span + original home (it can be temporarily moved
+    // into the error state to offer downloading already-collected items).
+    const downloadLabel = downloadBtn.querySelector('[data-i18n="downloadCsv"]');
+    const downloadBtnHome = downloadBtn.parentElement;
+    const resumeBtnHome = resumeBtn.parentElement;
 
     let exportStartTime = null;
     let timeInterval = null;
-    let cooldownInterval = null;
+    // Exports can be started from the popup in user-list modes and with
+    // non-CSV formats — the status broadcasts tell us what is really running.
+    let currentExportMode = 'posts';
+    let currentOutputFormat = 'csv';
+    // Live cooldown countdown driven by the SW's absolute `until` timestamp
+    // (duration fallback for older events). createCooldownTicker guards
+    // against stacked intervals internally.
+    // Localized label for the countdown — set per event from the SW's `kind`
+    // ('pacing' = normal spacing, 'window' = X budget spent, 'batch' = fallback).
+    let cooldownLabelKey = 'cooldown';
+    const cooldownTicker = createCooldownTicker((remaining) => {
+        const countdown = cooldownLabelKey === 'statusPacing' && remaining < 60
+            ? String(remaining)
+            : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+        statusMsg.textContent = `${t(cooldownLabelKey)} ${countdown}`;
+    });
     // Guards the rating prompt's export counter so one finished export counts
     // once, even though the 'complete' status can be re-broadcast.
     let ratePromptCounted = false;
@@ -62,8 +87,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const completedAt = state?.completedAt || 'complete';
         const startedAt = state?.startedAt || exportStartTime || 'unknown-start';
         const username = state?.username || usernameInput.value || 'unknown-user';
+        const mode = state?.exportMode || currentExportMode || 'posts';
         const count = state?.tweetCount ?? 0;
-        return [startedAt, completedAt, username, 'posts', count].join('|');
+        return [startedAt, completedAt, username, mode, count].join('|');
+    }
+
+    // Label the download button with the export's real output format —
+    // "Download CSV" on a JSON export would lie about what the file is.
+    function updateDownloadLabel() {
+        if (downloadLabel) {
+            downloadLabel.textContent = `${t('download')} ${(currentOutputFormat || 'csv').toUpperCase()}`;
+        }
     }
 
     if (exportVersion && chrome.runtime?.getManifest) {
@@ -124,15 +158,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function applyTranslations() {
         applyI18nToDOM(currentTranslations);
-        // Update select options for quantity limit
-        const options = quantityLimit.querySelectorAll('option');
-        const posts = currentTranslations.posts || 'posts';
-        if (options.length >= 1) options[0].textContent = currentTranslations.unlimited || 'Unlimited';
-        if (options.length >= 2) options[1].textContent = `100 ${posts}`;
-        if (options.length >= 3) options[2].textContent = `500 ${posts}`;
-        if (options.length >= 4) options[3].textContent = `1,000 ${posts}`;
-        if (options.length >= 5) options[4].textContent = `5,000 ${posts}`;
-        if (options.length >= 6) options[5].textContent = `10,000 ${posts}`;
+        // Update select options for quantity limit (shared helper: translated
+        // "Unlimited" + locale-aware number grouping for every numeric preset)
+        localizeQuantityOptions(quantityLimit, currentLang, currentTranslations);
+        updateDownloadLabel();
     }
 
     function t(key) {
@@ -153,12 +182,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     setThemeIcon(isLightInit);
 
+    // Ensure the select can represent a custom limit set in the popup (e.g.
+    // 2500): without a matching <option> the select silently falls back to
+    // value='' and the next settings save would persist 0 (Unlimited),
+    // destroying the user's limit.
+    function ensureQuantityOption(value) {
+        const val = String(value);
+        const options = Array.from(quantityLimit.options);
+        if (options.some(opt => opt.value === val)) return;
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = `${formatNumber(value, currentLang)} ${currentTranslations.posts || 'posts'}`;
+        // Keep numeric options sorted ("0" = Unlimited stays first)
+        const next = options.find(o => parseInt(o.value, 10) > value);
+        quantityLimit.insertBefore(opt, next || null);
+    }
+
     // Apply settings to controls
     includeRetweets.checked = settings.includeRetweets !== false;
     includeReplies.checked = settings.includeReplies !== false;
-    quantityLimit.value = String(settings.quantityLimit || 0);
-    cooldownMinutes.value = Math.round((settings.cooldownDuration || 180000) / 60000);
-    cooldownBatch.value = settings.batchSize || 20;
+    const savedQuantityLimit = parseInt(settings.quantityLimit, 10) || 0;
+    if (savedQuantityLimit > 0) ensureQuantityOption(savedQuantityLimit);
+    quantityLimit.value = String(savedQuantityLimit);
+    exportSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom'].includes(settings.exportSpeed)
+        ? settings.exportSpeed
+        : 'standard';
+    customDelaySec.value = settings.customDelaySec || 5;
+    customCooldownMin.value = settings.customCooldownMin || 3;
+    customBatchSize.value = settings.customBatchSize || 20;
+    customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
 
     // Read URL params (username may be passed from popup)
     const urlParams = new URLSearchParams(window.location.search);
@@ -187,7 +239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         settings.theme = isLight ? 'light' : 'dark';
         await sendMessage({
             type: 'SAVE_SETTINGS',
-            settings: { ...settings }
+            settings: { theme: settings.theme }
         });
     });
 
@@ -198,29 +250,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Save Settings on Change ====================
     const saveSettings = debounce(async () => {
-        Object.assign(settings, {
+        const nextSettings = {
             includeRetweets: includeRetweets.checked,
             includeReplies: includeReplies.checked,
-            quantityLimit: parseInt(quantityLimit.value) || 0,
             requestDelay: 3000,
-            batchSize: parseInt(cooldownBatch.value) || 20,
-            cooldownDuration: (parseInt(cooldownMinutes.value) || 3) * 60000,
+            exportSpeed: exportSpeed.value || 'standard',
+            customDelaySec: clampNumberInput(customDelaySec, 5),
+            customCooldownMin: clampNumberInput(customCooldownMin, 3),
+            customBatchSize: clampNumberInput(customBatchSize, 20),
             theme: body.classList.contains('light') ? 'light' : 'dark'
-        });
-        await sendMessage({
-            type: 'SAVE_SETTINGS',
-            settings: { ...settings }
-        });
+        };
+        // NEVER persist the limit from an empty select value — '' means the
+        // select could not represent the saved value, and writing it back
+        // would turn a custom limit into 0 (Unlimited).
+        if (quantityLimit.value !== '') {
+            nextSettings.quantityLimit = parseInt(quantityLimit.value) || 0;
+        }
+        const patch = {};
+        for (const [key, value] of Object.entries(nextSettings)) {
+            if (settings[key] !== value) patch[key] = value;
+        }
+        Object.assign(settings, patch);
+        if (Object.keys(patch).length > 0) {
+            return await sendMessage({ type: 'SAVE_SETTINGS', settings: patch });
+        }
+        return { success: true };
     }, 500);
 
-    [includeRetweets, includeReplies, quantityLimit, cooldownMinutes, cooldownBatch].forEach(el => {
+    // Clamp a typed number input to its own min/max attributes.
+    function clampNumberInput(el, fallback) {
+        const parsed = parseInt(el.value, 10);
+        const value = Number.isFinite(parsed) ? parsed : fallback;
+        const min = parseInt(el.min, 10);
+        const max = parseInt(el.max, 10);
+        return Math.max(Number.isFinite(min) ? min : value, Math.min(Number.isFinite(max) ? max : value, value));
+    }
+
+    exportSpeed.addEventListener('change', () => {
+        customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
+    });
+
+    [includeRetweets, includeReplies, quantityLimit, exportSpeed,
+        customDelaySec, customCooldownMin, customBatchSize].forEach(el => {
         el.addEventListener('change', saveSettings);
     });
 
     // ==================== Start Export ====================
     startBtn.addEventListener('click', async () => {
-        const username = usernameInput.value.trim().replace('@', '');
-        if (!username) {
+        const username = extractUsernameFromInput(usernameInput.value);
+        if (!username || !isValidUsername(username)) {
             usernameInput.focus();
             usernameInput.parentElement.style.borderColor = 'var(--danger)';
             setTimeout(() => {
@@ -229,8 +307,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Save settings first
-        await saveSettings.flush?.() || saveSettings();
+        // Save settings first (flush the pending debounce; the `||` chaining
+        // used here before double-ran the save)
+        let settingsSave;
+        if (typeof saveSettings.flush === 'function') {
+            settingsSave = await saveSettings.flush();
+        } else {
+            settingsSave = await saveSettings();
+        }
+        if (settingsSave?.success !== true) {
+            showError(t('exportError'), formatError(settingsSave?.error || 'STORAGE_FULL', t));
+            return;
+        }
 
         ratePromptCounted = false; // fresh export — allow it to be counted again
 
@@ -246,10 +334,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // This page starts posts/CSV exports (no mode/format was sent, so the
+        // SW defaults to them) — don't keep a previous export's mode/format.
+        currentExportMode = 'posts';
+        currentOutputFormat = 'csv';
+        updateDownloadLabel();
+
         exportStartTime = Date.now();
         startTimeCounter();
         showState('active');
-        exportUsername.textContent = `@${username}`;
+        exportUsername.textContent = bidiIsolate(`@${username}`);
         counter.textContent = '0';
         statusDot.className = 'status-dot green';
         statusMsg.textContent = t('resolvingUser');
@@ -276,6 +370,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // Resume can also be offered from the error screen — switch back to
+        // the live view (no-op when already there, e.g. after a manual stop).
+        showState('active');
         resumeBtn.classList.add('hidden');
         stopBtn.classList.remove('hidden');
         startTimeCounter();
@@ -283,25 +380,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusMsg.textContent = t('resuming');
     });
 
-    // ==================== Download CSV ====================
+    // ==================== Download ====================
+    // No format in the message — the SW uses the export's own format, and the
+    // button label (updateDownloadLabel) reflects it.
     downloadBtn.addEventListener('click', async () => {
-        const labelSpan = downloadBtn.querySelector('[data-i18n="downloadCsv"]');
         downloadBtn.disabled = true;
-        if (labelSpan) labelSpan.textContent = t('preparing');
+        if (downloadLabel) downloadLabel.textContent = t('preparing');
 
-        const result = await sendMessage({ type: 'DOWNLOAD_CSV' });
+        // Downloads (large XLSX generation) can far exceed the default 5s
+        // message timeout.
+        const result = await sendMessage(
+            { type: 'DOWNLOAD_CSV' },
+            XPORTER_CONFIG.DOWNLOAD_MESSAGE_TIMEOUT || 30000
+        );
 
         downloadBtn.disabled = false;
-        if (labelSpan) labelSpan.textContent = t('downloadCsv');
+        updateDownloadLabel();
 
-        if (result?.error) {
-            showError(t('downloadError'), formatError(result.error, t));
-        } else {
+        if (result?.success === true) {
             showToast(t('downloadStarted'), 'success');
             // User just got their file — the natural moment to ask for a rating.
             setTimeout(() => {
                 window.XPorterRatePrompt?.maybeShow({ translations: currentTranslations, lang: currentLang });
             }, 800);
+        } else {
+            // Anything that isn't an explicit success is a failure — including
+            // an empty/malformed response that used to pass the old check.
+            showError(t('downloadError'), formatError(result?.error || 'DOWNLOAD_FAILED', t));
         }
     });
 
@@ -312,6 +417,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         usernameInput.value = '';
         usernameInput.focus();
         stopTimeCounter();
+        exportStartTime = null; // next export starts its own elapsed clock
         ratePromptCounted = false;
     });
 
@@ -328,44 +434,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     function handleStatusUpdate(state) {
+        // Track what is actually being exported (mode/format may come from an
+        // export started in the popup).
+        if (state.exportMode) currentExportMode = state.exportMode;
+        if (state.outputFormat) currentOutputFormat = state.outputFormat;
+        // Keep the label honest — but not mid-download ("Preparing...").
+        if (!downloadBtn.disabled) updateDownloadLabel();
+        // The SW's startedAt is the authoritative elapsed-timer base (survives
+        // page reloads and popup-started exports).
+        if (state.startedAt) exportStartTime = state.startedAt;
+
+        progressFill.classList.remove('cooldown');
+        if (state.status !== 'cooldown') {
+            cooldownTicker.stop();
+            stopWaitProgress(progressFill);
+        }
+
         switch (state.status) {
             case 'resolving_user':
                 showState('active');
-                exportUsername.textContent = `@${state.username || usernameInput.value}`;
+                exportUsername.textContent = bidiIsolate(`@${state.username || usernameInput.value}`);
                 statusDot.className = 'status-dot green';
                 statusMsg.textContent = t('resolvingUser');
                 progressFill.classList.add('indeterminate');
-                if (!exportStartTime) { exportStartTime = Date.now(); startTimeCounter(); }
+                if (!exportStartTime) exportStartTime = Date.now();
+                if (!timeInterval) startTimeCounter();
                 break;
 
             case 'fetching':
                 showState('active');
-                if (state.username) exportUsername.textContent = `@${state.username}`;
+                if (state.username) exportUsername.textContent = bidiIsolate(`@${state.username}`);
                 exportExpected.textContent = state.expectedTweets
                     ? `~${formatNumber(state.expectedTweets, currentLang)} ${pluralLabel('totalTweets', state.expectedTweets, currentLang, currentTranslations)}`
                     : '';
 
                 counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
                 if (counterLabel) {
-                    counterLabel.textContent = collectedLabel(state.tweetCount || 0, 'posts', currentLang, currentTranslations);
+                    counterLabel.textContent = collectedLabel(state.tweetCount || 0, currentExportMode, currentLang, currentTranslations);
                 }
                 statusDot.className = 'status-dot green';
                 statusMsg.textContent = `${t('fetching')} (${t('batch')} ${state.batch || '?'})`;
-
-                // Honest progress: only show a real percentage when we know the
-                // target (an explicit limit or the account's known total).
-                // Otherwise keep the indeterminate shimmer instead of faking a
-                // percentage against a guessed denominator.
-                {
-                    const limit = parseInt(quantityLimit.value) || 0;
-                    const target = limit > 0 ? limit : (state.expectedTweets || 0);
-                    if (target > 0) {
-                        progressFill.classList.remove('indeterminate');
-                        progressFill.style.width = Math.min(95, ((state.tweetCount || 0) / target) * 100) + '%';
-                    } else {
-                        progressFill.classList.add('indeterminate');
-                    }
-                }
+                progressFill.classList.add('indeterminate');
+                progressFill.style.width = '100%';
 
                 if (state.totalRequests) statRequests.textContent = state.totalRequests;
                 if (state.batch) statBatch.textContent = state.batch;
@@ -375,12 +485,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 resumeBtn.classList.add('hidden');
                 startBtn.classList.add('hidden');
 
-                if (!exportStartTime) { exportStartTime = state.startedAt || Date.now(); startTimeCounter(); }
+                if (!exportStartTime) exportStartTime = Date.now();
+                if (!timeInterval) startTimeCounter();
                 break;
 
             case 'cooldown':
                 statusDot.className = 'status-dot yellow';
-                startCooldownTimer(state.duration || 180000);
+                // Label by wait type — plain "Cooldown" made normal pacing
+                // look like a penalty.
+                cooldownLabelKey = state.kind === 'pacing' ? 'statusPacing'
+                    : state.kind === 'window' ? 'statusRateLimitWait'
+                        : 'cooldown';
+                cooldownTicker.start(state.until, state.duration || 180000);
+                progressFill.classList.add('cooldown');
+                startWaitProgress(progressFill, state.until, state.duration || 180000);
                 break;
 
             case 'error':
@@ -392,9 +510,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (state.error === 'NOT_LOGGED_IN') {
                         showState('auth');
                     } else {
-                        showError(t('exportError'), errorMsg);
+                        // Collected items usually survive the error — offer
+                        // Download / Resume instead of only "Try Again".
+                        showError(t('exportError'), errorMsg, {
+                            itemCount: state.tweetCount || 0,
+                            canResume: !!state.canResume
+                        });
                     }
                     stopTimeCounter();
+                    exportStartTime = null;
                 }
                 break;
 
@@ -403,19 +527,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusMsg.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
                 break;
 
-            case 'complete':
+            case 'complete': {
                 showState('complete');
-                completeUser.textContent = `@${state.username || usernameInput.value}`;
-                completeCount.textContent = formatNumber(state.tweetCount || 0, currentLang);
+                const itemCount = state.tweetCount || 0;
+                completeUser.textContent = bidiIsolate(`@${state.username || usernameInput.value}`);
+                completeCount.textContent = formatNumber(itemCount, currentLang);
                 if (completePostsLabel) {
-                    completePostsLabel.textContent = ' ' + pluralLabel('postsUnit', state.tweetCount || 0, currentLang, currentTranslations);
+                    completePostsLabel.textContent = ' ' + pluralLabel(
+                        currentExportMode === 'posts' ? 'postsUnit' : 'usersCollected',
+                        itemCount, currentLang, currentTranslations);
                 }
+                // Nothing collected (e.g. a 0-post account) → nothing to
+                // download; hide the button instead of erroring on click.
+                downloadBtn.classList.toggle('hidden', itemCount <= 0);
                 stopTimeCounter();
+                exportStartTime = null;
                 if (!ratePromptCounted) {
                     ratePromptCounted = true;
                     window.XPorterRatePrompt?.incrementExports(ratePromptExportKey(state));
                 }
                 break;
+            }
 
             case 'stopped':
                 showState('active');
@@ -425,7 +557,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusMsg.textContent = t('stoppedClickResume');
                 counter.textContent = formatNumber(state.tweetCount || 0, currentLang);
                 if (counterLabel) {
-                    counterLabel.textContent = collectedLabel(state.tweetCount || 0, 'posts', currentLang, currentTranslations);
+                    counterLabel.textContent = collectedLabel(state.tweetCount || 0, currentExportMode, currentLang, currentTranslations);
                 }
                 stopTimeCounter();
                 break;
@@ -440,6 +572,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         startBtn.classList.toggle('hidden', stateName !== 'idle');
         stopBtn.classList.add('hidden');
         resumeBtn.classList.add('hidden');
+
+        // Re-home the download button (the error state may have borrowed it)
+        if (downloadBtn.parentElement !== downloadBtnHome) {
+            downloadBtnHome.insertBefore(downloadBtn, downloadBtnHome.firstChild);
+        }
+        downloadBtn.classList.remove('hidden');
+        if (resumeBtn.parentElement !== resumeBtnHome) {
+            resumeBtnHome.appendChild(resumeBtn);
+        }
 
         switch (stateName) {
             case 'idle':
@@ -462,10 +603,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function showError(title, message) {
+    // opts: { itemCount, canResume } — when the failed export already
+    // collected items, the user can still download them and/or resume
+    // instead of being offered only "Try Again".
+    function showError(title, message, opts = {}) {
         showState('error');
         errorTitle.textContent = title;
         errorMessage.textContent = message;
+        if (opts.itemCount > 0) {
+            errorActions.insertBefore(downloadBtn, errorRetryBtn);
+        } else {
+            downloadBtn.classList.add('hidden');
+        }
+        if (opts.canResume) {
+            errorActions.insertBefore(resumeBtn, errorRetryBtn);
+            resumeBtn.classList.remove('hidden');
+        }
     }
 
     // ==================== Timer ====================
@@ -485,31 +638,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearInterval(timeInterval);
             timeInterval = null;
         }
-        if (cooldownInterval) {
-            clearInterval(cooldownInterval);
-            cooldownInterval = null;
-        }
-    }
-
-    function startCooldownTimer(duration) {
-        // Guard against stacked intervals — each cooldown event used to spawn a
-        // new setInterval without clearing the previous one, making the timer
-        // jump.
-        if (cooldownInterval) { clearInterval(cooldownInterval); cooldownInterval = null; }
-        let remaining = Math.round(duration / 1000);
-        const render = () => {
-            statusMsg.textContent = `${t('cooldown')} ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
-        };
-        render();
-        cooldownInterval = setInterval(() => {
-            remaining--;
-            if (remaining <= 0) {
-                clearInterval(cooldownInterval);
-                cooldownInterval = null;
-                return;
-            }
-            render();
-        }, 1000);
+        cooldownTicker.stop();
     }
 
     // ==================== Helpers ====================

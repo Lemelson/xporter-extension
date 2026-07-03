@@ -9,7 +9,9 @@
     <link rel="stylesheet" href="../popup/rate-prompt.css">
 </head>
 
-<body class="dark">
+<body>
+    <script src="../popup/theme-init.js"></script>
+
     <div class="app" id="app">
         <!-- Header -->
         <header class="header">
@@ -33,7 +35,7 @@
 
                 <!-- Username -->
                 <div class="field">
-                    <label class="field-label" data-i18n="fieldUsername">Twitter Username</label>
+                    <label class="field-label" for="usernameInput" data-i18n="fieldUsername">Twitter Username</label>
                     <div class="input-group">
                         <span class="input-prefix">@</span>
                         <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername"
@@ -52,11 +54,11 @@
                     </div>
                     <div class="date-fields hidden" id="dateFields">
                         <div class="date-row">
-                            <span class="date-label" data-i18n="dateFrom">From</span>
+                            <label class="date-label" for="dateFrom" data-i18n="dateFrom">From</label>
                             <input type="date" id="dateFrom">
                         </div>
                         <div class="date-row">
-                            <span class="date-label" data-i18n="dateTo">To</span>
+                            <label class="date-label" for="dateTo" data-i18n="dateTo">To</label>
                             <input type="date" id="dateTo">
                         </div>
                     </div>
@@ -78,25 +80,42 @@
 
                 <!-- Quantity Limit -->
                 <div class="field">
-                    <label class="field-label" data-i18n="exportQuantityLimit">Export Limit</label>
+                    <label class="field-label" for="quantityLimit" data-i18n="exportQuantityLimit">Export Limit</label>
                     <select id="quantityLimit" class="select">
                         <option value="0" data-i18n="unlimited">Unlimited</option>
-                        <option value="100">100 <span data-i18n="posts">posts</span></option>
-                        <option value="500">500 <span data-i18n="posts">posts</span></option>
-                        <option value="1000">1,000 <span data-i18n="posts">posts</span></option>
-                        <option value="5000">5,000 <span data-i18n="posts">posts</span></option>
-                        <option value="10000">10,000 <span data-i18n="posts">posts</span></option>
+                        <option value="100">100 posts</option>
+                        <option value="500">500 posts</option>
+                        <option value="1000">1,000 posts</option>
+                        <option value="5000">5,000 posts</option>
+                        <option value="10000">10,000 posts</option>
                     </select>
                 </div>
 
-                <!-- Cooldown Config -->
+                <!-- Export Speed -->
                 <div class="field">
-                    <label class="field-label" data-i18n="requestCooldown">Cooldown</label>
-                    <div class="cooldown-row">
-                        <input type="number" id="cooldownMinutes" value="3" min="1" max="15" class="input-small">
-                        <span data-i18n="minAfterEvery">min /</span>
-                        <input type="number" id="cooldownBatch" value="20" min="5" max="50" class="input-small">
-                        <span data-i18n="requests">requests</span>
+                    <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="exportSpeed">Export Speed</label>
+                    <select id="exportSpeed" class="select">
+                        <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ~2 s between requests</option>
+                        <option value="fast" data-i18n="speedFast">Fast — ~3 s between requests</option>
+                        <option value="standard" data-i18n="speedStandard">Standard — ~4 s (recommended)</option>
+                        <option value="careful" data-i18n="speedCareful">Careful — ~7 s between requests</option>
+                        <option value="turtle" data-i18n="speedTurtle">🐢 Turtle — ~12 s between requests</option>
+                        <option value="custom" data-i18n="speedCustom">⚠️ Custom — your own numbers</option>
+                    </select>
+                    <div class="custom-speed hidden" id="customSpeedRows">
+                        <div class="cooldown-row">
+                            <input type="number" id="customDelaySec" value="5" min="2" max="120" class="input-small"
+                                aria-labelledby="customDelayLabel">
+                            <span id="customDelayLabel" data-i18n="customDelayLabel">sec between requests</span>
+                        </div>
+                        <div class="cooldown-row">
+                            <input type="number" id="customCooldownMin" value="3" min="1" max="30" class="input-small"
+                                aria-labelledby="customCooldownLabel">
+                            <span id="customCooldownLabel" data-i18n="customCooldownLabel">min pause every</span>
+                            <input type="number" id="customBatchSize" value="20" min="5" max="100" class="input-small"
+                                aria-labelledby="customBatchLabel">
+                            <span id="customBatchLabel" data-i18n="customBatchLabel">requests</span>
+                        </div>
                     </div>
                 </div>
 
@@ -277,7 +296,9 @@
                     </div>
                     <h3 id="errorTitle" data-i18n="errorTitle">Error</h3>
                     <p id="errorMessage" data-i18n="errorDesc">Something went wrong.</p>
-                    <button class="btn btn-secondary" id="errorRetryBtn" data-i18n="tryAgain">Try Again</button>
+                    <div class="error-actions" id="errorActions">
+                        <button class="btn btn-secondary" id="errorRetryBtn" data-i18n="tryAgain">Try Again</button>
+                    </div>
                 </div>
 
                 <!-- Auth error state -->
@@ -306,6 +327,7 @@
 
     <script src="../utils/config.js"></script>
     <script src="../utils/shared.js"></script>
+    <script src="../utils/usage-tracker.js"></script>
     <script src="../popup/i18n.js"></script>
     <script src="../popup/rate-prompt.js"></script>
     <script src="export.js"></script>

@@ -92,7 +92,7 @@ body.light .xrp-glow { opacity: 0.14; }
 .xrp-close {
   position: absolute;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
   width: 30px;
   height: 30px;
   display: flex;
@@ -284,8 +284,12 @@ body.light .xrp-glow { opacity: 0.14; }
   to { opacity: 1; transform: none; }
 }
 
-/* Prominent "Rate XPorter" CTA at the top of the About tab (popup) */
+/* Prominent "Rate XPorter" CTA at the top of the About tab (popup).
+   Reuses the overlay's --rp-accent-* palette; the vars are (re)declared here
+   because the CTA lives outside .xrp-overlay, so it doesn't inherit them. */
 .about-rate-cta {
+  --rp-accent-a: #4AA8FF;
+  --rp-accent-b: #1B7FD4;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -296,7 +300,7 @@ body.light .xrp-glow { opacity: 0.14; }
   padding: 13px 16px;
   font-family: inherit;
   color: #fff;
-  background: linear-gradient(135deg, #4AA8FF, #1B7FD4);
+  background: linear-gradient(135deg, var(--rp-accent-a), var(--rp-accent-b));
   border: none;
   border-radius: 12px;
   cursor: pointer;
@@ -305,7 +309,8 @@ body.light .xrp-glow { opacity: 0.14; }
 }
 
 body.light .about-rate-cta {
-  background: linear-gradient(135deg, #1D9BF0, #0A6FDB);
+  --rp-accent-a: #1D9BF0;
+  --rp-accent-b: #0A6FDB;
   box-shadow: 0 6px 18px rgba(10, 111, 219, 0.28);
 }
 

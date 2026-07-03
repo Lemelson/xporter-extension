@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.1.0**.
+> Last verified against the codebase at **v1.4.2**.
 
 ---
 
@@ -13,10 +13,10 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.1.0 (`manifest.json`) |
+| Version | 1.4.2 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
-| Target Browser | Chrome / Chromium-based, 88+ (MV3) |
+| Target Browser | Chrome / Chromium-based, 111+ |
 
 ### Key Selling Points
 - **Free & unlimited** — competitors charge $12–15/mo and cap at 150–200 posts
@@ -55,8 +55,8 @@
 All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage`:
 - **popup/export → service-worker**: commands (`START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `DOWNLOAD_EXPORT`, `SAVE_SETTINGS`, …)
 - **service-worker → popup/export**: live status (`EXPORT_STATUS_UPDATE` broadcast)
-- **content.js → service-worker**: username detection (`SET_USERNAME`) and captured queryIds
-- **interceptor.js → content.js**: `window.postMessage({type:'__XPORTER_QUERYID__'})` (page MAIN world → content-script isolated world)
+- **content.js → service-worker**: username detection (`SET_USERNAME`), captured queryIds, and compact seen-post batches
+- **interceptor.js → content.js**: validated `window.postMessage` events for queryIds, date-range payloads, and passively seen posts (page MAIN world → content-script isolated world)
 
 ### Export Flow (High-Level)
 1. User enters username + options in popup/export page
@@ -88,10 +88,14 @@ xporter/
 │                                #         date-range search-capture orchestration
 │
 ├── content/
-│   ├── content.js               # Username detection from the X page URL; injects + relays
-│   │                            #   interceptor messages; drives the search-capture tab
-│   └── interceptor.js           # Injected into the page MAIN world; wraps fetch/XHR to
-│                                #   capture live GraphQL queryIds + SearchTimeline payloads
+│   ├── feed-parser.js           # MAIN-world parser for compact non-reply rows from
+│   │                            #   GraphQL responses already loaded by X
+│   ├── content.js               # Username detection from the X page URL; validates + relays
+│   │                            #   interceptor messages; drives the search-capture tab.
+│   │                            #   Manifest-registered at document_start (isolated world).
+│   └── interceptor.js           # Manifest-registered at document_start in the page MAIN
+│                                #   world (Chrome 111+); wraps fetch/XHR to capture live
+│                                #   GraphQL queryIds + timeline payloads
 │
 ├── popup/                       # Compact popup UI (~350px)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
@@ -101,7 +105,6 @@ xporter/
 │   ├── theme-init.js            # Inline-loaded FIRST: applies saved theme to avoid FOUC
 │   ├── theme.js                 # Theme toggle logic + SVG icon helpers
 │   ├── i18n.js                  # In-app i18n engine + LANGUAGES list + loadTranslations()
-│   ├── utils.js                 # Thin popup-only wrapper (most helpers live in utils/shared.js)
 │   └── locales/                 # 🔑 In-app UI strings — 14 JSON files (en is the fallback)
 │       └── en.json, ru.json, es.json, de.json, fr.json, pt.json, it.json,
 │           tr.json, id.json, hi.json, ja.json, ko.json, zh.json, ar.json
@@ -116,14 +119,16 @@ xporter/
 │   ├── api.js                   # 🔑 X GraphQL client + endpoint discovery + parsers
 │   ├── api-features.js          # GraphQL feature-flag constant objects (split from api.js)
 │   ├── rateLimit.js             # RateLimitManager (spacing, batch cooldown, retry, abort)
-│   ├── csv.js                   # CSV / XLSX / JSON output generation
+│   ├── csv.js                   # CSV / XLSX output generation (JSON is built in the SW)
 │   ├── storage.js               # chrome.storage.local wrapper (quota-aware) + settings
+│   ├── post-database.js         # IndexedDB seen-post store (dedupe by ID; 50k cap)
 │   └── shared.js                # 🔑 Helpers shared by popup + export pages (see §4.6)
 │
 ├── _locales/                    # Chrome STORE metadata i18n (manifest __MSG_extName__ etc.)
 │   └── en/, ru/, … (messages.json per language)  ← NOT the same as popup/locales/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
+│   ├── package.sh                             # allowlist-based CWS zip builder (use this!)
 │   ├── discover_endpoints.js                  # find current queryIds from a console
 │   ├── debug-date-range-playwright.mjs        # Playwright repro for date-range
 │   └── debug-extension-date-range-playwright.mjs
@@ -152,7 +157,8 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 | `MAX_RETRIES` | `5` | retries per request |
 | `ADAPTIVE_PACING` | `true` | pace from X's `x-rate-limit-*` headers instead of the fixed delay |
 | `ADAPTIVE_MIN_DELAY` / `_PAD` / `_HEADER_TTL` | `5000` / `2000` / `300000` | pacing floor / margin / budget freshness |
-| `FALLBACK_REQUEST_DELAYS` | mode-specific | conservative header-less delay ranges (posts 20–25 s, followers 60 s, following/verified 5–10 s) |
+| `FALLBACK_REQUEST_DELAYS` | mode-specific | header-less delay ranges (posts 4–5 s at Standard, followers 60 s, following/verified 5–10 s; speed preset scales the range) |
+| `SPEED_PRESETS` / `CUSTOM_SPEED_LIMITS` | turbo…turtle / clamp ranges | Export Speed presets: adaptive floor/pad, `budgetFraction`, `raceReserve`, fallback scale + batch rhythm; clamp ranges for the Custom tier (§4.4) |
 | `ENDPOINT_CACHE_TTL` | `1800000` | 30-min queryId cache |
 | `TWEETS_PER_BATCH` | `50` | items per storage batch |
 | `FALLBACK_BEARER_TOKEN` | `AAAA…` | static public bearer |
@@ -184,23 +190,27 @@ currentExport = {
 }
 ```
 
-**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT`, `GET_STATUS`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE` (from content/interceptor). Plus the `EXPORT_STATUS_UPDATE` broadcast SW→UI.
+**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT`, `GET_STATUS`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. Plus the `EXPORT_STATUS_UPDATE` broadcast SW→UI.
 
 **Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
 
 ### 4.4. `utils/rateLimit.js` — `RateLimitManager`
 Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
 
-**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. `_computeAdaptiveDelay()` uses `ceil(msLeftInWindow / remaining) + PAD`, floored at `ADAPTIVE_MIN_DELAY`, without shortening a valid wait; when `remaining ≤ 0` or a 429 reports exhausted quota, it waits until the advertised reset. Missing/stale headers use conservative mode-specific fallback delays plus the existing batch cooldown. Long waits emit a `cooldown` status so the UI shows a countdown. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
+**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing: they run at their advertised delay while `remaining > raceReserve`, then hold until the advertised window reset (an explicit `'window'` wait). This fits finite exports: a small job finishes promptly, while a large job waits honestly when X's quota is spent. Missing/stale headers use mode-specific fallback delays plus the existing batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). Popup and export-page render pacing as a 4→3→2→1 countdown with an amber bar that fills exactly over the wait, then return to the full blue fetching animation; longer window/batch waits use `m:ss`. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
+
+**Export Speed presets.** The single user-facing pacing knob: the `exportSpeed` setting (`'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'`, default `'standard'`; a `<select>` in both popup and export-page settings). The five named tiers advertise 2 / 3 / 4 / 7 / 12 second delays; Standard is the recommended 4-second default. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus fallback-path `fallbackScale`/`batchSize`/`cooldownDuration`; `resolveSpeedPreset()` in the SW resolves it. **`'custom'` (⚠️ in the UI)** is built from the user-typed `customDelaySec`/`customCooldownMin`/`customBatchSize` settings (revealed under the select when picked; clamped to `CUSTOM_SPEED_LIMITS`), and sets `alwaysBatchCooldown` so "pause N min every M requests" is honored even while adaptive pacing is active — named tiers only apply the batch cooldown on the headerless fallback path. Every tier still obeys X's advertised budget. Replaced the old "Request Cooldown" min/batch numeric inputs; the legacy `batchSize`/`cooldownDuration` settings remain stored but are overridden by the preset.
 
 ### 4.5. `utils/storage.js` — Chrome Storage + Settings
-`chrome.storage.local` (10 MB). Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by either UI:
+`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by either UI:
 
 | Setting | Default | Notes |
 |---|---|---|
 | `includeRetweets` / `includeReplies` | `true` | posts filter |
 | `quantityLimit` | `500` | 0 = unlimited |
-| `requestDelay` / `batchSize` / `cooldownDuration` | from config | rate limiting (fallback path) |
+| `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
+| `customDelaySec` / `customCooldownMin` / `customBatchSize` | `5` / `3` / `20` | the Custom tier's user-typed pace (clamped to `CUSTOM_SPEED_LIMITS`) |
+| `requestDelay` / `batchSize` / `cooldownDuration` | from config | legacy rate-limit knobs; preset values override them |
 | `adaptivePacing` | `true` | pace from X's `x-rate-limit-*` headers (see §4.4) |
 | `theme` | `'dark'` | `'dark'`/`'light'` |
 | `language` | auto-detected | locale code |
@@ -209,18 +219,22 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 | `ladybugEnabled` | `true` | show the Easter-egg ladybug (§6.2) |
 
 ### 4.6. `utils/shared.js` — Shared Page Helpers (popup + export)
-Loaded by BOTH `popup.html` and `export.html` (so don't duplicate these in `popup/utils.js`, which is now a thin wrapper). Provides:
-- `sendMessage(msg)` — promisified `chrome.runtime.sendMessage` with timeout
+Loaded by BOTH `popup.html` and `export.html` (`popup/utils.js` was removed in v1.4.0). Provides:
+- `sendMessage(msg, timeoutMs?)` — promisified `chrome.runtime.sendMessage`; resolves `{error:'TIMEOUT'}` / `{error:'MESSAGING_ERROR'}` on failure (callers must check `result.success === true` for actions)
 - `checkAuth()` — looks for the `auth_token` cookie
 - `formatError(code, t)` — maps error codes → i18n key / English fallback
-- `extractUsernameFromInput(input)` + `RESERVED_PATHS` — parse @handle / URL
+- `extractUsernameFromInput(input)` + `RESERVED_PATHS` — parse @handle / URL (returns `''` for invalid input); `isValidUsername(v)`
 - `applyI18nToDOM(translations)` — applies all `data-i18n*` attributes (§6.1)
 - `escapeHtml`, `renderHelpMarkup`, `stripHelpMarkup` — tooltip markup (§6.1)
+- `bidiIsolate(v)` — FSI/PDI wrapper for @handles inside RTL sentences
+- `localizeQuantityOptions(select, lang, translations)` — quantity `<select>` relabeling
+- `createCooldownTicker(render)` — live cooldown countdown driven by the SW's `until` timestamps
 - RTL + number-formatting helpers
 
 ### 4.7. `content/content.js` + `content/interceptor.js`
-- **content.js** (isolated world): username detection from the URL (filters reserved paths, handles SPA nav via `MutationObserver`/`popstate`), injects `interceptor.js` into the page, relays `__XPORTER_QUERYID__` messages to the SW, and drives the date-range search-capture tab.
-- **interceptor.js** (page MAIN world, a `web_accessible_resource`): wraps `fetch`/`XHR` to read GraphQL queryIds + `SearchTimeline` response bodies, posting them back via `window.postMessage`.
+- **content.js** (isolated world, `document_start`): username detection from the URL (filters reserved paths, handles SPA nav via `MutationObserver`/`popstate`), validates + relays `__XPORTER_QUERYID__` messages to the SW (operation whitelist + queryId regex — the channel is page-spoofable), and drives the date-range search-capture tab.
+- **interceptor.js** (page MAIN world via manifest `"world": "MAIN"`, `document_start`, Chrome 111+ — no `web_accessible_resources`, no script-tag injection): wraps `fetch`/`XHR` to read GraphQL queryIds + `SearchTimeline` response bodies (≤8 MB), posting them back via `window.postMessage` with `location.origin` as target.
+- Validation is layered: content.js → SW (`VALID_LIVE_OPERATIONS` + regex) → `api.js setLiveQueryId` (last gate before URL interpolation).
 
 ---
 
@@ -232,9 +246,13 @@ Direct GraphQL paging from the service worker.
 ### Posts + Date Range (special path)
 X has no clean date-filter on the timeline GraphQL, so XPorter:
 1. Opens an **X search tab** at `https://x.com/search?q=…&f=live` (`openSearchCaptureTab` / `buildSearchTimelinePageUrl`).
-2. `interceptor.js` captures the page's own `SearchTimeline` responses; `content.js` scrolls the tab to load more.
-3. SW parses captured payloads (`parseSearchTimelineResponse`) and emits `scrolling` status to the in-page overlay (localized via `i18n.js` — that's why the SW imports it).
-4. **The user must keep that tab open until the export finishes** — this is what the `dateRangeHelp` tooltip warns about.
+2. `interceptor.js` captures the page's own `SearchTimeline` responses; `content.js` scrolls the tab to load more (each scroll ping also clicks X's "Retry" button if the timeline errored).
+3. SW parses captured payloads (`parseSearchTimelineResponse`) and drives the in-page overlay via `XPORTER_SEARCH_CAPTURE_STATUS` (localized via `i18n.js` — that's why the SW imports it). The overlay shows: phase subtitle, a progress bar (determinate when `progressPct` is computable — max of items/limit and date-depth of the oldest collected post via `searchCapture.oldestCollectedMs`, sweeping otherwise), a **Stop export** button (sends `STOP_EXPORT`), and an amber countdown when the SW sends `pauseUntil` (rate-limit pause). Overlay strings are the `ov*` locale keys.
+4. **Stall/ban handling:** HTTP ≥400 captures pause 10–60 s (>5 in a row → `RATE_LIMITED`). If X advertises a cursor but stops answering (timeline stuck on "Something went wrong"), `recoverStalledSearchCapture()` waits 60 s × 3 rounds with the overlay countdown, then the export **errors as `RATE_LIMITED`** (buffer flushed, resumable) — it never fake-"completes" with partial data.
+5. **The user must keep that tab open until the export finishes** — this is what the `dateRangeHelp` tooltip warns about.
+
+### Passive seen-post dataset
+`feed-parser.js` inspects only post-bearing GraphQL responses that X has already loaded in the page. It emits compact rows; `content.js` validates them before the SW writes them through `post-database.js`. Replies are excluded as rows, while `reply_count` is retained. IndexedDB uses the post ID as its primary key, so repeat sightings update latest metrics, `last_seen_at`, and `seen_count` without creating duplicates. The first metric snapshot is retained in `first_*` columns. No additional X requests are made, page URLs are not stored, and the oldest rows are trimmed above 50,000 unique posts. Settings exposes count, CSV/JSON download, and explicit clear.
 
 ### Schemas
 - **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
@@ -282,8 +300,17 @@ Yellow filled bolt with a glow + occasional "lightbulb" flicker:
 | `ENDPOINT_DISCOVERY_FAILED` | can't reach x.com | surface to user |
 | `MAX_RETRIES_EXCEEDED` | gave up | error message |
 | `ABORTED` | user stopped | save state for resume |
+| `STORAGE_FULL` | a batch write failed (quota) | export aborts loudly; collected data stays downloadable |
+| `DOWNLOAD_FAILED` | FileReader error / blocked download | error toast (never a false success) |
+| `ALREADY_RUNNING` | second START/RESUME while running | ignored with error |
+| `NO_DATA` / `HISTORY_NOT_FOUND` / `HISTORY_DATA_GONE` | nothing to download / stale history | error toast |
 
-Error codes ↔ i18n keys are mapped in `formatError()` (`utils/shared.js`).
+Error codes ↔ i18n keys are mapped in `formatError()` (`utils/shared.js`). `recordExportError`
+whitelists codes before they reach the anonymous uninstall URL (unknown → `UNKNOWN`).
+
+On `status:'error'` both UIs still offer **Download** (when items were collected) and **Resume**
+(`canResume` travels in error broadcasts and GET_STATUS). `getExportStatus` repairs a persisted
+`running:true` with no live export (SW killed mid-export) into a resumable `stopped`.
 
 ---
 
@@ -333,26 +360,26 @@ Run `node scripts/test-rate-limit.js` for deterministic pacing/retry checks. Als
 
 | Permission | Purpose |
 |---|---|
-| `cookies` | read `ct0`/`auth_token` for auth |
-| `activeTab` / `tabs` | username detection, search-capture tab |
+| `cookies` | read `ct0` value for the csrf header; `auth_token` is checked for EXISTENCE only (value never read) |
+| `activeTab` | username detection on the active x.com tab (`tabs` permission was dropped in v1.4.0 — `tabs.create/remove/update/query` don't need it, and it triggered the "read browsing activity" install warning) |
 | `downloads` | save files |
-| `storage` | export state, settings, batches |
+| `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
 | `host_permissions` | `https://x.com/*`, `https://api.x.com/*`, `https://twitter.com/*` |
 
-`interceptor.js` is injected via a page `<script>` from `content.js` (a `web_accessible_resource`), so no `scripting` permission is needed. (Confirm against the live `manifest.json` — permissions evolve.)
+Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
 
 ---
 
 ## 11. Script Loading Order
 
 **Service worker** (`importScripts`, order matters):
-`config.js` → `api-features.js` → `api.js` → `rateLimit.js` → `csv.js` → `storage.js` → `popup/i18n.js` (for the localized capture overlay).
+`config.js` → `api-features.js` → `api.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `popup/i18n.js` (for the localized capture overlay).
 
-**Popup** (`popup.html`, end of body):
-`theme-init.js` (in `<head>`/top, first) → `utils/config.js` → `utils/shared.js` → `i18n.js` → `utils.js` → `theme.js` → `popup.js` → `ladybug.js`.
+**Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
+`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `popup.js` → `ladybug.js`.
 
-**Export page** (`export.html`):
-`utils/config.js` → `utils/shared.js` → `popup/i18n.js` → `export.js`.
+**Export page** (`export.html`; same pattern):
+`popup/theme-init.js` (first in `<body>`, anti-FOUC) → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `popup/i18n.js` → `popup/rate-prompt.js` → `export.js`.
 
 ---
 

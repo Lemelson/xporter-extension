@@ -71,29 +71,6 @@ async function _ensureFallback() {
 // ==================== Public API ====================
 
 /**
- * Get a translation string with fallback chain:
- *   1. Current language
- *   2. English fallback
- *   3. Raw key name
- *
- * @param {string} key - Translation key
- * @param {Object} [currentTranslations] - Pre-loaded translations for current language
- * @returns {string} Translated string
- */
-function t(key, currentTranslations) {
-    // Try current language
-    if (currentTranslations && currentTranslations[key] !== undefined) {
-        return currentTranslations[key];
-    }
-    // Try English fallback
-    if (_fallbackLocale && _fallbackLocale[key] !== undefined) {
-        return _fallbackLocale[key];
-    }
-    // Last resort: return the key itself
-    return key;
-}
-
-/**
  * Load translations for a language and return a merged object
  * with English fallback for any missing keys.
  *
@@ -110,14 +87,3 @@ async function loadTranslations(langCode) {
     const merged = { ...fallback, ...(locale || {}) };
     return merged;
 }
-
-// ==================== TRANSLATIONS (backward compat) ====================
-// Provide a synchronous TRANSLATIONS object for existing code that
-// accesses TRANSLATIONS[lang][key]. Populated lazily as locales load.
-const TRANSLATIONS = new Proxy({}, {
-    get(target, langCode) {
-        // Return cached locale if available, otherwise empty object
-        // that will be populated when loadTranslations() is called
-        return _loadedLocales[langCode] || {};
-    }
-});

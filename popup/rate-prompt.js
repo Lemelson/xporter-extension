@@ -27,10 +27,10 @@
         // First ask: after this many completed exports since install.
         INITIAL_EXPORTS: 5,
         // Days to wait before the 2nd, 3rd and 4th prompt — one entry per
-        // deferral, each also requires at least one new export since deferring.
+        // shown prompt, each also requires at least one new export before re-asking.
         // Schedule grows so we ask less and less often.
         REASK_SCHEDULE_DAYS: [14, 30, 30],
-        // Hard cap: after this many "Maybe later" deferrals we never ask again.
+        // Hard cap: after this many shown prompts we never ask again.
         // (= the maximum number of times the prompt is ever shown.)
         MAX_DEFERS: 4,
     };
@@ -91,8 +91,8 @@
 
     // ==================== Gating ====================
     // Evaluated at a "successful download" moment.
-    // Schedule: 1st prompt after INITIAL_EXPORTS exports; then on each "Maybe
-    // later" we wait a growing window (14 → 30 → 30 days) AND require at least
+    // Schedule: 1st prompt after INITIAL_EXPORTS exports; after each prompt
+    // shown without rating we wait a growing window (14 → 30 → 30 days) AND require at least
     // one new export before re-asking. After MAX_DEFERS deferrals (or any
     // "Rate"), we stop forever. So a non-rater sees the prompt at most 4 times.
     function ready(state) {
@@ -149,16 +149,24 @@
         setTimeout(remove, 420); // fallback if transitionend never fires
     }
 
-    // Record a deferral: bump the counter (toward MAX_DEFERS), stamp the time,
-    // and capture the export baseline so the next ask needs a fresh export.
-    async function markDeferred() {
-        const s = await loadState();
-        await patchState({
+    // Build the deferral patch: bump the counter (toward MAX_DEFERS), stamp
+    // the time, and capture the export baseline so the next ask needs a
+    // fresh export.
+    function deferPatch(s) {
+        return {
             status: 'pending',
             deferCount: (s.deferCount || 0) + 1,
             lastDeferAt: Date.now(),
             exportsAtDefer: s.exports || 0
-        });
+        };
+    }
+
+    // Resolve a deferral. The show itself is persisted as a deferral before the
+    // overlay is rendered, so a popup that closes without firing/finishing an
+    // async pagehide write still cannot show the prompt again immediately.
+    async function markDeferred(overlay) {
+        if (!overlay || overlay._deferResolved) return;
+        overlay._deferResolved = true;
     }
 
     function renderThanks(card, t) {
@@ -203,11 +211,14 @@
         const card = overlay.querySelector('.xrp-card');
 
         const later = async () => {
-            await markDeferred();
+            await markDeferred(overlay);
             closeOverlay(overlay, prevFocus);
         };
 
         overlay.querySelector('.xrp-rate').addEventListener('click', async () => {
+            // Resolve the overlay first so another dismissal event cannot race
+            // this explicit "rated" choice.
+            overlay._deferResolved = true;
             // Persist BEFORE opening the tab: in the popup, the new tab closes
             // the popup and could otherwise drop the in-flight storage write.
             await patchState({ status: 'rated' });
@@ -221,7 +232,7 @@
         // Deflect unhappy users to the bug channel instead of a 1-star review.
         // Treated as a deferral, not a permanent dismissal.
         overlay.querySelector('.xrp-report').addEventListener('click', async () => {
-            await markDeferred();
+            await markDeferred(overlay);
             closeOverlay(overlay, prevFocus);
             if (typeof onReportBug === 'function') onReportBug();
             else openBugChannel();
@@ -259,7 +270,9 @@
         if (activeOverlay) return false;
         const state = await loadState();
         if (!ready(state)) return false;
-        await patchState({ lastShownAt: Date.now() });
+        // Persist the show before rendering. Every shown prompt consumes one
+        // slot in the re-ask schedule, including a silently closed popup.
+        await patchState({ ...deferPatch(state), lastShownAt: Date.now() });
         buildOverlay(makeT(o.translations), o.onReportBug);
         return true;
     }

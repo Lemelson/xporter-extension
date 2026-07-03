@@ -1,13 +1,15 @@
 // XPorter — Content Script
 // Detects the current X/Twitter username from the page URL
-// Runs on x.com and twitter.com pages
+// Runs on x.com and twitter.com pages at document_start (document.body
+// does not exist yet — never touch it at top level).
 
 const RESERVED_PATHS = new Set([
     'home', 'explore', 'search', 'notifications', 'messages',
     'settings', 'i', 'compose', 'intent', 'account', 'login',
     'logout', 'signup', 'tos', 'privacy', 'about', 'help',
     'hashtag', 'lists', 'communities', 'premium', 'jobs',
-    'who_to_follow', 'trending'
+    'who_to_follow', 'trending', 'bookmarks', 'topics',
+    'display', 'download', 'follower_requests'
 ]);
 
 function extractUsername() {
@@ -48,7 +50,10 @@ if (initialUsername) {
 // Detect on SPA navigation (X is a single-page app)
 let lastUrl = window.location.href;
 
-// Use MutationObserver to detect URL changes in SPA
+// Use MutationObserver to detect URL changes in SPA.
+// We run at document_start, where document.body is still null —
+// observe document.documentElement instead (it exists at document_start),
+// and fall back to DOMContentLoaded just in case.
 const observer = new MutationObserver(() => {
     if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
@@ -57,10 +62,19 @@ const observer = new MutationObserver(() => {
     }
 });
 
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+function startUrlObserver() {
+    const root = document.documentElement || document.body;
+    if (!root) return false;
+    observer.observe(root, {
+        childList: true,
+        subtree: true
+    });
+    return true;
+}
+
+if (!startUrlObserver()) {
+    document.addEventListener('DOMContentLoaded', startUrlObserver, { once: true });
+}
 
 // Also listen for popstate events (back/forward navigation)
 window.addEventListener('popstate', () => {
@@ -70,35 +84,104 @@ window.addEventListener('popstate', () => {
 
 // ==================== GraphQL QueryId Discovery via Fetch Interception ====================
 // X.com makes GraphQL requests with the correct queryIds.
-// We intercept these and forward them to the service worker so the extension
-// always has up-to-date queryIds without relying on fragile JS-bundle scanning.
+// content/interceptor.js (registered in manifest.json in the MAIN world at
+// document_start) intercepts these in the page context and forwards them to
+// us via window.postMessage; we relay them to the service worker so the
+// extension always has up-to-date queryIds without fragile JS-bundle scanning.
+// This listener must attach at document_start so early captures are not lost.
 
-// Inject a fetch interceptor into the actual page context.
-// Loaded via src (not inline textContent) so it doesn't violate x.com's CSP.
-const interceptorScript = document.createElement('script');
-interceptorScript.src = chrome.runtime.getURL('content/interceptor.js');
-interceptorScript.onload = () => interceptorScript.remove();
-(document.head || document.documentElement).appendChild(interceptorScript);
+// Must mirror TRACKED in content/interceptor.js — anything else is dropped.
+const RELAY_TRACKED_OPERATIONS = new Set([
+    'Followers', 'Following', 'BlueVerifiedFollowers',
+    'UserTweets', 'UserByScreenName', 'SearchTimeline'
+]);
+const RELAY_QUERYID_PATTERN = /^[A-Za-z0-9_-]{10,40}$/;
+const RELAY_MAX_BODY_CHARS = 8 * 1024 * 1024; // must match interceptor.js
+const RELAY_MAX_SEEN_POSTS = 250;
+const RELAY_POST_ID_PATTERN = /^\d{5,30}$/;
+const RELAY_POST_OPERATION_PATTERN = /(Timeline|Tweets|TweetDetail|Bookmarks|Likes|Community|ListLatest|UserMedia)/i;
 
-// Listen for messages from the injected script
+function sanitizeSeenPost(post) {
+    const text = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
+    const count = (value) => {
+        if (typeof value !== 'number' && typeof value !== 'string') return null;
+        const number = Number(value);
+        return Number.isFinite(number) && number >= 0 ? Math.round(number) : null;
+    };
+    return {
+        id: String(post.id),
+        text: text(post.text, 25000),
+        tweet_url: text(post.tweet_url, 300),
+        language: text(post.language, 16),
+        created_at: text(post.created_at, 80),
+        author_id: text(post.author_id, 32),
+        author_name: text(post.author_name, 200),
+        author_username: text(post.author_username, 40),
+        author_followers_count: count(post.author_followers_count),
+        author_verified: post.author_verified === true,
+        view_count: count(post.view_count),
+        bookmark_count: count(post.bookmark_count),
+        favorite_count: count(post.favorite_count),
+        retweet_count: count(post.retweet_count),
+        reply_count: count(post.reply_count),
+        quote_count: count(post.quote_count),
+        is_quote: post.is_quote === true,
+        is_retweet: post.is_retweet === true,
+        media_count: count(post.media_count),
+        media_types: text(post.media_types, 80)
+    };
+}
+
+// Listen for messages from the MAIN-world interceptor
 window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     if (event.data?.type === '__XPORTER_QUERYID__') {
+        // Strict validation before relaying to the SW (defense in depth —
+        // any page script can postMessage; drop anything unexpected silently).
+        const { queryId, operationName } = event.data;
+        if (typeof operationName !== 'string' || !RELAY_TRACKED_OPERATIONS.has(operationName)) return;
+        if (typeof queryId !== 'string' || !RELAY_QUERYID_PATTERN.test(queryId)) return;
         if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
         chrome.runtime.sendMessage({
             type: 'DISCOVERED_QUERYID',
-            queryId: event.data.queryId,
-            operationName: event.data.operationName
+            queryId: queryId,
+            operationName: operationName
         }).catch(() => { });
     }
     if (event.data?.type === '__XPORTER_GRAPHQL_RESPONSE__') {
+        const { operationName, bodyText } = event.data;
+        if (typeof operationName !== 'string' || !RELAY_TRACKED_OPERATIONS.has(operationName)) return;
+        // Cap relayed body size — oversized payloads are dropped, not truncated.
+        if (typeof bodyText !== 'string' || bodyText.length > RELAY_MAX_BODY_CHARS) return;
+        const status = Number(event.data.status);
+        if (!Number.isInteger(status) || status < 100 || status > 599) return;
+        if (typeof event.data.url !== 'string' || !event.data.url.includes('/i/api/graphql/')) return;
         if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
         chrome.runtime.sendMessage({
             type: 'PAGE_GRAPHQL_RESPONSE',
-            operationName: event.data.operationName,
+            operationName: operationName,
             url: event.data.url,
-            status: event.data.status,
-            bodyText: event.data.bodyText
+            status: status,
+            bodyText: bodyText
+        }).catch(() => { });
+    }
+    if (event.data?.type === '__XPORTER_SEEN_POSTS__') {
+        const { operationName, posts } = event.data;
+        if (typeof operationName !== 'string' ||
+            !/^[A-Za-z0-9_]{1,80}$/.test(operationName) ||
+            !RELAY_POST_OPERATION_PATTERN.test(operationName)) return;
+        if (!Array.isArray(posts) || posts.length === 0 || posts.length > RELAY_MAX_SEEN_POSTS) return;
+        if (!posts.every(post => (
+            post && typeof post === 'object' &&
+            RELAY_POST_ID_PATTERN.test(String(post.id || '')) &&
+            typeof post.text === 'string' &&
+            post.text.length <= 25000
+        ))) return;
+        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+        chrome.runtime.sendMessage({
+            type: 'CAPTURE_FEED_POSTS',
+            operationName,
+            posts: posts.map(sanitizeSeenPost)
         }).catch(() => { });
     }
 });
@@ -113,13 +196,17 @@ function ensureXporterCaptureOverlay() {
         <button class="xporter-capture-toggle" type="button" aria-label="Collapse XPorter status">−</button>
         <div class="xporter-capture-title">XPorter date range export</div>
         <div class="xporter-capture-subtitle" data-xporter-subtitle>Preparing search page...</div>
-        <div class="xporter-capture-bar"><span></span></div>
+        <div class="xporter-capture-bar"><span data-xporter-bar></span></div>
         <div class="xporter-capture-meta">
             <span data-xporter-count>0 posts collected</span>
-            <span class="xporter-capture-range" data-xporter-range></span>
+            <span class="xporter-capture-meta-right">
+                <span class="xporter-capture-pct" data-xporter-pct></span>
+                <span class="xporter-capture-range" data-xporter-range></span>
+            </span>
         </div>
         <div class="xporter-capture-limit" data-xporter-limit>No post limit</div>
         <div class="xporter-capture-note">Keep this tab open. XPorter is scrolling it to collect posts.</div>
+        <button class="xporter-capture-stop" type="button" data-xporter-stop>Stop export</button>
     `;
 
     const style = document.createElement('style');
@@ -134,35 +221,16 @@ function ensureXporterCaptureOverlay() {
             width: min(560px, calc(100vw - 32px));
             transform: translateX(-50%);
             padding: 14px 16px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, rgba(12, 20, 32, 0.96), rgba(31, 41, 73, 0.96));
+            border: 1px solid rgba(96, 184, 255, 0.28);
+            border-radius: 14px;
+            background: linear-gradient(150deg, rgba(13, 21, 34, 0.97), rgba(28, 39, 69, 0.97));
             color: #fff;
-            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.48);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             pointer-events: auto;
             transition: width 0.2s ease, top 0.2s ease, right 0.2s ease, bottom 0.2s ease, left 0.2s ease, transform 0.2s ease;
-        }
-        #xporter-capture-overlay::before {
-            position: absolute;
-            inset: -1px;
-            z-index: -1;
-            border-radius: 13px;
-            background: conic-gradient(from 0deg, rgba(96, 184, 255, 0.18), rgba(0, 186, 124, 0.92), rgba(96, 184, 255, 0.18), rgba(96, 184, 255, 0.78));
-            content: "";
-            animation: xporter-capture-border-spin 2.6s linear infinite;
-        }
-        #xporter-capture-overlay::after {
-            position: absolute;
-            inset: 1px;
-            z-index: -1;
-            border-radius: 11px;
-            background: linear-gradient(135deg, rgba(12, 20, 32, 0.98), rgba(31, 41, 73, 0.98));
-            content: "";
-        }
-        @keyframes xporter-capture-border-spin {
-            to { transform: rotate(360deg); }
         }
         #xporter-capture-overlay .xporter-capture-toggle {
             position: absolute;
@@ -211,6 +279,18 @@ function ensureXporterCaptureOverlay() {
             background: linear-gradient(90deg, #60B8FF, #00BA7C);
             animation: xporter-capture-bar-sweep 1.35s ease-in-out infinite alternate;
         }
+        /* Determinate mode: real progress is known — freeze the sweep and
+           show a width-driven fill instead. */
+        #xporter-capture-overlay.xporter-capture-determinate .xporter-capture-bar span {
+            animation: none;
+            transform: none;
+            transition: width 0.35s ease;
+        }
+        /* Paused on a rate limit: amber fill, no motion. */
+        #xporter-capture-overlay.xporter-capture-paused .xporter-capture-bar span {
+            animation: none;
+            background: linear-gradient(90deg, #FFD400, #FFAD1F);
+        }
         @keyframes xporter-capture-bar-sweep {
             from { transform: translateX(-75%); }
             to { transform: translateX(220%); }
@@ -223,6 +303,44 @@ function ensureXporterCaptureOverlay() {
             color: rgba(255, 255, 255, 0.88);
             font-size: 12px;
             font-weight: 650;
+        }
+        #xporter-capture-overlay .xporter-capture-meta-right {
+            display: inline-flex;
+            gap: 10px;
+            align-items: baseline;
+        }
+        #xporter-capture-overlay .xporter-capture-pct {
+            color: #7CD4A8;
+            font-variant-numeric: tabular-nums;
+        }
+        #xporter-capture-overlay.xporter-capture-paused .xporter-capture-pct,
+        #xporter-capture-overlay.xporter-capture-paused [data-xporter-subtitle] {
+            color: #FFD400;
+        }
+        #xporter-capture-overlay .xporter-capture-stop {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            margin-top: 12px;
+            padding: 8px 12px;
+            border: 1px solid rgba(244, 33, 46, 0.55);
+            border-radius: 9px;
+            background: rgba(244, 33, 46, 0.14);
+            color: #FF6B72;
+            cursor: pointer;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.2;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        #xporter-capture-overlay .xporter-capture-stop:hover {
+            background: rgba(244, 33, 46, 0.28);
+            color: #fff;
+        }
+        #xporter-capture-overlay .xporter-capture-stop:disabled {
+            cursor: default;
+            opacity: 0.6;
         }
         #xporter-capture-overlay.xporter-capture-collapsed {
             left: auto;
@@ -237,7 +355,8 @@ function ensureXporterCaptureOverlay() {
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-bar,
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-range,
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-limit,
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-note {
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-note,
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-stop {
             display: none;
         }
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-title {
@@ -260,6 +379,16 @@ function ensureXporterCaptureOverlay() {
         button.setAttribute('aria-label', collapsed
             ? (i.expand || 'Expand XPorter status')
             : (i.collapse || 'Collapse XPorter status'));
+    });
+
+    overlay.querySelector('[data-xporter-stop]').addEventListener('click', (event) => {
+        const button = event.currentTarget;
+        const i = overlay._xporterI18n || {};
+        button.disabled = true;
+        button.textContent = i.stopping || 'Stopping…';
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ type: 'STOP_EXPORT' }).catch(() => { });
+        }
     });
 
     return overlay;
@@ -364,13 +493,77 @@ function updateXporterCaptureOverlay(status) {
         }
     }
 
-    overlay.querySelector('[data-xporter-subtitle]').textContent =
-        status.phase || i.preparingPage || 'Preparing search page...';
     overlay.querySelector('[data-xporter-count]').textContent =
         `${count.toLocaleString(locale)} ${capturePluralLabel('postsCollected', count, i)}`;
     overlay.querySelector('[data-xporter-range]').textContent = range;
     overlay.querySelector('[data-xporter-limit]').textContent = limitText;
+
+    // Stop button label (unless a click already put it into "Stopping…").
+    const stopBtn = overlay.querySelector('[data-xporter-stop]');
+    if (stopBtn && !stopBtn.disabled) stopBtn.textContent = i.stop || 'Stop export';
+
+    // Real progress when the SW can compute it (quantity limit and/or how far
+    // back into the date range we've collected); sweeping bar otherwise.
+    // NB: null must stay indeterminate — Number(null) is 0, so gate on != null.
+    const pct = (status.progressPct != null) ? Number(status.progressPct) : NaN;
+    const barFill = overlay.querySelector('[data-xporter-bar]');
+    const pctEl = overlay.querySelector('[data-xporter-pct]');
+    if (Number.isFinite(pct) && pct >= 0) {
+        overlay.classList.add('xporter-capture-determinate');
+        const clamped = Math.max(0, Math.min(100, pct));
+        // Never a fully empty track while running — keep a visible sliver.
+        if (barFill) barFill.style.width = Math.max(2, clamped) + '%';
+        if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
+    } else {
+        overlay.classList.remove('xporter-capture-determinate');
+        if (barFill) barFill.style.width = '';
+        if (pctEl) pctEl.textContent = '';
+    }
+
+    // Rate-limit pause: live countdown in the subtitle until `pauseUntil`.
+    const subtitleEl = overlay.querySelector('[data-xporter-subtitle]');
+    if (overlay._xporterPauseTicker) {
+        clearInterval(overlay._xporterPauseTicker);
+        overlay._xporterPauseTicker = null;
+    }
+    const pauseUntil = Number(status.pauseUntil);
+    if (Number.isFinite(pauseUntil) && pauseUntil > Date.now()) {
+        overlay.classList.add('xporter-capture-paused');
+        const renderPause = () => {
+            const remaining = Math.max(0, Math.ceil((pauseUntil - Date.now()) / 1000));
+            subtitleEl.textContent = `${i.rateLimited || 'X rate limit — retrying in'} ` +
+                `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+            if (remaining <= 0 && overlay._xporterPauseTicker) {
+                clearInterval(overlay._xporterPauseTicker);
+                overlay._xporterPauseTicker = null;
+            }
+        };
+        renderPause();
+        overlay._xporterPauseTicker = setInterval(renderPause, 1000);
+    } else {
+        overlay.classList.remove('xporter-capture-paused');
+        subtitleEl.textContent = status.phase || i.preparingPage || 'Preparing search page...';
+    }
 }
+
+// "Retry" button labels across the major X UI locales
+// (compared against trimmed, lowercased button text).
+const RETRY_BUTTON_LABELS = new Set([
+    'retry', 'try again',               // en
+    'повторить', 'повторить попытку',   // ru
+    'إعادة المحاولة',                    // ar
+    'erneut versuchen',                 // de
+    'reintentar', 'intentar de nuevo',  // es
+    'réessayer',                        // fr
+    'riprova',                          // it
+    'tentar novamente',                 // pt
+    'tekrar dene',                      // tr
+    'coba lagi',                        // id
+    'पुनः प्रयास करें',                    // hi
+    '再試行', '再試行する',               // ja
+    '다시 시도', '다시 시도하기',          // ko
+    '重试', '重試'                       // zh
+]);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'XPORTER_SEARCH_CAPTURE_STATUS') {
@@ -385,9 +578,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     if (message?.type === 'XPORTER_SCROLL_SEARCH_PAGE') {
         try {
-            const retryButton = Array.from(document.querySelectorAll('button, [role="button"]')).find((button) => {
+            // Scope to the timeline/main region when present so we never click
+            // unrelated buttons elsewhere on the page.
+            const scope = document.querySelector('main[role="main"]')
+                || document.querySelector('[data-testid="primaryColumn"]')
+                || document;
+            const retryButton = Array.from(scope.querySelectorAll('button, [role="button"]')).find((button) => {
                 const text = (button.textContent || '').trim().toLowerCase();
-                return text === 'retry' || text === 'try again' || text === 'повторить';
+                return RETRY_BUTTON_LABELS.has(text);
             });
             retryButton?.click();
 
