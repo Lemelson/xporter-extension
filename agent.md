@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.5**.
+> Last verified against the codebase at **v1.4.6** (2026-07-10).
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.5 (`manifest.json`) |
+| Version | 1.4.6 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
@@ -159,7 +159,9 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 | `ADAPTIVE_MIN_DELAY` / `_PAD` / `_HEADER_TTL` | `5000` / `2000` / `300000` | pacing floor / margin / budget freshness |
 | `FALLBACK_REQUEST_DELAYS` | mode-specific | header-less delay ranges (posts 4–5 s at Standard, followers 60 s, following/verified 5–10 s; speed preset scales the range) |
 | `SPEED_PRESETS` / `CUSTOM_SPEED_LIMITS` | turbo…turtle / clamp ranges | Export Speed presets: adaptive floor/pad, `budgetFraction`, `raceReserve`, fallback scale + batch rhythm; clamp ranges for the Custom tier (§4.4) |
-| `ENDPOINT_CACHE_TTL` | `1800000` | 30-min queryId cache |
+| `ENDPOINT_CACHE_TTL` | `86400000` | 24-h queryId cache (stale ids self-heal via `withStaleRetry`; a failed pass caches fallbacks for only 10 min) |
+| `API_FETCH_TIMEOUT` | `30000` | deadline per GraphQL/REST fetch (`fetchTimed`) |
+| `DISCOVERY_FETCH_TIMEOUT` / `DISCOVERY_TOTAL_TIMEOUT` | `15000` / `25000` | per-fetch / whole-pass discovery deadlines (single-flight; timed-out pass keeps scanning in background to refresh the cache) |
 | `TWEETS_PER_BATCH` | `50` | items per storage batch |
 | `FALLBACK_BEARER_TOKEN` | `AAAA…` | static public bearer |
 
@@ -168,7 +170,7 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 ### 4.2. `utils/api.js` + `utils/api-features.js` — X GraphQL Integration
 The most complex, most fragile area.
 
-- **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 30 min. Falls back to `FALLBACK_ENDPOINTS` (these go stale when X ships new bundles — update periodically).
+- **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 24 h (persisted; failed passes cache `FALLBACK_ENDPOINTS` for 10 min only). One scan at a time (single-flight), whole pass capped at `DISCOVERY_TOTAL_TIMEOUT`. `FALLBACK_ENDPOINTS` go stale when X ships new bundles — update periodically. On 401/403 a discovered bearer is reverted to the built-in public token (`noteAuthFailure`).
 - **Live queryId capture**: `content/interceptor.js` also captures real queryIds (and `SearchTimeline` bodies) from X's own traffic and forwards them to the SW, which is more reliable than scraping bundles.
 - **Feature flags** (`api-features.js`): `USER_FEATURES`, `TWEETS_FEATURES` (large!), `FOLLOWERS_FEATURES`. Missing/renamed flags → `400 Bad Request`. To fix: copy the live `features` object from a real x.com GraphQL request in DevTools.
 - **`withStaleRetry(key, fn)`**: catches `STALE_QUERY_ID`, forces re-discovery, retries once. Self-healing against X changes.
@@ -190,7 +192,7 @@ currentExport = {
 }
 ```
 
-**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT`, `GET_STATUS`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. Plus the `EXPORT_STATUS_UPDATE` broadcast SW→UI.
+**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT` (optional `extraItems` — "+N more" becomes a per-export `limitOverride` baked into the settings snapshot and persisted with the export state; the stored `quantityLimit` setting is NEVER modified by a resume), `GET_STATUS`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. Plus the `EXPORT_STATUS_UPDATE` broadcast SW→UI.
 
 **Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
 
@@ -285,6 +287,9 @@ Yellow filled bolt with a glow + occasional "lightbulb" flicker:
 ### 6.4. Theme System
 `dark` (default) / `light` via a `.light` class on `<body>`. All colours are CSS custom properties. `theme-init.js` (inline, loaded first) applies the saved theme before CSS to prevent FOUC — **don't remove it**.
 
+### 6.5. Toolbar Badge (service worker)
+The popup closes on any outside click, so a running export was invisible — churn rows showed users start an export, lose the popup and uninstall minutes later thinking nothing happened. `updateBadgeForStatus()` in `background/service-worker.js` (called from `broadcastStatus`) keeps the export alive on the toolbar icon: live item count while running (blue), `✓` complete (green), `!` terminal error (red), `II` stopped (yellow). Transient retry errors (`retryIn` set) do **not** show `!`. A terminal badge is cleared once any UI actually renders the final state (`GET_STATUS` returning `running:false`) or on `CLEAR_EXPORT`.
+
 ---
 
 ## 7. Common Errors
@@ -298,6 +303,7 @@ Yellow filled bolt with a glow + occasional "lightbulb" flicker:
 | `STALE_QUERY_ID` | 400/404 (queryId changed) | re-discover + retry |
 | `AUTH_ERROR` | 401/403 | re-auth |
 | `ENDPOINT_DISCOVERY_FAILED` | can't reach x.com | surface to user |
+| `NETWORK_TIMEOUT` | a fetch hit its deadline (`fetchTimed` in `utils/api.js`; per-request 30s, discovery 15s/fetch + 25s total cap) | retried like a network error |
 | `MAX_RETRIES_EXCEEDED` | gave up | error message |
 | `ABORTED` | user stopped | save state for resume |
 | `STORAGE_FULL` | a batch write failed (quota) | export aborts loudly; collected data stays downloadable |

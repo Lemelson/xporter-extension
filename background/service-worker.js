@@ -310,8 +310,13 @@ async function handleMessage(message, sender) {
         case 'STOP_EXPORT':
             return stopExport();
 
-        case 'GET_STATUS':
-            return await getExportStatus();
+        case 'GET_STATUS': {
+            const exportStatus = await getExportStatus();
+            // A UI is now showing this state — a lingering terminal badge
+            // (✓ / ! / II) has done its job and would only go stale.
+            if (!exportStatus?.running) setBadge('');
+            return exportStatus;
+        }
 
         case 'DOWNLOAD_CSV':
         case 'DOWNLOAD_EXPORT':
@@ -321,7 +326,7 @@ async function handleMessage(message, sender) {
             return await downloadHistoryEntry(message.id, message.outputFormat);
 
         case 'RESUME_EXPORT':
-            return await resumeExport();
+            return await resumeExport(message.extraItems);
 
         case 'SAVE_SETTINGS':
             if (!await XPorterStorage.saveSettings(message.settings)) {
@@ -342,6 +347,7 @@ async function handleMessage(message, sender) {
             }
             await XPorterStorage.clearExportState();
             currentExport = null;
+            setBadge('');
             return { success: true };
 
         case 'DISCOVERED_QUERYID':
@@ -511,7 +517,18 @@ async function runExportLoop() {
 
         let userInfo;
         try {
-            userInfo = await XPorterAPI.getUserByScreenName(currentExport.username);
+            // Resolve through the rate limiter: a NETWORK_TIMEOUT or 429 here
+            // gets the same visible retries as any page fetch, and Stop aborts
+            // the retry wait instead of racing the in-flight request. Terminal
+            // errors (NOT_LOGGED_IN etc.) pass through non-retried as before.
+            userInfo = await rateLimiter.executeWithRateLimit(() =>
+                XPorterAPI.getUserByScreenName(currentExport.username));
+            // The resolve hits a separate, generous endpoint budget — don't
+            // let it count as request #1, or the first real page would sit
+            // out a pacing delay before any result appears.
+            rateLimiter.requestCount = 0;
+            rateLimiter.totalRequests = 0;
+            rateLimiter.lastRequestAt = null;
         } catch (err) {
             if (err.message === 'NOT_LOGGED_IN') throw new Error('NOT_LOGGED_IN');
             if (err.message === 'USER_NOT_FOUND') throw new Error('USER_NOT_FOUND');
@@ -1358,26 +1375,40 @@ async function stopExport() {
     return { success: true };
 }
 
-async function resumeExport() {
+async function resumeExport(extraItems) {
     await waitForLoopUnwind();
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
         return { error: 'ALREADY_RUNNING' };
     }
     exportStarting = true;
     try {
-        return await _resumeExportInner();
+        return await _resumeExportInner(extraItems);
     } finally {
         exportStarting = false;
     }
 }
 
-async function _resumeExportInner() {
+async function _resumeExportInner(extraItems) {
     const savedState = await XPorterStorage.loadExportState();
     if (!savedState) {
         return { error: 'No export to resume' };
     }
 
     const settings = await XPorterStorage.loadSettings();
+
+    // "+N more" resumes raise the limit for THIS export only, by overriding
+    // the per-export settings snapshot — the stored quantityLimit setting is
+    // never touched. (The popup used to SAVE_SETTINGS the bumped value, which
+    // permanently rewrote the user's configured limit on every resume.)
+    // The override persists with the export state so it survives a SW death.
+    const extra = parseInt(extraItems, 10);
+    let limitOverride = savedState.limitOverride || 0;
+    if (Number.isFinite(extra) && extra > 0) {
+        limitOverride = (savedState.tweetCount || 0) + extra;
+    }
+    if (limitOverride > 0) {
+        settings.quantityLimit = limitOverride;
+    }
 
     rateLimiter = createRateLimiter(settings, savedState.exportMode || 'posts');
     lastTransientStatus = null;
@@ -1406,7 +1437,8 @@ async function _resumeExportInner() {
         userInfo: savedState.userInfo,
         cursor: savedState.cursor,
         startedAt: savedState.startedAt,
-        status: 'fetching'
+        status: 'fetching',
+        limitOverride: limitOverride || 0
     };
 
     launchExportLoop('Resume export error:');
@@ -1674,6 +1706,7 @@ async function saveCurrentState() {
         startedAt: currentExport.startedAt,
         completedAt: currentExport.completedAt,
         running: currentExport.running,
+        limitOverride: currentExport.limitOverride || 0,
         rateLimiterState: rateLimiter?.getState() || null
     });
 }
@@ -1712,8 +1745,57 @@ async function swSleep(ms) {
     }
 }
 
+// ==================== Toolbar badge ====================
+// The popup closes on any outside click, and churn rows show people start an
+// export, lose the popup, see no sign of life and uninstall minutes later.
+// The badge keeps the export visibly alive on the toolbar icon: live item
+// count while running, ✓ / ! / II when it ends. A terminal badge is cleared
+// as soon as a UI shows the final state (GET_STATUS with running:false).
+const BADGE_COLORS = { run: '#1d9bf0', ok: '#00ba7c', err: '#f4212e', stop: '#e2b203' };
+
+function formatBadgeCount(n) {
+    if (!Number.isFinite(n) || n <= 0) return '';
+    if (n < 1000) return String(n);
+    if (n < 10000) return (Math.floor(n / 100) / 10) + 'k'; // 1.2k
+    return Math.floor(n / 1000) + 'k';                      // 12k (badge fits 4 chars)
+}
+
+function setBadge(text, color) {
+    try {
+        chrome.action.setBadgeText({ text });
+        if (color) chrome.action.setBadgeBackgroundColor({ color });
+    } catch (_) { /* badge is best-effort */ }
+}
+
+function updateBadgeForStatus(event) {
+    switch (event.status) {
+        case 'resolving_user':
+            setBadge('…', BADGE_COLORS.run);
+            break;
+        case 'fetching':
+        case 'cooldown':
+        case 'retrying':
+            setBadge(formatBadgeCount(currentExport?.tweetCount) || '…', BADGE_COLORS.run);
+            break;
+        case 'error':
+            // Transient retry errors (retryIn set, still running) keep the
+            // running badge — only a dead export earns the red mark.
+            if (event.running === false) {
+                setBadge('!', BADGE_COLORS.err);
+            }
+            break;
+        case 'complete':
+            setBadge('✓', BADGE_COLORS.ok);
+            break;
+        case 'stopped':
+            setBadge('II', BADGE_COLORS.stop);
+            break;
+    }
+}
+
 function broadcastStatus(event) {
     if (!chrome.runtime?.id) return;
+    updateBadgeForStatus(event);
     chrome.runtime.sendMessage({
         type: 'EXPORT_STATUS_UPDATE',
         exportMode: currentExport?.exportMode,
@@ -1735,6 +1817,17 @@ function launchExportLoop(logPrefix) {
             // older loop. The loop guard normally prevents that replacement;
             // this identity check is the final safety net.
             if (!currentExport || currentExport !== exportInstance) return;
+
+            // The user already pressed Stop — a late failure from the aborted
+            // in-flight request must land as the 'stopped' they asked for,
+            // not overwrite it with a scary terminal error.
+            if (rateLimiter?._aborted && currentExport.running === false) {
+                currentExport.status = 'stopped';
+                await saveCurrentState();
+                recordExportStoppedOnce();
+                broadcastStopped();
+                return;
+            }
 
             currentExport.running = false;
             currentExport.status = 'error';
@@ -1786,6 +1879,11 @@ chrome.runtime.onStartup.addListener(async () => {
         state.running = false;
         state.status = 'stopped';
         await XPorterStorage.saveExportState(state);
+        // The pre-restart badge still shows a live count — reflect reality:
+        // the export survived as a resumable 'stopped', not as running.
+        setBadge('II', BADGE_COLORS.stop);
+    } else {
+        setBadge(''); // don't carry a stale badge into a fresh session
     }
 
     // Pre-discover endpoints in background so first export is fast

@@ -739,16 +739,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Resume ====================
     resumeBtn.addEventListener('click', async () => {
         const extraPosts = parseInt(resumeQuantity.value) || 100;
-        const currentCount = lastItemCount || 0;
-        const newLimit = currentCount + extraPosts;
 
-        currentSettings.quantityLimit = newLimit;
-        await sendMessage({
-            type: 'SAVE_SETTINGS',
-            settings: { quantityLimit: newLimit }
-        });
-
-        const result = await sendMessage({ type: 'RESUME_EXPORT' });
+        // "+N more" applies to THIS export only (the SW turns it into a
+        // per-export limit override). It used to be written into the saved
+        // quantityLimit setting, permanently rewriting the user's configured
+        // limit on every resume.
+        const result = await sendMessage({ type: 'RESUME_EXPORT', extraItems: extraPosts });
         if (result?.error) {
             showToast(formatError(result.error, t), 'error');
             return;
@@ -898,9 +894,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     setDotColor('red');
                     // A dead rate-limited export reads as "waiting..." forever —
                     // tell the user the truth: progress is saved, come back and Resume.
-                    statusMessage.textContent = (state.error === 'RATE_LIMITED' && state.canResume)
-                        ? t('rateLimitedResumeHint')
-                        : formatError(state.error, t);
+                    if (state.error === 'NOT_LOGGED_IN') {
+                        // Dead-end text loses first-run users — give them the
+                        // actual login link (same strings the export page's
+                        // auth screen uses, present in all locales).
+                        statusMessage.textContent = '';
+                        statusMessage.append(`${t('authWarning')} `);
+                        const loginLink = document.createElement('a');
+                        loginLink.href = 'https://x.com/login';
+                        loginLink.target = '_blank';
+                        loginLink.textContent = t('authLink');
+                        statusMessage.append(loginLink);
+                        const suffix = t('authSuffix');
+                        statusMessage.append(`${suffix ? ' ' + suffix : ''}, ${t('thenTryAgain')}`);
+                    } else {
+                        statusMessage.textContent = (state.error === 'RATE_LIMITED' && state.canResume)
+                            ? t('rateLimitedResumeHint')
+                            : formatError(state.error, t);
+                    }
                 }
                 setMeasuredProgress();
                 break;

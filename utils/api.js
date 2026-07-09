@@ -4,8 +4,9 @@
 
 // Bearer token — dynamically extracted, falls back to config constant
 const _C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
-let activeBearerToken = _C.FALLBACK_BEARER_TOKEN
+const DEFAULT_BEARER_TOKEN = _C.FALLBACK_BEARER_TOKEN
   || 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+let activeBearerToken = DEFAULT_BEARER_TOKEN;
 
 // Hardcoded queryIds as fallback — extracted from X.com JS bundles (Feb 2026)
 const FALLBACK_ENDPOINTS = {
@@ -39,6 +40,15 @@ const FALLBACK_ENDPOINTS = {
 let discoveredEndpoints = null;
 let endpointsCacheTime = 0;
 const ENDPOINTS_CACHE_TTL = _C.ENDPOINT_CACHE_TTL || (30 * 60 * 1000);
+// A failed pass caches FALLBACK_ENDPOINTS — but only briefly. Caching a
+// failure for the full TTL would suppress re-discovery for a day after one
+// network blip.
+const FALLBACK_CACHE_TTL = 10 * 60 * 1000;
+// Effective TTL of whatever is cached right now (full for discovered data,
+// short for the fallback stand-in).
+let endpointsCacheTtl = ENDPOINTS_CACHE_TTL;
+// The one bundle scan currently running, if any (single-flight guard).
+let _discoveryInFlight = null;
 
 // Persist discovered endpoints across MV3 service-worker restarts.
 // The in-memory cache above is wiped every time the worker sleeps, which made
@@ -68,6 +78,7 @@ async function _hydrateEndpoints() {
       if (cached?.endpoints && (Date.now() - (cached.time || 0)) < ENDPOINTS_CACHE_TTL) {
         discoveredEndpoints = cached.endpoints;
         endpointsCacheTime = cached.time || 0;
+        endpointsCacheTtl = ENDPOINTS_CACHE_TTL; // only successful passes are persisted
         if (cached.bearer) activeBearerToken = cached.bearer;
         XLog.log('Endpoints hydrated from storage cache');
         return true;
@@ -79,6 +90,50 @@ async function _hydrateEndpoints() {
 
 // Live queryIds captured from X.com's own network traffic (highest priority)
 const liveQueryIds = {};
+
+// A discovered bearer can rotate while the session cookies stay valid.
+// Reverting to the long-lived public token is free (no bundle re-scan) and
+// un-wedges the next attempt when the stale bearer was the real cause of a
+// 401/403. Persist so a worker restart doesn't re-hydrate the bad token.
+function noteAuthFailure() {
+  if (activeBearerToken !== DEFAULT_BEARER_TOKEN) {
+    XLog.warn('AUTH_ERROR with a discovered bearer — reverting to the built-in public token');
+    activeBearerToken = DEFAULT_BEARER_TOKEN;
+    _persistEndpoints();
+  }
+}
+
+// ==================== Timed fetch ====================
+// Every network call must have a deadline: a fetch that never settles leaves
+// the export stuck on "Resolving user…" with no error, no retry and no
+// feedback — the single worst first-run experience (visible in churn data as
+// exp_started=1, exp_err=0, items=0). Timeouts convert a hang into
+// NETWORK_TIMEOUT, which the rate limiter retries visibly.
+async function fetchTimed(url, options = {}, timeoutMs) {
+  const ms = timeoutMs || _C.API_FETCH_TIMEOUT || 30000;
+  try {
+    return await fetch(url, { ...options, signal: AbortSignal.timeout(ms) });
+  } catch (err) {
+    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error('NETWORK_TIMEOUT');
+    }
+    throw err;
+  }
+}
+
+// A body read shares fetchTimed's abort signal, so it can hit the same
+// deadline after the headers already arrived — normalize it the same way,
+// or the raw TimeoutError would bypass the retry path and churn stats.
+async function readJsonTimed(response) {
+  try {
+    return await response.json();
+  } catch (err) {
+    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error('NETWORK_TIMEOUT');
+    }
+    throw err;
+  }
+}
 
 // ==================== Rate-limit budget tracking ====================
 // X reports a separate quota for each endpoint via x-rate-limit-* headers.
@@ -133,144 +188,170 @@ async function discoverEndpoints(forceRefresh = false) {
   }
 
   // Return cached if still valid (unless explicitly forcing a refresh)
-  if (!forceRefresh && discoveredEndpoints && (Date.now() - endpointsCacheTime) < ENDPOINTS_CACHE_TTL) {
+  if (!forceRefresh && discoveredEndpoints && (Date.now() - endpointsCacheTime) < endpointsCacheTtl) {
     return discoveredEndpoints;
   }
 
   XLog.log('Discovering GraphQL endpoints...');
 
+  // Cap the whole pass: scanning several multi-MB bundles on a slow
+  // connection can take minutes while the user stares at "Resolving user…".
+  // On timeout we fall back to the known queryIds; the still-running scan is
+  // left to finish and refresh the cache for the next call. Single-flight:
+  // concurrent callers (e.g. withStaleRetry forcing a refresh while a
+  // timed-out pass is still scanning) share one scan instead of stacking
+  // multi-MB downloads onto an already slow connection.
+  let timeoutId = null;
   try {
-    // Fetch X's main page to find JS bundle URLs
-    const mainPageResponse = await fetch('https://x.com', {
-      credentials: 'include',
-      headers: { 'User-Agent': navigator.userAgent }
-    });
-    const mainPageHtml = await mainPageResponse.text();
-
-    // Find JS bundle URLs
-    const scriptUrls = [];
-    const scriptRegex = /src="(https:\/\/abs\.twimg\.com\/responsive-web\/client-web[^"]*\.js)"/g;
-    let match;
-    while ((match = scriptRegex.exec(mainPageHtml)) !== null) {
-      scriptUrls.push(match[1]);
+    const totalMs = _C.DISCOVERY_TOTAL_TIMEOUT || 25000;
+    if (!_discoveryInFlight) {
+      _discoveryInFlight = _discoverEndpointsInner().finally(() => { _discoveryInFlight = null; });
+      _discoveryInFlight.catch(() => { /* stays handled even if every waiter times out first */ });
     }
-
-    XLog.log(`Found ${scriptUrls.length} JS bundles to scan`);
-
-    if (scriptUrls.length === 0) {
-      throw new Error('No JS bundles found');
-    }
-
-    const targetOperations = ['UserByScreenName', 'UserTweets', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
-    const found = {};
-    let discoveredBearer = null;
-
-    for (const url of scriptUrls) {
-      if (targetOperations.every(op => found[op]) && discoveredBearer) break;
-
-      try {
-        const jsResponse = await fetch(url);
-        const jsText = await jsResponse.text();
-
-        // Search for bearer token (pattern: "AAAAAAA..." — 100+ chars, URL-safe base64)
-        if (!discoveredBearer) {
-          const bearerMatch = jsText.match(/"(AAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,})"/)
-            || jsText.match(/Bearer\s+(AAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,})/);
-          if (bearerMatch) {
-            discoveredBearer = bearerMatch[1];
-            XLog.log('Dynamically extracted bearer token');
-          }
-        }
-
-        // Batch approach: find ALL queryId/operationName pairs in one pass
-        // X bundles endpoints in various formats, so we scan for all pairs at once
-        const batchPatterns = [
-          /queryId:"([^"]+)",operationName:"([^"]+)"/g,
-          /\{queryId:"([^"]+)",operationName:"([^"]+)"/g,
-          /operationName:"([^"]+)"[^}]{0,50}queryId:"([^"]+)"/g
-        ];
-
-        for (const pattern of batchPatterns) {
-          let m;
-          while ((m = pattern.exec(jsText)) !== null) {
-            let qId, opName;
-            // Different patterns capture in different order
-            if (pattern.source.startsWith('operationName')) {
-              opName = m[1]; qId = m[2];
-            } else {
-              qId = m[1]; opName = m[2];
-            }
-            if (targetOperations.includes(opName) && !found[opName]) {
-              found[opName] = qId;
-              XLog.log(`Found ${opName} queryId: ${qId}`);
-            }
-          }
-        }
-
-        // Fallback: also try individual per-operation patterns for any still-missing
-        for (const opName of targetOperations) {
-          if (found[opName]) continue;
-          const fallbackPatterns = [
-            new RegExp(`queryId:"([^"]+)"[^}]{0,300}operationName:"${opName}"`),
-            new RegExp(`"${opName}"[^}]{0,300}queryId:"([^"]+)"`)
-          ];
-          for (const p of fallbackPatterns) {
-            const fm = p.exec(jsText);
-            if (fm) {
-              found[opName] = fm[1];
-              XLog.log(`Found ${opName} queryId (fallback): ${fm[1]}`);
-              break;
-            }
-          }
-        }
-      } catch (e) {
-        XLog.warn(`Error scanning bundle ${url}:`, e.message);
-      }
-    }
-
-    // Update bearer token if dynamically extracted
-    if (discoveredBearer) {
-      activeBearerToken = discoveredBearer;
-    }
-
-    if (found.UserByScreenName && found.UserTweets) {
-      // Log discovery results for debugging
-      for (const op of targetOperations) {
-        if (found[op]) {
-          XLog.log(`✓ ${op}: discovered queryId = ${found[op]}`);
-        } else {
-          XLog.warn(`✗ ${op}: NOT found in bundles, using fallback = ${FALLBACK_ENDPOINTS[op]?.queryId || 'none'}`);
-        }
-      }
-      discoveredEndpoints = {
-        UserByScreenName: { queryId: found.UserByScreenName, operationName: 'UserByScreenName' },
-        UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' },
-        SearchTimeline: found.SearchTimeline
-          ? { queryId: found.SearchTimeline, operationName: 'SearchTimeline' }
-          : FALLBACK_ENDPOINTS.SearchTimeline,
-        Followers: found.Followers
-          ? { queryId: found.Followers, operationName: 'Followers' }
-          : FALLBACK_ENDPOINTS.Followers,
-        Following: found.Following
-          ? { queryId: found.Following, operationName: 'Following' }
-          : FALLBACK_ENDPOINTS.Following,
-        BlueVerifiedFollowers: found.BlueVerifiedFollowers
-          ? { queryId: found.BlueVerifiedFollowers, operationName: 'BlueVerifiedFollowers' }
-          : FALLBACK_ENDPOINTS.BlueVerifiedFollowers
-      };
-      endpointsCacheTime = Date.now();
-      XLog.log('Endpoints discovered successfully');
-      await _persistEndpoints();
-      return discoveredEndpoints;
-    }
-
-    throw new Error(`Missing queryIds: ${targetOperations.filter(op => !found[op]).join(', ')}`);
+    return await Promise.race([
+      _discoveryInFlight,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('DISCOVERY_TIMEOUT')), totalMs);
+      })
+    ]);
   } catch (error) {
     XLog.warn('Discovery failed, using fallback endpoints:', error.message);
     discoveredEndpoints = { ...FALLBACK_ENDPOINTS };
     endpointsCacheTime = Date.now();
+    endpointsCacheTtl = FALLBACK_CACHE_TTL;
+    return discoveredEndpoints;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function _discoverEndpointsInner() {
+  // Fetch X's main page to find JS bundle URLs
+  const mainPageResponse = await fetchTimed('https://x.com', {
+    credentials: 'include',
+    headers: { 'User-Agent': navigator.userAgent }
+  }, _C.DISCOVERY_FETCH_TIMEOUT || 15000);
+  const mainPageHtml = await mainPageResponse.text();
+
+  // Find JS bundle URLs
+  const scriptUrls = [];
+  const scriptRegex = /src="(https:\/\/abs\.twimg\.com\/responsive-web\/client-web[^"]*\.js)"/g;
+  let match;
+  while ((match = scriptRegex.exec(mainPageHtml)) !== null) {
+    scriptUrls.push(match[1]);
+  }
+
+  XLog.log(`Found ${scriptUrls.length} JS bundles to scan`);
+
+  if (scriptUrls.length === 0) {
+    throw new Error('No JS bundles found');
+  }
+
+  const targetOperations = ['UserByScreenName', 'UserTweets', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
+  const found = {};
+  let discoveredBearer = null;
+
+  for (const url of scriptUrls) {
+    if (targetOperations.every(op => found[op]) && discoveredBearer) break;
+
+    try {
+      const jsResponse = await fetchTimed(url, {}, _C.DISCOVERY_FETCH_TIMEOUT || 15000);
+      const jsText = await jsResponse.text();
+
+      // Search for bearer token (pattern: "AAAAAAA..." — 100+ chars, URL-safe base64)
+      if (!discoveredBearer) {
+        const bearerMatch = jsText.match(/"(AAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,})"/)
+          || jsText.match(/Bearer\s+(AAAAAAAAAAAAAAAAAAA[A-Za-z0-9%]{80,})/);
+        if (bearerMatch) {
+          discoveredBearer = bearerMatch[1];
+          XLog.log('Dynamically extracted bearer token');
+        }
+      }
+
+      // Batch approach: find ALL queryId/operationName pairs in one pass
+      // X bundles endpoints in various formats, so we scan for all pairs at once
+      const batchPatterns = [
+        /queryId:"([^"]+)",operationName:"([^"]+)"/g,
+        /\{queryId:"([^"]+)",operationName:"([^"]+)"/g,
+        /operationName:"([^"]+)"[^}]{0,50}queryId:"([^"]+)"/g
+      ];
+
+      for (const pattern of batchPatterns) {
+        let m;
+        while ((m = pattern.exec(jsText)) !== null) {
+          let qId, opName;
+          // Different patterns capture in different order
+          if (pattern.source.startsWith('operationName')) {
+            opName = m[1]; qId = m[2];
+          } else {
+            qId = m[1]; opName = m[2];
+          }
+          if (targetOperations.includes(opName) && !found[opName]) {
+            found[opName] = qId;
+            XLog.log(`Found ${opName} queryId: ${qId}`);
+          }
+        }
+      }
+
+      // Fallback: also try individual per-operation patterns for any still-missing
+      for (const opName of targetOperations) {
+        if (found[opName]) continue;
+        const fallbackPatterns = [
+          new RegExp(`queryId:"([^"]+)"[^}]{0,300}operationName:"${opName}"`),
+          new RegExp(`"${opName}"[^}]{0,300}queryId:"([^"]+)"`)
+        ];
+        for (const p of fallbackPatterns) {
+          const fm = p.exec(jsText);
+          if (fm) {
+            found[opName] = fm[1];
+            XLog.log(`Found ${opName} queryId (fallback): ${fm[1]}`);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      XLog.warn(`Error scanning bundle ${url}:`, e.message);
+    }
+  }
+
+  // Update bearer token if dynamically extracted
+  if (discoveredBearer) {
+    activeBearerToken = discoveredBearer;
+  }
+
+  if (found.UserByScreenName && found.UserTweets) {
+    // Log discovery results for debugging
+    for (const op of targetOperations) {
+      if (found[op]) {
+        XLog.log(`✓ ${op}: discovered queryId = ${found[op]}`);
+      } else {
+        XLog.warn(`✗ ${op}: NOT found in bundles, using fallback = ${FALLBACK_ENDPOINTS[op]?.queryId || 'none'}`);
+      }
+    }
+    discoveredEndpoints = {
+      UserByScreenName: { queryId: found.UserByScreenName, operationName: 'UserByScreenName' },
+      UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' },
+      SearchTimeline: found.SearchTimeline
+        ? { queryId: found.SearchTimeline, operationName: 'SearchTimeline' }
+        : FALLBACK_ENDPOINTS.SearchTimeline,
+      Followers: found.Followers
+        ? { queryId: found.Followers, operationName: 'Followers' }
+        : FALLBACK_ENDPOINTS.Followers,
+      Following: found.Following
+        ? { queryId: found.Following, operationName: 'Following' }
+        : FALLBACK_ENDPOINTS.Following,
+      BlueVerifiedFollowers: found.BlueVerifiedFollowers
+        ? { queryId: found.BlueVerifiedFollowers, operationName: 'BlueVerifiedFollowers' }
+        : FALLBACK_ENDPOINTS.BlueVerifiedFollowers
+    };
+    endpointsCacheTime = Date.now();
+    endpointsCacheTtl = ENDPOINTS_CACHE_TTL; // real data → full lifetime again
+    XLog.log('Endpoints discovered successfully');
+    await _persistEndpoints();
     return discoveredEndpoints;
   }
+
+  throw new Error(`Missing queryIds: ${targetOperations.filter(op => !found[op]).join(', ')}`);
 }
 
 // ==================== Auth ====================
@@ -310,7 +391,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     url += `&fieldToggles=${encodeURIComponent(JSON.stringify(fieldToggles))}`;
   }
 
-  const response = await fetch(url, {
+  const response = await fetchTimed(url, {
     method: 'GET',
     headers: {
       'authorization': `Bearer ${activeBearerToken}`,
@@ -331,6 +412,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
   }
 
   if (response.status === 401 || response.status === 403) {
+    noteAuthFailure();
     throw new Error('AUTH_ERROR');
   }
 
@@ -349,7 +431,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     throw new Error(`API_ERROR_${response.status}`);
   }
 
-  const jsonData = await response.json();
+  const jsonData = await readJsonTimed(response);
 
   if (jsonData.errors) {
     XLog.error(`GraphQL errors for ${endpoint.operationName}:`, JSON.stringify(jsonData.errors).substring(0, 300));
@@ -493,7 +575,7 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
 
   XLog.log(`[REST] Fetching Followers via v1.1 API (cursor: ${cursor || 'initial'})`);
 
-  const response = await fetch(url, {
+  const response = await fetchTimed(url, {
     method: 'GET',
     headers: {
       'authorization': `Bearer ${activeBearerToken}`,
@@ -511,6 +593,7 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
     throw new Error('RATE_LIMITED');
   }
   if (response.status === 401 || response.status === 403) {
+    noteAuthFailure();
     throw new Error('AUTH_ERROR');
   }
   if (!response.ok) {
@@ -519,7 +602,7 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
     throw new Error(`API_ERROR_${response.status}`);
   }
 
-  const data = await response.json();
+  const data = await readJsonTimed(response);
 
   // Parse REST v1.1 response into the same format used by GraphQL
   const users = (data.users || []).map(u => ({
