@@ -75,7 +75,9 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'errHistoryDataGone',
         'STORAGE_FULL': 'errStorageFull',
         'DOWNLOAD_FAILED': 'errDownloadFailed',
-        'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture'
+        'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture',
+        // Timed-out fetch — same user guidance as a failed connection
+        'NETWORK_TIMEOUT': 'errEndpointFailed'
     };
 
     // English fallbacks for when no i18n `t` function is available
@@ -98,6 +100,7 @@ function formatError(error, t) {
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
         'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results — keep the search tab open and press Resume to try again',
+        'NETWORK_TIMEOUT': 'Could not connect to X API — make sure x.com is accessible',
         'TIMEOUT': 'No response from the extension — please try again',
         'MESSAGING_ERROR': 'Could not reach the extension — please try again'
     };

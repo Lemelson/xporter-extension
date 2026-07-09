@@ -1791,6 +1791,16 @@ body.light .help-pop {
   color: var(--text-secondary);
 }
 
+/* Inline link inside a status message (e.g. "log in to X" on auth errors) */
+#statusMessage a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+#statusMessage a:hover {
+  color: var(--accent-hover);
+}
+
 .status-indicator,
 .status-dot {
   width: 8px;
