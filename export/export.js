@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const dateTo = document.getElementById('dateTo');
     const includeRetweets = document.getElementById('includeRetweets');
     const includeReplies = document.getElementById('includeReplies');
+    const includeArticles = document.getElementById('includeArticles');
     const quantityLimit = document.getElementById('quantityLimit');
     const exportSpeed = document.getElementById('exportSpeed');
     const customSpeedRows = document.getElementById('customSpeedRows');
@@ -201,6 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Apply settings to controls
     includeRetweets.checked = settings.includeRetweets !== false;
     includeReplies.checked = settings.includeReplies !== false;
+    includeArticles.checked = settings.includeArticles !== false;
     const savedQuantityLimit = parseInt(settings.quantityLimit, 10) || 0;
     if (savedQuantityLimit > 0) ensureQuantityOption(savedQuantityLimit);
     quantityLimit.value = String(savedQuantityLimit);
@@ -253,6 +255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nextSettings = {
             includeRetweets: includeRetweets.checked,
             includeReplies: includeReplies.checked,
+            includeArticles: includeArticles.checked,
             requestDelay: 3000,
             exportSpeed: exportSpeed.value || 'standard',
             customDelaySec: clampNumberInput(customDelaySec, 5),
@@ -290,7 +293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
     });
 
-    [includeRetweets, includeReplies, quantityLimit, exportSpeed,
+    [includeRetweets, includeReplies, includeArticles, quantityLimit, exportSpeed,
         customDelaySec, customCooldownMin, customBatchSize].forEach(el => {
         el.addEventListener('change', saveSettings);
     });
@@ -304,6 +307,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => {
                 usernameInput.parentElement.style.borderColor = '';
             }, 2000);
+            // A silent red flash left first-time users stranded (churn
+            // rows: opened popup, never started an export). Say what to do.
+            showToast(t('errEnterUsername'), 'error');
             return;
         }
 
@@ -506,7 +512,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     statusDot.className = 'status-dot red';
                     statusMsg.textContent = `${formatError(state.error, t)} — ${t('retryIn')} ${Math.round(state.retryIn / 1000)}s`;
                 } else {
-                    const errorMsg = formatError(state.error, t);
+                    // A dead rate-limited export reads as "waiting..." forever —
+                    // tell the user the truth: progress is saved, come back and Resume.
+                    const errorMsg = (state.error === 'RATE_LIMITED' && state.canResume)
+                        ? t('rateLimitedResumeHint')
+                        : formatError(state.error, t);
                     if (state.error === 'NOT_LOGGED_IN') {
                         showState('auth');
                     } else {

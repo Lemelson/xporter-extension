@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Settings elements
     const includeRetweets = document.getElementById('includeRetweets');
     const includeReplies = document.getElementById('includeReplies');
+    const includeArticles = document.getElementById('includeArticles');
     const quantityLimit = document.getElementById('quantityLimit');
     const exportSpeed = document.getElementById('exportSpeed');
     const customSpeedRows = document.getElementById('customSpeedRows');
@@ -442,6 +443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentSettings) {
         includeRetweets.checked = currentSettings.includeRetweets !== false;
         includeReplies.checked = currentSettings.includeReplies !== false;
+        includeArticles.checked = currentSettings.includeArticles !== false;
         const savedLimit = currentSettings.quantityLimit ?? 500;
         const presetValues = ['0', '100', '500', '1000', '5000', '10000'];
         if (presetValues.includes(String(savedLimit))) {
@@ -514,6 +516,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nextSettings = {
             includeRetweets: includeRetweets.checked,
             includeReplies: includeReplies.checked,
+            includeArticles: includeArticles.checked,
             quantityLimit: qLimit,
             requestDelay: 3000,
             exportSpeed: exportSpeed.value || 'standard',
@@ -552,7 +555,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
     });
 
-    [includeRetweets, includeReplies, quantityLimit, exportSpeed, customQuantity, autoExpireHours,
+    [includeRetweets, includeReplies, includeArticles, quantityLimit, exportSpeed, customQuantity, autoExpireHours,
         customDelaySec, customCooldownMin, customBatchSize].forEach(el => {
         el.addEventListener('change', saveSettingsDebounced);
     });
@@ -660,6 +663,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 usernameInput.focus();
                 usernameInput.style.borderColor = 'var(--danger)';
                 setTimeout(() => usernameInput.style.borderColor = '', 2000);
+                // A silent red flash left first-time users stranded (churn
+                // rows: opened popup, never started an export). Say what to do.
+                showToast(t('errEnterUsername'), 'error');
                 return;
             }
 
@@ -890,7 +896,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     statusText.textContent = `${t('errorTitle')}: ${formatError(state.error, t)}`;
                     setDotColor('red');
-                    statusMessage.textContent = formatError(state.error, t);
+                    // A dead rate-limited export reads as "waiting..." forever —
+                    // tell the user the truth: progress is saved, come back and Resume.
+                    statusMessage.textContent = (state.error === 'RATE_LIMITED' && state.canResume)
+                        ? t('rateLimitedResumeHint')
+                        : formatError(state.error, t);
                 }
                 setMeasuredProgress();
                 break;
@@ -953,6 +963,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const history = result?.history || [];
         renderHistory(history);
     }
+
+    // Seen-posts dataset — same collapsible pattern as the history above.
+    const feedDbToggle = document.getElementById('feedDbToggle');
+    const feedDbChevron = document.getElementById('feedDbChevron');
+    const feedDbBody = document.getElementById('feedDbBody');
+
+    feedDbToggle?.addEventListener('click', () => {
+        const isOpen = !feedDbBody.classList.contains('hidden');
+        feedDbBody.classList.toggle('hidden');
+        feedDbChevron.classList.toggle('open');
+        feedDbToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    });
 
     function renderHistory(history) {
         // Clear existing cards (preserve empty placeholder)

@@ -357,6 +357,49 @@ async function run() {
         'legacy numeric history IDs must remain deletable after DOM string conversion'
     );
 
+    const now = Date.now();
+    storageData.xporter_export_history = [
+        {
+            id: 'old',
+            completedAt: now - (5 * 60 * 60 * 1000),
+            hasData: true,
+            items: [{ id: 'old-post' }]
+        },
+        {
+            id: 'fresh',
+            completedAt: now - (30 * 60 * 1000),
+            hasData: true,
+            items: [{ id: 'fresh-post' }]
+        }
+    ];
+    await XPorterStorage.pruneExpiredExportHistory({ autoExpireEnabled: true, autoExpireHours: 4 }, now);
+    assert.equal(
+        storageData.xporter_export_history[0].items,
+        undefined,
+        'expired history entries must drop their saved export payload'
+    );
+    assert.equal(storageData.xporter_export_history[0].hasData, false);
+    assert.deepEqual(
+        storageData.xporter_export_history[1].items,
+        [{ id: 'fresh-post' }],
+        'fresh history entries must remain downloadable'
+    );
+
+    storageData.xporter_export_history = [
+        {
+            id: 'disabled',
+            completedAt: now - (5 * 60 * 60 * 1000),
+            hasData: true,
+            items: [{ id: 'kept-post' }]
+        }
+    ];
+    await XPorterStorage.pruneExpiredExportHistory({ autoExpireEnabled: false, autoExpireHours: 4 }, now);
+    assert.deepEqual(
+        storageData.xporter_export_history[0].items,
+        [{ id: 'kept-post' }],
+        'disabled auto-expire must keep history payloads'
+    );
+
     console.log('Rate-limit tests passed');
 }
 

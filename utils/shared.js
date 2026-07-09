@@ -74,7 +74,8 @@ function formatError(error, t) {
         'HISTORY_NOT_FOUND': 'errHistoryNotFound',
         'HISTORY_DATA_GONE': 'errHistoryDataGone',
         'STORAGE_FULL': 'errStorageFull',
-        'DOWNLOAD_FAILED': 'errDownloadFailed'
+        'DOWNLOAD_FAILED': 'errDownloadFailed',
+        'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture'
     };
 
     // English fallbacks for when no i18n `t` function is available
@@ -86,7 +87,7 @@ function formatError(error, t) {
         'ACCOUNT_PRIVATE': 'This account is private',
         'INVALID_DATE_RANGE': 'Date range is invalid — "From" must be earlier than "To"',
         'AUTH_ERROR': 'Authentication failed — please refresh x.com and try again',
-        'RATE_LIMITED': 'Rate limited by X — please wait',
+        'RATE_LIMITED': 'Routine pause — progress saved, please wait',
         'STALE_QUERY_ID': 'X API changed — retrying with fresh data...',
         'ENDPOINT_DISCOVERY_FAILED': 'Could not connect to X API — make sure x.com is accessible',
         'MAX_RETRIES_EXCEEDED': 'Maximum retries exceeded — please try again later',
@@ -96,6 +97,7 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'The saved data for this export has expired and can no longer be downloaded',
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
+        'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results — keep the search tab open and press Resume to try again',
         'TIMEOUT': 'No response from the extension — please try again',
         'MESSAGING_ERROR': 'Could not reach the extension — please try again'
     };
