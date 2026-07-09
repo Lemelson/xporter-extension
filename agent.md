@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.2**.
+> Last verified against the codebase at **v1.4.5**.
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.2 (`manifest.json`) |
+| Version | 1.4.5 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
@@ -206,7 +206,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 
 | Setting | Default | Notes |
 |---|---|---|
-| `includeRetweets` / `includeReplies` | `true` | posts filter |
+| `includeRetweets` / `includeReplies` / `includeArticles` | `true` | posts filter (`includeArticles` gates X long-form Articles, type `article`) |
 | `quantityLimit` | `500` | 0 = unlimited |
 | `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
 | `customDelaySec` / `customCooldownMin` / `customBatchSize` | `5` / `3` / `20` | the Custom tier's user-typed pace (clamped to `CUSTOM_SPEED_LIMITS`) |

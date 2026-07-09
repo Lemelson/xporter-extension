@@ -10,7 +10,8 @@ const POSTS_HEADERS = [
     'author_name', 'author_username', 'view_count',
     'bookmark_count', 'favorite_count', 'retweet_count',
     'reply_count', 'quote_count', 'created_at', 'source',
-    'hashtags', 'urls', 'media_type', 'media_urls'
+    'hashtags', 'urls', 'media_type', 'media_urls', 'media_alt_texts',
+    'article_title', 'article_url', 'article_text'
 ];
 
 const USERS_HEADERS = [

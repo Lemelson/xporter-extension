@@ -670,7 +670,11 @@ async function fetchUserTweets(userId, cursor = null, count = 20) {
   }
 
   const data = await withStaleRetry('UserTweets', (endpoint) =>
-    graphqlRequest(endpoint, variables, TWEETS_FEATURES, null)
+    graphqlRequest(endpoint, variables, TWEETS_FEATURES, {
+      // Ask X to inline the plain text of X Articles so long-form posts can be
+      // exported in full. X's own client sends this toggle (with false).
+      withArticlePlainText: true
+    })
   );
 
   return parseTimelineResponse(data);
@@ -826,6 +830,20 @@ function parseTweetObject(result) {
   const authorName = userCore.name || userLegacy.name || '';
   const authorUsername = userCore.screen_name || userLegacy.screen_name || '';
 
+  const article = extractArticle(result, authorUsername);
+  // Article posts usually have an empty/near-empty full_text — surface the
+  // article title there so the Text column is never blank for them.
+  if (article.title && !text.trim()) {
+    text = article.title;
+  }
+
+  // Link-card posts (YouTube, blog links, …) sometimes carry their destination
+  // only in the card, not in entities.urls — fall back to the card URL.
+  let urls = (legacy.entities?.urls || []).map(u => u.expanded_url).filter(Boolean).join(', ');
+  if (!urls) {
+    urls = extractCardUrl(result);
+  }
+
   return {
     id: legacy.id_str,
     text: text,
@@ -843,9 +861,13 @@ function parseTweetObject(result) {
     created_at: legacy.created_at || '',
     source: extractSource(legacy.source),
     hashtags: (legacy.entities?.hashtags || []).map(h => h.text).join(', '),
-    urls: (legacy.entities?.urls || []).map(u => u.expanded_url).join(', '),
+    urls: urls,
     media_type: media.type,
-    media_urls: media.urls
+    media_urls: media.urls,
+    media_alt_texts: media.altTexts,
+    article_title: article.title,
+    article_url: article.url,
+    article_text: article.text
   };
 }
 
@@ -855,6 +877,9 @@ function detectTweetType(legacy, result) {
   if (result.legacy?.retweeted_status_result || legacy.retweeted_status_result) {
     return 'retweet';
   }
+  if (result.article?.article_results?.result) {
+    return 'article';
+  }
   if (legacy.in_reply_to_status_id_str) {
     return 'reply';
   }
@@ -862,6 +887,45 @@ function detectTweetType(legacy, result) {
     return 'quote';
   }
   return 'tweet';
+}
+
+// X Articles (long-form). The timeline payload carries only the article's
+// title/preview under result.article.article_results.result — the full body
+// is never included, so title + canonical URL is all we can export here.
+function extractArticle(result, authorUsername) {
+  const art = result.article?.article_results?.result;
+  if (!art) return { title: '', url: '', text: '' };
+
+  const title = art.title || '';
+  // plain_text arrives only when the endpoint honors withArticlePlainText;
+  // fall back to the short preview_text otherwise.
+  const articleText = art.plain_text || art.preview_text || '';
+  const articleId = art.rest_id || art.id || '';
+  let url = '';
+  if (articleId && authorUsername) {
+    url = `https://x.com/${authorUsername}/article/${articleId}`;
+  } else if (result.legacy?.id_str && authorUsername) {
+    url = `https://x.com/${authorUsername}/status/${result.legacy.id_str}`;
+  }
+  return { title, url, text: articleText };
+}
+
+// Destination URL of a link-preview card, best-effort. binding_values can be
+// an array of {key, value} or a plain object depending on the card type.
+function extractCardUrl(result) {
+  const cardLegacy = result.card?.legacy;
+  if (!cardLegacy) return '';
+
+  const bv = cardLegacy.binding_values;
+  const lookup = (key) => {
+    if (Array.isArray(bv)) {
+      const hit = bv.find(b => b?.key === key);
+      return hit?.value?.string_value || '';
+    }
+    return bv?.[key]?.string_value || '';
+  };
+
+  return lookup('website_url') || lookup('card_url') || cardLegacy.url || '';
 }
 
 function extractSource(sourceHtml) {
@@ -874,7 +938,7 @@ function extractMedia(legacy) {
   const media = legacy.extended_entities?.media || legacy.entities?.media || [];
 
   if (media.length === 0) {
-    return { type: '', urls: '' };
+    return { type: '', urls: '', altTexts: '' };
   }
 
   const types = new Set(media.map(m => m.type));
@@ -895,7 +959,14 @@ function extractMedia(legacy) {
     return m.media_url_https || m.media_url || '';
   }).join(', ');
 
-  return { type: mediaType, urls };
+  // Author-written accessibility descriptions. Joined with ' | ' (alt text is
+  // free-form prose — commas would blur item boundaries); positions align with
+  // media_urls so a blank slot means "this image has no alt".
+  const altTexts = media.some(m => m.ext_alt_text)
+    ? media.map(m => m.ext_alt_text || '').join(' | ')
+    : '';
+
+  return { type: mediaType, urls, altTexts };
 }
 
 // Export for use in service worker
