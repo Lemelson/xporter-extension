@@ -308,8 +308,9 @@ class RateLimitManager {
                     continue;
                 }
 
-                // Network errors — retry
-                if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
+                // Network errors — retry (NETWORK_TIMEOUT = a fetch that hit
+                // its deadline in api.js; same recovery path as any drop)
+                if (error.message === 'NETWORK_TIMEOUT' || error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
                     if (attempt >= this.maxRetries) break;
                     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
                     const waitTime = (C.NETWORK_RETRY_BASE_WAIT || 30000) * (attempt + 1);

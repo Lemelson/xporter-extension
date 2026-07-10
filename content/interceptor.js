@@ -77,11 +77,15 @@
     try {
       const capturesExport = operationName === 'SearchTimeline';
       const capturesFeed = window.XPorterFeedParser?.supportsOperation(operationName);
-      if ((capturesExport || capturesFeed) && response && response.status >= 200 && response.status < 300) {
+      const successful = response && response.status >= 200 && response.status < 300;
+      // SearchTimeline errors are part of the export protocol: the worker uses
+      // 429/4xx status codes to show a real countdown and decide whether to
+      // retry. Feed collection remains success-only.
+      if ((capturesExport || (capturesFeed && successful)) && response) {
         response.clone().text().then((bodyText) => {
           if (bodyText.length > MAX_BODY_CHARS) return;
           if (capturesExport) postGraphqlResponse(operationName, requestUrl, response.status, bodyText);
-          if (capturesFeed && bodyText.length <= MAX_FEED_BODY_CHARS) {
+          if (capturesFeed && successful && bodyText.length <= MAX_FEED_BODY_CHARS) {
             // Yield once so X can render the response before passive parsing.
             setTimeout(() => postSeenPosts(operationName, bodyText), 0);
           }
@@ -119,9 +123,10 @@
           this.addEventListener('load', () => {
             try {
               if (this.__xporterOpenToken !== token) return; // re-opened since — stale
-              if (this.status >= 200 && this.status < 300) {
+              const successful = this.status >= 200 && this.status < 300;
+              if (capturesExport || (capturesFeed && successful)) {
                 const bodyText = (this.responseType === '' || this.responseType === 'text') ? this.responseText : '';
-                if (bodyText && bodyText.length <= MAX_BODY_CHARS) {
+                if (bodyText.length <= MAX_BODY_CHARS && (capturesExport || bodyText)) {
                   if (capturesExport) {
                     postGraphqlResponse(
                       operation.operationName,
@@ -130,7 +135,7 @@
                       bodyText
                     );
                   }
-                  if (capturesFeed && bodyText.length <= MAX_FEED_BODY_CHARS) {
+                  if (capturesFeed && successful && bodyText.length <= MAX_FEED_BODY_CHARS) {
                     setTimeout(() => postSeenPosts(operation.operationName, bodyText), 0);
                   }
                 }
