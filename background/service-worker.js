@@ -1388,6 +1388,27 @@ async function resumeExport(extraItems) {
     }
 }
 
+// Settings that only control request pacing, never the shape of the data.
+const PACING_SETTING_KEYS = [
+    'exportSpeed', 'customDelaySec', 'customBatchSize', 'customCooldownMin',
+    'adaptivePacing', 'requestDelay', 'batchSize', 'cooldownDuration'
+];
+
+// Resume with the same FILTERS that produced the saved rows (the export
+// snapshot; changing includeRetweets mid-export would make one half of the
+// file contradict the other), but with the user's CURRENT pacing: switching
+// to a slower speed is the natural escape hatch after rate limits, and a
+// snapshot that silently ignored it would trap the export at the old pace.
+// Merging on top of stored defaults keeps states from before snapshots
+// were persisted working.
+function buildResumeSettings(storedSettings, snapshot) {
+    const settings = { ...storedSettings, ...(snapshot || {}) };
+    for (const key of PACING_SETTING_KEYS) {
+        if (storedSettings[key] !== undefined) settings[key] = storedSettings[key];
+    }
+    return settings;
+}
+
 async function _resumeExportInner(extraItems) {
     const savedState = await XPorterStorage.loadExportState();
     if (!savedState) {
@@ -1395,11 +1416,7 @@ async function _resumeExportInner(extraItems) {
     }
 
     const storedSettings = await XPorterStorage.loadSettings();
-    // Resume with the same filters and pacing that produced the saved rows.
-    // UI preferences may have changed since, so merge the export snapshot on
-    // top of today's stored defaults for backward compatibility with states
-    // created before snapshots were persisted.
-    const settings = { ...storedSettings, ...(savedState.settings || {}) };
+    const settings = buildResumeSettings(storedSettings, savedState.settings);
 
     // "+N more" resumes raise the limit for THIS export only, by overriding
     // the per-export settings snapshot — the stored quantityLimit setting is

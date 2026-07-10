@@ -47,9 +47,11 @@ async function main() {
     assert.equal(await popup.locator('#extensionVersion').textContent(), `v${MANIFEST.version}`);
     assert.equal(await popup.locator('#exportMode').inputValue(), 'posts');
     assert.equal(await popup.locator('#outputFormat').inputValue(), 'csv');
+    // The public mirror — the `Lemelson/xporter` dev repo is private and 404s
+    // for users, so a link pointing there is a regression this guards against.
     assert.equal(
       await popup.locator('#githubLink').getAttribute('href'),
-      'https://github.com/Lemelson/xporter'
+      'https://github.com/Lemelson/xporter-extension'
     );
 
     const settingsResult = await popup.evaluate(() => chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }));

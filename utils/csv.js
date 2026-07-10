@@ -101,7 +101,10 @@ function generateXLSX(items, isUsers = false, opts = {}) {
             // Excel's hard per-cell limit is 32,767 characters. CSV/JSON keep
             // the full value; XLSX must stay within the format contract so one
             // unusually long article cannot make the workbook unreadable.
-            const val = String(value ?? '').slice(0, 32767);
+            let val = String(value ?? '').slice(0, 32767);
+            // The cut can land mid-emoji; a dangling high surrogate would be
+            // encoded as U+FFFD, so drop it.
+            if (/[\uD800-\uDBFF]$/.test(val)) val = val.slice(0, -1);
             const key = dataKeys?.[index] || '';
             // Keep identifiers and very long digit strings as text — Excel
             // stores numbers as IEEE-754 doubles and would corrupt post IDs.

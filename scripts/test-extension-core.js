@@ -285,6 +285,37 @@ async function testExportSnapshotSurvivesWorkerRestart() {
     );
 }
 
+async function testResumeKeepsFiltersButFollowsCurrentPacing() {
+    const harness = createWorkerHarness();
+    const merged = vm.runInContext(`buildResumeSettings(
+        { exportSpeed: 'turtle', customDelaySec: 9, includeRetweets: true, quantityLimit: 100 },
+        { exportSpeed: 'turbo', includeRetweets: false, quantityLimit: 500 }
+    )`, harness.context);
+    assert.equal(merged.exportSpeed, 'turtle',
+        'pacing must follow the user\'s current settings — slowing down is the rate-limit escape hatch');
+    assert.equal(merged.customDelaySec, 9);
+    assert.equal(merged.includeRetweets, false,
+        'data filters must keep the export snapshot so resumed rows match collected rows');
+    assert.equal(merged.quantityLimit, 500,
+        'the snapshot limit stays; raises go through limitOverride');
+}
+
+async function testXlsxCellTruncationKeepsXmlValid() {
+    const context = vm.createContext({ TextEncoder, Uint8Array, DataView, ArrayBuffer });
+    vm.runInContext(source('utils/csv.js'), context, { filename: 'utils/csv.js' });
+
+    // 32,766 chars + an emoji: the 32,767 cut would otherwise strand half a
+    // surrogate pair, which TextEncoder turns into U+FFFD garbage.
+    const text = 'a'.repeat(32766) + '😀';
+    const bytes = context.XPorterCSV.generateXLSX([{ id: '1', text }]);
+    // Inspect only the worksheet XML (stored uncompressed): the ZIP's binary
+    // headers legitimately decode to U+FFFD, the sheet text must not.
+    const archiveText = new TextDecoder().decode(bytes);
+    const sheetXml = archiveText.slice(archiveText.indexOf('<worksheet'), archiveText.indexOf('</worksheet>'));
+    assert(sheetXml.length > 0, 'worksheet XML must be present');
+    assert(!sheetXml.includes('�'), 'a truncated cell must not contain replacement characters');
+}
+
 async function testPersistedLimitOverrideIsReported() {
     const harness = createWorkerHarness();
     harness.setSavedState({
@@ -331,6 +362,8 @@ const tests = [
     ['real XLSX OOXML', testXlsxIsRealOoxmlZip],
     ['stale bearer retry', testStaleBearerRetriesImmediately],
     ['export settings snapshot', testExportSnapshotSurvivesWorkerRestart],
+    ['resume pacing vs filters', testResumeKeepsFiltersButFollowsCurrentPacing],
+    ['XLSX truncation stays valid', testXlsxCellTruncationKeepsXmlValid],
     ['persisted limit override', testPersistedLimitOverrideIsReported],
     ['terminal auto-expiration', testTerminalExportActuallyExpires]
 ];
