@@ -43,12 +43,12 @@
 ### From Source (Developer Mode)
 
 ```bash
-git clone https://github.com/Lemelson/xporter.git
+git clone https://github.com/Lemelson/xporter-extension.git
 ```
 
 1. Open `chrome://extensions/` in Chrome
 2. Enable **Developer Mode** (top-right toggle)
-3. Click **Load unpacked** and select the cloned `xporter/` directory
+3. Click **Load unpacked** and select the cloned `xporter-extension/` directory
 4. Navigate to [x.com](https://x.com) and log in
 5. Click the XPorter icon in the toolbar
 
@@ -222,7 +222,7 @@ xporter/
 
 ## Contributing
 
-Contributions are welcome. Please open an [issue](https://github.com/Lemelson/xporter/issues) for bugs or feature requests, or submit a pull request directly.
+Contributions are welcome. Please open an [issue](https://github.com/Lemelson/xporter-extension/issues) for bugs or feature requests, or submit a pull request directly.
 
 ## Contact
 
