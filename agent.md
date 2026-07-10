@@ -21,7 +21,7 @@
 ### Key Selling Points
 - **Free & unlimited** — competitors charge $12–15/mo and cap at 150–200 posts
 - **Multi-mode** — posts, followers, following, verified followers
-- **Multi-format** — CSV, JSON, XLSX (XML SpreadsheetML)
+- **Multi-format** — CSV, JSON, real OOXML XLSX
 - **Date-range filtering** for posts (via an X search tab — see §5)
 - **14 languages** — auto-detected from the browser
 - **Self-healing API** — discovers GraphQL queryIds from X's JS bundles AND captures them live from X's own network traffic
@@ -33,8 +33,8 @@
 ```
 ┌─────────────────────────┐     ┌──────────────────────┐     ┌──────────────────────┐
 │ content/content.js      │     │ background/          │◀───▶│ popup/popup.js       │
-│  + interceptor.js       │────▶│ service-worker.js    │     │ export/export.js     │
-│ (runs on x.com)         │     │ (the engine)         │     │ (the two UIs)        │
+│  + interceptor.js       │────▶│ service-worker.js    │     │ (the extension UI)   │
+│ (runs on x.com)         │     │ (the engine)         │     │                      │
 │                         │     │                      │     │                      │
 │ • detect username       │     │ • export state mach. │     │ • user input         │
 │ • capture live queryIds │     │ • GraphQL API calls  │     │ • live progress      │
@@ -59,7 +59,7 @@ All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage
 - **interceptor.js → content.js**: validated `window.postMessage` events for queryIds, date-range payloads, and passively seen posts (page MAIN world → content-script isolated world)
 
 ### Export Flow (High-Level)
-1. User enters username + options in popup/export page
+1. User enters username + options in the popup
 2. UI sends `START_EXPORT` to the service worker
 3. SW resolves user ID via `UserByScreenName` GraphQL
 4. Fetches data in batches via the appropriate endpoint, parsing each page
@@ -109,11 +109,6 @@ xporter/
 │       └── en.json, ru.json, es.json, de.json, fr.json, pt.json, it.json,
 │           tr.json, id.json, hi.json, ja.json, ko.json, zh.json, ar.json
 │
-├── export/                      # Full-page export UI (alternative surface, mirrors popup)
-│   ├── export.html
-│   ├── export.css
-│   └── export.js
-│
 ├── utils/                       # Shared modules (some load in SW, some in pages)
 │   ├── config.js                # 🔑 XPORTER_CONFIG constants + XLog logger
 │   ├── api.js                   # 🔑 X GraphQL client + endpoint discovery + parsers
@@ -122,7 +117,7 @@ xporter/
 │   ├── csv.js                   # CSV / XLSX output generation (JSON is built in the SW)
 │   ├── storage.js               # chrome.storage.local wrapper (quota-aware) + settings
 │   ├── post-database.js         # IndexedDB seen-post store (dedupe by ID; 50k cap)
-│   └── shared.js                # 🔑 Helpers shared by popup + export pages (see §4.6)
+│   └── shared.js                # 🔑 Shared popup/UI helpers (see §4.6)
 │
 ├── _locales/                    # Chrome STORE metadata i18n (manifest __MSG_extName__ etc.)
 │   └── en/, ru/, … (messages.json per language)  ← NOT the same as popup/locales/
@@ -199,12 +194,12 @@ currentExport = {
 ### 4.4. `utils/rateLimit.js` — `RateLimitManager`
 Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
 
-**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing: they run at their advertised delay while `remaining > raceReserve`, then hold until the advertised window reset (an explicit `'window'` wait). This fits finite exports: a small job finishes promptly, while a large job waits honestly when X's quota is spent. Missing/stale headers use mode-specific fallback delays plus the existing batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). Popup and export-page render pacing as a 4→3→2→1 countdown with an amber bar that fills exactly over the wait, then return to the full blue fetching animation; longer window/batch waits use `m:ss`. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
+**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing: they run at their advertised delay while `remaining > raceReserve`, then hold until the advertised window reset (an explicit `'window'` wait). This fits finite exports: a small job finishes promptly, while a large job waits honestly when X's quota is spent. Missing/stale headers use mode-specific fallback delays plus the existing batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders pacing as a 4→3→2→1 countdown with an amber bar that fills exactly over the wait, then returns to the full blue fetching animation; longer window/batch waits use `m:ss`. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
 
-**Export Speed presets.** The single user-facing pacing knob: the `exportSpeed` setting (`'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'`, default `'standard'`; a `<select>` in both popup and export-page settings). The five named tiers advertise 2 / 3 / 4 / 7 / 12 second delays; Standard is the recommended 4-second default. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus fallback-path `fallbackScale`/`batchSize`/`cooldownDuration`; `resolveSpeedPreset()` in the SW resolves it. **`'custom'` (⚠️ in the UI)** is built from the user-typed `customDelaySec`/`customCooldownMin`/`customBatchSize` settings (revealed under the select when picked; clamped to `CUSTOM_SPEED_LIMITS`), and sets `alwaysBatchCooldown` so "pause N min every M requests" is honored even while adaptive pacing is active — named tiers only apply the batch cooldown on the headerless fallback path. Every tier still obeys X's advertised budget. Replaced the old "Request Cooldown" min/batch numeric inputs; the legacy `batchSize`/`cooldownDuration` settings remain stored but are overridden by the preset.
+**Export Speed presets.** The single user-facing pacing knob: the `exportSpeed` setting (`'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'`, default `'standard'`; a `<select>` in popup settings). The five named tiers advertise 2 / 3 / 4 / 7 / 12 second delays; Standard is the recommended 4-second default. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus fallback-path `fallbackScale`/`batchSize`/`cooldownDuration`; `resolveSpeedPreset()` in the SW resolves it. **`'custom'` (⚠️ in the UI)** is built from the user-typed `customDelaySec`/`customCooldownMin`/`customBatchSize` settings (revealed under the select when picked; clamped to `CUSTOM_SPEED_LIMITS`), and sets `alwaysBatchCooldown` so "pause N min every M requests" is honored even while adaptive pacing is active — named tiers only apply the batch cooldown on the headerless fallback path. Every tier still obeys X's advertised budget. Replaced the old "Request Cooldown" min/batch numeric inputs; the legacy `batchSize`/`cooldownDuration` settings remain stored but are overridden by the preset.
 
 ### 4.5. `utils/storage.js` — Chrome Storage + Settings
-`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by either UI:
+`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by UI patches:
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -220,8 +215,8 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 | `autoExpireEnabled` / `autoExpireHours` | `true` / `4` | auto-clear old exports |
 | `ladybugEnabled` | `true` | show the Easter-egg ladybug (§6.2) |
 
-### 4.6. `utils/shared.js` — Shared Page Helpers (popup + export)
-Loaded by BOTH `popup.html` and `export.html` (`popup/utils.js` was removed in v1.4.0). Provides:
+### 4.6. `utils/shared.js` — Shared UI Helpers
+Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 - `sendMessage(msg, timeoutMs?)` — promisified `chrome.runtime.sendMessage`; resolves `{error:'TIMEOUT'}` / `{error:'MESSAGING_ERROR'}` on failure (callers must check `result.success === true` for actions)
 - `checkAuth()` — looks for the `auth_token` cookie
 - `formatError(code, t)` — maps error codes → i18n key / English fallback
@@ -259,7 +254,7 @@ X has no clean date-filter on the timeline GraphQL, so XPorter:
 ### Schemas
 - **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
 - **Users CSV**: `id, name, username, bio, location, url, followers_count, following_count, tweet_count, listed_count, verified, protected, created_at, profile_image_url, profile_url`.
-- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (XML SpreadsheetML, no library).
+- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP).
 
 ---
 
@@ -314,7 +309,7 @@ The popup closes on any outside click, so a running export was invisible — chu
 Error codes ↔ i18n keys are mapped in `formatError()` (`utils/shared.js`). `recordExportError`
 whitelists codes before they reach the anonymous uninstall URL (unknown → `UNKNOWN`).
 
-On `status:'error'` both UIs still offer **Download** (when items were collected) and **Resume**
+On `status:'error'` the popup still offers **Download** (when items were collected) and **Resume**
 (`canResume` travels in error broadcasts and GET_STATUS). `getExportStatus` repairs a persisted
 `running:true` with no live export (SW killed mid-export) into a resumable `stopped`.
 
@@ -327,7 +322,7 @@ On `status:'error'` both UIs still offer **Download** (when items were collected
 3. **QueryIds change** — handled by discovery + live capture + `withStaleRetry`, but refresh `FALLBACK_ENDPOINTS` periodically.
 4. **Response paths vary** — some endpoints use `timeline_v2.timeline`, others `timeline.timeline`. Check both.
 5. **Service worker sleep** — Chrome kills the SW at will; persist after every batch.
-6. **Dual UI surfaces** — `popup.js` and `export.js` share logic via `utils/shared.js`, but messaging/status changes must be reflected in **both**.
+6. **Single UI surface** — export controls live in `popup/`; keep its status handling aligned with service-worker messages.
 7. **`tweetCount`/`tweetBuffer`** mean item count/buffer even for user exports — historical naming.
 8. **Two i18n systems** — `popup/locales/` (in-app) vs `_locales/` (store metadata). See §3.
 9. **Help-tooltip markup** — keep the `**bold**` spans when editing/translating; aria-labels are auto-stripped.
@@ -343,11 +338,11 @@ On `status:'error'` both UIs still offer **Download** (when items were collected
 1. Add endpoint to `FALLBACK_ENDPOINTS` + `discoverEndpoints()` in `api.js` (and `interceptor.js` `TRACKED` if capturing live).
 2. Add fetch fn (follow `fetchFollowers`) + parser (`parseFollowersResponse`).
 3. Export via `globalThis.XPorterAPI`; dispatch in the SW fetch loop.
-4. Add UI option in `popup.html` **and** `export.html`; add CSV headers; add i18n keys to all 14 locales.
+4. Add the UI option in `popup.html`; add CSV headers; add i18n keys to all 14 locales.
 
 ### Add a setting
 1. Default in `loadSettings()` (`storage.js`) and `onInstalled` (SW).
-2. UI in the Settings tab of `popup.html` (and export if relevant).
+2. UI in the Settings tab of `popup.html`.
 3. Wire save handler in `popup.js` (read → `SAVE_SETTINGS`), apply on load.
 4. Add the i18n key to all 14 locales (en first).
 
@@ -358,7 +353,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-rate-limit.js` for deterministic pacing/retry checks. Also verify both themes; stop/resume (SW resilience); large exports (>1000 → storage batching); CSV in Excel (BOM/escaping); 429 + network-loss recovery; every language; date-range (keep the search tab open).
+Run `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. For a real unpacked-browser check, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 
 ---
 
@@ -370,7 +365,7 @@ Run `node scripts/test-rate-limit.js` for deterministic pacing/retry checks. Als
 | `activeTab` | username detection on the active x.com tab (`tabs` permission was dropped in v1.4.0 — `tabs.create/remove/update/query` don't need it, and it triggered the "read browsing activity" install warning) |
 | `downloads` | save files |
 | `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
-| `host_permissions` | `https://x.com/*`, `https://api.x.com/*`, `https://twitter.com/*` |
+| `host_permissions` | `https://x.com/*`, `https://twitter.com/*` |
 
 Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
 
@@ -384,9 +379,6 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 **Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
 `theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `popup.js` → `ladybug.js`.
 
-**Export page** (`export.html`; same pattern):
-`popup/theme-init.js` (first in `<body>`, anti-FOUC) → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `popup/i18n.js` → `popup/rate-prompt.js` → `export.js`.
-
 ---
 
 ## 12. Global Objects (Service Worker Scope)
@@ -396,7 +388,7 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 | `XPORTER_CONFIG`, `XLog` | `config.js` | constants + logger |
 | `XPorterAPI` | `api.js` | `.getUserByScreenName`, `.fetchUserTweets`, `.fetchFollowers/Following/VerifiedFollowers`, `.discoverEndpoints`, search-capture parsers |
 | `RateLimitManager` | `rateLimit.js` | class |
-| `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateFilename` (+ JSON/XLSX) |
+| `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateXLSX`, `.generateExportFilename` |
 | `XPorterStorage` | `storage.js` | export state, batches, settings, username |
 
 In pages, `utils/shared.js` exposes its helpers as plain globals; `ladybug.js` exposes `window.XPorterLadybug`.
@@ -405,7 +397,7 @@ In pages, `utils/shared.js` exposes its helpers as plain globals; `ladybug.js` e
 
 ## 13. Future / Backlog
 - Export likes & bookmarks; media download; built-in analytics; threads as units; Firefox build.
-- Refactor: the dual UI still shares a lot — keep consolidating into `utils/shared.js`. Rename `tweetCount`/`tweetBuffer` → `itemCount`/`itemBuffer`. Add unit tests (CSV escaping, URL parsing, error mapping). Clean up orphaned batch keys after crashes.
+- Refactor: rename `tweetCount`/`tweetBuffer` → `itemCount`/`itemBuffer`; keep expanding focused regression coverage.
 
 ---
 

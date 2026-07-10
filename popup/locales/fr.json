@@ -183,6 +183,7 @@
   "rateClose": "Fermer",
   "rateThanks": "Merci !",
   "rateAbout": "Noter XPorter",
+  "viewSource": "Voir le code source sur GitHub",
   "localizeHeaders": "Traduire les titres de colonnes",
   "localizeHeadersHelp": "**Traduit les en-têtes de colonnes des fichiers CSV et XLSX dans votre langue.** Désactivez-le pour conserver les en-têtes en anglais ; ils conviennent mieux aux scripts et aux modèles de tableur. Les clés JSON restent toujours en anglais.",
   "aboutSafetyTitle": "Sans danger pour votre compte",

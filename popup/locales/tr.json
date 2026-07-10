@@ -183,6 +183,7 @@
   "rateClose": "Kapat",
   "rateThanks": "Teşekkürler!",
   "rateAbout": "XPorter'ı değerlendir",
+  "viewSource": "Kaynak kodunu GitHub'da görüntüle",
   "localizeHeaders": "Sütun başlıklarını yerelleştir",
   "localizeHeadersHelp": "**CSV ve XLSX dosyalarındaki sütun başlıklarını dilinize çevirir.** Kapatırsanız başlıklar İngilizce kalır; bu, betikler ve elektronik tablo şablonları için daha uygundur. JSON anahtarları her zaman İngilizce kalır.",
   "aboutSafetyTitle": "Hesabınız için güvenli",

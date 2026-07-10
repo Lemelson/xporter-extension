@@ -1,6 +1,5 @@
 // XPorter — Shared Utilities
-// Common functions used by both popup and export pages
-// Eliminates duplication between popup/utils.js and export/export.js
+// Common helpers used by the popup and other extension UI contexts.
 
 // ==================== Messaging ====================
 
@@ -212,7 +211,7 @@ function stripHelpMarkup(text) {
 
 /**
  * Apply translations to common i18n attributes.
- * Used by both popup and export pages.
+ * Used by extension UI pages.
  */
 function applyI18nToDOM(translations) {
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-tooltip], [data-i18n-aria-label]').forEach(el => {
@@ -288,7 +287,7 @@ function bidiIsolate(value) {
 }
 
 /**
- * Localize the quantity-limit <select> shared by the popup and export pages:
+ * Localize the popup quantity-limit <select>:
  * translated "Unlimited"/"Custom" labels, and locale-aware number grouping
  * for every numeric preset (including a dynamically inserted custom value).
  */
@@ -457,7 +456,7 @@ function formatCollectedCount(count, mode, langCode, translations) {
 // ==================== Cooldown Countdown ====================
 
 /**
- * Create a live cooldown countdown shared by the popup and export pages.
+ * Create a live cooldown countdown for extension UI.
  * Driven by an absolute `until` timestamp (epoch ms) from the service
  * worker's cooldown events, with a duration fallback for older events.
  * `render(secondsRemaining)` is called once per second.

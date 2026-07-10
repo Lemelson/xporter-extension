@@ -183,6 +183,7 @@
   "rateClose": "إغلاق",
   "rateThanks": "شكرًا لك!",
   "rateAbout": "قيّم XPorter",
+  "viewSource": "عرض المصدر على GitHub",
   "localizeHeaders": "ترجمة عناوين الأعمدة",
   "localizeHeadersHelp": "**يترجم عناوين الأعمدة في ملفات CSV وXLSX إلى لغتك.** أوقفه للإبقاء على العناوين الإنجليزية؛ فهي أنسب للنصوص البرمجية وقوالب الجداول. تبقى مفاتيح JSON بالإنجليزية دائمًا.",
   "aboutSafetyTitle": "آمن لحسابك",

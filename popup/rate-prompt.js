@@ -1,6 +1,6 @@
 // XPorter — Rate Prompt
-// A self-contained "Enjoying XPorter? leave a review" overlay, shared by the
-// popup and the full-page export UI. State lives directly in
+// A self-contained "Enjoying XPorter? leave a review" overlay for the popup.
+// State lives directly in
 // chrome.storage.local (no new service-worker message types). Strings come
 // from popup/locales/*.json via the page's loaded translations, with an
 // English fallback baked in so the overlay always renders something readable.
@@ -19,8 +19,7 @@
     const CONFIG = {
         // Deep-link straight to the Chrome Web Store reviews section.
         STORE_URL: 'https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja/reviews',
-        // Where "Report a problem" sends users on the export page (the popup
-        // instead switches to its About tab — see export.js / popup.js).
+        // Fallback destination when no popup callback is supplied.
         BUG_URL: 'https://t.me/Lemelson',
         STORAGE_KEY: 'xporter_rate_prompt',
 

@@ -183,6 +183,7 @@
   "rateClose": "关闭",
   "rateThanks": "谢谢！",
   "rateAbout": "为 XPorter 评分",
+  "viewSource": "在 GitHub 上查看源代码",
   "localizeHeaders": "本地化列标题",
   "localizeHeadersHelp": "**将 CSV 和 XLSX 的列标题翻译成你的语言。** 关闭后保留英文标题，更适合脚本和表格模板。JSON 的键始终保持英文。",
   "aboutSafetyTitle": "对您的账号安全",

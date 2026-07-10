@@ -129,8 +129,7 @@ body.light .date-row input[type="date"]::-webkit-calendar-picker-indicator {
   filter: none;
 }
 
-/* Dark theme: invert the native calendar icon so it isn't dark-on-dark
-   (parity with the export page). */
+/* Dark theme: invert the native calendar icon so it isn't dark-on-dark. */
 .date-row input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8);
 }
@@ -2643,8 +2642,7 @@ html {
    there's nothing left to interact with. They now behave like buttons —
    highlighted only while hovered (see Tier 2).
    :focus-visible is safe, though: mouse interaction never matches it, so the
-   stuck-outline problem can't occur, while keyboard users still get a ring
-   (same style as the export page's selects). */
+   stuck-outline problem can't occur, while keyboard users still get a ring. */
 .select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
