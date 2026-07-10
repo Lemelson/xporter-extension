@@ -29,7 +29,7 @@ OUT="${XPORTER_ZIP_OUT:-$(dirname "$ROOT")/xporter-v${VERSION}.zip}"
 
 # ---- Allowlist: everything that ships, nothing else. ----
 INCLUDE_FILES=(manifest.json LICENSE)
-INCLUDE_DIRS=(background content popup utils export icons _locales)
+INCLUDE_DIRS=(background content popup utils icons _locales)
 
 for f in "${INCLUDE_FILES[@]}"; do
   [[ -f "$f" ]] || { echo "ERROR: required file missing: $f" >&2; exit 1; }

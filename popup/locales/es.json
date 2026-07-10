@@ -183,6 +183,7 @@
   "rateClose": "Cerrar",
   "rateThanks": "¡Gracias!",
   "rateAbout": "Valorar XPorter",
+  "viewSource": "Ver código fuente en GitHub",
   "localizeHeaders": "Traducir títulos de columnas",
   "localizeHeadersHelp": "**Traduce los encabezados de columna de los archivos CSV y XLSX a tu idioma.** Desactívalo para mantener los encabezados en inglés; funcionan mejor con scripts y plantillas de hojas de cálculo. Las claves JSON siempre quedan en inglés.",
   "aboutSafetyTitle": "Seguro para tu cuenta",

@@ -896,8 +896,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // tell the user the truth: progress is saved, come back and Resume.
                     if (state.error === 'NOT_LOGGED_IN') {
                         // Dead-end text loses first-run users — give them the
-                        // actual login link (same strings the export page's
-                        // auth screen uses, present in all locales).
+                        // actual login link using strings present in all locales.
                         statusMessage.textContent = '';
                         statusMessage.append(`${t('authWarning')} `);
                         const loginLink = document.createElement('a');

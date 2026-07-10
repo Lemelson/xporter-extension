@@ -81,7 +81,7 @@ While you browse X, the page hook also extracts non-reply posts from timeline re
 X periodically rotates its GraphQL `queryId` values. XPorter handles this by:
 1. Fetching the X main page HTML
 2. Scanning linked JS bundles for `queryId` + `operationName` patterns
-3. Caching discovered IDs for 30 minutes
+3. Caching discovered IDs for 24 hours (stale IDs self-heal on failure)
 4. Falling back to hardcoded IDs if discovery fails
 5. Automatically re-discovering on `STALE_QUERY_ID` (HTTP 400) errors
 
@@ -139,7 +139,7 @@ User-list exports include:
 
 ## Configuration
 
-All settings are persisted in Chrome storage and synced between the popup and export page.
+All settings are persisted in Chrome storage and reused across popup sessions.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -183,11 +183,9 @@ xporter/
 │   ├── popup.html/.css/.js   # Markup, glassmorphism styles (dark + light), logic
 │   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + toggle
 │   ├── i18n.js               # In-app translation engine
-│   ├── rate-prompt.js/.css   # "Rate XPorter" prompt (shared by popup + export page)
+│   ├── rate-prompt.js/.css   # "Rate XPorter" prompt
 │   ├── ladybug.js            # Easter-egg ladybug on the About tab
 │   └── locales/*.json        # UI strings for 14 languages (en = fallback)
-├── export/
-│   └── export.html/.css/.js  # Full-page export UI
 ├── utils/
 │   ├── api.js                # X GraphQL client, endpoint discovery
 │   ├── api-features.js       # GraphQL feature-flag constants
@@ -198,7 +196,7 @@ xporter/
 │   ├── storage.js            # Chrome storage abstraction + settings
 │   ├── post-database.js      # Deduplicated seen-post IndexedDB store
 │   ├── usage-tracker.js      # Anonymous local usage counters (opens, active time)
-│   └── shared.js             # Helpers shared by the popup and export pages
+│   └── shared.js             # Shared popup/UI helpers
 ├── _locales/                 # Chrome Web Store metadata translations
 ├── icons/                    # icon16/48/128.png + bolt16/48/128.png (toolbar action icons)
 ├── docs/                     # GitHub Pages site (landing, feedback, privacy policy)

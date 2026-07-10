@@ -103,6 +103,20 @@ function noteAuthFailure() {
   }
 }
 
+// A bearer scraped from X's bundles can expire independently of the user's
+// session cookies. Retry the same request once with the long-lived built-in
+// token instead of failing the export and requiring a manual second attempt.
+async function fetchWithBearerFallback(url, buildOptions) {
+  const bearerBeforeRequest = activeBearerToken;
+  let response = await fetchTimed(url, buildOptions(bearerBeforeRequest));
+  if ((response.status === 401 || response.status === 403) &&
+      bearerBeforeRequest !== DEFAULT_BEARER_TOKEN) {
+    noteAuthFailure();
+    response = await fetchTimed(url, buildOptions(activeBearerToken));
+  }
+  return response;
+}
+
 // ==================== Timed fetch ====================
 // Every network call must have a deadline: a fetch that never settles leaves
 // the export stuck on "Resolving user…" with no error, no retry and no
@@ -391,17 +405,17 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     url += `&fieldToggles=${encodeURIComponent(JSON.stringify(fieldToggles))}`;
   }
 
-  const response = await fetchTimed(url, {
+  const response = await fetchWithBearerFallback(url, (bearerToken) => ({
     method: 'GET',
     headers: {
-      'authorization': `Bearer ${activeBearerToken}`,
+      'authorization': `Bearer ${bearerToken}`,
       'x-csrf-token': auth.csrfToken,
       'x-twitter-active-user': 'yes',
       'x-twitter-auth-type': 'OAuth2Session',
       'x-twitter-client-language': 'en'
     },
     credentials: 'include'
-  });
+  }));
 
   // Read X's advertised budget from this response (even on errors) so the next
   // wait can be paced to it.
@@ -575,17 +589,17 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
 
   XLog.log(`[REST] Fetching Followers via v1.1 API (cursor: ${cursor || 'initial'})`);
 
-  const response = await fetchTimed(url, {
+  const response = await fetchWithBearerFallback(url, (bearerToken) => ({
     method: 'GET',
     headers: {
-      'authorization': `Bearer ${activeBearerToken}`,
+      'authorization': `Bearer ${bearerToken}`,
       'x-csrf-token': auth.csrfToken,
       'x-twitter-active-user': 'yes',
       'x-twitter-auth-type': 'OAuth2Session',
       'x-twitter-client-language': 'en'
     },
     credentials: 'include'
-  });
+  }));
 
   captureRateLimit(response, 'Followers');
 

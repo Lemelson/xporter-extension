@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { chromium } from 'playwright';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const USERNAME = process.argv[2] || 'Hongnumongol99';
 const DATE_FROM = process.argv[3] || '2025-01-01';
@@ -12,12 +12,12 @@ const LIMIT = Number(process.argv[5] || 100);
 const EXT_PATH = path.resolve(process.cwd());
 const BROWSER_CANDIDATES = [
   {
-    cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Comet', 'Default', 'Cookies'),
-    keychainService: 'Comet Safe Storage'
-  },
-  {
     cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Cookies'),
     keychainService: 'Chrome Safe Storage'
+  },
+  {
+    cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Comet', 'Default', 'Cookies'),
+    keychainService: 'Comet Safe Storage'
   }
 ];
 
@@ -81,7 +81,7 @@ async function sleep(ms) {
 async function main() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xporter-extension-e2e-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
-    channel: 'chromium',
+    executablePath: process.env.XPORTER_BROWSER_EXECUTABLE || chromium.executablePath(),
     headless: true,
     args: [
       `--disable-extensions-except=${EXT_PATH}`,

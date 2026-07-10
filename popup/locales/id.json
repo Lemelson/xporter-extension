@@ -183,6 +183,7 @@
   "rateClose": "Tutup",
   "rateThanks": "Terima kasih!",
   "rateAbout": "Beri rating XPorter",
+  "viewSource": "Lihat kode sumber di GitHub",
   "localizeHeaders": "Lokalkan judul kolom",
   "localizeHeadersHelp": "**Menerjemahkan judul kolom pada file CSV dan XLSX ke bahasa Anda.** Matikan untuk mempertahankan judul bahasa Inggris; lebih cocok untuk skrip dan templat spreadsheet. Kunci JSON selalu tetap dalam bahasa Inggris.",
   "aboutSafetyTitle": "Aman untuk akun Anda",

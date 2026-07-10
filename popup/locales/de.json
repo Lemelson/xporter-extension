@@ -183,6 +183,7 @@
   "rateClose": "Schließen",
   "rateThanks": "Danke!",
   "rateAbout": "XPorter bewerten",
+  "viewSource": "Quellcode auf GitHub ansehen",
   "localizeHeaders": "Spaltentitel lokalisieren",
   "localizeHeadersHelp": "**Übersetzt die Spaltenüberschriften in CSV- und XLSX-Dateien in deine Sprache.** Schalte es aus, um die englischen Überschriften zu behalten; sie eignen sich besser für Skripte und Tabellenvorlagen. JSON-Schlüssel bleiben immer Englisch.",
   "aboutSafetyTitle": "Sicher für Ihr Konto",

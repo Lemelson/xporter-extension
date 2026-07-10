@@ -3,24 +3,27 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { chromium } from 'playwright';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const USERNAME = process.argv[2] || 'Hongnumongol99';
 const DATE_FROM = process.argv[3] || '2025-01-01';
 const DATE_TO = process.argv[4] || '2025-12-31';
 const BROWSER_CANDIDATES = [
   {
-    cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Comet', 'Default', 'Cookies'),
-    keychainService: 'Comet Safe Storage'
+    cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Cookies'),
+    keychainService: 'Chrome Safe Storage',
+    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   },
   {
-    cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Cookies'),
-    keychainService: 'Chrome Safe Storage'
+    cookiesDb: path.join(os.homedir(), 'Library', 'Application Support', 'Comet', 'Default', 'Cookies'),
+    keychainService: 'Comet Safe Storage',
+    executablePath: '/Applications/Comet.app/Contents/MacOS/Comet'
   }
 ];
 
 function resolveBrowserSource() {
-  const match = BROWSER_CANDIDATES.find((candidate) => fs.existsSync(candidate.cookiesDb));
+  const match = BROWSER_CANDIDATES.find((candidate) =>
+    fs.existsSync(candidate.cookiesDb) && fs.existsSync(candidate.executablePath));
   if (!match) {
     throw new Error('No supported Chromium cookie database found (checked Comet and Google Chrome).');
   }
@@ -86,7 +89,10 @@ function collectTweetDates(node, out = []) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true, channel: 'chromium' });
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: resolveBrowserSource().executablePath
+  });
   const context = await browser.newContext({ userAgent: 'Mozilla/5.0' });
   await context.addCookies(decryptCookies());
 

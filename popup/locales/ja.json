@@ -183,6 +183,7 @@
   "rateClose": "閉じる",
   "rateThanks": "ありがとうございます！",
   "rateAbout": "XPorter を評価",
+  "viewSource": "GitHub でソースを見る",
   "localizeHeaders": "列見出しをローカライズ",
   "localizeHeadersHelp": "**CSV と XLSX の列見出しをあなたの言語に翻訳します。** オフにすると英語の見出しのままになり、スクリプトや表計算のテンプレートに適しています。JSON のキーは常に英語のままです。",
   "aboutSafetyTitle": "アカウントに安全",

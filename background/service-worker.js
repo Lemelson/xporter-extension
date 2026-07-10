@@ -1,5 +1,5 @@
 // XPorter — Background Service Worker
-// Orchestrates the export process, handles messages from popup/export page
+// Orchestrates the export process and handles popup/content-script messages
 
 // Import utility scripts (paths relative to this service worker's location)
 importScripts(
@@ -400,7 +400,7 @@ async function handleMessage(message, sender) {
             return { success: true };
 
         case 'XP_SESSION_OPEN':
-            // Popup / export page was opened — count it and refresh the snapshot.
+            // Popup was opened — count it and refresh the snapshot.
             await XPorterStorage.recordOpen();
             refreshUninstallURL();
             return { success: true };
@@ -1394,7 +1394,12 @@ async function _resumeExportInner(extraItems) {
         return { error: 'No export to resume' };
     }
 
-    const settings = await XPorterStorage.loadSettings();
+    const storedSettings = await XPorterStorage.loadSettings();
+    // Resume with the same filters and pacing that produced the saved rows.
+    // UI preferences may have changed since, so merge the export snapshot on
+    // top of today's stored defaults for backward compatibility with states
+    // created before snapshots were persisted.
+    const settings = { ...storedSettings, ...(savedState.settings || {}) };
 
     // "+N more" resumes raise the limit for THIS export only, by overriding
     // the per-export settings snapshot — the stored quantityLimit setting is
@@ -1452,6 +1457,14 @@ async function _resumeExportInner(extraItems) {
 }
 
 async function getExportStatus() {
+    // Expiration must also run while a terminal export is still held in this
+    // live worker. Previously it only ran after currentExport became null, so
+    // a long-lived worker could retain "auto-cleared" data indefinitely.
+    let savedSettings = null;
+    if (!currentExport?.running) {
+        savedSettings = await applyAutoExpiration();
+    }
+
     if (currentExport) {
         const waitUntil = rateLimiter?.waitUntil || manualWaitUntil || null;
         const transient = currentExport.running && waitUntil > Date.now() && lastTransientStatus
@@ -1485,7 +1498,7 @@ async function getExportStatus() {
     }
 
     // Check saved state
-    const savedSettings = await applyAutoExpiration();
+    if (!savedSettings) savedSettings = await applyAutoExpiration();
     const savedState = await XPorterStorage.loadExportState();
     if (savedState) {
         // A persisted running=true with no in-memory export means Chrome killed
@@ -1504,7 +1517,9 @@ async function getExportStatus() {
             username: savedState.username,
             tweetCount: savedState.tweetCount || 0,
             expectedTweets: getExpectedItemCount(savedState),
-            quantityLimit: savedSettings?.quantityLimit || 0,
+            quantityLimit: savedState.limitOverride > 0
+                ? savedState.limitOverride
+                : (savedState.settings?.quantityLimit ?? savedSettings?.quantityLimit ?? 0),
             error: savedState.error || null,
             startedAt: savedState.startedAt,
             completedAt: savedState.completedAt,
@@ -1580,7 +1595,7 @@ async function downloadItems(allItems, options) {
         mimeType = 'application/json;charset=utf-8;';
         extension = 'json';
     } else if (format === 'xlsx') {
-        content = XPorterCSV.generateSimpleXLSX(allItems, isUsers, headerOpts);
+        content = XPorterCSV.generateXLSX(allItems, isUsers, headerOpts);
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         extension = 'xlsx';
     } else {
@@ -1707,6 +1722,7 @@ async function saveCurrentState() {
         completedAt: currentExport.completedAt,
         running: currentExport.running,
         limitOverride: currentExport.limitOverride || 0,
+        settings: { ...currentExport.settings },
         rateLimiterState: rateLimiter?.getState() || null
     });
 }
@@ -1716,9 +1732,10 @@ async function applyAutoExpiration() {
     if (settings.autoExpireEnabled === false) return settings;
 
     const maxAge = Math.max(1, Number(settings.autoExpireHours) || 4) * 60 * 60 * 1000;
-    const state = currentExport ? null : await XPorterStorage.loadExportState();
+    const state = currentExport?.running ? null : await XPorterStorage.loadExportState();
     if (state?.updatedAt && Date.now() - state.updatedAt > maxAge) {
         await XPorterStorage.clearExportState();
+        if (currentExport && !currentExport.running) currentExport = null;
     }
     await XPorterStorage.pruneExpiredExportHistory(settings);
     return settings;
