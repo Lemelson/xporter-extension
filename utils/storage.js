@@ -240,6 +240,54 @@ async function loadExportHistory() {
     return result[STORAGE_KEYS.EXPORT_HISTORY] || [];
 }
 
+function historyEntryCompletedAtMs(entry) {
+    const completedAt = entry?.completedAt;
+    if (typeof completedAt === 'number' && Number.isFinite(completedAt)) return completedAt;
+    if (typeof completedAt === 'string') {
+        const parsed = Date.parse(completedAt);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    // Legacy IDs were Date.now() numbers before UUIDs were introduced.
+    const id = Number(entry?.id);
+    return Number.isFinite(id) ? id : null;
+}
+
+/**
+ * Drop downloadable payloads for history entries older than the auto-expire
+ * window. The metadata stays visible in Export History.
+ */
+async function pruneExpiredExportHistory(settings, now = Date.now()) {
+    const effectiveSettings = settings || await loadSettings();
+    if (effectiveSettings.autoExpireEnabled === false) {
+        return { changed: false, expired: 0 };
+    }
+
+    const hours = Number(effectiveSettings.autoExpireHours) || 4;
+    const maxAge = Math.max(1, hours) * 60 * 60 * 1000;
+    const history = await loadExportHistory();
+    let changed = false;
+    let expired = 0;
+
+    for (const entry of history) {
+        const completedAtMs = historyEntryCompletedAtMs(entry);
+        const isExpired = Number.isFinite(completedAtMs) && now - completedAtMs > maxAge;
+        if (isExpired && entry.items) {
+            delete entry.items;
+            entry.hasData = false;
+            changed = true;
+            expired++;
+        } else if (!entry.items && entry.hasData) {
+            entry.hasData = false;
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+    }
+    return { changed, expired };
+}
+
 async function loadExportHistoryEntry(id) {
     const history = await loadExportHistory();
     return history.find(e => String(e.id) === String(id)) || null;
@@ -298,6 +346,7 @@ async function loadSettings() {
     return {
         includeRetweets: true,
         includeReplies: true,
+        includeArticles: true,
         quantityLimit: 500,
         requestDelay: C.REQUEST_DELAY || 3000,
         exportSpeed: 'standard',
@@ -342,11 +391,16 @@ function defaultUsage() {
     return {
         installedAt: 0,
         installVersion: '',
+        installedAtApprox: false,
         exportsStarted: 0,
         exportsOk: 0,
         exportsErr: 0,
+        exportsStopped: 0,
         byMode: { posts: 0, followers: 0, following: 0, verifiedFollowers: 0 },
         byFormat: { csv: 0, json: 0, xlsx: 0 },
+        dateRangeExports: 0,
+        resumes: 0,
+        downloads: 0,
         itemsTotal: 0,
         lastExportAt: 0,
         lastError: '',
@@ -392,6 +446,19 @@ function markInstalled(version) {
     });
 }
 
+/** Backfill install time for users who installed before usage tracking existed. */
+function backfillInstalledAt() {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        if (!usage.installedAt) {
+            usage.installedAt = Date.now();
+            usage.installedAtApprox = true;
+            await saveUsage(usage);
+        }
+        return usage;
+    });
+}
+
 /** Count one open of the popup / export UI. */
 function recordOpen() {
     return withUsageLock(async () => {
@@ -416,7 +483,7 @@ function addActiveMs(ms) {
 }
 
 /** Bump counters when an export begins (mode + output format known up front). */
-function recordExportStart(mode, format) {
+function recordExportStart(mode, format, opts = {}) {
     return withUsageLock(async () => {
         const usage = await loadUsage();
         usage.exportsStarted += 1;
@@ -424,6 +491,20 @@ function recordExportStart(mode, format) {
         usage.byMode[m] = (usage.byMode[m] || 0) + 1;
         const f = (format || 'csv').toLowerCase();
         usage.byFormat[f] = (usage.byFormat[f] || 0) + 1;
+        // Extra churn-analysis signals: the date-range path is separate and
+        // fragile (search-tab capture), and resumes were invisible before.
+        if (opts.dateRange) usage.dateRangeExports = (usage.dateRangeExports || 0) + 1;
+        if (opts.resume) usage.resumes = (usage.resumes || 0) + 1;
+        await saveUsage(usage);
+        return usage;
+    });
+}
+
+/** Count one file download (fresh export or re-download from history). */
+function recordDownload() {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.downloads = (usage.downloads || 0) + 1;
         await saveUsage(usage);
         return usage;
     });
@@ -441,6 +522,17 @@ function recordExportComplete(itemCount) {
     });
 }
 
+/** Bump counters when an export is stopped by the user. */
+function recordExportStopped() {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.exportsStopped += 1;
+        usage.lastExportAt = Date.now();
+        await saveUsage(usage);
+        return usage;
+    });
+}
+
 // Error codes allowed into the anonymous uninstall URL. The privacy policy
 // promises "a short error code" — free text could one day carry a username
 // inside a message, so anything unknown is collapsed to UNKNOWN.
@@ -448,7 +540,8 @@ const KNOWN_ERROR_CODES = new Set([
     'NOT_LOGGED_IN', 'USER_NOT_FOUND', 'USER_SUSPENDED', 'USER_UNAVAILABLE',
     'ACCOUNT_PRIVATE', 'INVALID_DATE_RANGE', 'RATE_LIMITED', 'STALE_QUERY_ID',
     'AUTH_ERROR', 'ENDPOINT_DISCOVERY_FAILED', 'MAX_RETRIES_EXCEEDED',
-    'ABORTED', 'STORAGE_FULL', 'SEARCH_CAPTURE_TIMEOUT', 'DOWNLOAD_FAILED'
+    'ABORTED', 'STORAGE_FULL', 'SEARCH_CAPTURE_TIMEOUT', 'DOWNLOAD_FAILED',
+    'NETWORK_TIMEOUT'
 ]);
 
 /** Bump counters on failure (stores a whitelisted error code, no free text). */
@@ -474,11 +567,12 @@ if (typeof globalThis !== 'undefined') {
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,
         saveExportHistory, loadExportHistory, loadExportHistoryEntry,
+        pruneExpiredExportHistory,
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
-        loadUsage, saveUsage, markInstalled,
+        loadUsage, saveUsage, markInstalled, backfillInstalledAt,
         recordOpen, addActiveMs,
-        recordExportStart, recordExportComplete, recordExportError,
+        recordExportStart, recordExportComplete, recordExportStopped, recordExportError, recordDownload,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH
     };
 }

@@ -81,9 +81,16 @@ const XPORTER_CONFIG = {
     },
 
     // API
-    ENDPOINT_CACHE_TTL: 30 * 60 * 1000, // 30 min cache for discovered endpoints
+    // 24h: queryIds only change on X deploys, and a stale id self-heals via
+    // withStaleRetry's forced re-discovery. A short TTL made nearly every
+    // export session re-download X's multi-MB JS bundles first — on a slow
+    // connection/VPN that is 10-60s of "Resolving user…" dead air (churn).
+    ENDPOINT_CACHE_TTL: 24 * 60 * 60 * 1000,
     STALE_RETRY_BASE_WAIT: 10000,        // base wait on STALE_QUERY_ID (multiplied by attempt)
     NETWORK_RETRY_BASE_WAIT: 30000,      // base wait on network errors
+    API_FETCH_TIMEOUT: 30000,            // ms per GraphQL/REST request — a hung fetch must fail visibly, not hang the export forever
+    DISCOVERY_FETCH_TIMEOUT: 15000,      // ms per discovery fetch (x.com page / JS bundle)
+    DISCOVERY_TOTAL_TIMEOUT: 25000,      // ms cap on a whole discovery pass before falling back to known queryIds
 
     // Storage
     TWEETS_PER_BATCH: 50,          // tweets per storage batch

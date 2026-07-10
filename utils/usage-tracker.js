@@ -1,4 +1,4 @@
-// XPorter — anonymous usage tracker (loaded by popup + export pages)
+// XPorter — anonymous usage tracker (loaded by the popup)
 // =====================================================================
 // Counts how many times the UI is opened and how long it is actively VISIBLE,
 // so the uninstall churn stats can tell "installed but never really used" from

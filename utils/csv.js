@@ -10,7 +10,8 @@ const POSTS_HEADERS = [
     'author_name', 'author_username', 'view_count',
     'bookmark_count', 'favorite_count', 'retweet_count',
     'reply_count', 'quote_count', 'created_at', 'source',
-    'hashtags', 'urls', 'media_type', 'media_urls'
+    'hashtags', 'urls', 'media_type', 'media_urls', 'media_alt_texts',
+    'article_title', 'article_url', 'article_text'
 ];
 
 const USERS_HEADERS = [
@@ -69,7 +70,7 @@ function headerLabels(keys, opts = {}) {
     return keys.map(k => XPorterColumns.columnLabel(k, opts.lang || 'en'));
 }
 
-// ==================== XLSX (XML SpreadsheetML) ====================
+// ==================== XLSX (OOXML ZIP) ====================
 
 /**
  * Escape XML special characters.
@@ -82,53 +83,183 @@ function escapeXml(str) {
 }
 
 /**
- * Generate a simple XLSX file (XML-based SpreadsheetML) — no external deps.
- * Compatible with Excel, LibreOffice, and Google Sheets.
+ * Generate a real XLSX workbook (OOXML ZIP) without external dependencies.
+ * The ZIP entries use the uncompressed "store" method; spreadsheet data is
+ * already text-heavy, and avoiding a bundled compression library keeps the
+ * extension dependency-free while producing a standards-compliant workbook.
  * @param {Array} items - Array of data objects
  * @param {boolean} isUsers - true for followers/following, false for posts
- * @returns {string} XML SpreadsheetML string
+ * @returns {Uint8Array} XLSX bytes
  */
-function generateSimpleXLSX(items, isUsers = false, opts = {}) {
+function generateXLSX(items, isUsers = false, opts = {}) {
     const keys = isUsers ? USERS_HEADERS : POSTS_HEADERS;
     const labels = headerLabels(keys, opts);
 
-    const rows = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<?mso-application progid="Excel.Sheet"?>',
-        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"',
-        ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">',
-        '<Worksheet ss:Name="Export">',
-        '<Table>'
-    ];
-
-    // Header row
-    let headerRow = '<Row>';
-    for (const label of labels) {
-        headerRow += `<Cell><Data ss:Type="String">${escapeXml(label)}</Data></Cell>`;
-    }
-    rows.push(headerRow + '</Row>');
-
-    // Data rows
-    for (const item of items) {
-        let row = '<Row>';
-        for (const h of keys) {
-            const val = String(item[h] ?? '');
-            // Keep identifiers and very long digit strings as text — Excel stores
-            // numbers as IEEE-754 doubles and would corrupt 17–19 digit tweet/user
-            // IDs (losing the last digits). Only treat short, space-free, plain
-            // decimal values as real numbers — the strict regex rejects things
-            // JS Number() would accept ('Infinity', '0xBEEF', '1e999') and
-            // leading-zero strings like '007' that Excel would mangle.
-            const isIdField = h === 'id' || h.endsWith('_id') || h.endsWith('_str');
-            const isNum = !isIdField && val !== '' && !val.includes(' ') &&
+    const worksheetRows = [];
+    const appendRow = (values, rowNumber, dataKeys = null) => {
+        const cells = values.map((value, index) => {
+            // Excel's hard per-cell limit is 32,767 characters. CSV/JSON keep
+            // the full value; XLSX must stay within the format contract so one
+            // unusually long article cannot make the workbook unreadable.
+            const val = String(value ?? '').slice(0, 32767);
+            const key = dataKeys?.[index] || '';
+            // Keep identifiers and very long digit strings as text — Excel
+            // stores numbers as IEEE-754 doubles and would corrupt post IDs.
+            const isIdField = key === 'id' || key.endsWith('_id') || key.endsWith('_str');
+            const isNumber = !isIdField && val !== '' && !val.includes(' ') &&
                 /^-?(0|[1-9]\d*)(\.\d+)?$/.test(val) && val.length <= 15;
-            row += `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escapeXml(val)}</Data></Cell>`;
+            const ref = `${columnName(index + 1)}${rowNumber}`;
+            if (isNumber) return `<c r="${ref}"><v>${escapeXml(val)}</v></c>`;
+            const preserve = /^\s|\s$|[\n\r\t]/.test(val) ? ' xml:space="preserve"' : '';
+            return `<c r="${ref}" t="inlineStr"><is><t${preserve}>${escapeXml(val)}</t></is></c>`;
+        });
+        worksheetRows.push(`<row r="${rowNumber}">${cells.join('')}</row>`);
+    };
+
+    appendRow(labels, 1);
+    items.forEach((item, index) => appendRow(keys.map(key => item[key]), index + 2, keys));
+
+    const lastCell = `${columnName(keys.length)}${Math.max(1, items.length + 1)}`;
+    const worksheet = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        `<dimension ref="A1:${lastCell}"/>`,
+        '<sheetViews><sheetView workbookViewId="0"/></sheetViews>',
+        '<sheetFormatPr defaultRowHeight="15"/>',
+        `<sheetData>${worksheetRows.join('')}</sheetData>`,
+        '</worksheet>'
+    ].join('');
+
+    return createZip([
+        {
+            name: '[Content_Types].xml',
+            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+                '<Default Extension="xml" ContentType="application/xml"/>' +
+                '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+                '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+                '</Types>'
+        },
+        {
+            name: '_rels/.rels',
+            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+                '</Relationships>'
+        },
+        {
+            name: 'xl/workbook.xml',
+            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+                'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+                '<sheets><sheet name="Export" sheetId="1" r:id="rId1"/></sheets></workbook>'
+        },
+        {
+            name: 'xl/_rels/workbook.xml.rels',
+            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+                '</Relationships>'
+        },
+        { name: 'xl/worksheets/sheet1.xml', content: worksheet }
+    ]);
+}
+
+function columnName(index) {
+    let result = '';
+    while (index > 0) {
+        index--;
+        result = String.fromCharCode(65 + (index % 26)) + result;
+        index = Math.floor(index / 26);
+    }
+    return result;
+}
+
+const CRC32_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let index = 0; index < table.length; index++) {
+        let value = index;
+        for (let bit = 0; bit < 8; bit++) {
+            value = (value >>> 1) ^ ((value & 1) ? 0xEDB88320 : 0);
         }
-        rows.push(row + '</Row>');
+        table[index] = value >>> 0;
+    }
+    return table;
+})();
+
+function crc32(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (const byte of bytes) {
+        crc = CRC32_TABLE[(crc ^ byte) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function write16(bytes, offset, value) {
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint16(offset, value, true);
+}
+
+function write32(bytes, offset, value) {
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(offset, value >>> 0, true);
+}
+
+function concatBytes(parts) {
+    const total = parts.reduce((sum, part) => sum + part.length, 0);
+    const result = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+        result.set(part, offset);
+        offset += part.length;
+    }
+    return result;
+}
+
+function createZip(entries) {
+    const encoder = new TextEncoder();
+    const localParts = [];
+    const centralParts = [];
+    let localOffset = 0;
+
+    for (const entry of entries) {
+        const name = encoder.encode(entry.name);
+        const content = encoder.encode(entry.content);
+        const checksum = crc32(content);
+        const local = new Uint8Array(30);
+        write32(local, 0, 0x04034B50);
+        write16(local, 4, 20);
+        write16(local, 6, 0x0800); // UTF-8 names
+        write16(local, 8, 0);      // stored, no compression
+        write32(local, 14, checksum);
+        write32(local, 18, content.length);
+        write32(local, 22, content.length);
+        write16(local, 26, name.length);
+        localParts.push(local, name, content);
+
+        const central = new Uint8Array(46);
+        write32(central, 0, 0x02014B50);
+        write16(central, 4, 20);
+        write16(central, 6, 20);
+        write16(central, 8, 0x0800);
+        write16(central, 10, 0);
+        write32(central, 16, checksum);
+        write32(central, 20, content.length);
+        write32(central, 24, content.length);
+        write16(central, 28, name.length);
+        write32(central, 42, localOffset);
+        centralParts.push(central, name);
+
+        localOffset += local.length + name.length + content.length;
     }
 
-    rows.push('</Table>', '</Worksheet>', '</Workbook>');
-    return rows.join('\n');
+    const centralDirectory = concatBytes(centralParts);
+    const end = new Uint8Array(22);
+    write32(end, 0, 0x06054B50);
+    write16(end, 8, entries.length);
+    write16(end, 10, entries.length);
+    write32(end, 12, centralDirectory.length);
+    write32(end, 16, localOffset);
+    return concatBytes([...localParts, centralDirectory, end]);
 }
 
 // ==================== Filename ====================
@@ -189,7 +320,7 @@ function generateExportFilename(username, mode, ext, options = {}) {
 if (typeof globalThis !== 'undefined') {
     globalThis.XPorterCSV = {
         generateCSV,
-        generateSimpleXLSX,
+        generateXLSX,
         generateExportFilename,
         escapeCSVValue,
         escapeXml,

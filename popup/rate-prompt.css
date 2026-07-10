@@ -1,9 +1,9 @@
 /* XPorter — Rate Prompt overlay
-   Shared by the popup and the full-page export UI. Colours follow the
+   Popup overlay. Colours follow the
    dark/light convention (gotcha #9): the dark palette is the base, `.light`
    on <body> overrides. We use a dedicated `--rp-*` set rather than the page
    tokens because the popup's surface tokens are translucent glass — the
-   overlay needs solid, controlled surfaces to look the same on both pages. */
+   overlay needs solid, controlled surfaces. */
 
 .xrp-overlay {
   --rp-scrim: rgba(8, 12, 17, 0.66);

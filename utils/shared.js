@@ -1,6 +1,5 @@
 // XPorter — Shared Utilities
-// Common functions used by both popup and export pages
-// Eliminates duplication between popup/utils.js and export/export.js
+// Common helpers used by the popup and other extension UI contexts.
 
 // ==================== Messaging ====================
 
@@ -74,7 +73,10 @@ function formatError(error, t) {
         'HISTORY_NOT_FOUND': 'errHistoryNotFound',
         'HISTORY_DATA_GONE': 'errHistoryDataGone',
         'STORAGE_FULL': 'errStorageFull',
-        'DOWNLOAD_FAILED': 'errDownloadFailed'
+        'DOWNLOAD_FAILED': 'errDownloadFailed',
+        'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture',
+        // Timed-out fetch — same user guidance as a failed connection
+        'NETWORK_TIMEOUT': 'errEndpointFailed'
     };
 
     // English fallbacks for when no i18n `t` function is available
@@ -86,7 +88,7 @@ function formatError(error, t) {
         'ACCOUNT_PRIVATE': 'This account is private',
         'INVALID_DATE_RANGE': 'Date range is invalid — "From" must be earlier than "To"',
         'AUTH_ERROR': 'Authentication failed — please refresh x.com and try again',
-        'RATE_LIMITED': 'Rate limited by X — please wait',
+        'RATE_LIMITED': 'Routine pause — progress saved, please wait',
         'STALE_QUERY_ID': 'X API changed — retrying with fresh data...',
         'ENDPOINT_DISCOVERY_FAILED': 'Could not connect to X API — make sure x.com is accessible',
         'MAX_RETRIES_EXCEEDED': 'Maximum retries exceeded — please try again later',
@@ -96,6 +98,8 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'The saved data for this export has expired and can no longer be downloaded',
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
+        'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results — keep the search tab open and press Resume to try again',
+        'NETWORK_TIMEOUT': 'Could not connect to X API — make sure x.com is accessible',
         'TIMEOUT': 'No response from the extension — please try again',
         'MESSAGING_ERROR': 'Could not reach the extension — please try again'
     };
@@ -207,7 +211,7 @@ function stripHelpMarkup(text) {
 
 /**
  * Apply translations to common i18n attributes.
- * Used by both popup and export pages.
+ * Used by extension UI pages.
  */
 function applyI18nToDOM(translations) {
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-tooltip], [data-i18n-aria-label]').forEach(el => {
@@ -283,7 +287,7 @@ function bidiIsolate(value) {
 }
 
 /**
- * Localize the quantity-limit <select> shared by the popup and export pages:
+ * Localize the popup quantity-limit <select>:
  * translated "Unlimited"/"Custom" labels, and locale-aware number grouping
  * for every numeric preset (including a dynamically inserted custom value).
  */
@@ -452,7 +456,7 @@ function formatCollectedCount(count, mode, langCode, translations) {
 // ==================== Cooldown Countdown ====================
 
 /**
- * Create a live cooldown countdown shared by the popup and export pages.
+ * Create a live cooldown countdown for extension UI.
  * Driven by an absolute `until` timestamp (epoch ms) from the service
  * worker's cooldown events, with a duration fallback for older events.
  * `render(secondsRemaining)` is called once per second.

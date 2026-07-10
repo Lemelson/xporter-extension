@@ -1,5 +1,5 @@
 // XPorter — Background Service Worker
-// Orchestrates the export process, handles messages from popup/export page
+// Orchestrates the export process and handles popup/content-script messages
 
 // Import utility scripts (paths relative to this service worker's location)
 importScripts(
@@ -175,10 +175,14 @@ async function refreshUninstallURL() {
             exp_started: usage.exportsStarted || 0,
             exp_ok: usage.exportsOk || 0,
             exp_err: usage.exportsErr || 0,
+            exp_stopped: usage.exportsStopped || 0,
             m_posts: m.posts || 0,
             m_followers: m.followers || 0,
             m_following: m.following || 0,
             m_verified: m.verifiedFollowers || 0,
+            m_dates: usage.dateRangeExports || 0,
+            resumes: usage.resumes || 0,
+            dl: usage.downloads || 0,
             f_csv: f.csv || 0,
             f_json: f.json || 0,
             f_xlsx: f.xlsx || 0,
@@ -187,9 +191,18 @@ async function refreshUninstallURL() {
             last_err: usage.lastError || '',
             s_retweets: settings.includeRetweets ? 1 : 0,
             s_replies: settings.includeReplies ? 1 : 0,
+            s_articles: settings.includeArticles !== false ? 1 : 0,
             s_limit: settings.quantityLimit,
-            s_localize: settings.localizeExportHeaders ? 1 : 0
+            s_localize: settings.localizeExportHeaders ? 1 : 0,
+            // Speed preset; for custom, inline the user's own pacing numbers
+            // (delay sec / cooldown min / batch size) so churn can be sliced
+            // by how aggressively people were hitting X.
+            s_speed: settings.exportSpeed === 'custom'
+                ? `custom_${settings.customDelaySec || 0}_${settings.customCooldownMin || 0}_${settings.customBatchSize || 0}`
+                : (settings.exportSpeed || 'standard'),
+            s_adaptive: settings.adaptivePacing !== false ? 1 : 0
         };
+        if (usage.installedAtApprox) p.inst_approx = 1;
         const qs = Object.keys(p)
             .filter(k => p[k] !== '' && p[k] !== undefined && p[k] !== null)
             .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(p[k]))
@@ -204,6 +217,8 @@ async function refreshUninstallURL() {
 chrome.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === 'install') {
         await XPorterStorage.markInstalled(chrome.runtime.getManifest().version);
+    } else if (details.reason === 'update') {
+        await XPorterStorage.backfillInstalledAt();
     }
     refreshUninstallURL();
 });
@@ -229,7 +244,7 @@ async function getOverlayI18n() {
     } catch (_) { /* default en fallbacks below */ }
     const g = (k, fallback) => (tr[k] !== undefined ? tr[k] : fallback);
     const dir = ['ar', 'fa', 'he', 'ur'].includes(lang) ? 'rtl' : 'ltr';
-    _overlayI18n = {
+    const strings = {
         lang,
         dir,
         title: g('ovTitle', 'XPorter date range export'),
@@ -246,9 +261,17 @@ async function getOverlayI18n() {
         scrollingFor: g('ovScrolling', 'Scrolling X search for'),
         stop: g('ovStop', 'Stop export'),
         stopping: g('ovStopping', 'Stopping…'),
-        rateLimited: g('ovRateLimited', 'X rate limit — retrying in')
+        rateLimited: g('ovRateLimited', 'X rate limit — retrying in'),
+        almostDone: g('ovAlmostDone', "Looks like that's all the posts in this range — you can stop the export")
     };
-    return _overlayI18n;
+    // Cache only when the locale really loaded. Caching the silent English
+    // fallback pinned the overlay to English for the SW's whole lifetime
+    // even though the popup UI was localized (seen in the field: RU popup,
+    // English overlay).
+    if (tr && Object.keys(tr).length > 0) {
+        _overlayI18n = strings;
+    }
+    return strings;
 }
 
 // Build a localized overlay subtitle for a given phase key.
@@ -287,8 +310,13 @@ async function handleMessage(message, sender) {
         case 'STOP_EXPORT':
             return stopExport();
 
-        case 'GET_STATUS':
-            return await getExportStatus();
+        case 'GET_STATUS': {
+            const exportStatus = await getExportStatus();
+            // A UI is now showing this state — a lingering terminal badge
+            // (✓ / ! / II) has done its job and would only go stale.
+            if (!exportStatus?.running) setBadge('');
+            return exportStatus;
+        }
 
         case 'DOWNLOAD_CSV':
         case 'DOWNLOAD_EXPORT':
@@ -298,13 +326,14 @@ async function handleMessage(message, sender) {
             return await downloadHistoryEntry(message.id, message.outputFormat);
 
         case 'RESUME_EXPORT':
-            return await resumeExport();
+            return await resumeExport(message.extraItems);
 
         case 'SAVE_SETTINGS':
             if (!await XPorterStorage.saveSettings(message.settings)) {
                 return { error: 'STORAGE_FULL' };
             }
             _overlayI18n = null; // language may have changed — reload overlay strings lazily
+            await applyAutoExpiration();
             refreshUninstallURL(); // keep language/theme/settings snapshot fresh
             return { success: true };
 
@@ -318,6 +347,7 @@ async function handleMessage(message, sender) {
             }
             await XPorterStorage.clearExportState();
             currentExport = null;
+            setBadge('');
             return { success: true };
 
         case 'DISCOVERED_QUERYID':
@@ -357,6 +387,7 @@ async function handleMessage(message, sender) {
             return { success: true };
 
         case 'GET_EXPORT_HISTORY':
+            await applyAutoExpiration();
             const history = await XPorterStorage.loadExportHistory();
             return { history: history.map(({ items, ...entry }) => entry) };
 
@@ -369,7 +400,7 @@ async function handleMessage(message, sender) {
             return { success: true };
 
         case 'XP_SESSION_OPEN':
-            // Popup / export page was opened — count it and refresh the snapshot.
+            // Popup was opened — count it and refresh the snapshot.
             await XPorterStorage.recordOpen();
             refreshUninstallURL();
             return { success: true };
@@ -397,7 +428,20 @@ function isXPageSender(sender) {
 
 // ==================== Export Engine ====================
 
+// A stopped export's loop unwinds asynchronously (final flush + persist +
+// tab close). Start/Resume gate on exportLoopPromise, so a fast Stop → Resume
+// raced that unwind and returned ALREADY_RUNNING for an export the UI already
+// showed as stopped. Wait (bounded) for the loop to actually exit first.
+async function waitForLoopUnwind(ms = 8000) {
+    if (!exportLoopPromise || currentExport?.running) return;
+    await Promise.race([
+        exportLoopPromise,
+        new Promise(resolve => setTimeout(resolve, ms))
+    ]);
+}
+
 async function startExport({ username, dateFrom, dateTo, exportMode, outputFormat }) {
+    await waitForLoopUnwind();
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
         return { error: 'ALREADY_RUNNING' };
     }
@@ -424,6 +468,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     // adaptively from X's live x-rate-limit-* budget (fixed delay is fallback).
     rateLimiter = createRateLimiter(settings, mode);
     lastTransientStatus = null;
+    _overlayI18n = null; // re-read the UI language for this export's overlay
 
     rateLimiter.onStatusChange((event) => {
         lastTransientStatus = event;
@@ -442,6 +487,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
         dateTo: normalizedDateTo,
         settings: settings,
         tweetCount: 0, // used for both tweets and users (item count)
+        itemsRecordedBase: 0,
         totalBatches: 0,
         tweetBuffer: [], // used for both tweets and users
         userId: null,
@@ -454,7 +500,9 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     await saveCurrentState();
 
     // Anonymous usage counter (for uninstall feedback) — fire and forget
-    XPorterStorage.recordExportStart(mode, outputFormat).then(refreshUninstallURL).catch(() => {});
+    XPorterStorage.recordExportStart(mode, outputFormat, {
+        dateRange: !!(normalizedDateFrom || normalizedDateTo)
+    }).then(refreshUninstallURL).catch(() => {});
 
     // Start the export process (non-blocking)
     launchExportLoop('Export loop error:');
@@ -469,7 +517,18 @@ async function runExportLoop() {
 
         let userInfo;
         try {
-            userInfo = await XPorterAPI.getUserByScreenName(currentExport.username);
+            // Resolve through the rate limiter: a NETWORK_TIMEOUT or 429 here
+            // gets the same visible retries as any page fetch, and Stop aborts
+            // the retry wait instead of racing the in-flight request. Terminal
+            // errors (NOT_LOGGED_IN etc.) pass through non-retried as before.
+            userInfo = await rateLimiter.executeWithRateLimit(() =>
+                XPorterAPI.getUserByScreenName(currentExport.username));
+            // The resolve hits a separate, generous endpoint budget — don't
+            // let it count as request #1, or the first real page would sit
+            // out a pacing delay before any result appears.
+            rateLimiter.requestCount = 0;
+            rateLimiter.totalRequests = 0;
+            rateLimiter.lastRequestAt = null;
         } catch (err) {
             if (err.message === 'NOT_LOGGED_IN') throw new Error('NOT_LOGGED_IN');
             if (err.message === 'USER_NOT_FOUND') throw new Error('USER_NOT_FOUND');
@@ -510,6 +569,7 @@ async function runExportLoop() {
             await flushExportBuffer();
             currentExport.status = 'stopped';
             await saveCurrentState();
+            recordExportStoppedOnce();
             broadcastStopped();
             return;
         }
@@ -540,7 +600,8 @@ async function runExportLoop() {
         });
 
         // Anonymous usage counter (for uninstall feedback) — fire and forget
-        XPorterStorage.recordExportComplete(currentExport.tweetCount).then(refreshUninstallURL).catch(() => {});
+        const itemsDelta = Math.max(0, currentExport.tweetCount - (currentExport.itemsRecordedBase || 0));
+        XPorterStorage.recordExportComplete(itemsDelta).then(refreshUninstallURL).catch(() => {});
 
         broadcastStatus({
             running: false,
@@ -559,6 +620,7 @@ async function runExportLoop() {
             currentExport.running = false;
             currentExport.status = 'stopped';
             await saveCurrentState();
+            recordExportStoppedOnce();
             broadcastStopped();
         } else {
             throw error;
@@ -671,6 +733,7 @@ async function _fetchPostsLoop() {
         for (const tweet of (result.tweets || [])) {
             if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
             if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
+            if (currentExport.settings.includeArticles === false && tweet.type === 'article') continue;
 
             if (seenIds.has(tweet.id)) continue;
             if (quantityLimitReached()) {
@@ -754,6 +817,14 @@ async function _fetchPostsByDateRangeLoop() {
 
     try {
         payload = await waitForSearchCapturePayload(20000);
+        // Slow machines/connections routinely need more than 20s for X's
+        // search page to boot (real churn case: SEARCH_CAPTURE_TIMEOUT on the
+        // most engaged user we ever lost). Before giving up, actively ping the
+        // capture tab — requestNextSearchCapturePayload retries with scroll
+        // nudges for up to ~48 more seconds.
+        if (!payload) {
+            payload = await requestNextSearchCapturePayload();
+        }
         if (!payload) {
             throw new Error('SEARCH_CAPTURE_TIMEOUT');
         }
@@ -790,9 +861,9 @@ async function _fetchPostsByDateRangeLoop() {
                 if (!currentExport.running) break;
                 await sendSearchCaptureStatus({ phaseKey: 'scrolling' });
                 payload = await requestNextSearchCapturePayload();
-                if (!payload) payload = await recoverStalledSearchCapture();
+                if (!payload && !searchLikelyComplete()) payload = await recoverStalledSearchCapture();
                 if (!payload) {
-                    if (currentExport.running) {
+                    if (currentExport.running && !searchLikelyComplete()) {
                         await flushExportBuffer();
                         await saveCurrentState();
                         throw new Error('RATE_LIMITED');
@@ -830,6 +901,7 @@ async function _fetchPostsByDateRangeLoop() {
             for (const tweet of (parsedPayload.tweets || [])) {
                 if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
                 if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
+                if (currentExport.settings.includeArticles === false && tweet.type === 'article') continue;
                 if (seenIds.has(tweet.id)) continue;
                 if (quantityLimitReached()) {
                     hasMore = false;
@@ -869,10 +941,18 @@ async function _fetchPostsByDateRangeLoop() {
                 // A cursor means X advertised more results — silence here is a
                 // stalled/blocked timeline ("Something went wrong"), NOT the
                 // end of data. Wait it out and retry; content.js clicks Retry
-                // on every scroll ping. Never fake a "complete".
-                if (!payload) payload = await recoverStalledSearchCapture();
+                // on every scroll ping. Never fake a "complete" — EXCEPT when:
+                //  · the collected posts already reach (≥95% cover) the start
+                //    of the requested range — silence IS the end there; or
+                //  · the last page(s) were EMPTY (e.g. a range with no posts:
+                //    X renders "No results", there is nothing to scroll, so no
+                //    new request will ever fire). Recovering for minutes and
+                //    then failing RATE_LIMITED turned "0 posts in range" into
+                //    a fake error.
+                const silenceIsEnd = () => emptyPages > 0 || searchLikelyComplete();
+                if (!payload && !silenceIsEnd()) payload = await recoverStalledSearchCapture();
                 if (!payload) {
-                    if (currentExport.running) {
+                    if (currentExport.running && !silenceIsEnd()) {
                         await flushExportBuffer();
                         await saveCurrentState();
                         throw new Error('RATE_LIMITED');
@@ -922,6 +1002,40 @@ function buildDateRangeSearchQuery(username, dateFrom, dateTo) {
 
 function formatDateForSearch(date) {
     return date.toISOString().slice(0, 10);
+}
+
+// The live search feed runs newest → oldest, so once the oldest collected
+// post sits within a day of the range start, a silent timeline means the end
+// of the data — NOT a stall. Finishing cleanly here beats minutes of pointless
+// rate-limit retries and a "failed" export stuck at 98%.
+function dateRangeCovered() {
+    const fromMs = toEpochMs(currentExport?.dateFrom);
+    const oldest = searchCapture?.oldestCollectedMs;
+    if (!Number.isFinite(fromMs) || !Number.isFinite(oldest)) return false;
+    return (oldest - fromMs) <= 24 * 60 * 60 * 1000;
+}
+
+// How much of the requested date window is already collected, in percent.
+// Date coverage only — never the quantity-limit progress, which measures a
+// different thing (a user stopping at their own limit is not "out of posts").
+function computeDateCoveragePct() {
+    const fromMs = toEpochMs(currentExport?.dateFrom);
+    let toMs = toEpochMs(currentExport?.dateTo);
+    const oldest = searchCapture?.oldestCollectedMs;
+    if (!Number.isFinite(fromMs) || !Number.isFinite(oldest)) return null;
+    if (!Number.isFinite(toMs)) toMs = Date.now();
+    if (toMs <= fromMs) return null;
+    return Math.min(100, Math.max(0, ((toMs - oldest) / (toMs - fromMs)) * 100));
+}
+
+// Real churn case: oldest post in range was Jan 2 with the range starting
+// Jan 1 — 38h gap, so the 24h rule alone kept "recovering" a finished export.
+// ≥95% of the window collected + a silent timeline = done for all practical
+// purposes; the sliver left is a gap in the user's posting, not missing data.
+function searchLikelyComplete() {
+    if (dateRangeCovered()) return true;
+    const pct = computeDateCoveragePct();
+    return Number.isFinite(pct) && pct >= 95;
 }
 
 function buildSearchTimelinePageUrl(rawQuery) {
@@ -1062,15 +1176,9 @@ function computeSearchCaptureProgress() {
         pct = Math.min(100, ((currentExport.tweetCount || 0) / limit) * 100);
     }
 
-    const fromMs = toEpochMs(currentExport.dateFrom);
-    let toMs = toEpochMs(currentExport.dateTo);
-    const oldest = searchCapture?.oldestCollectedMs;
-    if (Number.isFinite(fromMs) && Number.isFinite(oldest)) {
-        if (!Number.isFinite(toMs)) toMs = Date.now();
-        if (toMs > fromMs) {
-            const datePct = Math.min(100, Math.max(0, ((toMs - oldest) / (toMs - fromMs)) * 100));
-            pct = (pct === null) ? datePct : Math.max(pct, datePct);
-        }
+    const datePct = computeDateCoveragePct();
+    if (datePct !== null) {
+        pct = (pct === null) ? datePct : Math.max(pct, datePct);
     }
 
     return pct === null ? null : Math.round(pct);
@@ -1096,6 +1204,9 @@ async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
         dateFrom: currentExport.dateFrom ? formatDateForSearch(currentExport.dateFrom) : '',
         dateTo: currentExport.dateTo ? formatDateForSearch(currentExport.dateTo) : '',
         progressPct: computeSearchCaptureProgress(),
+        // ≥95% of the date window collected → the overlay tells the user the
+        // rest is almost certainly a posting gap, and highlights Stop.
+        almostDone: (computeDateCoveragePct() ?? 0) >= 95,
         i18n,
         ...rest
     };
@@ -1258,28 +1369,51 @@ async function stopExport() {
         rateLimiter.abort();
     }
     await closeSearchCaptureTab();
+    // Acknowledge only after the loop exits, so a Resume/Start issued right
+    // after this response can't collide with the unwinding loop.
+    await waitForLoopUnwind();
     return { success: true };
 }
 
-async function resumeExport() {
+async function resumeExport(extraItems) {
+    await waitForLoopUnwind();
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
         return { error: 'ALREADY_RUNNING' };
     }
     exportStarting = true;
     try {
-        return await _resumeExportInner();
+        return await _resumeExportInner(extraItems);
     } finally {
         exportStarting = false;
     }
 }
 
-async function _resumeExportInner() {
+async function _resumeExportInner(extraItems) {
     const savedState = await XPorterStorage.loadExportState();
     if (!savedState) {
         return { error: 'No export to resume' };
     }
 
-    const settings = await XPorterStorage.loadSettings();
+    const storedSettings = await XPorterStorage.loadSettings();
+    // Resume with the same filters and pacing that produced the saved rows.
+    // UI preferences may have changed since, so merge the export snapshot on
+    // top of today's stored defaults for backward compatibility with states
+    // created before snapshots were persisted.
+    const settings = { ...storedSettings, ...(savedState.settings || {}) };
+
+    // "+N more" resumes raise the limit for THIS export only, by overriding
+    // the per-export settings snapshot — the stored quantityLimit setting is
+    // never touched. (The popup used to SAVE_SETTINGS the bumped value, which
+    // permanently rewrote the user's configured limit on every resume.)
+    // The override persists with the export state so it survives a SW death.
+    const extra = parseInt(extraItems, 10);
+    let limitOverride = savedState.limitOverride || 0;
+    if (Number.isFinite(extra) && extra > 0) {
+        limitOverride = (savedState.tweetCount || 0) + extra;
+    }
+    if (limitOverride > 0) {
+        settings.quantityLimit = limitOverride;
+    }
 
     rateLimiter = createRateLimiter(settings, savedState.exportMode || 'posts');
     lastTransientStatus = null;
@@ -1301,21 +1435,36 @@ async function _resumeExportInner() {
         dateTo: savedState.dateTo ? new Date(savedState.dateTo) : null,
         settings: settings,
         tweetCount: savedState.tweetCount || 0,
+        itemsRecordedBase: savedState.tweetCount || 0,
         totalBatches: savedState.totalBatches || 0,
         tweetBuffer: [],
         userId: savedState.userId,
         userInfo: savedState.userInfo,
         cursor: savedState.cursor,
         startedAt: savedState.startedAt,
-        status: 'fetching'
+        status: 'fetching',
+        limitOverride: limitOverride || 0
     };
 
     launchExportLoop('Resume export error:');
+
+    XPorterStorage.recordExportStart(currentExport.exportMode, currentExport.outputFormat, {
+        resume: true,
+        dateRange: !!(currentExport.dateFrom || currentExport.dateTo)
+    }).then(refreshUninstallURL).catch(() => {});
 
     return { success: true, status: 'resumed', tweetCount: currentExport.tweetCount };
 }
 
 async function getExportStatus() {
+    // Expiration must also run while a terminal export is still held in this
+    // live worker. Previously it only ran after currentExport became null, so
+    // a long-lived worker could retain "auto-cleared" data indefinitely.
+    let savedSettings = null;
+    if (!currentExport?.running) {
+        savedSettings = await applyAutoExpiration();
+    }
+
     if (currentExport) {
         const waitUntil = rateLimiter?.waitUntil || manualWaitUntil || null;
         const transient = currentExport.running && waitUntil > Date.now() && lastTransientStatus
@@ -1349,17 +1498,9 @@ async function getExportStatus() {
     }
 
     // Check saved state
+    if (!savedSettings) savedSettings = await applyAutoExpiration();
     const savedState = await XPorterStorage.loadExportState();
     if (savedState) {
-        const savedSettings = await XPorterStorage.loadSettings();
-        if (savedSettings.autoExpireEnabled && savedState.updatedAt) {
-            const maxAge = (savedSettings.autoExpireHours || 4) * 60 * 60 * 1000;
-            if (Date.now() - savedState.updatedAt > maxAge) {
-                await XPorterStorage.clearExportState();
-                return { running: false, status: 'idle' };
-            }
-        }
-
         // A persisted running=true with no in-memory export means Chrome killed
         // the SW mid-export (sleep, crash, update). Repair it to a resumable
         // 'stopped' — otherwise the UI shows a phantom in-progress export with
@@ -1376,7 +1517,9 @@ async function getExportStatus() {
             username: savedState.username,
             tweetCount: savedState.tweetCount || 0,
             expectedTweets: getExpectedItemCount(savedState),
-            quantityLimit: savedSettings?.quantityLimit || 0,
+            quantityLimit: savedState.limitOverride > 0
+                ? savedState.limitOverride
+                : (savedState.settings?.quantityLimit ?? savedSettings?.quantityLimit ?? 0),
             error: savedState.error || null,
             startedAt: savedState.startedAt,
             completedAt: savedState.completedAt,
@@ -1413,6 +1556,7 @@ async function downloadExport(format) {
 }
 
 async function downloadHistoryEntry(id, format) {
+    await applyAutoExpiration();
     const entry = await XPorterStorage.loadExportHistoryEntry(id);
     if (!entry) {
         return { error: 'HISTORY_NOT_FOUND' };
@@ -1451,7 +1595,7 @@ async function downloadItems(allItems, options) {
         mimeType = 'application/json;charset=utf-8;';
         extension = 'json';
     } else if (format === 'xlsx') {
-        content = XPorterCSV.generateSimpleXLSX(allItems, isUsers, headerOpts);
+        content = XPorterCSV.generateXLSX(allItems, isUsers, headerOpts);
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         extension = 'xlsx';
     } else {
@@ -1485,6 +1629,9 @@ async function downloadItems(allItems, options) {
                     resolve({ error: 'DOWNLOAD_FAILED' });
                     return;
                 }
+                // Anonymous usage counter — "actually got a file in hand" is a
+                // stronger signal than a completed fetch. Fire and forget.
+                XPorterStorage.recordDownload().then(refreshUninstallURL).catch(() => {});
                 resolve({ success: true, downloadId, count: allItems.length, filename });
             });
         };
@@ -1574,8 +1721,24 @@ async function saveCurrentState() {
         startedAt: currentExport.startedAt,
         completedAt: currentExport.completedAt,
         running: currentExport.running,
+        limitOverride: currentExport.limitOverride || 0,
+        settings: { ...currentExport.settings },
         rateLimiterState: rateLimiter?.getState() || null
     });
+}
+
+async function applyAutoExpiration() {
+    const settings = await XPorterStorage.loadSettings();
+    if (settings.autoExpireEnabled === false) return settings;
+
+    const maxAge = Math.max(1, Number(settings.autoExpireHours) || 4) * 60 * 60 * 1000;
+    const state = currentExport?.running ? null : await XPorterStorage.loadExportState();
+    if (state?.updatedAt && Date.now() - state.updatedAt > maxAge) {
+        await XPorterStorage.clearExportState();
+        if (currentExport && !currentExport.running) currentExport = null;
+    }
+    await XPorterStorage.pruneExpiredExportHistory(settings);
+    return settings;
 }
 
 // Cancellable sleep for waits outside RateLimitManager. Check the export flag
@@ -1599,8 +1762,57 @@ async function swSleep(ms) {
     }
 }
 
+// ==================== Toolbar badge ====================
+// The popup closes on any outside click, and churn rows show people start an
+// export, lose the popup, see no sign of life and uninstall minutes later.
+// The badge keeps the export visibly alive on the toolbar icon: live item
+// count while running, ✓ / ! / II when it ends. A terminal badge is cleared
+// as soon as a UI shows the final state (GET_STATUS with running:false).
+const BADGE_COLORS = { run: '#1d9bf0', ok: '#00ba7c', err: '#f4212e', stop: '#e2b203' };
+
+function formatBadgeCount(n) {
+    if (!Number.isFinite(n) || n <= 0) return '';
+    if (n < 1000) return String(n);
+    if (n < 10000) return (Math.floor(n / 100) / 10) + 'k'; // 1.2k
+    return Math.floor(n / 1000) + 'k';                      // 12k (badge fits 4 chars)
+}
+
+function setBadge(text, color) {
+    try {
+        chrome.action.setBadgeText({ text });
+        if (color) chrome.action.setBadgeBackgroundColor({ color });
+    } catch (_) { /* badge is best-effort */ }
+}
+
+function updateBadgeForStatus(event) {
+    switch (event.status) {
+        case 'resolving_user':
+            setBadge('…', BADGE_COLORS.run);
+            break;
+        case 'fetching':
+        case 'cooldown':
+        case 'retrying':
+            setBadge(formatBadgeCount(currentExport?.tweetCount) || '…', BADGE_COLORS.run);
+            break;
+        case 'error':
+            // Transient retry errors (retryIn set, still running) keep the
+            // running badge — only a dead export earns the red mark.
+            if (event.running === false) {
+                setBadge('!', BADGE_COLORS.err);
+            }
+            break;
+        case 'complete':
+            setBadge('✓', BADGE_COLORS.ok);
+            break;
+        case 'stopped':
+            setBadge('II', BADGE_COLORS.stop);
+            break;
+    }
+}
+
 function broadcastStatus(event) {
     if (!chrome.runtime?.id) return;
+    updateBadgeForStatus(event);
     chrome.runtime.sendMessage({
         type: 'EXPORT_STATUS_UPDATE',
         exportMode: currentExport?.exportMode,
@@ -1622,6 +1834,17 @@ function launchExportLoop(logPrefix) {
             // older loop. The loop guard normally prevents that replacement;
             // this identity check is the final safety net.
             if (!currentExport || currentExport !== exportInstance) return;
+
+            // The user already pressed Stop — a late failure from the aborted
+            // in-flight request must land as the 'stopped' they asked for,
+            // not overwrite it with a scary terminal error.
+            if (rateLimiter?._aborted && currentExport.running === false) {
+                currentExport.status = 'stopped';
+                await saveCurrentState();
+                recordExportStoppedOnce();
+                broadcastStopped();
+                return;
+            }
 
             currentExport.running = false;
             currentExport.status = 'error';
@@ -1658,6 +1881,12 @@ function broadcastStopped() {
     });
 }
 
+function recordExportStoppedOnce() {
+    if (!currentExport || currentExport._stopRecorded) return;
+    currentExport._stopRecorded = true;
+    XPorterStorage.recordExportStopped().then(refreshUninstallURL).catch(() => {});
+}
+
 // ==================== Auto-Resume on Startup ====================
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -1667,6 +1896,11 @@ chrome.runtime.onStartup.addListener(async () => {
         state.running = false;
         state.status = 'stopped';
         await XPorterStorage.saveExportState(state);
+        // The pre-restart badge still shows a live count — reflect reality:
+        // the export survived as a resumable 'stopped', not as running.
+        setBadge('II', BADGE_COLORS.stop);
+    } else {
+        setBadge(''); // don't carry a stale badge into a fresh session
     }
 
     // Pre-discover endpoints in background so first export is fast
@@ -1684,6 +1918,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         await XPorterStorage.saveSettings({
             includeRetweets: true,
             includeReplies: true,
+            includeArticles: true,
             quantityLimit: 500,
             requestDelay: 3000,
             exportSpeed: 'standard',

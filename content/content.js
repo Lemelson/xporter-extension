@@ -291,6 +291,23 @@ function ensureXporterCaptureOverlay() {
             animation: none;
             background: linear-gradient(90deg, #FFD400, #FFAD1F);
         }
+        /* ≥95% of the date range collected: the rest is almost certainly a
+           posting gap — say so, and flip Stop into an inviting green finish. */
+        #xporter-capture-overlay.xporter-capture-almost .xporter-capture-subtitle {
+            color: #34D399;
+            font-weight: 650;
+        }
+        #xporter-capture-overlay.xporter-capture-almost .xporter-capture-stop {
+            border-color: rgba(0, 186, 124, 0.65);
+            background: rgba(0, 186, 124, 0.14);
+            color: #34D399;
+            animation: xporter-capture-stop-pulse 1.8s ease-out infinite;
+        }
+        @keyframes xporter-capture-stop-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 186, 124, 0.35); }
+            70% { box-shadow: 0 0 0 8px rgba(0, 186, 124, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 186, 124, 0); }
+        }
         @keyframes xporter-capture-bar-sweep {
             from { transform: translateX(-75%); }
             to { transform: translateX(220%); }
@@ -529,6 +546,7 @@ function updateXporterCaptureOverlay(status) {
     const pauseUntil = Number(status.pauseUntil);
     if (Number.isFinite(pauseUntil) && pauseUntil > Date.now()) {
         overlay.classList.add('xporter-capture-paused');
+        overlay.classList.remove('xporter-capture-almost');
         const renderPause = () => {
             const remaining = Math.max(0, Math.ceil((pauseUntil - Date.now()) / 1000));
             subtitleEl.textContent = `${i.rateLimited || 'X rate limit — retrying in'} ` +
@@ -542,7 +560,17 @@ function updateXporterCaptureOverlay(status) {
         overlay._xporterPauseTicker = setInterval(renderPause, 1000);
     } else {
         overlay.classList.remove('xporter-capture-paused');
-        subtitleEl.textContent = status.phase || i.preparingPage || 'Preparing search page...';
+        // Near the end of the date window the honest message is "that's
+        // probably all of them" — not another phase line that suggests more
+        // posts are coming.
+        if (status.almostDone) {
+            overlay.classList.add('xporter-capture-almost');
+            subtitleEl.textContent = i.almostDone
+                || "Looks like that's all the posts in this range — you can stop the export";
+        } else {
+            overlay.classList.remove('xporter-capture-almost');
+            subtitleEl.textContent = status.phase || i.preparingPage || 'Preparing search page...';
+        }
     }
 }
 
