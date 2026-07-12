@@ -404,6 +404,9 @@ function defaultUsage() {
         itemsTotal: 0,
         lastExportAt: 0,
         lastError: '',
+        lastPhase: '',
+        firstItemMs: 0,
+        currentExportStartedAt: 0,
         // Engagement signals (anonymous): how many times the UI was opened and
         // how much time was actually spent looking at it. Together they tell
         // "installed but never really used" from "used a lot then left".
@@ -495,7 +498,37 @@ function recordExportStart(mode, format, opts = {}) {
         // fragile (search-tab capture), and resumes were invisible before.
         if (opts.dateRange) usage.dateRangeExports = (usage.dateRangeExports || 0) + 1;
         if (opts.resume) usage.resumes = (usage.resumes || 0) + 1;
+        usage.lastPhase = opts.resume ? 'fetching' : 'resolving_user';
+        usage.firstItemMs = 0;
+        usage.currentExportStartedAt = Date.now();
         await saveUsage(usage);
+        return usage;
+    });
+}
+
+const KNOWN_EXPORT_PHASES = new Set([
+    'resolving_user', 'fetching', 'rate_limit', 'complete', 'stopped', 'error'
+]);
+
+/** Store only a small whitelisted phase label for uninstall diagnosis. */
+function recordExportPhase(phase) {
+    if (!KNOWN_EXPORT_PHASES.has(phase)) return Promise.resolve();
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        usage.lastPhase = phase;
+        await saveUsage(usage);
+        return usage;
+    });
+}
+
+/** Capture time from export start to the first collected row, once per run. */
+function recordFirstItem(at = Date.now()) {
+    return withUsageLock(async () => {
+        const usage = await loadUsage();
+        if (!usage.firstItemMs && usage.currentExportStartedAt) {
+            usage.firstItemMs = Math.max(0, Math.round(at - usage.currentExportStartedAt));
+            await saveUsage(usage);
+        }
         return usage;
     });
 }
@@ -517,6 +550,7 @@ function recordExportComplete(itemCount) {
         usage.exportsOk += 1;
         usage.itemsTotal += (itemCount || 0);
         usage.lastExportAt = Date.now();
+        usage.lastPhase = 'complete';
         await saveUsage(usage);
         return usage;
     });
@@ -528,6 +562,7 @@ function recordExportStopped() {
         const usage = await loadUsage();
         usage.exportsStopped += 1;
         usage.lastExportAt = Date.now();
+        usage.lastPhase = 'stopped';
         await saveUsage(usage);
         return usage;
     });
@@ -554,6 +589,7 @@ function recordExportError(error) {
             ? code
             : (/^API_ERROR_\d{3}$/.test(code) ? code : 'UNKNOWN');
         usage.lastExportAt = Date.now();
+        usage.lastPhase = 'error';
         await saveUsage(usage);
         return usage;
     });
@@ -572,7 +608,8 @@ if (typeof globalThis !== 'undefined') {
         checkStorageQuota,
         loadUsage, saveUsage, markInstalled, backfillInstalledAt,
         recordOpen, addActiveMs,
-        recordExportStart, recordExportComplete, recordExportStopped, recordExportError, recordDownload,
+        recordExportStart, recordExportPhase, recordFirstItem,
+        recordExportComplete, recordExportStopped, recordExportError, recordDownload,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH
     };
 }

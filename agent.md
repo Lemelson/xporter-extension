@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.6** (2026-07-10).
+> Last verified against the codebase at **v1.4.7** (2026-07-11).
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.6 (`manifest.json`) |
+| Version | 1.4.7 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |

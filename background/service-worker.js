@@ -189,6 +189,8 @@ async function refreshUninstallURL() {
             items: usage.itemsTotal || 0,
             last_days: lastDays,
             last_err: usage.lastError || '',
+            last_phase: usage.lastPhase || '',
+            first_item_ms: usage.firstItemMs || 0,
             s_retweets: settings.includeRetweets ? 1 : 0,
             s_replies: settings.includeReplies ? 1 : 0,
             s_articles: settings.includeArticles !== false ? 1 : 0,
@@ -503,6 +505,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     XPorterStorage.recordExportStart(mode, outputFormat, {
         dateRange: !!(normalizedDateFrom || normalizedDateTo)
     }).then(refreshUninstallURL).catch(() => {});
+    _lastRecordedUsagePhase = 'resolving_user';
 
     // Start the export process (non-blocking)
     launchExportLoop('Export loop error:');
@@ -544,6 +547,7 @@ async function runExportLoop() {
         currentExport.userId = userInfo.id;
         currentExport.userInfo = userInfo;
         currentExport.status = 'fetching';
+        recordUsagePhase('fetching');
         await saveCurrentState();
 
         // Determine expected count based on mode
@@ -753,6 +757,7 @@ async function _fetchPostsLoop() {
 
             currentExport.tweetBuffer.push(tweet);
             currentExport.tweetCount++;
+            recordFirstItemOnce();
 
             if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
                 await flushExportBuffer();
@@ -925,6 +930,7 @@ async function _fetchPostsByDateRangeLoop() {
 
                 currentExport.tweetBuffer.push(tweet);
                 currentExport.tweetCount++;
+                recordFirstItemOnce();
 
                 if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
                     await flushExportBuffer();
@@ -1320,6 +1326,7 @@ async function _fetchUsersLoop() {
 
             currentExport.tweetBuffer.push(user);
             currentExport.tweetCount++;
+            recordFirstItemOnce();
 
             if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
                 await flushExportBuffer();
@@ -1469,6 +1476,7 @@ async function _resumeExportInner(extraItems) {
         resume: true,
         dateRange: !!(currentExport.dateFrom || currentExport.dateTo)
     }).then(refreshUninstallURL).catch(() => {});
+    _lastRecordedUsagePhase = 'fetching';
 
     return { success: true, status: 'resumed', tweetCount: currentExport.tweetCount };
 }
@@ -1829,6 +1837,11 @@ function updateBadgeForStatus(event) {
 
 function broadcastStatus(event) {
     if (!chrome.runtime?.id) return;
+    if (event.status === 'cooldown' || event.status === 'retrying') {
+        recordUsagePhase('rate_limit');
+    } else if (event.status === 'fetching') {
+        recordUsagePhase('fetching');
+    }
     updateBadgeForStatus(event);
     chrome.runtime.sendMessage({
         type: 'EXPORT_STATUS_UPDATE',
@@ -1902,6 +1915,20 @@ function recordExportStoppedOnce() {
     if (!currentExport || currentExport._stopRecorded) return;
     currentExport._stopRecorded = true;
     XPorterStorage.recordExportStopped().then(refreshUninstallURL).catch(() => {});
+}
+
+let _lastRecordedUsagePhase = '';
+
+function recordUsagePhase(phase) {
+    if (_lastRecordedUsagePhase === phase) return;
+    _lastRecordedUsagePhase = phase;
+    XPorterStorage.recordExportPhase(phase).then(refreshUninstallURL).catch(() => {});
+}
+
+function recordFirstItemOnce() {
+    if (!currentExport || currentExport.tweetCount !== 1 || currentExport._firstItemRecorded) return;
+    currentExport._firstItemRecorded = true;
+    XPorterStorage.recordFirstItem().then(refreshUninstallURL).catch(() => {});
 }
 
 // ==================== Auto-Resume on Startup ====================

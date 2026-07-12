@@ -233,7 +233,7 @@ function createWorkerHarness() {
                 onInstalled: { addListener() {} },
                 onStartup: { addListener() {} },
                 onMessage: { addListener() {} },
-                getManifest: () => ({ version: '1.4.6' }),
+                getManifest: () => ({ version: '1.4.7' }),
                 setUninstallURL() {},
                 getPlatformInfo: async () => ({ os: 'mac' }),
                 sendMessage: async () => ({})
