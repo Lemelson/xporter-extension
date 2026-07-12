@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.7** (2026-07-11).
+> Last verified against the codebase at **v1.4.7** (2026-07-12).
 
 ---
 
@@ -353,7 +353,9 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. For a real unpacked-browser check, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
+Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. The static-contract suite checks runtime JavaScript syntax, manifest/import/popup assets, DOM IDs, both 14-locale sets, popup i18n references, and the popup/content/worker message protocol without opening a browser. For a real unpacked-browser check, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
+
+**Static-only audit boundary.** A clean local suite proves internal contracts, parsers against fixtures, persistence/rate-limit state, and generated files. It does **not** prove that X's current queryIds, GraphQL feature flags, cookie behavior, or live payload shapes still match the code. Record that distinction explicitly whenever browser/live-X validation is intentionally skipped.
 
 ---
 

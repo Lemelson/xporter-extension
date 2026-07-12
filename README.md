@@ -30,7 +30,7 @@
 - **CSV, JSON, and XLSX output** — choose the format that fits your workflow
 - **Date range filtering** — export posts from a specific time window
 - **Pause and resume** — stop mid-export and continue later with zero data loss
-- **Smart rate limiting** — handles X API limits automatically with configurable batch sizes and cooldowns
+- **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
 - **100% local processing** — everything happens in your browser; your exported data is never transmitted anywhere
 - **Dark and light themes** — glassmorphism UI with a one-click toggle
 - **14 languages** — auto-detects Chrome's UI language on first launch
@@ -86,10 +86,11 @@ X periodically rotates its GraphQL `queryId` values. XPorter handles this by:
 5. Automatically re-discovering on `STALE_QUERY_ID` (HTTP 400) errors
 
 **Rate limiting:**
-- Configurable batch size (default: 20 requests)
-- Configurable cooldown between batches (default: 3 minutes)
-- Exponential backoff on 429 responses
-- Automatic retry with fresh endpoints on stale query errors
+- Five named speed presets target roughly 2 / 3 / 4 / 7 / 12 seconds between requests; Standard (~4 s) is the default
+- A Custom mode exposes the request delay, batch size, and longer batch cooldown
+- Valid `x-rate-limit-*` headers always take priority so XPorter stops at the live quota instead of overrunning it
+- Missing headers use conservative mode-specific fallback delays; 429s and network timeouts retry automatically
+- Stale GraphQL query IDs trigger live capture or endpoint re-discovery before the export fails
 
 ## Export Output
 
@@ -116,6 +117,8 @@ Post exports include:
 | `urls` | Expanded URLs, comma-separated |
 | `media_type` | `photo` · `video` · `animated_gif` |
 | `media_urls` | Direct media URLs (highest quality) |
+| `media_alt_texts` | Author-written media descriptions, when present |
+| `article_title` / `article_url` / `article_text` | X Article metadata and available plain text |
 
 User-list exports include:
 
@@ -145,11 +148,14 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 |---|---|---|
 | Include retweets | On | Export retweets alongside original posts |
 | Include replies | On | Export replies alongside original posts |
+| Include articles | On | Export X Articles alongside ordinary posts |
 | Export mode | Posts | Data type to export: posts, followers, following, or verified followers |
 | Output format | CSV | File format: CSV, JSON, or XLSX |
 | Quantity limit | 500 | Maximum posts or users per export (0 = unlimited) |
-| Cooldown duration | 3 min | Pause between request batches |
-| Batch size | 20 | Requests before triggering a cooldown |
+| Export Speed | Standard | Turbo, Fast, Standard, Careful, Turtle, or Custom request pacing |
+| Custom pacing | 5 s / 20 / 3 min | Delay, requests per batch, and batch pause used only by Custom |
+| Auto-clear old exports | On / 4 hours | Removes old downloadable payloads while keeping history metadata |
+| Localize column titles | On | Translate CSV/XLSX headers; JSON keys always remain English |
 
 Preset quantity options: 100, 500, 1,000, 5,000, 10,000, unlimited, or a custom value.
 

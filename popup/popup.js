@@ -615,23 +615,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isIdle = !status || status.status === 'idle';
     if (isIdle) {
         const activeTab = activeTabs[0];
-        if (activeTab?.url) {
-            const tabUsername = extractUsernameFromInput(activeTab.url);
-            if (tabUsername) {
-                usernameInput.value = tabUsername;
-            }
-        } else if (!activeTab) {
+        const tabUsername = activeTab?.url ? extractUsernameFromInput(activeTab.url) : '';
+        if (tabUsername) {
+            usernameInput.value = tabUsername;
+        } else {
+            // The active tab may be chrome://, a non-X page, or otherwise hide
+            // its URL. Fall back to the last profile seen by content.js.
             const usernameResult = await sendMessage({ type: 'GET_USERNAME' });
             if (usernameResult?.username) {
                 usernameInput.value = usernameResult.username;
             }
         }
-    }
-
-    // ==================== Helper: mode-specific item label ====================
-    function itemLabel() {
-        const mode = exportMode.value;
-        return collectedLabel(lastItemCount || 0, mode, currentLang, currentTranslations);
     }
 
     function updateResumeQuantityLabel() {
