@@ -217,6 +217,25 @@ async function run() {
         'resume after elapsed wall-clock cooldown must only use the normal request delay'
     );
 
+    const changedPacing = new RateLimitManager({
+        requestDelay: 12000,
+        batchSize: 50,
+        cooldownDuration: 600000
+    });
+    changedPacing.restoreState({
+        requestCount: 7,
+        totalRequests: 9,
+        requestDelay: 2000,
+        batchSize: 5,
+        cooldownDuration: 30000,
+        lastRequestAt: 123
+    });
+    assert.equal(changedPacing.requestDelay, 12000, 'resume must keep the newly selected request delay');
+    assert.equal(changedPacing.batchSize, 50, 'resume must keep the newly selected batch size');
+    assert.equal(changedPacing.cooldownDuration, 600000, 'resume must keep the newly selected cooldown');
+    assert.equal(changedPacing.requestCount, 7, 'resume must restore request counters');
+    assert.equal(changedPacing.lastRequestAt, 123, 'resume must restore cooldown timing');
+
     let attempts = 0;
     const waits = [];
     const retry = new RateLimitManager({
@@ -255,6 +274,10 @@ async function run() {
             }
         }
     };
+    vm.runInThisContext(
+        fs.readFileSync(path.join(__dirname, '../utils/api-parsers.js'), 'utf8'),
+        { filename: 'utils/api-parsers.js' }
+    );
     vm.runInThisContext(
         fs.readFileSync(path.join(__dirname, '../utils/api.js'), 'utf8'),
         { filename: 'utils/api.js' }
@@ -331,6 +354,24 @@ async function run() {
         fs.readFileSync(path.join(__dirname, '../utils/storage.js'), 'utf8'),
         { filename: 'utils/storage.js' }
     );
+
+    const settingsCache = { theme: 'dark' };
+    uiContext.__settingsCache = settingsCache;
+    uiContext.chrome = {
+        runtime: {
+            lastError: null,
+            sendMessage(_message, callback) { callback({ error: 'STORAGE_FULL' }); }
+        }
+    };
+    const failedPatch = await vm.runInContext(
+        'persistSettingsPatch(__settingsCache, { theme: "light" })',
+        uiContext
+    );
+    assert.equal(failedPatch.error, 'STORAGE_FULL');
+    assert.equal(settingsCache.theme, 'dark', 'a failed settings write must not advance the popup cache');
+    uiContext.chrome.runtime.sendMessage = (_message, callback) => callback({ success: true });
+    await vm.runInContext('persistSettingsPatch(__settingsCache, { theme: "light" })', uiContext);
+    assert.equal(settingsCache.theme, 'light', 'a confirmed settings write must advance the popup cache');
     await XPorterStorage.saveSettings({ theme: 'light' });
     const savedSettings = await XPorterStorage.loadSettings();
     assert.equal(savedSettings.theme, 'light');

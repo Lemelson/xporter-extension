@@ -606,7 +606,7 @@ if (typeof globalThis !== 'undefined') {
         pruneExpiredExportHistory,
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
-        loadUsage, saveUsage, markInstalled, backfillInstalledAt,
+        loadUsage, markInstalled, backfillInstalledAt,
         recordOpen, addActiveMs,
         recordExportStart, recordExportPhase, recordFirstItem,
         recordExportComplete, recordExportStopped, recordExportError, recordDownload,

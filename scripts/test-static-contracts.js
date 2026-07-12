@@ -38,7 +38,7 @@ for (const iconMap of [manifest.icons, manifest.action.default_icon]) {
 }
 
 const workerSource = read(manifest.background.service_worker);
-const workerImports = [...workerSource.matchAll(/['"](\.\.\/[^'"]+\.js)['"]/g)]
+const workerImports = [...workerSource.matchAll(/['"]((?:\.\.?\/)[^'"]+\.js)['"]/g)]
     .map((match) => localRef(manifest.background.service_worker, match[1]));
 for (const file of workerImports) assertFile(file, 'importScripts');
 
@@ -54,12 +54,20 @@ for (const file of popupRefs) assertFile(file, 'popup asset');
 const popupScripts = [...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
     .map((match) => match[1]);
 assert.equal(popupScripts[0], 'theme-init.js', 'theme-init.js must remain the first popup script');
+assert(
+    popupScripts.indexOf('history.js') < popupScripts.indexOf('popup.js') &&
+    popupScripts.indexOf('seen-posts.js') < popupScripts.indexOf('popup.js'),
+    'popup modules must load before popup.js initializes them'
+);
 
 const htmlIds = [...popupHtml.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
 assert.equal(new Set(htmlIds).size, htmlIds.length, 'popup.html contains duplicate ids');
 const idSet = new Set(htmlIds);
-const popupRuntime = ['popup/popup.js', 'popup/theme.js', 'popup/rate-prompt.js', 'popup/ladybug.js']
-    .map(read).join('\n');
+const popupRuntime = popupScripts
+    .map((script) => localRef(popupFile, script))
+    .filter(Boolean)
+    .map(read)
+    .join('\n');
 const referencedIds = [...popupRuntime.matchAll(/getElementById\(['"]([^'"]+)['"]\)/g)]
     .map((match) => match[1]);
 for (const id of referencedIds) assert(idSet.has(id), `popup JS references missing id: ${id}`);
@@ -106,8 +114,7 @@ for (const match of JSON.stringify(manifest).matchAll(/__MSG_([^_][A-Za-z0-9_]*)
 
 const workerCases = new Set([...workerSource.matchAll(/case\s+['"]([A-Z][A-Z0-9_]*)['"]/g)]
     .map((match) => match[1]));
-const senderFiles = ['popup/popup.js', 'utils/usage-tracker.js', 'content/content.js'];
-const senderSource = senderFiles.map(read).join('\n');
+const senderSource = popupRuntime + '\n' + read('content/content.js');
 const sentToWorker = new Set([...senderSource.matchAll(/type\s*:\s*['"]([A-Z][A-Z0-9_]*)['"]/g)]
     .map((match) => match[1]));
 for (const type of sentToWorker) {

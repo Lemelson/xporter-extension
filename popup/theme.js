@@ -14,13 +14,10 @@ const ICONS = {
  * Returns the resolved theme mode ('light' or 'dark').
  */
 function initTheme(savedTheme, themeIconEl) {
-    if (savedTheme === 'light') {
-        document.body.classList.add('light');
-        themeIconEl.innerHTML = ICONS.moon;
-        return 'light';
-    }
-    themeIconEl.innerHTML = ICONS.sun;
-    return 'dark';
+    const isLight = savedTheme === 'light';
+    document.body.classList.toggle('light', isLight);
+    themeIconEl.innerHTML = isLight ? ICONS.moon : ICONS.sun;
+    return isLight ? 'light' : 'dark';
 }
 
 /**

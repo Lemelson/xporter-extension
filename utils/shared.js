@@ -35,6 +35,20 @@ function sendMessage(msg, timeoutMs) {
     });
 }
 
+/**
+ * Persist a partial settings update and advance the caller's cache only after
+ * storage confirms the write. Keeping this transaction in one place prevents
+ * a failed save from becoming the popup's new in-memory source of truth.
+ */
+async function persistSettingsPatch(currentSettings, patch) {
+    if (!patch || Object.keys(patch).length === 0) return { success: true };
+    const result = await sendMessage({ type: 'SAVE_SETTINGS', settings: patch });
+    if (result?.success === true) {
+        Object.assign(currentSettings, patch);
+    }
+    return result;
+}
+
 // ==================== Auth ====================
 
 /**

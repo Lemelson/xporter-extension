@@ -5,13 +5,16 @@
 importScripts(
     '../utils/config.js',
     '../utils/api-features.js',
+    '../utils/api-parsers.js',
     '../utils/api.js',
     '../utils/rateLimit.js',
     '../utils/columns-i18n.js',
     '../utils/csv.js',
     '../utils/storage.js',
     '../utils/post-database.js',
-    '../popup/i18n.js' // loadTranslations() — used to localize the in-page capture overlay
+    '../popup/i18n.js', // loadTranslations() — used to localize the in-page capture overlay
+    './uninstall-feedback.js',
+    './downloads.js'
 );
 
 // Export batches, history, settings, and usage counters are worker/UI data.
@@ -119,114 +122,6 @@ function createRateLimiter(settings, mode) {
     });
 }
 
-// ==================== Uninstall feedback ====================
-// When the user removes XPorter, Chrome opens this page in a new tab. We append an
-// anonymous, non-personal usage snapshot (version, install age, language, theme,
-// per-mode/format counts, success/error totals, a few settings) so the feedback
-// form can ask the right follow-up and so churn can be understood.
-// NO X data, no usernames, nothing identifying is ever sent. Disclosed in the
-// privacy policy. EDIT this if your GitHub Pages URL differs.
-const FEEDBACK_URL_BASE = 'https://lemelson.github.io/xporter/feedback.html';
-
-let _lastUninstallRefresh = 0;
-
-// Throttled wrapper: high-frequency callers (active-time ticks) use this so we
-// don't rebuild the URL every few seconds. `force` bypasses the throttle.
-function maybeRefreshUninstallURL(force) {
-    const now = Date.now();
-    if (force || now - _lastUninstallRefresh > 20000) {
-        refreshUninstallURL();
-    }
-}
-
-async function refreshUninstallURL() {
-    _lastUninstallRefresh = Date.now();
-    try {
-        const [settings, usage] = await Promise.all([
-            XPorterStorage.loadSettings(),
-            XPorterStorage.loadUsage()
-        ]);
-        const now = Date.now();
-        const days = usage.installedAt ? Math.floor((now - usage.installedAt) / 86400000) : '';
-        const lastDays = usage.lastExportAt ? Math.floor((now - usage.lastExportAt) / 86400000) : '';
-        let lang = settings.language;
-        if (!lang && typeof detectBrowserLanguage === 'function') {
-            try { lang = detectBrowserLanguage(); } catch (_) { /* ignore */ }
-        }
-        // Operating system (win | mac | linux | cros | …) so churn can be sliced
-        // by platform without parsing the User-Agent.
-        let os = '';
-        try {
-            const pi = await chrome.runtime.getPlatformInfo();
-            os = (pi && pi.os) || '';
-        } catch (_) { /* ignore */ }
-        const m = usage.byMode || {};
-        const f = usage.byFormat || {};
-        const p = {
-            src: 'uninstall',
-            v: chrome.runtime.getManifest().version,
-            os,
-            days,
-            installed_at: usage.installedAt ? new Date(usage.installedAt).toISOString() : '',
-            ui_lang: lang || 'en',
-            theme: settings.theme || '',
-            opens: usage.opens || 0,
-            active_s: Math.round((usage.activeMs || 0) / 1000),
-            exp_started: usage.exportsStarted || 0,
-            exp_ok: usage.exportsOk || 0,
-            exp_err: usage.exportsErr || 0,
-            exp_stopped: usage.exportsStopped || 0,
-            m_posts: m.posts || 0,
-            m_followers: m.followers || 0,
-            m_following: m.following || 0,
-            m_verified: m.verifiedFollowers || 0,
-            m_dates: usage.dateRangeExports || 0,
-            resumes: usage.resumes || 0,
-            dl: usage.downloads || 0,
-            f_csv: f.csv || 0,
-            f_json: f.json || 0,
-            f_xlsx: f.xlsx || 0,
-            items: usage.itemsTotal || 0,
-            last_days: lastDays,
-            last_err: usage.lastError || '',
-            last_phase: usage.lastPhase || '',
-            first_item_ms: usage.firstItemMs || 0,
-            s_retweets: settings.includeRetweets ? 1 : 0,
-            s_replies: settings.includeReplies ? 1 : 0,
-            s_articles: settings.includeArticles !== false ? 1 : 0,
-            s_limit: settings.quantityLimit,
-            s_localize: settings.localizeExportHeaders ? 1 : 0,
-            // Speed preset; for custom, inline the user's own pacing numbers
-            // (delay sec / cooldown min / batch size) so churn can be sliced
-            // by how aggressively people were hitting X.
-            s_speed: settings.exportSpeed === 'custom'
-                ? `custom_${settings.customDelaySec || 0}_${settings.customCooldownMin || 0}_${settings.customBatchSize || 0}`
-                : (settings.exportSpeed || 'standard'),
-            s_adaptive: settings.adaptivePacing !== false ? 1 : 0
-        };
-        if (usage.installedAtApprox) p.inst_approx = 1;
-        const qs = Object.keys(p)
-            .filter(k => p[k] !== '' && p[k] !== undefined && p[k] !== null)
-            .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(p[k]))
-            .join('&');
-        chrome.runtime.setUninstallURL(FEEDBACK_URL_BASE + '?' + qs);
-    } catch (e) {
-        // Always keep a working URL so the feedback page still opens.
-        try { chrome.runtime.setUninstallURL(FEEDBACK_URL_BASE + '?src=uninstall'); } catch (_) { /* ignore */ }
-    }
-}
-
-chrome.runtime.onInstalled.addListener(async (details) => {
-    if (details.reason === 'install') {
-        await XPorterStorage.markInstalled(chrome.runtime.getManifest().version);
-    } else if (details.reason === 'update') {
-        await XPorterStorage.backfillInstalledAt();
-    }
-    refreshUninstallURL();
-});
-
-chrome.runtime.onStartup.addListener(() => { refreshUninstallURL(); });
-
 // ==================== Overlay i18n (date-range capture overlay) ====================
 // The in-page overlay shown on x.com during a date-range export lives in the page
 // context and can't load the popup locale files itself. The worker loads the user's
@@ -322,10 +217,11 @@ async function handleMessage(message, sender) {
 
         case 'DOWNLOAD_CSV':
         case 'DOWNLOAD_EXPORT':
-            return await downloadExport(message.outputFormat);
+            return await XPorterDownloads.downloadCurrent(message.outputFormat);
 
         case 'DOWNLOAD_HISTORY_ENTRY':
-            return await downloadHistoryEntry(message.id, message.outputFormat);
+            await applyAutoExpiration();
+            return await XPorterDownloads.downloadHistory(message.id, message.outputFormat);
 
         case 'RESUME_EXPORT':
             return await resumeExport(message.extraItems);
@@ -336,7 +232,7 @@ async function handleMessage(message, sender) {
             }
             _overlayI18n = null; // language may have changed — reload overlay strings lazily
             await applyAutoExpiration();
-            refreshUninstallURL(); // keep language/theme/settings snapshot fresh
+            XPorterFeedback.refresh(); // keep language/theme/settings snapshot fresh
             return { success: true };
 
         case 'GET_SETTINGS':
@@ -347,7 +243,9 @@ async function handleMessage(message, sender) {
             if (exportLoopPromise) {
                 return { error: 'ALREADY_RUNNING' };
             }
-            await XPorterStorage.clearExportState();
+            if (!await XPorterStorage.clearExportState()) {
+                return { error: 'STORAGE_FULL' };
+            }
             currentExport = null;
             setBadge('');
             return { success: true };
@@ -382,7 +280,7 @@ async function handleMessage(message, sender) {
             return XPorterPostDB.getSummary();
 
         case 'DOWNLOAD_FEED_DB':
-            return downloadFeedDatabase(message.outputFormat);
+            return XPorterDownloads.downloadSeenPosts(message.outputFormat);
 
         case 'CLEAR_FEED_DB':
             await XPorterPostDB.clear();
@@ -394,24 +292,26 @@ async function handleMessage(message, sender) {
             return { history: history.map(({ items, ...entry }) => entry) };
 
         case 'DELETE_HISTORY_ENTRY':
-            await XPorterStorage.deleteExportHistoryEntry(message.id);
-            return { success: true };
+            return await XPorterStorage.deleteExportHistoryEntry(message.id)
+                ? { success: true }
+                : { error: 'STORAGE_FULL' };
 
         case 'CLEAR_HISTORY':
-            await XPorterStorage.clearExportHistory();
-            return { success: true };
+            return await XPorterStorage.clearExportHistory()
+                ? { success: true }
+                : { error: 'STORAGE_FULL' };
 
         case 'XP_SESSION_OPEN':
             // Popup was opened — count it and refresh the snapshot.
             await XPorterStorage.recordOpen();
-            refreshUninstallURL();
+            XPorterFeedback.refresh();
             return { success: true };
 
         case 'XP_ACTIVE_TICK':
             // Accumulated active (visible) time in the UI. Refresh is throttled
             // unless the page is unloading (flush) so we don't churn on every tick.
             await XPorterStorage.addActiveMs(message.ms);
-            maybeRefreshUninstallURL(message.flush);
+            XPorterFeedback.maybeRefresh(message.flush);
             return { success: true };
 
         default:
@@ -478,7 +378,9 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     });
 
     // Clear previous export data
-    await XPorterStorage.clearExportState();
+    if (!await XPorterStorage.clearExportState()) {
+        return { error: 'STORAGE_FULL' };
+    }
 
     currentExport = {
         running: true,
@@ -498,13 +400,20 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
         status: 'resolving_user'
     };
 
-    // Save initial state
-    await saveCurrentState();
+    // Save initial state before acknowledging the start. A failed write must
+    // not leave an in-memory export marked running with no loop behind it.
+    try {
+        await saveCurrentState();
+    } catch (error) {
+        currentExport = null;
+        rateLimiter = null;
+        return { error: error.message };
+    }
 
     // Anonymous usage counter (for uninstall feedback) — fire and forget
     XPorterStorage.recordExportStart(mode, outputFormat, {
         dateRange: !!(normalizedDateFrom || normalizedDateTo)
-    }).then(refreshUninstallURL).catch(() => {});
+    }).then(XPorterFeedback.refresh).catch(() => {});
     _lastRecordedUsagePhase = 'resolving_user';
 
     // Start the export process (non-blocking)
@@ -605,7 +514,7 @@ async function runExportLoop() {
 
         // Anonymous usage counter (for uninstall feedback) — fire and forget
         const itemsDelta = Math.max(0, currentExport.tweetCount - (currentExport.itemsRecordedBase || 0));
-        XPorterStorage.recordExportComplete(itemsDelta).then(refreshUninstallURL).catch(() => {});
+        XPorterStorage.recordExportComplete(itemsDelta).then(XPorterFeedback.refresh).catch(() => {});
 
         broadcastStatus({
             running: false,
@@ -878,7 +787,7 @@ async function _fetchPostsByDateRangeLoop() {
                 continue;
             }
             try {
-                parsedPayload = parseSearchTimelineResponse(JSON.parse(payload.bodyText));
+                parsedPayload = XPorterAPI.parseSearchTimelineResponse(JSON.parse(payload.bodyText));
             } catch (_) {
                 badPageStreak++;
                 if (badPageStreak > 5) throw new Error('SEARCH_CAPTURE_TIMEOUT');
@@ -1375,6 +1284,7 @@ async function stopExport() {
     if (rateLimiter) {
         rateLimiter.abort();
     }
+    XPorterAPI.abortActiveRequests?.();
     await closeSearchCaptureTab();
     // Acknowledge only after the loop exits, so a Resume/Start issued right
     // after this response can't collide with the unwinding loop.
@@ -1470,12 +1380,22 @@ async function _resumeExportInner(extraItems) {
         limitOverride: limitOverride || 0
     };
 
+    // Persist the raised per-export limit and running state before the loop can
+    // enter a long rate-limit wait or be terminated by Chrome.
+    try {
+        await saveCurrentState();
+    } catch (error) {
+        currentExport = null;
+        rateLimiter = null;
+        return { error: error.message };
+    }
+
     // Enqueue the per-run usage reset before the loop can collect its first
     // resumed item. This keeps first_item_ms tied to this resume attempt.
     XPorterStorage.recordExportStart(currentExport.exportMode, currentExport.outputFormat, {
         resume: true,
         dateRange: !!(currentExport.dateFrom || currentExport.dateTo)
-    }).then(refreshUninstallURL).catch(() => {});
+    }).then(XPorterFeedback.refresh).catch(() => {});
     _lastRecordedUsagePhase = 'fetching';
 
     launchExportLoop('Resume export error:');
@@ -1560,179 +1480,12 @@ async function getExportStatus() {
     return { running: false, status: 'idle' };
 }
 
-// ==================== Download (Multi-Format) ====================
-
-async function downloadExport(format) {
-    const allItems = await XPorterStorage.loadAllTweets();
-    if (allItems.length === 0) {
-        return { error: 'NO_DATA' };
-    }
-
-    const state = await XPorterStorage.loadExportState();
-    const username = state?.username || 'unknown';
-    const mode = state?.exportMode || 'posts';
-    format = format || state?.outputFormat || 'csv';
-
-    return await downloadItems(allItems, {
-        username,
-        mode,
-        format,
-        dateFrom: state?.dateFrom,
-        dateTo: state?.dateTo
-    });
-}
-
-async function downloadHistoryEntry(id, format) {
-    await applyAutoExpiration();
-    const entry = await XPorterStorage.loadExportHistoryEntry(id);
-    if (!entry) {
-        return { error: 'HISTORY_NOT_FOUND' };
-    }
-    if (!Array.isArray(entry.items) || entry.items.length === 0) {
-        return { error: 'HISTORY_DATA_GONE' };
-    }
-
-    return await downloadItems(entry.items, {
-        username: entry.username || 'unknown',
-        mode: entry.exportMode || 'posts',
-        format: format || entry.outputFormat || 'csv',
-        dateFrom: entry.dateFrom,
-        dateTo: entry.dateTo,
-        exportedAt: entry.completedAt || new Date()
-    });
-}
-
-async function downloadItems(allItems, options) {
-    const username = options.username || 'unknown';
-    const mode = options.mode || 'posts';
-    const format = options.format || 'csv';
-    const isUsers = (mode !== 'posts');
-    let content, mimeType, extension;
-
-    // Localize CSV/XLSX header labels when the user opts in (default on). The
-    // underlying data keys — and all JSON keys — always stay English.
-    const settings = await XPorterStorage.loadSettings();
-    const headerOpts = {
-        localize: settings.localizeExportHeaders === true,
-        lang: settings.language || 'en'
-    };
-
-    if (format === 'json') {
-        content = JSON.stringify(allItems, null, 2);
-        mimeType = 'application/json;charset=utf-8;';
-        extension = 'json';
-    } else if (format === 'xlsx') {
-        content = XPorterCSV.generateXLSX(allItems, isUsers, headerOpts);
-        mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-        extension = 'xlsx';
-    } else {
-        content = XPorterCSV.generateCSV(allItems, isUsers, headerOpts);
-        mimeType = 'text/csv;charset=utf-8;';
-        extension = 'csv';
-    }
-
-    const filename = XPorterCSV.generateExportFilename(username, mode, extension, {
-        dateFrom: options.dateFrom,
-        dateTo: options.dateTo,
-        exportedAt: options.exportedAt || new Date()
-    });
-    const blob = new Blob([content], { type: mimeType });
-    const reader = new FileReader();
-
-    return new Promise((resolve) => {
-        reader.onerror = () => {
-            resolve({ error: 'DOWNLOAD_FAILED' });
-        };
-        reader.onload = () => {
-            chrome.downloads.download({
-                url: reader.result,
-                filename: filename,
-                saveAs: true
-            }, (downloadId) => {
-                // A blocked/rejected download surfaces only here — reporting
-                // success anyway would show a false "Download started" toast.
-                if (chrome.runtime.lastError || downloadId === undefined) {
-                    XLog.error('Download failed:', chrome.runtime.lastError?.message);
-                    resolve({ error: 'DOWNLOAD_FAILED' });
-                    return;
-                }
-                // Anonymous usage counter — "actually got a file in hand" is a
-                // stronger signal than a completed fetch. Fire and forget.
-                XPorterStorage.recordDownload().then(refreshUninstallURL).catch(() => {});
-                resolve({ success: true, downloadId, count: allItems.length, filename });
-            });
-        };
-        reader.readAsDataURL(blob);
-    });
-}
-
-const FEED_EXPORT_HEADERS = [
-    'id', 'text', 'tweet_url', 'language', 'created_at',
-    'author_id', 'author_name', 'author_username',
-    'author_followers_count', 'first_author_followers_count', 'author_verified',
-    'view_count', 'bookmark_count', 'favorite_count', 'retweet_count', 'reply_count', 'quote_count',
-    'first_view_count', 'first_bookmark_count', 'first_favorite_count',
-    'first_retweet_count', 'first_reply_count', 'first_quote_count',
-    'first_seen_at', 'last_seen_at', 'seen_count', 'last_surface',
-    'is_quote', 'is_retweet', 'media_count', 'media_types'
-];
-
-async function downloadFeedDatabase(outputFormat) {
-    const posts = await XPorterPostDB.getAllPosts();
-    if (posts.length === 0) return { error: 'NO_DATA' };
-
-    const rows = posts.map(post => ({
-        ...post,
-        first_seen_at: post.first_seen_at ? new Date(post.first_seen_at).toISOString() : '',
-        last_seen_at: post.last_seen_at ? new Date(post.last_seen_at).toISOString() : ''
-    }));
-    const format = outputFormat === 'json' ? 'json' : 'csv';
-    let content;
-    let mimeType;
-
-    if (format === 'json') {
-        content = JSON.stringify(rows.map(({ created_at_ms, ...post }) => post), null, 2);
-        mimeType = 'application/json;charset=utf-8;';
-    } else {
-        const lines = [FEED_EXPORT_HEADERS.map(XPorterCSV.escapeCSVValue).join(',')];
-        for (const row of rows) {
-            lines.push(FEED_EXPORT_HEADERS.map(header => XPorterCSV.escapeCSVValue(row[header])).join(','));
-        }
-        content = '\uFEFF' + lines.join('\n') + '\n';
-        mimeType = 'text/csv;charset=utf-8;';
-    }
-
-    const now = new Date();
-    const stamp = now.toISOString().replace(/[:T]/g, '-').slice(0, 19);
-    const filename = `XPorter_seen_posts_${stamp}.${format}`;
-    const blob = new Blob([content], { type: mimeType });
-    const reader = new FileReader();
-
-    return new Promise((resolve) => {
-        reader.onerror = () => resolve({ error: 'DOWNLOAD_FAILED' });
-        reader.onload = () => {
-            chrome.downloads.download({
-                url: reader.result,
-                filename,
-                saveAs: true
-            }, (downloadId) => {
-                if (chrome.runtime.lastError || downloadId === undefined) {
-                    resolve({ error: 'DOWNLOAD_FAILED' });
-                    return;
-                }
-                resolve({ success: true, downloadId, count: rows.length, filename });
-            });
-        };
-        reader.readAsDataURL(blob);
-    });
-}
-
 // ==================== Helpers ====================
 
-async function saveCurrentState() {
+async function saveCurrentState({ bestEffort = false } = {}) {
     if (!currentExport) return;
 
-    await XPorterStorage.saveExportState({
+    const saved = await XPorterStorage.saveExportState({
         username: currentExport.username,
         userId: currentExport.userId,
         userInfo: currentExport.userInfo,
@@ -1752,6 +1505,8 @@ async function saveCurrentState() {
         settings: { ...currentExport.settings },
         rateLimiterState: rateLimiter?.getState() || null
     });
+    if (!saved && !bestEffort) throw new Error('STORAGE_FULL');
+    return saved;
 }
 
 async function applyAutoExpiration() {
@@ -1872,7 +1627,7 @@ function launchExportLoop(logPrefix) {
             // not overwrite it with a scary terminal error.
             if (rateLimiter?._aborted && currentExport.running === false) {
                 currentExport.status = 'stopped';
-                await saveCurrentState();
+                await saveCurrentState({ bestEffort: true });
                 recordExportStoppedOnce();
                 broadcastStopped();
                 return;
@@ -1881,7 +1636,7 @@ function launchExportLoop(logPrefix) {
             currentExport.running = false;
             currentExport.status = 'error';
             currentExport.error = err.message.startsWith('API_ERROR_400') ? 'STALE_QUERY_ID' : err.message;
-            await saveCurrentState();
+            await saveCurrentState({ bestEffort: true });
             broadcastStatus({
                 running: false,
                 status: 'error',
@@ -1889,7 +1644,7 @@ function launchExportLoop(logPrefix) {
                 tweetCount: currentExport.tweetCount,
                 canResume: !!currentExport.userId
             });
-            XPorterStorage.recordExportError(currentExport.error).then(refreshUninstallURL).catch(() => {});
+            XPorterStorage.recordExportError(currentExport.error).then(XPorterFeedback.refresh).catch(() => {});
         })
         .finally(() => {
             if (exportLoopPromise === tracked) exportLoopPromise = null;
@@ -1916,7 +1671,7 @@ function broadcastStopped() {
 function recordExportStoppedOnce() {
     if (!currentExport || currentExport._stopRecorded) return;
     currentExport._stopRecorded = true;
-    XPorterStorage.recordExportStopped().then(refreshUninstallURL).catch(() => {});
+    XPorterStorage.recordExportStopped().then(XPorterFeedback.refresh).catch(() => {});
 }
 
 let _lastRecordedUsagePhase = '';
@@ -1924,7 +1679,7 @@ let _lastRecordedUsagePhase = '';
 function recordUsagePhase(phase) {
     if (_lastRecordedUsagePhase === phase) return;
     _lastRecordedUsagePhase = phase;
-    XPorterStorage.recordExportPhase(phase).then(refreshUninstallURL).catch(() => {});
+    XPorterStorage.recordExportPhase(phase).then(XPorterFeedback.refresh).catch(() => {});
 }
 
 function recordFirstItemOnce() {
@@ -1932,7 +1687,7 @@ function recordFirstItemOnce() {
     // constructed in-memory run, so the first NEW row still records latency.
     if (!currentExport || currentExport._firstItemRecorded) return;
     currentExport._firstItemRecorded = true;
-    XPorterStorage.recordFirstItem().then(refreshUninstallURL).catch(() => {});
+    XPorterStorage.recordFirstItem().then(XPorterFeedback.refresh).catch(() => {});
 }
 
 // ==================== Auto-Resume on Startup ====================

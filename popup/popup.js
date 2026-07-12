@@ -48,11 +48,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const autoExpireRow = document.getElementById('autoExpireRow');
     const ladybugEnabled = document.getElementById('ladybugEnabled');
     const localizeExportHeaders = document.getElementById('localizeExportHeaders');
-    const feedDbCount = document.getElementById('feedDbCount');
-    const feedDbSummary = document.getElementById('feedDbSummary');
-    const downloadFeedCsv = document.getElementById('downloadFeedCsv');
-    const downloadFeedJson = document.getElementById('downloadFeedJson');
-    const clearFeedDb = document.getElementById('clearFeedDb');
 
     // Settings tab — posts-only elements
     const settingsPostsOnly = document.getElementById('settingsPostsOnly');
@@ -73,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastExpectedItems = 0;
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
-    let lastFeedSummary = null;
+    let seenPostsView = null;
 
     function ratePromptExportKey(state) {
         const completedAt = state?.completedAt || 'complete';
@@ -129,25 +124,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Parallel Init ====================
     // Fire all independent async requests at once instead of sequentially
-    const [settingsResult, authResult, status, activeTabs, initialFeedSummary] = await Promise.all([
+    const [settingsResult, authResult, status, activeTabs] = await Promise.all([
         sendMessage({ type: 'GET_SETTINGS' }),
         checkAuth().catch(() => null),
         sendMessage({ type: 'GET_STATUS' }),
-        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []),
-        sendMessage({ type: 'GET_FEED_DB_SUMMARY' }).catch(() => null)
+        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [])
     ]);
 
     const currentSettings = settingsResult?.settings || {};
-    lastFeedSummary = initialFeedSummary;
 
     // ==================== Theme & Design ====================
     initTheme(currentSettings.theme, themeIcon);
 
     themeToggle.addEventListener('click', async () => {
-        currentSettings.theme = toggleTheme(themeIcon);
+        const previousTheme = currentSettings.theme || 'dark';
+        const nextTheme = toggleTheme(themeIcon);
         // Send only the changed key — a full snapshot would revert newer
         // settings saved elsewhere (the SW merge is shallow/partial).
-        await sendMessage({ type: 'SAVE_SETTINGS', settings: { theme: currentSettings.theme } });
+        const result = await persistSettingsPatch(currentSettings, { theme: nextTheme });
+        if (result?.success !== true) {
+            initTheme(previousTheme, themeIcon);
+            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+        }
     });
 
     // ==================== Export Mode Switching ====================
@@ -168,14 +166,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyModeUI(exportMode.value);
 
     exportMode.addEventListener('change', async () => {
+        const previousMode = currentSettings.exportMode || 'posts';
         applyModeUI(exportMode.value);
-        currentSettings.exportMode = exportMode.value;
-        sendMessage({ type: 'SAVE_SETTINGS', settings: { exportMode: exportMode.value } });
+        const result = await persistSettingsPatch(currentSettings, { exportMode: exportMode.value });
+        if (result?.success !== true) {
+            exportMode.value = previousMode;
+            applyModeUI(previousMode);
+            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+            return;
+        }
 
         // If there's an active/stopped/completed export, auto-reset (like New Export)
         const currentStatus = lastExportState?.status;
         if (currentStatus === 'stopped' || currentStatus === 'complete' || currentStatus === 'error') {
-            await sendMessage({ type: 'CLEAR_EXPORT' });
+            const cleared = await sendMessage({ type: 'CLEAR_EXPORT' });
+            if (cleared?.success !== true) {
+                showToast(formatError(cleared?.error || 'STORAGE_FULL', t), 'error');
+                return;
+            }
             updateUI({ running: false, status: 'idle' });
         }
     });
@@ -184,17 +192,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentSettings.outputFormat) {
         outputFormat.value = currentSettings.outputFormat;
     }
-    outputFormat.addEventListener('change', () => {
-        currentSettings.outputFormat = outputFormat.value;
-        sendMessage({ type: 'SAVE_SETTINGS', settings: { outputFormat: outputFormat.value } });
+    outputFormat.addEventListener('change', async () => {
+        const previousFormat = currentSettings.outputFormat || 'csv';
+        const result = await persistSettingsPatch(currentSettings, { outputFormat: outputFormat.value });
+        if (result?.success !== true) {
+            outputFormat.value = previousFormat;
+            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+        }
     });
 
     // ==================== Language Selector ====================
     let currentLang = currentSettings.language || detectBrowserLanguage();
 
     if (!currentSettings.language) {
-        currentSettings.language = currentLang;
-        sendMessage({ type: 'SAVE_SETTINGS', settings: { language: currentLang } });
+        await persistSettingsPatch(currentSettings, { language: currentLang });
     }
 
     let dropdownBuilt = false;
@@ -239,6 +250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function selectLanguage(code) {
+        const previousLang = currentLang;
         currentLang = code;
         updateLangButton(code);
         await applyLanguage(code);
@@ -248,9 +260,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         buildLangDropdown();
         closeLangDropdown();
 
-        currentSettings.language = code;
-        await sendMessage({ type: 'SAVE_SETTINGS', settings: { language: code } });
-        renderFeedDbSummary(lastFeedSummary);
+        const result = await persistSettingsPatch(currentSettings, { language: code });
+        if (result?.success !== true) {
+            currentLang = previousLang;
+            updateLangButton(previousLang);
+            await applyLanguage(previousLang);
+            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+        }
+        seenPostsView?.refreshLanguage();
     }
 
     function toggleLangDropdown() {
@@ -326,54 +343,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => toast.remove(), 250);
         }, type === 'error' ? 4500 : 2800);
     }
-
-    function renderFeedDbSummary(summary) {
-        if (!feedDbCount || !feedDbSummary) return;
-        const count = Number(summary?.count) || 0;
-        feedDbCount.textContent = count.toLocaleString(currentLang);
-        if (count === 0) {
-            feedDbSummary.textContent = t('feedStatsEmpty');
-        } else {
-            const lastSeen = summary?.lastSeenAt
-                ? new Date(summary.lastSeenAt).toLocaleString(currentLang)
-                : '—';
-            feedDbSummary.textContent = `${t('feedStatsCount')}: ${count.toLocaleString(currentLang)} · ${t('feedStatsLastSeen')}: ${lastSeen}`;
-        }
-        downloadFeedCsv.disabled = count === 0;
-        downloadFeedJson.disabled = count === 0;
-        clearFeedDb.disabled = count === 0;
-    }
-
-    async function refreshFeedDbSummary() {
-        const summary = await sendMessage({ type: 'GET_FEED_DB_SUMMARY' });
-        if (summary?.error) return;
-        lastFeedSummary = summary;
-        renderFeedDbSummary(summary);
-    }
-
-    async function downloadFeedData(outputFormat, button) {
-        button.disabled = true;
-        const result = await sendMessage(
-            { type: 'DOWNLOAD_FEED_DB', outputFormat },
-            XPORTER_CONFIG.DOWNLOAD_MESSAGE_TIMEOUT || 30000
-        );
-        button.disabled = false;
-        if (result?.success) showToast(t('downloadStarted'), 'success');
-        else showToast(formatError(result?.error || 'DOWNLOAD_FAILED', t), 'error');
-    }
-
-    downloadFeedCsv?.addEventListener('click', () => downloadFeedData('csv', downloadFeedCsv));
-    downloadFeedJson?.addEventListener('click', () => downloadFeedData('json', downloadFeedJson));
-    clearFeedDb?.addEventListener('click', async () => {
-        if (!window.confirm(t('clearSeenConfirm'))) return;
-        const result = await sendMessage({ type: 'CLEAR_FEED_DB' });
-        if (result?.success) {
-            showToast(t('seenDataCleared'), 'success');
-            await refreshFeedDbSummary();
-        }
-    });
-
-    renderFeedDbSummary(initialFeedSummary);
 
     // ==================== Tabs ====================
     function activateTab(tab, focus = false) {
@@ -540,9 +509,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         for (const [key, value] of Object.entries(nextSettings)) {
             if (currentSettings[key] !== value) patch[key] = value;
         }
-        Object.assign(currentSettings, patch);
         if (Object.keys(patch).length > 0) {
-            return await sendMessage({ type: 'SAVE_SETTINGS', settings: patch });
+            return await persistSettingsPatch(currentSettings, patch);
         }
         return { success: true };
     }, 500);
@@ -700,7 +668,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // In-flight `running:true` broadcasts must not flip the UI back
         // after the local stopped render below.
         ignoreRunningUntil = Date.now() + 1500;
-        await sendMessage({ type: 'STOP_EXPORT' });
+        const result = await sendMessage({ type: 'STOP_EXPORT' });
+        if (result?.success !== true) {
+            ignoreRunningUntil = 0;
+            showToast(formatError(result?.error || 'MESSAGING_ERROR', t), 'error');
+            return;
+        }
         updateUI({ running: false, status: 'stopped', tweetCount: lastItemCount || 0 });
     });
 
@@ -748,7 +721,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== New Export ====================
     newExportBtn.addEventListener('click', async () => {
-        await sendMessage({ type: 'CLEAR_EXPORT' });
+        const cleared = await sendMessage({ type: 'CLEAR_EXPORT' });
+        if (cleared?.success !== true) {
+            showToast(formatError(cleared?.error || 'STORAGE_FULL', t), 'error');
+            return;
+        }
         updateUI({ running: false, status: 'idle' });
         ratePromptCounted = false;
         try {
@@ -947,186 +924,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==================== Export History ====================
-    const historyToggle = document.getElementById('historyToggle');
-    const historyChevron = document.getElementById('historyChevron');
-    const historyList = document.getElementById('historyList');
-    const historyEmpty = document.getElementById('historyEmpty');
-
-    historyToggle.addEventListener('click', async () => {
-        const isOpen = !historyList.classList.contains('hidden');
-        historyList.classList.toggle('hidden');
-        historyChevron.classList.toggle('open');
-        historyToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-        if (!isOpen) {
-            await loadAndRenderHistory();
-        }
+    XPorterHistory.mount({
+        t,
+        showToast,
+        modeLabel,
+        getLanguage: () => currentLang
+    });
+    seenPostsView = XPorterSeenPosts.mount({
+        t,
+        showToast,
+        getLanguage: () => currentLang
     });
 
-    async function loadAndRenderHistory() {
-        const result = await sendMessage({ type: 'GET_EXPORT_HISTORY' });
-        const history = result?.history || [];
-        renderHistory(history);
-    }
-
-    // Seen-posts dataset — same collapsible pattern as the history above.
-    const feedDbToggle = document.getElementById('feedDbToggle');
-    const feedDbChevron = document.getElementById('feedDbChevron');
-    const feedDbBody = document.getElementById('feedDbBody');
-
-    feedDbToggle?.addEventListener('click', () => {
-        const isOpen = !feedDbBody.classList.contains('hidden');
-        feedDbBody.classList.toggle('hidden');
-        feedDbChevron.classList.toggle('open');
-        feedDbToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-    });
-
-    function renderHistory(history) {
-        // Clear existing cards (preserve empty placeholder)
-        historyList.querySelectorAll('.history-card, .history-clear-btn').forEach(el => el.remove());
-
-        if (history.length === 0) {
-            historyEmpty.classList.remove('hidden');
-            return;
-        }
-        historyEmpty.classList.add('hidden');
-
-        history.forEach((entry, index) => {
-            const card = document.createElement('div');
-            card.className = 'history-card';
-            card.dataset.id = entry.id;
-
-            // Avatar (https-only — never let a stored entry inject another scheme)
-            if (entry.profileImageUrl && String(entry.profileImageUrl).startsWith('https://')) {
-                const avatar = document.createElement('img');
-                avatar.className = 'history-avatar';
-                avatar.src = entry.profileImageUrl;
-                avatar.alt = entry.displayName || entry.username;
-                avatar.onerror = () => {
-                    // Replace broken image with placeholder
-                    const ph = document.createElement('div');
-                    ph.className = 'history-avatar-placeholder';
-                    ph.textContent = (entry.displayName || entry.username || '?')[0].toUpperCase();
-                    avatar.replaceWith(ph);
-                };
-                card.appendChild(avatar);
-            } else {
-                const ph = document.createElement('div');
-                ph.className = 'history-avatar-placeholder';
-                ph.textContent = (entry.displayName || entry.username || '?')[0].toUpperCase();
-                card.appendChild(ph);
-            }
-
-            // Info block
-            const info = document.createElement('div');
-            info.className = 'history-info';
-
-            const name = document.createElement('div');
-            name.className = 'history-name';
-            name.textContent = entry.displayName || entry.username;
-            info.appendChild(name);
-
-            const handle = document.createElement('div');
-            handle.className = 'history-handle';
-            handle.textContent = '@' + (entry.username || '');
-            info.appendChild(handle);
-
-            const meta = document.createElement('div');
-            meta.className = 'history-meta';
-
-            const badge = document.createElement('span');
-            badge.className = 'history-badge';
-            badge.textContent = modeLabel(entry.exportMode || 'posts');
-            meta.appendChild(badge);
-
-            const count = document.createTextNode(` · ${formatNumber(entry.itemCount || 0, currentLang)} · ${(entry.outputFormat || 'csv').toUpperCase()}`);
-            meta.appendChild(count);
-
-            // Date
-            if (entry.completedAt) {
-                let dateStr;
-                try {
-                    dateStr = new Date(entry.completedAt).toLocaleDateString(currentLang, {
-                        month: 'short', day: 'numeric', year: 'numeric'
-                    });
-                } catch (_) {
-                    dateStr = new Date(entry.completedAt).toLocaleDateString(undefined, {
-                        month: 'short', day: 'numeric', year: 'numeric'
-                    });
-                }
-                const dateSpan = document.createTextNode(` · ${dateStr}`);
-                meta.appendChild(dateSpan);
-            }
-            info.appendChild(meta);
-            card.appendChild(info);
-
-            // Actions
-            const actions = document.createElement('div');
-            actions.className = 'history-actions';
-
-            // Download button for entries whose data snapshot is still available.
-            if (entry.hasData) {
-                const dlBtn = document.createElement('button');
-                dlBtn.className = 'history-dl-btn';
-                dlBtn.title = t('download');
-                dlBtn.setAttribute('aria-label', t('download'));
-                dlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
-                dlBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    dlBtn.disabled = true;
-                    const result = await sendMessage({
-                        type: 'DOWNLOAD_HISTORY_ENTRY',
-                        id: entry.id,
-                        outputFormat: entry.outputFormat || 'csv'
-                    }, XPORTER_CONFIG.DOWNLOAD_MESSAGE_TIMEOUT || 30000);
-                    dlBtn.disabled = false;
-                    if (result?.success === true) {
-                        showToast(t('downloadStarted'), 'success');
-                    } else {
-                        showToast(formatError(result?.error || 'DOWNLOAD_FAILED', t), 'error');
-                    }
-                });
-                actions.appendChild(dlBtn);
-            }
-
-            // Delete button
-            const delBtn = document.createElement('button');
-            delBtn.className = 'history-del-btn';
-            delBtn.title = t('remove');
-            delBtn.setAttribute('aria-label', t('remove'));
-            delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-            delBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                await sendMessage({ type: 'DELETE_HISTORY_ENTRY', id: entry.id });
-                card.style.opacity = '0';
-                card.style.transform = 'translateX(20px)';
-                card.style.transition = 'opacity 0.25s, transform 0.25s';
-                setTimeout(() => {
-                    card.remove();
-                    // Check if empty
-                    if (!historyList.querySelector('.history-card')) {
-                        historyEmpty.classList.remove('hidden');
-                        const clearBtn = historyList.querySelector('.history-clear-btn');
-                        if (clearBtn) clearBtn.remove();
-                    }
-                }, 250);
-            });
-            actions.appendChild(delBtn);
-            card.appendChild(actions);
-
-            historyList.appendChild(card);
-        });
-
-        // Clear all button
-        if (history.length > 1) {
-            const clearBtn = document.createElement('button');
-            clearBtn.className = 'history-clear-btn';
-            clearBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> ';
-            clearBtn.appendChild(document.createTextNode(t('clearAll')));
-            clearBtn.addEventListener('click', async () => {
-                await sendMessage({ type: 'CLEAR_HISTORY' });
-                renderHistory([]);
-            });
-            historyList.appendChild(clearBtn);
-        }
-    }
 });

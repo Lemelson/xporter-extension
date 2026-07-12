@@ -2,7 +2,7 @@
 
 **XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, followers, following, and verified followers to **CSV / JSON / XLSX**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Version:** 1.4.7 (`manifest.json`)
+- **Version:** 1.4.8 (`manifest.json`)
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 
@@ -11,20 +11,20 @@
 | You want to… | Go to |
 |---|---|
 | Export engine, message routing, state machine | `background/service-worker.js` |
-| X GraphQL calls, endpoint discovery, parsers | `utils/api.js` (+ `utils/api-features.js` = feature flags) |
+| X GraphQL calls + endpoint discovery | `utils/api.js` (`utils/api-features.js` = flags; `utils/api-parsers.js` = pure response normalization) |
 | Live queryId + seen-post capture / page hooks | `content/feed-parser.js` + `content/content.js` + `content/interceptor.js` (manifest-registered at `document_start`; parser/interceptor run in the page MAIN world) |
 | Rate limiting (cooldowns, retries, abort) | `utils/rateLimit.js` |
 | Storage, settings + defaults | `utils/storage.js` |
 | Passive seen-post database | `utils/post-database.js` (IndexedDB; one row per post ID, 50k-row cap) |
 | Tunable constants + logger (`XLog`) | `utils/config.js` |
-| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css` |
+| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css`; history and seen-post UI live in `popup/history.js` / `popup/seen-posts.js` |
 | Popup UI helpers | `utils/shared.js` (incl. `sendMessage` w/ error sentinels, `formatError`, `isValidUsername`, `bidiIsolate`, `localizeQuantityOptions`, `createCooldownTicker`) |
 | In-app UI strings (14 languages) | `popup/locales/*.json` (`en.json` = fallback) |
 | Localized CSV/XLSX column headers | `utils/columns-i18n.js` (`XPorterColumns`; data keys + JSON stay English; gated by the `localizeExportHeaders` setting, default on) |
 | Store name/description i18n | `_locales/*/messages.json` (≠ `popup/locales/`) |
 | Ladybug Easter egg (About tab) | `popup/ladybug.js` |
 | "Rate XPorter" prompt | `popup/rate-prompt.{js,css}` (self-contained; state in `chrome.storage.local` key `xporter_rate_prompt`; deep-links to the CWS reviews page) |
-| Uninstall feedback (anonymous churn stats) | `background/service-worker.js` → `refreshUninstallURL()` builds a `chrome.runtime.setUninstallURL` to the hosted `feedback.html` with anonymous usage params; counters live in `chrome.storage.local` key `xporter_usage` via `XPorterStorage.recordExport*`. Page + backend live in the `xporter-web/` site folder. NO X data is sent — disclosed in `privacy-policy.html`. |
+| Downloads + uninstall feedback | `background/downloads.js` owns serialization/download handoff; `background/uninstall-feedback.js` builds `chrome.runtime.setUninstallURL`; counters remain in `XPorterStorage.recordExport*`. NO X data is sent — disclosed in `privacy-policy.html`. |
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Dev/debug scripts (not shipped) | `scripts/`, `index.html`, `docs/` |
