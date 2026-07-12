@@ -677,7 +677,8 @@ async function _fetchUserList(endpointKey, userId, cursor, count) {
 // ==================== Followers Response Parsing ====================
 
 function parseFollowersResponse(data) {
-  const timeline = data?.data?.user?.result?.timeline?.timeline;
+  const result = data?.data?.user?.result;
+  const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
   const instructions = timeline?.instructions || [];
 
   const users = [];

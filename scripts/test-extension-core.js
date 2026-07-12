@@ -181,6 +181,7 @@ async function testStaleBearerRetriesImmediately() {
 function createWorkerHarness() {
     let savedState = null;
     let cleared = false;
+    let firstItemRecords = 0;
     const settings = {
         quantityLimit: 500,
         autoExpireEnabled: true,
@@ -221,7 +222,8 @@ function createWorkerHarness() {
             async loadUsage() { return {}; },
             async markInstalled() {},
             async backfillInstalledAt() {},
-            async saveSettings() { return true; }
+            async saveSettings() { return true; },
+            async recordFirstItem() { firstItemRecords += 1; }
         },
         RateLimitManager: class {},
         detectBrowserLanguage: () => 'en',
@@ -256,7 +258,8 @@ function createWorkerHarness() {
         context,
         setSavedState(state) { savedState = state; },
         getSavedState() { return savedState; },
-        wasCleared() { return cleared; }
+        wasCleared() { return cleared; },
+        firstItemRecords() { return firstItemRecords; }
     };
 }
 
@@ -357,6 +360,72 @@ async function testTerminalExportActuallyExpires() {
     assert.equal(harness.wasCleared(), true, 'expired terminal data must be cleared while the worker is alive');
 }
 
+async function testResumeRecordsFirstNewItem() {
+    const harness = createWorkerHarness();
+    vm.runInContext(`
+        currentExport = { tweetCount: 500 };
+        recordFirstItemOnce();
+        recordFirstItemOnce();
+    `, harness.context);
+    assert.equal(
+        harness.firstItemRecords(),
+        1,
+        'a resumed run must record latency for its first new item even when the saved count is non-zero'
+    );
+}
+
+function testTimelineV2UserListsAreParsed() {
+    const context = vm.createContext({
+        console,
+        setTimeout,
+        clearTimeout,
+        XPORTER_CONFIG: {},
+        XLog: { log() {}, warn() {}, error() {}, info() {} },
+        USER_FEATURES: {},
+        USER_FIELD_TOGGLES: {},
+        TWEETS_FEATURES: {},
+        FOLLOWERS_FEATURES: {},
+        FOLLOWERS_FIELD_TOGGLES: {}
+    });
+    vm.runInContext(source('utils/api.js'), context, { filename: 'utils/api.js' });
+    context.__payload = {
+        data: {
+            user: {
+                result: {
+                    timeline_v2: {
+                        timeline: {
+                            instructions: [{
+                                type: 'TimelineAddEntries',
+                                entries: [{
+                                    entryId: 'user-1',
+                                    content: {
+                                        itemContent: {
+                                            user_results: {
+                                                result: {
+                                                    rest_id: '1',
+                                                    core: { name: 'Test', screen_name: 'test' },
+                                                    legacy: {}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }, {
+                                    entryId: 'cursor-bottom-1',
+                                    content: { value: 'next' }
+                                }]
+                            }]
+                        }
+                    }
+                }
+            }
+        }
+    };
+    const result = vm.runInContext('parseFollowersResponse(__payload)', context);
+    assert.equal(result.users.length, 1);
+    assert.equal(result.users[0].username, 'test');
+    assert.equal(result.nextCursor, 'next');
+}
+
 const tests = [
     ['SearchTimeline error relay', testSearchErrorsAreRelayed],
     ['real XLSX OOXML', testXlsxIsRealOoxmlZip],
@@ -365,7 +434,9 @@ const tests = [
     ['resume pacing vs filters', testResumeKeepsFiltersButFollowsCurrentPacing],
     ['XLSX truncation stays valid', testXlsxCellTruncationKeepsXmlValid],
     ['persisted limit override', testPersistedLimitOverrideIsReported],
-    ['terminal auto-expiration', testTerminalExportActuallyExpires]
+    ['terminal auto-expiration', testTerminalExportActuallyExpires],
+    ['resume first-item telemetry', testResumeRecordsFirstNewItem],
+    ['timeline_v2 user-list parser', testTimelineV2UserListsAreParsed]
 ];
 
 (async () => {

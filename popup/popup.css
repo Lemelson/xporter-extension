@@ -410,18 +410,6 @@ body.light .btn-primary:hover {
   box-shadow: 0 6px 24px rgba(220, 38, 38, 0.46), 0 0 20px rgba(244, 80, 80, 0.42), var(--glass-edge);
 }
 
-.btn-success {
-  background: linear-gradient(135deg, rgba(0, 200, 134, 0.92) 0%, rgba(0, 166, 104, 0.92) 50%, rgba(0, 214, 143, 0.9) 100%);
-  border: 1px solid rgba(52, 211, 153, 0.55);
-  box-shadow: 0 4px 16px rgba(0, 166, 104, 0.34), var(--glass-edge);
-  color: #fff;
-}
-
-.btn-success:hover {
-  background: linear-gradient(135deg, rgba(0, 214, 143, 1) 0%, rgba(0, 184, 116, 1) 50%, rgba(20, 224, 153, 1) 100%);
-  box-shadow: 0 6px 24px rgba(0, 166, 104, 0.50), 0 0 22px rgba(0, 214, 143, 0.45), var(--glass-edge);
-}
-
 /* Warning / amber — the Download square button. Dark text for contrast on gold. */
 .btn-warning {
   background: linear-gradient(135deg, #FFD45A 0%, #F5B73C 50%, #FFCB52 100%);
@@ -450,12 +438,11 @@ body.light .btn-secondary {
 
 /* ============================================================
    TIER 2 — glass clickable controls (single source of truth).
-   Resume, New Export, GitHub/Telegram, Export History toggle, and the
-   dropdowns (Export Mode, Output Format, Quantity Limit) all share this hover:
+   Resume, New Export, Export History toggle, and the dropdowns (Export Mode,
+   Output Format, Quantity Limit) all share this hover:
    whiten + accent glow ring + lift + depth shadow. Edit here → all update.
    body.light copies are required so light-theme base rules don't out-specify. */
 .btn-secondary:hover,
-.about-link:hover,
 .history-toggle:hover,
 .select:hover {
   background-color: rgba(255, 255, 255, 0.24);
@@ -465,7 +452,6 @@ body.light .btn-secondary {
 }
 
 body.light .btn-secondary:hover,
-body.light .about-link:hover,
 body.light .history-toggle:hover,
 body.light .select:hover {
   background-color: rgba(255, 255, 255, 0.74);
@@ -565,38 +551,6 @@ body.light .date-row input[type="date"]:hover {
   flex: 1;
   padding: 10px 16px;
 }
-
-/* Glass features / about */
-.feature {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-edge);
-  font-size: 12px;
-  color: var(--text-primary);
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-}
-
-.about-link {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-edge);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-/* .about-link:hover is handled by the TIER 2 group rule above */
 
 /* Glass progress bar */
 .progress-bar {
@@ -1221,11 +1175,6 @@ body.light .about-icon { --zap-glow: 13px; --zap-glow-hi: 21px; }
   margin-right: 2px;
 }
 
-.icon-feature {
-  color: var(--success);
-  margin-right: 4px;
-}
-
 .brand {
   font-family: 'Avenir Next', 'Avenir', 'Montserrat', 'Segoe UI', system-ui, sans-serif;
   font-size: 20px;
@@ -1800,7 +1749,6 @@ body.light .help-pop {
   color: var(--accent-hover);
 }
 
-.status-indicator,
 .status-dot {
   width: 8px;
   height: 8px;
@@ -2059,13 +2007,6 @@ body.light .detail-head:hover {
 
 [dir="rtl"] .detail-body-inner p {
   padding: 0 50px 12px 12px;
-}
-
-.about-links {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 14px;
 }
 
 /* Open-source card — quiet, outlined (secondary to the filled Rate CTA). */
@@ -2557,8 +2498,7 @@ html {
 .tab,
 .field,
 .export-status,
-.feature,
-.footer,
+  .footer,
 .toggle-track,
 .toggle-label,
 .date-help,

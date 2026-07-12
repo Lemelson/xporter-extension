@@ -1470,13 +1470,15 @@ async function _resumeExportInner(extraItems) {
         limitOverride: limitOverride || 0
     };
 
-    launchExportLoop('Resume export error:');
-
+    // Enqueue the per-run usage reset before the loop can collect its first
+    // resumed item. This keeps first_item_ms tied to this resume attempt.
     XPorterStorage.recordExportStart(currentExport.exportMode, currentExport.outputFormat, {
         resume: true,
         dateRange: !!(currentExport.dateFrom || currentExport.dateTo)
     }).then(refreshUninstallURL).catch(() => {});
     _lastRecordedUsagePhase = 'fetching';
+
+    launchExportLoop('Resume export error:');
 
     return { success: true, status: 'resumed', tweetCount: currentExport.tweetCount };
 }
@@ -1926,7 +1928,9 @@ function recordUsagePhase(phase) {
 }
 
 function recordFirstItemOnce() {
-    if (!currentExport || currentExport.tweetCount !== 1 || currentExport._firstItemRecorded) return;
+    // tweetCount can already be > 0 on Resume; this flag belongs to the newly
+    // constructed in-memory run, so the first NEW row still records latency.
+    if (!currentExport || currentExport._firstItemRecorded) return;
     currentExport._firstItemRecorded = true;
     XPorterStorage.recordFirstItem().then(refreshUninstallURL).catch(() => {});
 }
