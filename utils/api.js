@@ -8,6 +8,20 @@ const DEFAULT_BEARER_TOKEN = _C.FALLBACK_BEARER_TOKEN
   || 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 let activeBearerToken = DEFAULT_BEARER_TOKEN;
 
+// Every fetch gets its own controller so Stop can cancel an in-flight network
+// request immediately instead of waiting for the 30-second deadline. The map
+// records whether cancellation was user-driven so it stays distinct from a
+// real timeout in retry/error handling.
+const activeRequests = new Map();
+const responseRequests = new WeakMap();
+
+function abortActiveRequests() {
+  for (const [controller, request] of activeRequests) {
+    request.aborted = true;
+    controller.abort();
+  }
+}
+
 // Hardcoded queryIds as fallback — extracted from X.com JS bundles (Feb 2026)
 const FALLBACK_ENDPOINTS = {
   UserByScreenName: {
@@ -111,6 +125,7 @@ async function fetchWithBearerFallback(url, buildOptions) {
   let response = await fetchTimed(url, buildOptions(bearerBeforeRequest));
   if ((response.status === 401 || response.status === 403) &&
       bearerBeforeRequest !== DEFAULT_BEARER_TOKEN) {
+    discardResponse(response);
     noteAuthFailure();
     response = await fetchTimed(url, buildOptions(activeBearerToken));
   }
@@ -125,13 +140,60 @@ async function fetchWithBearerFallback(url, buildOptions) {
 // NETWORK_TIMEOUT, which the rate limiter retries visibly.
 async function fetchTimed(url, options = {}, timeoutMs) {
   const ms = timeoutMs || _C.API_FETCH_TIMEOUT || 30000;
+  const controller = new AbortController();
+  const request = { aborted: false, timedOut: false, hasResponse: false };
+  const timer = setTimeout(() => {
+    request.timedOut = true;
+    controller.abort();
+  }, ms);
+  activeRequests.set(controller, request);
   try {
-    return await fetch(url, { ...options, signal: AbortSignal.timeout(ms) });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    request.hasResponse = true;
+    responseRequests.set(response, { controller, timer, request });
+    return response;
   } catch (err) {
-    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+    if (request.aborted) {
+      throw new Error('ABORTED');
+    }
+    if (request.timedOut || (err && err.name === 'TimeoutError')) {
       throw new Error('NETWORK_TIMEOUT');
     }
     throw err;
+  } finally {
+    // Successful responses stay cancellable until their body has been read.
+    if (!request.hasResponse) {
+      clearTimeout(timer);
+      activeRequests.delete(controller);
+    }
+  }
+}
+
+function releaseResponse(response) {
+  const lifecycle = responseRequests.get(response);
+  if (!lifecycle) return;
+  clearTimeout(lifecycle.timer);
+  activeRequests.delete(lifecycle.controller);
+  responseRequests.delete(response);
+}
+
+function discardResponse(response) {
+  try { response.body?.cancel().catch(() => {}); } catch (_) { /* already closed */ }
+  releaseResponse(response);
+}
+
+function normalizeBodyReadError(response, error) {
+  if (!error || (error.name !== 'TimeoutError' && error.name !== 'AbortError')) return error;
+  return new Error(responseRequests.get(response)?.request?.aborted ? 'ABORTED' : 'NETWORK_TIMEOUT');
+}
+
+async function readTextTimed(response) {
+  try {
+    return await response.text();
+  } catch (err) {
+    throw normalizeBodyReadError(response, err);
+  } finally {
+    releaseResponse(response);
   }
 }
 
@@ -142,10 +204,9 @@ async function readJsonTimed(response) {
   try {
     return await response.json();
   } catch (err) {
-    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
-      throw new Error('NETWORK_TIMEOUT');
-    }
-    throw err;
+    throw normalizeBodyReadError(response, err);
+  } finally {
+    releaseResponse(response);
   }
 }
 
@@ -245,7 +306,7 @@ async function _discoverEndpointsInner() {
     credentials: 'include',
     headers: { 'User-Agent': navigator.userAgent }
   }, _C.DISCOVERY_FETCH_TIMEOUT || 15000);
-  const mainPageHtml = await mainPageResponse.text();
+  const mainPageHtml = await readTextTimed(mainPageResponse);
 
   // Find JS bundle URLs
   const scriptUrls = [];
@@ -270,7 +331,7 @@ async function _discoverEndpointsInner() {
 
     try {
       const jsResponse = await fetchTimed(url, {}, _C.DISCOVERY_FETCH_TIMEOUT || 15000);
-      const jsText = await jsResponse.text();
+      const jsText = await readTextTimed(jsResponse);
 
       // Search for bearer token (pattern: "AAAAAAA..." — 100+ chars, URL-safe base64)
       if (!discoveredBearer) {
@@ -422,16 +483,18 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
   captureRateLimit(response, endpoint.operationName);
 
   if (response.status === 429) {
+    discardResponse(response);
     throw new Error('RATE_LIMITED');
   }
 
   if (response.status === 401 || response.status === 403) {
+    discardResponse(response);
     noteAuthFailure();
     throw new Error('AUTH_ERROR');
   }
 
   if (response.status === 400 || response.status === 404) {
-    const body = await response.text().catch(() => '');
+    const body = await readTextTimed(response).catch(() => '');
     XLog.error(`GraphQL ${response.status} error for ${endpoint.operationName}:`, body.substring(0, 200));
     // Invalidate cache so next call tries fresh discovery
     discoveredEndpoints = null;
@@ -440,7 +503,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
   }
 
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
+    const body = await readTextTimed(response).catch(() => '');
     XLog.error(`API error ${response.status}:`, body.substring(0, 500));
     throw new Error(`API_ERROR_${response.status}`);
   }
@@ -604,14 +667,16 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
   captureRateLimit(response, 'Followers');
 
   if (response.status === 429) {
+    discardResponse(response);
     throw new Error('RATE_LIMITED');
   }
   if (response.status === 401 || response.status === 403) {
+    discardResponse(response);
     noteAuthFailure();
     throw new Error('AUTH_ERROR');
   }
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
+    const body = await readTextTimed(response).catch(() => '');
     XLog.error(`[REST] Followers API error ${response.status}:`, body.substring(0, 500));
     throw new Error(`API_ERROR_${response.status}`);
   }
@@ -619,7 +684,7 @@ async function fetchFollowers(userId, cursor = null, count = 100) {
   const data = await readJsonTimed(response);
 
   // Parse REST v1.1 response into the same format used by GraphQL
-  const users = (data.users || []).map(u => ({
+  const users = (data.users || []).filter(u => u?.id_str || Number.isFinite(u?.id)).map(u => ({
     id: u.id_str || String(u.id),
     name: u.name || '',
     username: u.screen_name || '',
@@ -671,84 +736,7 @@ async function _fetchUserList(endpointKey, userId, cursor, count) {
     graphqlRequest(endpoint, variables, FOLLOWERS_FEATURES, FOLLOWERS_FIELD_TOGGLES)
   );
 
-  return parseFollowersResponse(data);
-}
-
-// ==================== Followers Response Parsing ====================
-
-function parseFollowersResponse(data) {
-  const result = data?.data?.user?.result;
-  const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
-  const instructions = timeline?.instructions || [];
-
-  const users = [];
-  let nextCursor = null;
-
-  for (const instruction of instructions) {
-    const entries = instruction.entries || [];
-
-    if (instruction.type === 'TimelineAddEntries' || entries.length > 0) {
-      for (const entry of entries) {
-        const entryId = entry.entryId || '';
-
-        // User entries
-        if (entryId.startsWith('user-')) {
-          const userResult = entry.content?.itemContent?.user_results?.result;
-          if (userResult && userResult.__typename !== 'UserUnavailable') {
-            const parsed = parseUserObject(userResult);
-            if (parsed) users.push(parsed);
-          }
-        }
-
-        // Cursor entries
-        if (entryId.startsWith('cursor-bottom-')) {
-          nextCursor = entry.content?.value || null;
-        }
-      }
-    }
-  }
-
-  XLog.log(`Parsed ${users.length} users, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
-  return { users, nextCursor };
-}
-
-/**
- * Parse a single user object from the API response into a flat structure.
- * X has moved identity fields (name, screen_name, created_at) to `result.core`
- * and profile images to `result.avatar`. Stats remain in `result.legacy`.
- */
-function parseUserObject(result) {
-  if (!result) return null;
-  const legacy = result.legacy;
-  const core = result.core || {};
-  if (!legacy) return null;
-
-  // Identity fields: prefer core (new location), fall back to legacy
-  const name = core.name || legacy.name || '';
-  const screenName = core.screen_name || legacy.screen_name || '';
-  const createdAt = core.created_at || legacy.created_at || '';
-
-  // Profile image: prefer avatar (new location), fall back to legacy
-  const rawImageUrl = result.avatar?.image_url || legacy.profile_image_url_https || '';
-  const profileImageUrl = rawImageUrl.replace('_normal', '_400x400');
-
-  return {
-    id: result.rest_id,
-    name: name,
-    username: screenName,
-    bio: (legacy.description || '').replace(/\n/g, ' '),
-    location: core.location || legacy.location || '',
-    url: legacy.url || '',
-    followers_count: legacy.followers_count || 0,
-    following_count: legacy.friends_count || 0,
-    tweet_count: legacy.statuses_count || 0,
-    listed_count: legacy.listed_count || 0,
-    verified: result.is_blue_verified || false,
-    protected: legacy.protected || false,
-    created_at: createdAt,
-    profile_image_url: profileImageUrl,
-    profile_url: `https://x.com/${screenName}`
-  };
+  return XPorterApiParsers.parseFollowersResponse(data);
 }
 
 // ==================== Tweet Fetching ====================
@@ -775,296 +763,7 @@ async function fetchUserTweets(userId, cursor = null, count = 20) {
     })
   );
 
-  return parseTimelineResponse(data);
-}
-
-// ==================== Response Parsing ====================
-
-function parseTimelineResponse(data) {
-  // X may return data under either `timeline` or `timeline_v2` depending on API version
-  const result = data?.data?.user?.result;
-  const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
-  return parseTimelineByInstructions(timeline?.instructions || [], result?.timeline_v2 ? 'timeline_v2' : 'timeline');
-}
-
-function parseSearchTimelineResponse(data) {
-  const timeline = data?.data?.search_by_raw_query?.search_timeline?.timeline;
-  return parseTimelineByInstructions(timeline?.instructions || [], 'search_timeline');
-}
-
-function parseTimelineByInstructions(instructions, sourceLabel = 'timeline') {
-  XLog.log(`Response path: ${sourceLabel}, instructions: ${instructions.length}`);
-
-  const tweets = [];
-  const seenIds = new Set();
-  let nextCursor = null;
-  let previousCursor = null;
-
-  function addTweet(tweet, { pinned = false } = {}) {
-    if (!tweet?.id || seenIds.has(tweet.id)) return;
-    if (pinned) tweet.is_pinned = true;
-    seenIds.add(tweet.id);
-    tweets.push(tweet);
-  }
-
-  for (const instruction of instructions) {
-    // Handle pinned tweet entry
-    if (instruction.type === 'TimelinePinEntry' && instruction.entry) {
-      extractTimelineEntry(instruction.entry, { addTweet, setNextCursor, setPreviousCursor }, { pinned: true });
-    }
-
-    // Some instruction variants carry a single entry outside of `entries`.
-    if (instruction.entry && instruction.type !== 'TimelinePinEntry') {
-      extractTimelineEntry(instruction.entry, { addTweet, setNextCursor, setPreviousCursor });
-    }
-
-    const entries = instruction.entries || [];
-
-    if (instruction.type === 'TimelineAddEntries' || entries.length > 0) {
-      for (const entry of entries) {
-        extractTimelineEntry(entry, { addTweet, setNextCursor, setPreviousCursor });
-      }
-    }
-  }
-
-  XLog.log(`Parsed ${tweets.length} tweets, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
-  return { tweets, nextCursor, previousCursor };
-
-  function setNextCursor(value) {
-    if (value) nextCursor = value;
-  }
-
-  function setPreviousCursor(value) {
-    if (value) previousCursor = value;
-  }
-}
-
-function extractTimelineEntry(entry, sinks, options = {}) {
-  if (!entry) return;
-
-  const entryId = entry.entryId || '';
-  if (entryId.startsWith('cursor-bottom-')) {
-    sinks.setNextCursor(entry.content?.value || null);
-  }
-  if (entryId.startsWith('cursor-top-')) {
-    sinks.setPreviousCursor(entry.content?.value || null);
-  }
-
-  const directTweet = extractTweetResult(entry);
-  if (directTweet) {
-    sinks.addTweet(directTweet, options);
-  }
-
-  walkTimelineNode(entry.content, sinks, options);
-}
-
-function walkTimelineNode(node, sinks, options = {}) {
-  if (!node) return;
-
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walkTimelineNode(item, sinks, options);
-    }
-    return;
-  }
-
-  if (typeof node !== 'object') return;
-
-  const tweetResult = node.tweet_results?.result || node.itemContent?.tweet_results?.result;
-  if (tweetResult) {
-    const parsed = parseTweetObject(tweetResult);
-    if (parsed) sinks.addTweet(parsed, options);
-  }
-
-  if (node.__typename === 'TimelineTimelineCursor' || node.cursorType) {
-    if (node.cursorType === 'Bottom') sinks.setNextCursor(node.value || null);
-    if (node.cursorType === 'Top') sinks.setPreviousCursor(node.value || null);
-  }
-
-  for (const value of Object.values(node)) {
-    walkTimelineNode(value, sinks, options);
-  }
-}
-
-function extractTweetResult(entry) {
-  const itemContent = entry.content?.itemContent;
-  if (!itemContent) return null;
-
-  const result = itemContent.tweet_results?.result;
-  if (!result) return null;
-
-  return parseTweetObject(result);
-}
-
-function parseTweetObject(result) {
-  // Handle tweet with visibility results
-  if (result.__typename === 'TweetWithVisibilityResults') {
-    result = result.tweet;
-  }
-
-  if (!result || result.__typename === 'TweetTombstone') {
-    return null;
-  }
-
-  const legacy = result.legacy;
-  if (!legacy) return null;
-
-  const tweetUser = result.core?.user_results?.result;
-  const userLegacy = tweetUser?.legacy || {};
-  const userCore = tweetUser?.core || {};
-  const views = result.views;
-
-  const type = detectTweetType(legacy, result);
-
-  // Get tweet text — handle note tweets (longer tweets)
-  let text = legacy.full_text || '';
-  if (result.note_tweet?.note_tweet_results?.result?.text) {
-    text = result.note_tweet.note_tweet_results.result.text;
-  }
-
-  const media = extractMedia(legacy);
-
-  // Author identity: prefer userCore (new location), fall back to userLegacy
-  const authorName = userCore.name || userLegacy.name || '';
-  const authorUsername = userCore.screen_name || userLegacy.screen_name || '';
-
-  const article = extractArticle(result, authorUsername);
-  // Article posts usually have an empty/near-empty full_text — surface the
-  // article title there so the Text column is never blank for them.
-  if (article.title && !text.trim()) {
-    text = article.title;
-  }
-
-  // Link-card posts (YouTube, blog links, …) sometimes carry their destination
-  // only in the card, not in entities.urls — fall back to the card URL.
-  let urls = (legacy.entities?.urls || []).map(u => u.expanded_url).filter(Boolean).join(', ');
-  if (!urls) {
-    urls = extractCardUrl(result);
-  }
-
-  return {
-    id: legacy.id_str,
-    text: text,
-    tweet_url: `https://x.com/${authorUsername}/status/${legacy.id_str}`,
-    language: legacy.lang || '',
-    type: type,
-    author_name: authorName,
-    author_username: authorUsername,
-    view_count: views?.count || '',
-    bookmark_count: legacy.bookmark_count || 0,
-    favorite_count: legacy.favorite_count || 0,
-    retweet_count: legacy.retweet_count || 0,
-    reply_count: legacy.reply_count || 0,
-    quote_count: legacy.quote_count || 0,
-    created_at: legacy.created_at || '',
-    source: extractSource(legacy.source),
-    hashtags: (legacy.entities?.hashtags || []).map(h => h.text).join(', '),
-    urls: urls,
-    media_type: media.type,
-    media_urls: media.urls,
-    media_alt_texts: media.altTexts,
-    article_title: article.title,
-    article_url: article.url,
-    article_text: article.text
-  };
-}
-
-// ==================== Helpers ====================
-
-function detectTweetType(legacy, result) {
-  if (result.legacy?.retweeted_status_result || legacy.retweeted_status_result) {
-    return 'retweet';
-  }
-  if (result.article?.article_results?.result) {
-    return 'article';
-  }
-  if (legacy.in_reply_to_status_id_str) {
-    return 'reply';
-  }
-  if (result.quoted_status_result) {
-    return 'quote';
-  }
-  return 'tweet';
-}
-
-// X Articles (long-form). The timeline payload carries only the article's
-// title/preview under result.article.article_results.result — the full body
-// is never included, so title + canonical URL is all we can export here.
-function extractArticle(result, authorUsername) {
-  const art = result.article?.article_results?.result;
-  if (!art) return { title: '', url: '', text: '' };
-
-  const title = art.title || '';
-  // plain_text arrives only when the endpoint honors withArticlePlainText;
-  // fall back to the short preview_text otherwise.
-  const articleText = art.plain_text || art.preview_text || '';
-  const articleId = art.rest_id || art.id || '';
-  let url = '';
-  if (articleId && authorUsername) {
-    url = `https://x.com/${authorUsername}/article/${articleId}`;
-  } else if (result.legacy?.id_str && authorUsername) {
-    url = `https://x.com/${authorUsername}/status/${result.legacy.id_str}`;
-  }
-  return { title, url, text: articleText };
-}
-
-// Destination URL of a link-preview card, best-effort. binding_values can be
-// an array of {key, value} or a plain object depending on the card type.
-function extractCardUrl(result) {
-  const cardLegacy = result.card?.legacy;
-  if (!cardLegacy) return '';
-
-  const bv = cardLegacy.binding_values;
-  const lookup = (key) => {
-    if (Array.isArray(bv)) {
-      const hit = bv.find(b => b?.key === key);
-      return hit?.value?.string_value || '';
-    }
-    return bv?.[key]?.string_value || '';
-  };
-
-  return lookup('website_url') || lookup('card_url') || cardLegacy.url || '';
-}
-
-function extractSource(sourceHtml) {
-  if (!sourceHtml) return '';
-  const match = sourceHtml.match(/>([^<]+)</);
-  return match ? match[1] : sourceHtml;
-}
-
-function extractMedia(legacy) {
-  const media = legacy.extended_entities?.media || legacy.entities?.media || [];
-
-  if (media.length === 0) {
-    return { type: '', urls: '', altTexts: '' };
-  }
-
-  const types = new Set(media.map(m => m.type));
-  let mediaType = '';
-  if (types.has('video')) mediaType = 'video';
-  else if (types.has('animated_gif')) mediaType = 'animated_gif';
-  else if (types.has('photo')) mediaType = 'photo';
-
-  const urls = media.map(m => {
-    if (m.type === 'video' || m.type === 'animated_gif') {
-      const variants = m.video_info?.variants || [];
-      const mp4s = variants.filter(v => v.content_type === 'video/mp4');
-      if (mp4s.length > 0) {
-        mp4s.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-        return mp4s[0].url;
-      }
-    }
-    return m.media_url_https || m.media_url || '';
-  }).join(', ');
-
-  // Author-written accessibility descriptions. Joined with ' | ' (alt text is
-  // free-form prose — commas would blur item boundaries); positions align with
-  // media_urls so a blank slot means "this image has no alt".
-  const altTexts = media.some(m => m.ext_alt_text)
-    ? media.map(m => m.ext_alt_text || '').join(' | ')
-    : '';
-
-  return { type: mediaType, urls, altTexts };
+  return XPorterApiParsers.parseTimelineResponse(data);
 }
 
 // Export for use in service worker
@@ -1076,11 +775,13 @@ if (typeof globalThis !== 'undefined') {
     fetchFollowers,
     fetchFollowing,
     fetchVerifiedFollowers,
-    parseTweetObject,
-    parseUserObject,
+    parseTweetObject: XPorterApiParsers.parseTweetObject,
+    parseUserObject: XPorterApiParsers.parseUserObject,
+    parseSearchTimelineResponse: XPorterApiParsers.parseSearchTimelineResponse,
     discoverEndpoints,
     setLiveQueryId,
     getRateLimit,
+    abortActiveRequests,
     get BEARER_TOKEN() { return activeBearerToken; }
   };
 }

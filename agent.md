@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.7** (2026-07-12).
+> Last verified against the codebase at **v1.4.8** (2026-07-13).
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.7 (`manifest.json`) |
+| Version | 1.4.8 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
@@ -84,8 +84,10 @@ xporter/
 ├── icon128.png                  # Loose copy of the store icon (also in icons/ and docs/)
 │
 ├── background/
-│   └── service-worker.js        # 🔑 CORE: export engine, message router, state machine,
-│                                #         date-range search-capture orchestration
+│   ├── service-worker.js        # 🔑 CORE: export engine, message router, state machine,
+│   │                            #         date-range search-capture orchestration
+│   ├── downloads.js             # CSV/JSON/XLSX + seen-post download handoff
+│   └── uninstall-feedback.js    # Anonymous uninstall URL construction + refresh throttle
 │
 ├── content/
 │   ├── feed-parser.js           # MAIN-world parser for compact non-reply rows from
@@ -100,7 +102,9 @@ xporter/
 ├── popup/                       # Compact popup UI (~350px)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
 │   ├── popup.css                # 🔑 ALL popup styles (themes, animations, ladybug, logo)
-│   ├── popup.js                 # Tabs, export controls, settings, status, history
+│   ├── popup.js                 # Tabs, export controls, settings, live status
+│   ├── history.js               # Export-history rendering/download/delete UI
+│   ├── seen-posts.js            # Passive dataset summary/download/clear UI
 │   ├── ladybug.js               # Easter-egg ladybug on the About tab (see §6.2)
 │   ├── theme-init.js            # Inline-loaded FIRST: applies saved theme to avoid FOUC
 │   ├── theme.js                 # Theme toggle logic + SVG icon helpers
@@ -111,7 +115,8 @@ xporter/
 │
 ├── utils/                       # Shared modules (some load in SW, some in pages)
 │   ├── config.js                # 🔑 XPORTER_CONFIG constants + XLog logger
-│   ├── api.js                   # 🔑 X GraphQL client + endpoint discovery + parsers
+│   ├── api.js                   # 🔑 X GraphQL client, auth, queryId discovery, cancellation
+│   ├── api-parsers.js           # Pure X response normalization (users/posts/cursors)
 │   ├── api-features.js          # GraphQL feature-flag constant objects (split from api.js)
 │   ├── rateLimit.js             # RateLimitManager (spacing, batch cooldown, retry, abort)
 │   ├── csv.js                   # CSV / XLSX output generation (JSON is built in the SW)
@@ -162,7 +167,7 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 
 **`XLog`** — use `XLog.log/warn/error/info()` instead of `console.*` in SW code.
 
-### 4.2. `utils/api.js` + `utils/api-features.js` — X GraphQL Integration
+### 4.2. `utils/api.js` + `utils/api-parsers.js` + `utils/api-features.js` — X GraphQL Integration
 The most complex, most fragile area.
 
 - **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 24 h (persisted; failed passes cache `FALLBACK_ENDPOINTS` for 10 min only). One scan at a time (single-flight), whole pass capped at `DISCOVERY_TOTAL_TIMEOUT`. `FALLBACK_ENDPOINTS` go stale when X ships new bundles — update periodically. On 401/403 a discovered bearer is reverted to the built-in public token (`noteAuthFailure`).
@@ -171,6 +176,8 @@ The most complex, most fragile area.
 - **`withStaleRetry(key, fn)`**: catches `STALE_QUERY_ID`, forces re-discovery, retries once. Self-healing against X changes.
 - **Auth**: reads cookies directly — `ct0` → `x-csrf-token`, `auth_token` → session. Requests go to `https://x.com/i/api/graphql/…` and use `encodeURIComponent` (NOT `URLSearchParams` — X rejects `+` for spaces).
 - **Target ops**: `UserByScreenName`, `UserTweets`, `Followers`, `Following`, `BlueVerifiedFollowers`, `SearchTimeline` (date range).
+- **Parser seam**: `api-parsers.js` owns response-shape traversal and normalized rows; `api.js` owns network/auth/queryId behavior only.
+- **Cancellation**: `XPorterAPI.abortActiveRequests()` aborts an in-flight fetch when the user presses Stop; fetch and response-body reads share the same deadline.
 
 ### 4.3. `background/service-worker.js` — Export Engine
 Central orchestrator + message router. Loads utils via `importScripts` (§11). Key state:
@@ -376,10 +383,10 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 ## 11. Script Loading Order
 
 **Service worker** (`importScripts`, order matters):
-`config.js` → `api-features.js` → `api.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `popup/i18n.js` (for the localized capture overlay).
+`config.js` → `api-features.js` → `api-parsers.js` → `api.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
 
 **Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
-`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `popup.js` → `ladybug.js`.
+`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `popup.js` → `ladybug.js`.
 
 ---
 
@@ -389,11 +396,14 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 |---|---|---|
 | `XPORTER_CONFIG`, `XLog` | `config.js` | constants + logger |
 | `XPorterAPI` | `api.js` | `.getUserByScreenName`, `.fetchUserTweets`, `.fetchFollowers/Following/VerifiedFollowers`, `.discoverEndpoints`, search-capture parsers |
+| `XPorterApiParsers` | `api-parsers.js` | Pure user/tweet/timeline normalization |
 | `RateLimitManager` | `rateLimit.js` | class |
 | `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateXLSX`, `.generateExportFilename` |
 | `XPorterStorage` | `storage.js` | export state, batches, settings, username |
+| `XPorterFeedback` | `uninstall-feedback.js` | `.refresh`, `.maybeRefresh` |
+| `XPorterDownloads` | `downloads.js` | current/history/seen-post downloads |
 
-In pages, `utils/shared.js` exposes its helpers as plain globals; `ladybug.js` exposes `window.XPorterLadybug`.
+In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-post modules expose `XPorterHistory` / `XPorterSeenPosts`; `ladybug.js` exposes `window.XPorterLadybug`.
 
 ---
 

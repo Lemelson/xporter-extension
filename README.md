@@ -180,7 +180,9 @@ xporter/
 ├── manifest.json             # Manifest V3 configuration
 ├── agent.md / CLAUDE.md      # Developer & AI context docs
 ├── background/
-│   └── service-worker.js     # Export engine, message router, state machine
+│   ├── service-worker.js     # Export engine, message router, state machine
+│   ├── downloads.js          # File serialization + Chrome download handoff
+│   └── uninstall-feedback.js # Anonymous uninstall-summary URL
 ├── content/
 │   ├── feed-parser.js        # Extracts compact non-reply post rows from page responses
 │   ├── content.js            # Username detection from the active X tab
@@ -190,10 +192,13 @@ xporter/
 │   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + toggle
 │   ├── i18n.js               # In-app translation engine
 │   ├── rate-prompt.js/.css   # "Rate XPorter" prompt
+│   ├── history.js            # Export-history UI
+│   ├── seen-posts.js         # Passive seen-post dataset UI
 │   ├── ladybug.js            # Easter-egg ladybug on the About tab
 │   └── locales/*.json        # UI strings for 14 languages (en = fallback)
 ├── utils/
 │   ├── api.js                # X GraphQL client, endpoint discovery
+│   ├── api-parsers.js        # Pure X response parsers
 │   ├── api-features.js       # GraphQL feature-flag constants
 │   ├── config.js             # Tunable constants + logger
 │   ├── rateLimit.js          # Batch rate limiter with cooldowns

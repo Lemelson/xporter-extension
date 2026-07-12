@@ -347,27 +347,12 @@ class RateLimitManager {
     }
 
     /**
-     * Reset the manager
-     */
-    reset() {
-        this.requestCount = 0;
-        this.totalRequests = 0;
-        this._aborted = false;
-        this._abortController = null;
-        this.status = 'idle';
-        this._emitStatus('idle');
-    }
-
-    /**
      * Get serializable state for storage
      */
     getState() {
         return {
             requestCount: this.requestCount,
             totalRequests: this.totalRequests,
-            requestDelay: this.requestDelay,
-            batchSize: this.batchSize,
-            cooldownDuration: this.cooldownDuration,
             lastRequestAt: this.lastRequestAt
         };
     }
@@ -379,9 +364,6 @@ class RateLimitManager {
         if (state) {
             this.requestCount = state.requestCount || 0;
             this.totalRequests = state.totalRequests || 0;
-            if (state.requestDelay) this.requestDelay = state.requestDelay;
-            if (state.batchSize) this.batchSize = state.batchSize;
-            if (state.cooldownDuration) this.cooldownDuration = state.cooldownDuration;
             if (state.lastRequestAt) this.lastRequestAt = state.lastRequestAt;
         }
     }
