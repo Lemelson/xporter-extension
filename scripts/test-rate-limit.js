@@ -341,12 +341,26 @@ async function run() {
     );
 
     await XPorterStorage.recordExportStart('verified_followers', 'csv');
-    const usage = await XPorterStorage.loadUsage();
+    let usage = await XPorterStorage.loadUsage();
     assert.equal(usage.byMode.verifiedFollowers, 1);
     assert.equal(
         usage.byMode.verified_followers,
         undefined,
         'verified follower usage must use the uninstall-report field name'
+    );
+
+    assert.equal(usage.lastPhase, 'resolving_user');
+    assert.equal(usage.firstItemMs, 0);
+    await XPorterStorage.recordExportPhase('fetching');
+    await XPorterStorage.recordFirstItem(usage.currentExportStartedAt + 1250);
+    usage = await XPorterStorage.loadUsage();
+    assert.equal(usage.lastPhase, 'fetching');
+    assert.equal(usage.firstItemMs, 1250);
+    await XPorterStorage.recordExportPhase('not-a-real-phase');
+    assert.equal(
+        (await XPorterStorage.loadUsage()).lastPhase,
+        'fetching',
+        'unknown phases must not enter uninstall telemetry'
     );
 
     storageData.xporter_export_history = [{ id: 123, username: 'legacy' }];
