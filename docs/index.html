@@ -4,15 +4,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XPorter — Free X / Twitter Export to CSV, JSON & Excel</title>
+  <title>XPorter — Export X data to CSV, JSON or Excel</title>
   <meta name="description"
-    content="Export posts, followers, following and verified followers from any X (Twitter) profile to CSV, JSON or Excel. Free, unlimited, and your data never leaves your browser." />
+    content="Export posts, followers, following and verified followers from X to CSV, JSON or Excel. Free, unlimited, and processed in your browser." />
   <link rel="icon" type="image/png" href="assets/icon128.png" />
   <meta name="google-site-verification" content="6Z2cj0kX7irYbmkR9JIBBW6sUhmadw8sFJx33zqTFNY" />
-  <meta property="og:title" content="XPorter — Free X / Twitter Export" />
+  <meta property="og:title" content="XPorter — Export X data. Keep the file." />
   <meta property="og:description"
-    content="Export posts, followers & following from any X profile to CSV, JSON or Excel. Free, unlimited, private." />
+    content="Posts and audiences from X, saved as CSV, JSON or Excel. Free, unlimited and local." />
   <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <!-- anti-FOUC theme: set before paint -->
   <script>
     (function () {
@@ -240,18 +243,6 @@
     .reveal.in { opacity: 1; transform: none; }
     @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
-    /* ---------- stats ---------- */
-    .stats {
-      display: grid; grid-template-columns: repeat(4, 1fr);
-      background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius);
-      box-shadow: var(--card-shadow); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow: hidden;
-    }
-    .stat { text-align: center; padding: 34px 16px; position: relative; }
-    .stat + .stat::before { content: ""; position: absolute; left: 0; top: 22%; height: 56%; width: 1px; background: linear-gradient(var(--glass-border), transparent); }
-    .stat .n { font-size: clamp(34px, 4.5vw, 48px); font-weight: 850; line-height: 1; letter-spacing: -2px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-    .stat .l { color: var(--text-muted); font-size: 13.5px; margin-top: 10px; font-weight: 550; }
-    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(3)::before, .stat:nth-child(2)::before { background: transparent; } }
-
     /* ---------- features (bento) ---------- */
     .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     .fcard {
@@ -262,7 +253,6 @@
     .fcard::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, var(--accent-glow), transparent 62%); opacity: 0; transition: opacity .25s; pointer-events: none; }
     .fcard:hover { transform: translateY(-5px); border-color: var(--glass-border-strong); background: var(--glass-bg-2); }
     .fcard:hover::after { opacity: 1; }
-    .fcard.wide { grid-column: 1 / -1; }
     .ftile {
       width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
       color: #fff; margin-bottom: 18px;
@@ -271,19 +261,7 @@
     }
     .fcard h3 { font-size: 18px; font-weight: 750; margin-bottom: 8px; letter-spacing: -0.3px; }
     .fcard p { color: var(--text-secondary); font-size: 14.5px; max-width: 52ch; }
-    .fcard.wide .inner { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
-    .fcard.wide .inner > div:first-child { flex: 1 1 320px; }
-    .metric-pills { display: flex; flex-wrap: wrap; gap: 9px; flex: 1 1 280px; }
-    .mpill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; padding: 9px 13px; border-radius: 999px; background: var(--glass-bg-2); border: 1px solid var(--glass-border); }
-    .mpill svg { color: var(--accent); width: 15px; height: 15px; flex: none; }
     @media (max-width: 720px) { .bento { grid-template-columns: 1fr; } }
-
-    /* ---------- chips (any data any format) ---------- */
-    .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-    .chip { display: inline-flex; align-items: center; gap: 9px; background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 11px 19px; border-radius: 999px; font-size: 15px; font-weight: 600; transition: transform .12s, border-color .15s; }
-    .chip:hover { transform: translateY(-2px); border-color: var(--glass-border-strong); }
-    .chip .em { font-size: 17px; }
-    .chips.sub .chip { font-size: 14px; padding: 9px 16px; color: var(--text-secondary); }
 
     /* ---------- steps ---------- */
     .steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
@@ -314,11 +292,6 @@
     .privacy-box p { color: var(--text-secondary); max-width: 640px; margin: 16px auto 0; font-size: 16px; }
     .privacy-box a { color: var(--accent); font-weight: 650; }
 
-    /* ---------- languages ---------- */
-    .langs { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 800px; margin: 0 auto; }
-    .lang { display: inline-flex; align-items: center; gap: 8px; background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 9px 16px; border-radius: 999px; font-size: 14px; transition: transform .12s, border-color .15s, background .15s; }
-    .lang:hover { transform: translateY(-2px); border-color: var(--glass-border-strong); background: var(--glass-bg-hover); }
-    .lang .fl { font-size: 16px; line-height: 1; }
 
     /* ---------- final cta ---------- */
     .final { text-align: center; }
@@ -335,10 +308,203 @@
     .disclaimer { font-size: 12.5px; color: var(--text-muted); margin-top: 18px; max-width: 780px; }
 
     @media (max-width: 560px) { section { padding-top: 34px; padding-bottom: 34px; } .privacy-box { padding: 32px 20px; } }
+
+    /* 2026 compact editorial pass */
+    :root {
+      --text-primary: #f7f9fc;
+      --text-secondary: #b6c0d0;
+      --text-muted: #8793a6;
+      --accent: #58a8f8;
+      --accent-2: #58a8f8;
+      --accent-hover: #80bdf8;
+      --accent-glow: rgba(48, 133, 219, 0.18);
+      --glass-bg: rgba(255, 255, 255, 0.035);
+      --glass-bg-2: rgba(255, 255, 255, 0.055);
+      --glass-bg-hover: rgba(255, 255, 255, 0.075);
+      --glass-border: rgba(255, 255, 255, 0.10);
+      --glass-border-strong: rgba(255, 255, 255, 0.18);
+      --card-shadow: none;
+      --nav-bg: rgba(10, 17, 29, 0.86);
+      --radius: 18px;
+      --radius-sm: 10px;
+      --maxw: 1080px;
+    }
+
+    :root[data-theme="light"] {
+      --text-primary: #152033;
+      --text-secondary: #526076;
+      --text-muted: #758198;
+      --accent: #116fc7;
+      --accent-2: #116fc7;
+      --accent-hover: #0d5eaa;
+      --accent-glow: rgba(17, 111, 199, 0.12);
+      --glass-bg: rgba(255, 255, 255, 0.58);
+      --glass-bg-2: rgba(255, 255, 255, 0.78);
+      --glass-bg-hover: rgba(255, 255, 255, 0.92);
+      --glass-border: rgba(29, 62, 97, 0.12);
+      --glass-border-strong: rgba(29, 62, 97, 0.20);
+      --nav-bg: rgba(238, 244, 250, 0.88);
+    }
+
+    body {
+      font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0a111d;
+      font-feature-settings: "ss01" 1, "ss02" 1;
+    }
+    :root[data-theme="light"] body { background: #edf3f8; }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(52, 138, 225, 0.16), transparent 31rem),
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+      background-size: auto, 64px 64px, 64px 64px;
+      mask-image: linear-gradient(to bottom, black, transparent 74%);
+    }
+    :root[data-theme="light"] body::before {
+      background:
+        radial-gradient(circle at 12% 0%, rgba(28, 117, 203, 0.13), transparent 31rem),
+        linear-gradient(rgba(29, 62, 97, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(29, 62, 97, 0.035) 1px, transparent 1px);
+      background-size: auto, 64px 64px, 64px 64px;
+    }
+    .orbs { display: none; }
+    .wrap { padding-left: 28px; padding-right: 28px; }
+    a:focus-visible, button:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .skip-link { position: fixed; left: 18px; top: 12px; z-index: 100; padding: 10px 14px; border-radius: 8px; background: var(--text-primary); color: #0a111d; transform: translateY(-160%); transition: transform .2s; }
+    .skip-link:focus { transform: translateY(0); }
+
+    nav { border-bottom-color: var(--glass-border); }
+    .nav-inner { height: 68px; }
+    .brand { font-weight: 800; letter-spacing: -0.55px; }
+    .nav-links { gap: 26px; }
+    .nav-links a.minor { font-size: 13.5px; }
+    .icon-btn, .lang-select { border-radius: 9px; }
+    .btn { border-radius: 10px; font-weight: 700; }
+    .btn-primary { box-shadow: none; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px var(--accent-glow); }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+    .btn-ghost:hover { color: var(--text-primary); background: transparent; }
+
+    .hero { min-height: 620px; padding-top: 80px; padding-bottom: 74px; gap: 64px; }
+    .pill { border: 0; border-left: 2px solid var(--accent); border-radius: 0; background: transparent; padding: 2px 0 2px 12px; margin-bottom: 24px; color: var(--text-secondary); }
+    .pill .bolt { display: none; }
+    .hero h1 { max-width: 660px; font-size: clamp(44px, 6.2vw, 72px); line-height: .99; letter-spacing: -3.2px; font-weight: 800; text-wrap: balance; }
+    .hero h1 .grad { background: none; color: var(--accent); -webkit-text-fill-color: currentColor; }
+    .hero p.lead { max-width: 600px; margin: 24px 0 30px; font-size: 18px; line-height: 1.7; text-wrap: pretty; }
+    .hero .btn-primary, .hero .btn-ghost { padding: 13px 20px; font-size: 14.5px; }
+    .trust { margin-top: 30px; gap: 8px 18px; max-width: 620px; font-size: 12.5px; }
+    .trust .dot { font-size: 9px; }
+
+    .mock-wrap { justify-content: flex-end; }
+    .mock-wrap::before { inset: -20px; opacity: .45; }
+    .mock { width: 320px; border-radius: 18px; transform: rotateY(-5deg) rotateX(2deg); box-shadow: 0 30px 70px rgba(0, 0, 0, .32); }
+    .mock:hover { transform: translateY(-4px); }
+    .mock-tabs { display: none; }
+    .mock-body { gap: 11px; padding: 14px; }
+    .mfield { border-radius: 8px; padding: 10px 12px; }
+    .mbtn { border-radius: 8px; box-shadow: none; }
+
+    section { padding-top: 58px; padding-bottom: 58px; }
+    .section-head { max-width: 720px; margin: 0 0 28px; text-align: left; }
+    .eyebrow { margin-bottom: 10px; font-size: 11px; letter-spacing: 1.8px; }
+    .section-head h2 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -1.7px; font-weight: 800; text-wrap: balance; }
+    .section-head p { max-width: 620px; font-size: 15.5px; line-height: 1.75; text-wrap: pretty; }
+
+    #features { border-top: 1px solid var(--glass-border); }
+    .bento { gap: 0; border-top: 1px solid var(--glass-border); }
+    .fcard {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      column-gap: 16px;
+      align-content: start;
+      min-height: 126px;
+      padding: 22px 24px;
+      border: 0;
+      border-bottom: 1px solid var(--glass-border);
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .fcard:nth-child(odd) { border-right: 1px solid var(--glass-border); }
+    .fcard:hover { transform: none; background: var(--glass-bg); }
+    .fcard::after { display: none; }
+    .ftile { grid-row: 1 / 3; width: 36px; height: 36px; margin: 1px 0 0; border-radius: 9px; background: var(--glass-bg-2); border: 1px solid var(--glass-border); box-shadow: none; color: var(--accent); }
+    .ftile svg { width: 18px; height: 18px; }
+    .fcard h3 { margin: 0 0 5px; font-size: 15.5px; font-weight: 700; }
+    .fcard p { max-width: 44ch; font-size: 13.5px; line-height: 1.6; }
+
+    #how { border-top: 1px solid var(--glass-border); }
+    .steps { gap: 0; border-top: 1px solid var(--glass-border); }
+    .step { min-height: 196px; padding: 22px 18px 24px; border: 0; border-right: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); border-radius: 0; background: transparent; box-shadow: none; }
+    .step:last-child { border-right: 0; }
+    .step:hover { transform: none; background: var(--glass-bg); }
+    .step-top { margin-bottom: 22px; }
+    .step .num { width: 30px; height: 30px; border-radius: 8px; background: transparent; border: 1px solid var(--glass-border-strong); box-shadow: none; color: var(--accent); font-size: 13px; }
+    .step .step-ico { display: none; }
+    .step h3 { font-size: 15px; }
+    .step p { font-size: 13px; line-height: 1.6; }
+
+    #privacy { padding-top: 60px; }
+    .privacy-box { display: grid; grid-template-columns: 72px minmax(200px, .72fr) minmax(320px, 1.28fr); gap: 24px; align-items: start; padding: 34px; text-align: left; border-radius: 18px; background: var(--glass-bg-2); box-shadow: none; backdrop-filter: none; }
+    .privacy-box::before { display: none; }
+    .privacy-box .shield { width: 52px; height: 52px; margin: 0; border-radius: 12px; background: transparent; border: 1px solid var(--glass-border-strong); box-shadow: none; color: var(--accent); }
+    .privacy-box h2 { padding-top: 6px; font-size: clamp(24px, 3vw, 34px); font-weight: 800; }
+    .privacy-box p { max-width: none; margin: 0; font-size: 14px; line-height: 1.7; }
+    .privacy-box p:last-child { grid-column: 3; margin-top: -8px; }
+
+    .final { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 32px; margin-top: 18px; padding: 34px 28px; text-align: left; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
+    .final h2 { font-size: clamp(28px, 4vw, 42px); letter-spacing: -1.6px; font-weight: 800; }
+    .final p { margin: 0; font-size: 14px; }
+    .final .btn-primary { grid-column: 2; grid-row: 1 / 3; padding: 14px 22px; font-size: 14.5px; }
+
+    footer { margin-top: 36px; padding: 30px 0 34px; }
+    .foot-links { gap: 18px; }
+    .foot-links a { font-size: 13px; }
+    .disclaimer { font-size: 11.5px; }
+
+    @media (max-width: 920px) {
+      .hero { min-height: 0; padding-top: 58px; padding-bottom: 58px; gap: 42px; }
+      .mock-wrap { order: initial; justify-content: center; }
+      .mock { transform: none; }
+      .privacy-box { grid-template-columns: 56px 1fr; }
+      .privacy-box p { grid-column: 1 / -1; }
+      .privacy-box p:last-child { grid-column: 1 / -1; margin-top: -12px; }
+    }
+    @media (max-width: 720px) {
+      .wrap { padding-left: 20px; padding-right: 20px; }
+      .nav-links { display: none; }
+      .nav-tools .btn { display: none; }
+      .hero { padding-top: 46px; padding-bottom: 46px; }
+      .hero h1 { letter-spacing: -2.2px; }
+      .hero-cta .btn { width: auto; }
+      .mock-wrap { display: none; }
+      .bento { grid-template-columns: 1fr; }
+      .fcard:nth-child(odd) { border-right: 0; }
+      .steps { grid-template-columns: 1fr 1fr; }
+      .step:nth-child(2) { border-right: 0; }
+      .final { grid-template-columns: 1fr; }
+      .final .btn-primary { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 14px; }
+    }
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 42px; }
+      .lang-select { max-width: 116px; }
+      .steps { grid-template-columns: 1fr; }
+      .step, .step:nth-child(2) { min-height: 0; border-right: 0; }
+      .privacy-box { grid-template-columns: 1fr; padding: 26px 22px; }
+      .privacy-box h2, .privacy-box p, .privacy-box p:last-child { grid-column: 1; }
+      .final { padding: 28px 0; }
+    }
   </style>
 </head>
 
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <div class="orbs"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
 
   <!-- NAV -->
@@ -367,12 +533,13 @@
     </div>
   </nav>
 
+  <main id="main">
   <!-- HERO -->
   <header class="wrap hero" id="top">
     <div class="reveal">
-      <span class="pill"><span class="bolt" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> <span data-i18n="hero_pill">Free &amp; unlimited — no account, no API keys</span></span>
-      <h1 data-i18n-html="hero_h1">Export <span class="grad">anything</span> from X / Twitter</h1>
-      <p class="lead" data-i18n="hero_lead">Posts, followers, following and verified followers from any profile — straight to CSV, JSON or Excel. One click. Your data never leaves your browser.</p>
+      <span class="pill"><span class="bolt" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> <span data-i18n="hero_pill">Free · unlimited · no API key</span></span>
+      <h1 data-i18n-html="hero_h1">Export <span class="grad">X data</span>.<br />Keep the file.</h1>
+      <p class="lead" data-i18n="hero_lead">Posts and audiences from any public profile, saved as CSV, JSON or Excel. Everything is processed in your browser.</p>
       <div class="hero-cta">
         <a class="btn btn-primary" id="heroInstall" href="#" target="_blank" rel="noopener">
           <span class="bolt" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
@@ -405,90 +572,35 @@
     </div>
   </header>
 
-  <!-- STATS -->
-  <section class="wrap" style="padding-top: 8px;">
-    <div class="stats reveal">
-      <div class="stat"><div class="n" data-count="4">4</div><div class="l" data-i18n="stat_types">Export types</div></div>
-      <div class="stat"><div class="n" data-count="3">3</div><div class="l" data-i18n="stat_formats">File formats</div></div>
-      <div class="stat"><div class="n" data-count="14">14</div><div class="l" data-i18n="stat_langs">Languages</div></div>
-      <div class="stat"><div class="n">∞</div><div class="l" data-i18n="stat_unlimited">Unlimited &amp; free</div></div>
-    </div>
-  </section>
-
   <!-- FEATURES -->
   <section id="features" class="wrap">
     <div class="section-head reveal">
       <span class="eyebrow" data-i18n="feat_eyebrow">Features</span>
-      <h2 data-i18n="feat_head">Everything you need to get X data out</h2>
-      <p data-i18n="feat_sub">Built for marketers, researchers, analysts and creators who need real data — not a 150-tweet preview.</p>
+      <h2 data-i18n="feat_head">Only the useful parts</h2>
+      <p data-i18n="feat_sub">Choose the dataset and file type. XPorter keeps the fields you will actually use.</p>
     </div>
     <div class="bento">
-      <div class="fcard wide reveal">
-        <div class="inner">
-          <div>
-            <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/></svg></div>
-            <h3 data-i18n="f_engage_t">Full engagement metrics</h3>
-            <p data-i18n="f_engage_d">Every post comes with the numbers that matter — plus dates, links, media and hashtags.</p>
-          </div>
-          <div class="metric-pills">
-            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> <span data-i18n="m_views">Views</span></span>
-            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg> <span data-i18n="m_likes">Likes</span></span>
-            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg> <span data-i18n="m_reposts">Reposts</span></span>
-            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> <span data-i18n="m_replies">Replies</span></span>
-            <span class="mpill"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 17h3l2-4V7H5v6h2zm9 0h3l2-4V7h-7v6h2z"/></svg> <span data-i18n="m_quotes">Quotes</span></span>
-            <span class="mpill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> <span data-i18n="m_bookmarks">Bookmarks</span></span>
-          </div>
-        </div>
-      </div>
-
       <div class="fcard reveal">
         <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <h3 data-i18n="f_types_t">Four export types</h3>
+        <h3 data-i18n="f_types_t">Posts and audiences</h3>
         <p data-i18n="f_types_d">Posts, followers, following and verified followers from any public profile.</p>
       </div>
       <div class="fcard reveal">
         <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg></div>
-        <h3 data-i18n="f_formats_t">CSV, JSON &amp; XLSX</h3>
-        <p data-i18n="f_formats_d">CSV for any spreadsheet, XLSX for Excel, JSON for developers — built locally and downloaded straight to you.</p>
+        <h3 data-i18n="f_formats_t">Ready for your workflow</h3>
+        <p data-i18n="f_formats_d">CSV for spreadsheets, XLSX for Excel and JSON for code.</p>
       </div>
       <div class="fcard reveal">
         <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
-        <h3 data-i18n="f_dates_t">Date-range filtering</h3>
-        <p data-i18n="f_dates_d">Export posts from a specific time window — XPorter gathers exactly the period you need.</p>
+        <h3 data-i18n="f_dates_t">Pick the date range</h3>
+        <p data-i18n="f_dates_d">Export posts from exactly the period you need.</p>
       </div>
       <div class="fcard reveal">
         <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
-        <h3 data-i18n="f_resume_t">Auto-resume &amp; rate limiting</h3>
-        <p data-i18n="f_resume_d">Progress is saved as it runs. Pause, close or restart your browser and pick up where you left off — while respecting X's limits.</p>
+        <h3 data-i18n="f_resume_t">Stop and continue later</h3>
+        <p data-i18n="f_resume_d">Progress is saved, so you can resume without starting over.</p>
       </div>
 
-      <div class="fcard wide reveal">
-        <div class="inner">
-          <div>
-            <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
-            <h3 data-i18n="f_local_t">100% local &amp; private</h3>
-            <p data-i18n="f_local_d">Uses your own logged-in X session — no password, no API keys, no account. Your exported data goes straight from X into your file and never passes through us.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ANY DATA ANY FORMAT -->
-  <section class="wrap">
-    <div class="section-head reveal">
-      <span class="eyebrow" data-i18n="fmt_eyebrow">Flexible</span>
-      <h2 data-i18n="fmt_head">Any data, any format</h2>
-      <p data-i18n="fmt_sub">Pick what to export and how you want it.</p>
-    </div>
-    <div class="chips reveal" style="margin-bottom: 14px;">
-      <span class="chip"><span class="em">📝</span> <span data-i18n="chip_posts">Posts</span></span>
-      <span class="chip"><span class="em">👥</span> <span data-i18n="chip_followers">Followers</span></span>
-      <span class="chip"><span class="em">➡️</span> <span data-i18n="chip_following">Following</span></span>
-      <span class="chip"><span class="em">✓</span> <span data-i18n="chip_verified">Verified followers</span></span>
-    </div>
-    <div class="chips sub reveal">
-      <span class="chip">CSV</span><span class="chip">JSON</span><span class="chip">Excel (XLSX)</span>
     </div>
   </section>
 
@@ -496,8 +608,8 @@
   <section id="how" class="wrap">
     <div class="section-head reveal">
       <span class="eyebrow" data-i18n="how_eyebrow">How it works</span>
-      <h2 data-i18n="how_head">Exporting takes four clicks</h2>
-      <p data-i18n="how_sub">No setup, no sign-up. Install and go.</p>
+      <h2 data-i18n="how_head">From profile to file in four clicks</h2>
+      <p data-i18n="how_sub">No setup and no XPorter account.</p>
     </div>
     <div class="steps-wrap">
       <div class="steps">
@@ -526,38 +638,21 @@
     <div class="privacy-box reveal">
       <div class="shield"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
       <h2 data-i18n="priv_t">Your data stays yours</h2>
-      <p data-i18n="priv_d">XPorter runs entirely in your browser using the X session you're already logged into. There are no XPorter servers, no account, and no trackers during use — your exported data goes straight from X into your file and never passes through us. The only thing XPorter ever sends is an anonymous, non-personal usage summary when you uninstall, so churn can be understood and the extension improved.</p>
+      <p data-i18n="priv_d">Exported data stays in your browser. XPorter uses your signed-in X session, has no server account and never receives your files. On uninstall, it may send a short anonymous usage summary — no X content or personal data.</p>
       <p><a href="privacy-policy.html" data-i18n="priv_link">Read the full privacy policy →</a></p>
-    </div>
-  </section>
-
-  <!-- LANGUAGES -->
-  <section class="wrap">
-    <div class="section-head reveal">
-      <span class="eyebrow" data-i18n="lang_eyebrow">Global</span>
-      <h2 data-i18n="lang_head">Speaks your language</h2>
-      <p data-i18n="lang_sub">Auto-detects your browser language on first launch — switchable any time.</p>
-    </div>
-    <div class="langs reveal">
-      <span class="lang"><span class="fl">🇺🇸</span> English</span><span class="lang"><span class="fl">🇨🇳</span> 中文</span>
-      <span class="lang"><span class="fl">🇯🇵</span> 日本語</span><span class="lang"><span class="fl">🇪🇸</span> Español</span>
-      <span class="lang"><span class="fl">🇰🇷</span> 한국어</span><span class="lang"><span class="fl">🇷🇺</span> Русский</span>
-      <span class="lang"><span class="fl">🇮🇹</span> Italiano</span><span class="lang"><span class="fl">🇧🇷</span> Português</span>
-      <span class="lang"><span class="fl">🇹🇷</span> Türkçe</span><span class="lang"><span class="fl">🇩🇪</span> Deutsch</span>
-      <span class="lang"><span class="fl">🇸🇦</span> العربية</span><span class="lang"><span class="fl">🇫🇷</span> Français</span>
-      <span class="lang"><span class="fl">🇮🇳</span> हिन्दी</span><span class="lang"><span class="fl">🇮🇩</span> Bahasa Indonesia</span>
     </div>
   </section>
 
   <!-- FINAL CTA -->
   <section class="wrap final reveal">
-    <h2 data-i18n="cta_t">Get your X data in seconds</h2>
-    <p data-i18n="cta_d">Free, unlimited, and private. No reason not to.</p>
+    <h2 data-i18n="cta_t">Your next dataset is one click away</h2>
+    <p data-i18n="cta_d">Install XPorter and export when you need it.</p>
     <a class="btn btn-primary" id="finalInstall" href="#" target="_blank" rel="noopener">
       <span class="bolt" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
       <span data-i18n="cta_btn">Add XPorter to Chrome</span>
     </a>
   </section>
+  </main>
 
   <!-- FOOTER -->
   <footer>
@@ -669,6 +764,47 @@
       "zh_CN": {"nav_features": "功能", "nav_how": "工作原理", "nav_privacy": "隐私", "nav_install": "添加到 Chrome", "hero_pill": "免费且无限制 — 无需账户，无需 API 密钥", "hero_h1": "从 X / Twitter 导出<span class=\"grad\">一切</span>", "hero_lead": "从任意主页导出帖子、关注者、正在关注和已认证关注者 — 直接生成 CSV、JSON 或 Excel。一键搞定。你的数据永远不会离开浏览器。", "hero_cta1": "添加到 Chrome — 免费", "hero_cta2": "在 GitHub 查看", "trust_local": "100% 本地且私密", "trust_unlimited": "无限次导出", "trust_langs": "14 种语言", "stat_types": "导出类型", "stat_formats": "文件格式", "stat_langs": "语言", "stat_unlimited": "无限制且免费", "feat_eyebrow": "功能", "feat_head": "导出 X 数据所需的一切", "feat_sub": "专为需要真实数据的营销人员、研究者、分析师和创作者打造 — 不是只能看 150 条推文的预览。", "f_engage_t": "完整互动指标", "f_engage_d": "每条帖子都附带真正重要的数字 — 还有日期、链接、媒体和话题标签。", "m_views": "浏览量", "m_likes": "点赞", "m_reposts": "转发", "m_replies": "回复", "m_quotes": "引用", "m_bookmarks": "书签", "f_types_t": "四种导出类型", "f_types_d": "从任意公开主页导出帖子、关注者、正在关注和已认证关注者。", "f_formats_t": "CSV、JSON 和 XLSX", "f_formats_d": "CSV 适用于任何电子表格，XLSX 适用于 Excel，JSON 适用于开发者 — 在本地生成并直接下载给你。", "f_dates_t": "日期范围筛选", "f_dates_d": "导出特定时间段内的帖子 — XPorter 只精确收集你需要的那段时间。", "f_resume_t": "自动恢复与速率限制", "f_resume_d": "运行时会保存进度。暂停、关闭或重启浏览器后，都可从中断处继续 — 同时遵守 X 的限制。", "f_local_t": "100% 本地且私密", "f_local_d": "使用你自己已登录的 X 会话 — 无需密码、无需 API 密钥、无需账户。导出的数据直接从 X 进入你的文件，绝不会经过我们。", "fmt_eyebrow": "灵活", "fmt_head": "任意数据，任意格式", "fmt_sub": "选择导出什么，以及你想要的方式。", "chip_posts": "帖子", "chip_followers": "关注者", "chip_following": "正在关注", "chip_verified": "已认证关注者", "how_eyebrow": "工作原理", "how_head": "导出只需四次点击", "how_sub": "无需设置，无需注册。装好即用。", "s1_t": "打开 XPorter", "s1_d": "在登录 X 的状态下，点击工具栏中的 XPorter 图标。", "s2_t": "输入用户名", "s2_d": "输入任意主页的用户名，例如 <code>elonmusk</code>。", "s3_t": "选择类型和格式", "s3_d": "帖子、关注者、正在关注或已认证 — 导出为 CSV、JSON 或 Excel。", "s4_t": "开始导出", "s4_d": "点击开始并下载文件。就这么简单。", "priv_t": "你的数据始终属于你", "priv_d": "XPorter 完全在你的浏览器中运行，使用你已经登录的 X 会话。没有 XPorter 服务器，无需账户，使用期间也没有任何追踪器 — 导出的数据直接从 X 进入你的文件，绝不会经过我们。XPorter 唯一发送的，是在你卸载时的一份匿名、非个人化使用摘要，以便了解流失情况并改进扩展。", "priv_link": "阅读完整隐私政策 →", "lang_eyebrow": "全球", "lang_head": "说你的语言", "lang_sub": "首次启动时自动检测你的浏览器语言 — 随时可切换。", "cta_t": "几秒内获取你的 X 数据", "cta_d": "免费、无限制且私密。没有理由不用。", "cta_btn": "将 XPorter 添加到 Chrome", "foot_privacy": "隐私", "foot_disclaimer": "X 和 Twitter 是 X Corp. 的商标。XPorter 是一款独立工具，与 X Corp. 或 Twitter, Inc. 无任何隶属、背书或关联关系。© 2026 XPorter。"}
     };
 
+    Object.assign(I18N.en, {
+      hero_pill: "Free · unlimited · no API key",
+      hero_h1: 'Export <span class="grad">X data</span>.<br>Keep the file.',
+      hero_lead: "Posts and audiences from any public profile, saved as CSV, JSON or Excel. Everything is processed in your browser.",
+      feat_head: "Only the useful parts",
+      feat_sub: "Choose the dataset and file type. XPorter keeps the fields you will actually use.",
+      f_types_t: "Posts and audiences",
+      f_formats_t: "Ready for your workflow",
+      f_formats_d: "CSV for spreadsheets, XLSX for Excel and JSON for code.",
+      f_dates_t: "Pick the date range",
+      f_dates_d: "Export posts from exactly the period you need.",
+      f_resume_t: "Stop and continue later",
+      f_resume_d: "Progress is saved, so you can resume without starting over.",
+      how_head: "From profile to file in four clicks",
+      how_sub: "No setup and no XPorter account.",
+      priv_d: "Exported data stays in your browser. XPorter uses your signed-in X session, has no server account and never receives your files. On uninstall, it may send a short anonymous usage summary — no X content or personal data.",
+      cta_t: "Your next dataset is one click away",
+      cta_d: "Install XPorter and export when you need it."
+    });
+
+    Object.assign(I18N.ru, {
+      hero_pill: "Бесплатно · без лимитов · без API-ключа",
+      hero_h1: 'Выгрузи <span class="grad">данные из X</span>.<br>Файл останется у тебя.',
+      hero_lead: "Посты и аудитория любого публичного профиля — в CSV, JSON или Excel. Всё обрабатывается в твоём браузере.",
+      feat_head: "Только то, что пригодится",
+      feat_sub: "Выбери данные и формат файла. XPorter сохранит полезные поля без лишнего шума.",
+      f_types_t: "Посты и аудитория",
+      f_types_d: "Посты, подписчики, подписки и verified-подписчики любого публичного профиля.",
+      f_formats_t: "Под любой сценарий",
+      f_formats_d: "CSV для таблиц, XLSX для Excel, JSON для кода.",
+      f_dates_t: "Нужный период",
+      f_dates_d: "Выгружай посты ровно за те даты, которые нужны.",
+      f_resume_t: "Остановись и продолжи позже",
+      f_resume_d: "Прогресс сохраняется — начинать заново не придётся.",
+      how_head: "От профиля до файла — четыре клика",
+      how_sub: "Без настройки и отдельного аккаунта XPorter.",
+      priv_d: "Экспортированные данные остаются в браузере. XPorter использует твою активную сессию X, не требует серверного аккаунта и не получает твои файлы. При удалении может отправиться короткая анонимная статистика — без контента X и персональных данных.",
+      cta_t: "Следующий датасет — в одном клике",
+      cta_d: "Установи XPorter и выгружай данные, когда понадобится."
+    });
+
     var LANG_NAMES = { en: "English", ru: "Русский", de: "Deutsch", es: "Español", fr: "Français", it: "Italiano", pt_BR: "Português", tr: "Türkçe", id: "Indonesia", ar: "العربية", hi: "हिन्दी", ja: "日本語", ko: "한국어", zh_CN: "中文" };
     var RTL = ["ar"];
 
@@ -719,19 +855,6 @@
       document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
     }
 
-    /* ---------------- count-up ---------------- */
-    function countUp(el) {
-      var target = parseInt(el.getAttribute("data-count"), 10); if (!target) return;
-      var start = null, dur = 900;
-      function step(ts) { if (!start) start = ts; var p = Math.min((ts - start) / dur, 1); el.textContent = Math.round(p * target); if (p < 1) requestAnimationFrame(step); }
-      requestAnimationFrame(step);
-    }
-    if ("IntersectionObserver" in window) {
-      var io2 = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) { if (en.isIntersecting) { countUp(en.target); io2.unobserve(en.target); } });
-      }, { threshold: 0.5 });
-      document.querySelectorAll("[data-count]").forEach(function (el) { io2.observe(el); });
-    }
   </script>
 </body>
 
