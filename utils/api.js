@@ -623,16 +623,30 @@ async function getUserByScreenName(screenName) {
   // not crash with a raw TypeError (parseUserObject guards the same way).
   const legacy = userResult.legacy || {};
   const core = userResult.core || {};
+  const expandedProfileUrl = legacy.entities?.url?.urls?.find(item => item?.expanded_url)?.expanded_url || '';
+  const professionalCategories = Array.isArray(userResult.professional?.category)
+    ? userResult.professional.category.map(item => item?.name).filter(Boolean)
+    : [];
 
   return {
     id: userResult.rest_id,
     name: core.name || legacy.name || '',
     screenName: core.screen_name || legacy.screen_name || '',
+    bio: legacy.description || '',
+    location: core.location || legacy.location || '',
+    url: expandedProfileUrl || legacy.url || '',
+    createdAt: core.created_at || legacy.created_at || '',
     profileImageUrl: (legacy.profile_image_url_https || '').replace('_normal', '_200x200'),
     isProtected: legacy.protected || false,
+    isVerified: userResult.is_blue_verified || legacy.verified || false,
     tweetCount: legacy.statuses_count || 0,
     followersCount: legacy.followers_count || 0,
-    followingCount: legacy.friends_count || 0
+    followingCount: legacy.friends_count || 0,
+    listedCount: legacy.listed_count || 0,
+    likesCount: legacy.favourites_count || 0,
+    mediaCount: legacy.media_count || 0,
+    subscriptionsCount: userResult.creator_subscriptions_count ?? legacy.creator_subscriptions_count ?? null,
+    professionalCategory: professionalCategories.join(', ')
   };
 }
 

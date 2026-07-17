@@ -217,7 +217,13 @@ async function handleMessage(message, sender) {
 
         case 'DOWNLOAD_CSV':
         case 'DOWNLOAD_EXPORT':
-            return await XPorterDownloads.downloadCurrent(message.outputFormat);
+            return await XPorterDownloads.startCurrentDownload(message.outputFormat);
+
+        case 'GET_DOWNLOAD_PLAN':
+            return await XPorterDownloads.getCurrentPlan(message.outputFormat);
+
+        case 'GET_EXPORT_TEXT':
+            return await XPorterDownloads.getCurrentPostsText();
 
         case 'DOWNLOAD_HISTORY_ENTRY':
             await applyAutoExpiration();
@@ -496,21 +502,7 @@ async function runExportLoop() {
         currentExport.completedAt = Date.now();
         await saveCurrentState();
 
-        // Save to export history
-        const ui = currentExport.userInfo || {};
-        const historyItems = await XPorterStorage.loadAllTweets();
-        await XPorterStorage.saveExportHistory({
-            username: ui.screenName || currentExport.username,
-            displayName: ui.name || currentExport.username,
-            profileImageUrl: ui.profileImageUrl || '',
-            exportMode: currentExport.exportMode,
-            itemCount: currentExport.tweetCount,
-            outputFormat: currentExport.outputFormat || 'csv',
-            dateFrom: currentExport.dateFrom?.toISOString() || null,
-            dateTo: currentExport.dateTo?.toISOString() || null,
-            completedAt: Date.now(),
-            items: historyItems
-        });
+        await saveCompletedExportHistory();
 
         // Anonymous usage counter (for uninstall feedback) — fire and forget
         const itemsDelta = Math.max(0, currentExport.tweetCount - (currentExport.itemsRecordedBase || 0));
@@ -541,6 +533,26 @@ async function runExportLoop() {
     }
 }
 
+async function saveCompletedExportHistory() {
+    const ui = currentExport.userInfo || {};
+    const historyLimit = Number(XPORTER_CONFIG.EXPORT_HISTORY_DATA_LIMIT) || 5000;
+    const keepPayload = currentExport.tweetCount <= historyLimit;
+    const historyItems = keepPayload ? await XPorterStorage.loadAllTweets() : null;
+    await XPorterStorage.saveExportHistory({
+        username: ui.screenName || currentExport.username,
+        displayName: ui.name || currentExport.username,
+        profileImageUrl: ui.profileImageUrl || '',
+        userInfo: { ...ui },
+        exportMode: currentExport.exportMode,
+        itemCount: currentExport.tweetCount,
+        outputFormat: currentExport.outputFormat || 'csv',
+        dateFrom: currentExport.dateFrom?.toISOString() || null,
+        dateTo: currentExport.dateTo?.toISOString() || null,
+        completedAt: currentExport.completedAt || Date.now(),
+        ...(historyItems ? { items: historyItems } : {})
+    });
+}
+
 // ==================== Posts Fetch Loop ====================
 
 // Seed a de-dup set with saved IDs. Cursor-based exports only need a recent
@@ -565,6 +577,32 @@ async function preloadSeenIds(seenIds) {
             }
         }
     } catch (_) { /* best-effort dedup */ }
+}
+
+// Cursor pagination can overlap around page boundaries, but retaining every ID
+// from a multi-million-row run wastes hundreds of MB. Keep only a generous
+// recent window; persisted batches remain the source of truth across resumes.
+function createRecentIdTracker(seed, requestedLimit) {
+    const limit = Math.max(1, Number(requestedLimit) || XPORTER_CONFIG.RECENT_EXPORT_ID_LIMIT || 1000);
+    const order = Array.from(seed || []).slice(-limit);
+    const seen = new Set(order);
+    let nextEviction = 0;
+
+    return {
+        add(id) {
+            if (seen.has(id)) return false;
+            if (seen.size === limit) {
+                seen.delete(order[nextEviction]);
+                order[nextEviction] = id;
+                nextEviction = (nextEviction + 1) % limit;
+            } else {
+                order.push(id);
+            }
+            seen.add(id);
+            return true;
+        },
+        get size() { return seen.size; }
+    };
 }
 
 function quantityLimitReached() {
@@ -614,6 +652,7 @@ async function _fetchPostsLoop() {
     let emptyPages = 0;
     const seenIds = new Set();
     await preloadSeenIds(seenIds);
+    const recentIds = createRecentIdTracker(seenIds);
 
     while (hasMore && currentExport.running) {
         // Check quantity limit
@@ -648,13 +687,11 @@ async function _fetchPostsLoop() {
             if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
             if (currentExport.settings.includeArticles === false && tweet.type === 'article') continue;
 
-            if (seenIds.has(tweet.id)) continue;
+            if (!recentIds.add(tweet.id)) continue;
             if (quantityLimitReached()) {
                 hasMore = false;
                 break;
             }
-            seenIds.add(tweet.id);
-
             // Inject author info if missing
             if (!tweet.author_name && currentExport.userInfo) {
                 tweet.author_name = currentExport.userInfo.name || '';
@@ -724,6 +761,7 @@ async function _fetchPostsByDateRangeLoop() {
     let emptyPages = 0;
     const seenIds = new Set();
     await preloadSeenIds(seenIds);
+    const recentIds = createRecentIdTracker(seenIds);
     const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom, currentExport.dateTo);
     let payload = null;
 
@@ -962,9 +1000,12 @@ async function openSearchCaptureTab(rawQuery) {
 
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
 
-    // X search lazy-loads reliably only in a foreground tab.
+    // Arm the capture state before navigating to X. Creating the tab directly
+    // at the search URL leaves a race where document_start can relay the first
+    // SearchTimeline response before chrome.tabs.create() resolves; the worker
+    // then drops the only payload because searchCapture does not exist yet.
     const tab = await chrome.tabs.create({
-        url: buildSearchTimelinePageUrl(rawQuery),
+        url: 'about:blank',
         active: true
     });
 
@@ -976,6 +1017,15 @@ async function openSearchCaptureTab(rawQuery) {
         seenUrls: new Set(),
         oldestCollectedMs: null // drives the overlay's date-based progress %
     };
+
+    try {
+        await chrome.tabs.update(tab.id, {
+            url: buildSearchTimelinePageUrl(rawQuery)
+        });
+    } catch (_) {
+        await closeSearchCaptureTab();
+        throw new Error('SEARCH_CAPTURE_TIMEOUT');
+    }
 
     setTimeout(() => {
         sendSearchCaptureStatus({ phaseKey: 'preparing' }, 8);
@@ -1188,6 +1238,7 @@ async function _fetchUsersLoop() {
     let emptyPages = 0;
     const seenIds = new Set();
     await preloadSeenIds(seenIds);
+    const recentIds = createRecentIdTracker(seenIds);
 
     // Pick the right API function
     const fetchFn = {
@@ -1214,8 +1265,21 @@ async function _fetchUsersLoop() {
         });
         if (!currentExport.running) break;
 
-        if (!result.users || result.users.length === 0) {
+        const users = Array.isArray(result.users) ? result.users : [];
+        const unexpectedInitialEmpty = users.length === 0 &&
+            currentExport.tweetCount === 0 &&
+            !currentExport.cursor &&
+            getExpectedItemCount() > 0;
+
+        if (users.length === 0) {
             emptyPages++;
+            // A profile lookup just told us rows exist, so an empty first page
+            // is not a successful zero-row export. Retry the same initial page
+            // a few times through the normal pacing path; otherwise one empty
+            // or malformed REST response becomes a green "complete" state.
+            if (unexpectedInitialEmpty && emptyPages >= 3) {
+                throw new Error('MAX_RETRIES_EXCEEDED');
+            }
             if (emptyPages >= 3) {
                 hasMore = false;
                 break;
@@ -1225,14 +1289,12 @@ async function _fetchUsersLoop() {
         }
 
         // Process users
-        for (const user of (result.users || [])) {
-            if (seenIds.has(user.id)) continue;
+        for (const user of users) {
+            if (!recentIds.add(user.id)) continue;
             if (quantityLimitReached()) {
                 hasMore = false;
                 break;
             }
-            seenIds.add(user.id);
-
             currentExport.tweetBuffer.push(user);
             currentExport.tweetCount++;
             recordFirstItemOnce();
@@ -1248,7 +1310,7 @@ async function _fetchUsersLoop() {
         // Update cursor
         if (hasMore && result.nextCursor) {
             currentExport.cursor = result.nextCursor;
-        } else {
+        } else if (!unexpectedInitialEmpty) {
             hasMore = false;
         }
 

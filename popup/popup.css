@@ -325,6 +325,13 @@ body.light .input-small {
   min-width: 0;
 }
 
+.status-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 /* Contextual action: a fixed compact square (icon over a short label), centered
    beside the status — never stretches tall on long translations. */
 /* NOTE: must be `.btn.btn-square`, not `.btn-square` — the base `.btn` rule is
@@ -363,6 +370,31 @@ body.light .input-small {
   width: 22px;
   height: 22px;
   flex-shrink: 0;
+}
+
+/* TXT exposes two equal actions. They are shorter than the normal single
+   square, while min-height + a two-line label area keeps long translations
+   clear of the icon instead of clipping or shrinking unpredictably. */
+.status-action-stack.txt-actions .btn.btn-square {
+  width: 74px;
+  height: 64px;
+  min-height: 64px;
+  padding: 6px 5px;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.status-action-stack.txt-actions .btn.btn-square span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.status-action-stack.txt-actions .btn.btn-square svg {
+  width: 19px;
+  height: 19px;
 }
 
 /* Glass buttons */
@@ -421,6 +453,20 @@ body.light .btn-primary:hover {
 .btn-warning:hover {
   background: linear-gradient(135deg, #FFDE74 0%, #FFC44E 50%, #FFD968 100%);
   box-shadow: 0 6px 24px rgba(214, 158, 30, 0.46), 0 0 22px rgba(255, 203, 82, 0.5), var(--glass-edge);
+}
+
+/* Cool blue distinguishes Copy from the amber file download without adding a
+   second loud accent to the status card. */
+.btn-copy {
+  background: linear-gradient(135deg, rgba(72, 164, 196, 0.88), rgba(48, 132, 170, 0.94));
+  border: 1px solid rgba(137, 211, 230, 0.46);
+  box-shadow: 0 4px 14px rgba(25, 100, 132, 0.30), var(--glass-edge);
+  color: #f4fbff;
+}
+
+.btn-copy:hover {
+  background: linear-gradient(135deg, rgba(86, 182, 211, 0.96), rgba(54, 145, 184, 0.98));
+  box-shadow: 0 6px 20px rgba(25, 100, 132, 0.40), var(--glass-edge);
 }
 
 .btn-secondary {
@@ -1795,6 +1841,15 @@ body.light .help-pop {
   font-weight: 600;
   color: var(--text-primary);
   margin-top: 8px;
+}
+
+.download-plan {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 /* Buttons base */

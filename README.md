@@ -5,7 +5,7 @@
 <h1 align="center">XPorter</h1>
 
 <p align="center">
-  Free, unlimited export of X (Twitter) posts, followers, and following to CSV, JSON, or XLSX.<br/>
+  Free, unlimited export of X (Twitter) posts, followers, and following to CSV, JSON, XLSX, or AI-friendly TXT.<br/>
   A Chrome extension — no servers or subscriptions; your exported data stays local.
 </p>
 
@@ -27,7 +27,7 @@
 - **Full engagement metrics** — views, likes, retweets, replies, quotes, bookmarks
 - **Passive seen-post dataset** — stores one local row per non-reply post already loaded while you browse X, with first/latest metrics and no extra API requests
 - **Multiple export modes** — posts, followers, following, and verified followers
-- **CSV, JSON, and XLSX output** — choose the format that fits your workflow
+- **CSV, JSON, XLSX, and posts-only TXT output** — download the AI-friendly TXT or copy it straight to your clipboard
 - **Date range filtering** — export posts from a specific time window
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
@@ -57,7 +57,7 @@ git clone https://github.com/Lemelson/xporter-extension.git
 XPorter leverages your existing authenticated X session to access X's internal GraphQL API. No API keys, no OAuth flow — it piggybacks on the cookies you already have.
 
 ```
-Popup UI ──▶ Service Worker ──▶ X APIs ──▶ CSV / JSON / XLSX File
+Popup UI ──▶ Service Worker ──▶ X APIs ──▶ CSV / JSON / XLSX / TXT File
                   │
             Chrome Storage
             (incremental saves)
@@ -72,7 +72,7 @@ Content Script ── detects username from active tab
 2. **Popup** collects the target username and export settings
 3. **Service worker** resolves the username to a user ID via `UserByScreenName`, then fetches the selected data type in paginated batches
 4. Items are saved incrementally to Chrome local storage (batches of 50)
-5. On completion (or manual download), items are compiled into CSV, JSON, or XLSX locally in the browser
+5. On completion (or manual download), items are compiled locally into CSV, JSON, XLSX, or posts-only TXT; large exports automatically download as safe, numbered parts
 
 While you browse X, the page hook also extracts non-reply posts from timeline responses X has already loaded. They are deduplicated by post ID in a local IndexedDB database; repeat sightings update metrics and exposure count instead of adding rows. The Settings tab can export this dataset as CSV/JSON or clear it. Collection is capped at the 50,000 most recently seen unique posts.
 
@@ -150,7 +150,7 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 | Include replies | On | Export replies alongside original posts |
 | Include articles | On | Export X Articles alongside ordinary posts |
 | Export mode | Posts | Data type to export: posts, followers, following, or verified followers |
-| Output format | CSV | File format: CSV, JSON, or XLSX |
+| Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for posts |
 | Quantity limit | 500 | Maximum posts or users per export (0 = unlimited) |
 | Export Speed | Standard | Turbo, Fast, Standard, Careful, Turtle, or Custom request pacing |
 | Custom pacing | 5 s / 20 / 3 min | Delay, requests per batch, and batch pause used only by Custom |

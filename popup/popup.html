@@ -172,6 +172,7 @@
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
           <option value="xlsx">Excel (XLSX)</option>
+          <option value="txt" data-i18n="formatTxtPostsOnly">TXT (Posts only)</option>
         </select>
       </div>
 
@@ -189,6 +190,7 @@
             <span id="statusMessage" data-i18n="starting">Starting...</span>
           </div>
           <div class="tweet-count" id="tweetCount">0 <span data-i18n="postsCollected">posts collected</span></div>
+          <div class="download-plan hidden" id="downloadPlan"></div>
         </div>
         <button class="btn btn-square btn-danger hidden" id="stopBtn">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -200,15 +202,25 @@
           </svg>
           <span data-i18n="stop">Stop</span>
         </button>
-        <button class="btn btn-square btn-warning hidden" id="downloadBtn">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 15V3" />
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <path d="m7 10 5 5 5-5" />
-          </svg>
-          <span data-i18n="download">Download</span>
-        </button>
+        <div class="status-action-stack" id="statusActionStack">
+          <button class="btn btn-square btn-warning hidden" id="downloadBtn">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 15V3" />
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="m7 10 5 5 5-5" />
+            </svg>
+            <span data-i18n="download">Download</span>
+          </button>
+          <button class="btn btn-square btn-copy hidden" id="copyBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect width="14" height="14" x="8" y="8" rx="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            </svg>
+            <span data-i18n="contactCopyShort">Copy</span>
+          </button>
+        </div>
       </div>
 
       <!-- Action buttons -->

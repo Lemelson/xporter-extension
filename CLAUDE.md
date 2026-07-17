@@ -1,8 +1,8 @@
 # CLAUDE.md — quick orientation
 
-**XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, followers, following, and verified followers to **CSV / JSON / XLSX**, using X's internal GraphQL API through the user's own logged-in session.
+**XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, followers, following, and verified followers to **CSV / JSON / XLSX**, plus an AI-friendly **posts-only TXT**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Version:** 1.4.8 (`manifest.json`)
+- **Version:** 1.4.11 (`manifest.json`)
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 
@@ -24,7 +24,7 @@
 | Store name/description i18n | `_locales/*/messages.json` (≠ `popup/locales/`) |
 | Ladybug Easter egg (About tab) | `popup/ladybug.js` |
 | "Rate XPorter" prompt | `popup/rate-prompt.{js,css}` (self-contained; state in `chrome.storage.local` key `xporter_rate_prompt`; deep-links to the CWS reviews page) |
-| Downloads + uninstall feedback | `background/downloads.js` owns serialization/download handoff; `background/uninstall-feedback.js` builds `chrome.runtime.setUninstallURL`; counters remain in `XPorterStorage.recordExport*`. NO X data is sent — disclosed in `privacy-policy.html`. |
+| Downloads + uninstall feedback | `background/downloads.js` owns serialization/download handoff, including incremental numbered parts for large exports; `background/uninstall-feedback.js` builds `chrome.runtime.setUninstallURL`; counters remain in `XPorterStorage.recordExport*`. NO X data is sent — disclosed in `privacy-policy.html`. |
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Dev/debug scripts (not shipped) | `scripts/`, `index.html`, `docs/` |
@@ -42,6 +42,8 @@
 9. **CSS:** never hardcode colours — everything is CSS custom properties with `dark`/`light` (`.light` on `<body>`).
 10. **Rate-limit budgets are endpoint-specific:** use `XPorterAPI.getRateLimit(operationName)` and never reuse one operation's headers for another. Header-less responses must take the mode-specific fallback path.
 11. **Static proof has a boundary:** repo tests can prove manifest/DOM/i18n/message contracts, parsers, persistence, pacing, and file generation. They cannot prove that X's current queryIds, feature flags, cookies, or live response shapes still work; that requires an authenticated browser smoke test.
+12. **Large downloads are multipart:** never call `loadAllTweets()` for the current export download path. `downloads.js` reads bounded batch ranges and uses `DOWNLOAD_PART_LIMITS`; XLSX/JSON/CSV/TXT parts must remain below their configured row ceilings.
+13. **Cursor de-duplication is bounded:** ordinary posts/user-list exports keep only `RECENT_EXPORT_ID_LIMIT` IDs in memory. Do not restore an unbounded per-run `Set`; date-range search is the separate path that needs full saved-ID de-duplication on resume.
 
 ## When you change things
 Keep **`agent.md`** and this file in sync (new files, message types, storage keys, settings, export modes). Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`; use `scripts/test-extension-smoke.mjs` for a real unpacked-Chromium check. Bump `version` in `manifest.json` for releases. Build the CWS zip with `scripts/package.sh` (allowlist-based — never zip the folder naively; that would leak `.git/`, docs and dev scripts).

@@ -148,6 +148,24 @@ async function loadTweetBatch(batchIndex) {
     return result[key] || [];
 }
 
+/**
+ * Load a bounded range of saved batches without materializing the whole export.
+ * The returned array preserves batch boundaries so callers can split output at
+ * an exact item count even when API pages produced short batches.
+ */
+async function loadTweetBatches(startBatch, count) {
+    const start = Math.max(0, Number(startBatch) || 0);
+    const size = Math.max(0, Number(count) || 0);
+    if (size === 0) return [];
+
+    const keys = [];
+    for (let i = start; i < start + size; i++) {
+        keys.push(STORAGE_KEYS.TWEETS_PREFIX + i);
+    }
+    const result = await safeGet(keys);
+    return keys.map(key => result[key] || []);
+}
+
 // ==================== Cleanup ====================
 
 /**
@@ -598,7 +616,7 @@ function recordExportError(error) {
 if (typeof globalThis !== 'undefined') {
     globalThis.XPorterStorage = {
         saveExportState, loadExportState,
-        saveTweetBatch, loadTweetBatch, loadAllTweets,
+        saveTweetBatch, loadTweetBatch, loadTweetBatches, loadAllTweets,
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,

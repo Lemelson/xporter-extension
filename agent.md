@@ -2,18 +2,18 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.8** (2026-07-13).
+> Last verified against the codebase at **v1.4.11** (2026-07-17).
 
 ---
 
 ## 1. Project Overview
 
-**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, followers, following, and verified followers — into CSV, JSON, or XLSX files. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
+**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, followers, following, and verified followers — into CSV, JSON, or XLSX files, plus AI-friendly posts-only TXT. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
 
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.8 (`manifest.json`) |
+| Version | 1.4.11 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
@@ -21,7 +21,7 @@
 ### Key Selling Points
 - **Free & unlimited** — competitors charge $12–15/mo and cap at 150–200 posts
 - **Multi-mode** — posts, followers, following, verified followers
-- **Multi-format** — CSV, JSON, real OOXML XLSX
+- **Multi-format** — CSV, JSON, real OOXML XLSX, and posts-only AI-friendly TXT
 - **Date-range filtering** for posts (via an X search tab — see §5)
 - **14 languages** — auto-detected from the browser
 - **Self-healing API** — discovers GraphQL queryIds from X's JS bundles AND captures them live from X's own network traffic
@@ -64,8 +64,9 @@ All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage
 3. SW resolves user ID via `UserByScreenName` GraphQL
 4. Fetches data in batches via the appropriate endpoint, parsing each page
 5. Items are buffered in memory and flushed to `chrome.storage.local` in batches of 50
+   - Cursor exports retain only a bounded recent-ID overlap window in memory; saved batches remain the durable source of truth
 6. `RateLimitManager` manages spacing, batch cooldowns, and retries
-7. On completion the user clicks Download → SW assembles all batches and calls `chrome.downloads`
+7. On completion the user clicks Download → small exports become one file; large exports are read from storage incrementally and downloaded as numbered parts through `chrome.downloads`
 8. **Posts + date range** takes a different path — see §5.
 
 ---
@@ -194,7 +195,7 @@ currentExport = {
 }
 ```
 
-**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT` (optional `extraItems` — "+N more" becomes a per-export `limitOverride` baked into the settings snapshot and persisted with the export state; the stored `quantityLimit` setting is NEVER modified by a resume. A resume keeps the snapshot's data FILTERS but takes PACING keys from the current stored settings — `buildResumeSettings` in the SW — so slowing the Export Speed down actually applies to the resumed run), `GET_STATUS`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. Plus the `EXPORT_STATUS_UPDATE` broadcast SW→UI.
+**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT` (optional `extraItems` — "+N more" becomes a per-export `limitOverride` baked into the settings snapshot and persisted with the export state; the stored `quantityLimit` setting is NEVER modified by a resume. A resume keeps the snapshot's data FILTERS but takes PACING keys from the current stored settings — `buildResumeSettings` in the SW — so slowing the Export Speed down actually applies to the resumed run), `GET_STATUS`, `GET_DOWNLOAD_PLAN`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `GET_EXPORT_TEXT` (returns the already-collected posts-only TXT to the popup for a user-triggered clipboard copy), `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. Worker-to-popup broadcasts include `EXPORT_STATUS_UPDATE` and multipart `DOWNLOAD_PROGRESS`/`DOWNLOAD_COMPLETE`/`DOWNLOAD_ERROR`.
 
 **Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
 
@@ -261,7 +262,7 @@ X has no clean date-filter on the timeline GraphQL, so XPorter:
 ### Schemas
 - **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
 - **Users CSV**: `id, name, username, bio, location, url, followers_count, following_count, tweet_count, listed_count, verified, protected, created_at, profile_image_url, profile_url`.
-- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP).
+- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for posts only (public profile context followed by compact per-post metrics, full text, and canonical URL). Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially instead of loading every saved row into memory; the popup shows the planned file count and live part progress. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
 
 ---
 
@@ -310,6 +311,8 @@ The popup closes on any outside click, so a running export was invisible — chu
 | `ABORTED` | user stopped | save state for resume |
 | `STORAGE_FULL` | a batch write failed (quota) | export aborts loudly; collected data stays downloadable |
 | `DOWNLOAD_FAILED` | FileReader error / blocked download | error toast (never a false success) |
+| `DOWNLOAD_IN_PROGRESS` | Download clicked again while parts are still being generated | keep the active run; reject the duplicate click |
+| `COPY_TOO_LARGE` | TXT payload exceeds one safe part | hide Copy in the planned multipart UI; download numbered TXT files |
 | `ALREADY_RUNNING` | second START/RESUME while running | ignored with error |
 | `NO_DATA` / `HISTORY_NOT_FOUND` / `HISTORY_DATA_GONE` | nothing to download / stale history | error toast |
 
@@ -401,7 +404,7 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 | `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateXLSX`, `.generateExportFilename` |
 | `XPorterStorage` | `storage.js` | export state, batches, settings, username |
 | `XPorterFeedback` | `uninstall-feedback.js` | `.refresh`, `.maybeRefresh` |
-| `XPorterDownloads` | `downloads.js` | current/history/seen-post downloads |
+| `XPorterDownloads` | `downloads.js` | current download planning/start, incremental multipart generation, history/seen-post downloads |
 
 In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-post modules expose `XPorterHistory` / `XPorterSeenPosts`; `ladybug.js` exposes `window.XPorterLadybug`.
 
