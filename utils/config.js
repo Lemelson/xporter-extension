@@ -80,6 +80,19 @@ const XPORTER_CONFIG = {
         cooldownMin: [1, 30, 3]    // minutes of pause after each batch
     },
 
+    // Bound each generated file so a multi-million-row export is never loaded
+    // into one JS array/string. Posts use a smaller ceiling because article and
+    // text fields can be much larger than user-list rows.
+    DOWNLOAD_PART_LIMITS: {
+        posts: { csv: 10000, json: 10000, xlsx: 10000, txt: 10000 },
+        users: { csv: 100000, json: 50000, xlsx: 25000 }
+    },
+    STORAGE_BATCH_READ_SIZE: 100,
+    RECENT_EXPORT_ID_LIMIT: 1000,
+    // History duplicates row payloads. Large completed exports keep metadata
+    // only; their current saved batches remain available from the main screen.
+    EXPORT_HISTORY_DATA_LIMIT: 5000,
+
     // API
     // 24h: queryIds only change on X deploys, and a stale id self-heals via
     // withStaleRetry's forced re-discovery. A short TTL made nearly every

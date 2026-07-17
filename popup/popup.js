@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const statusActionStack = document.getElementById('statusActionStack');
     const resumeBtn = document.getElementById('resumeBtn');
     const resumeRow = document.getElementById('resumeRow');
     const resumeQuantity = document.getElementById('resumeQuantity');
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusMessage = document.getElementById('statusMessage');
     const progressFill = document.getElementById('progressFill');
     const tweetCountEl = document.getElementById('tweetCount');
+    const downloadPlanEl = document.getElementById('downloadPlan');
     const authWarning = document.getElementById('authWarning');
     const tabs = document.querySelectorAll('.tab');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -69,6 +72,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
     let seenPostsView = null;
+    let lastDownloadPlan = null;
+    let downloadPlanRequest = 0;
+    let downloadInProgress = false;
 
     function ratePromptExportKey(state) {
         const completedAt = state?.completedAt || 'complete';
@@ -89,6 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // only buffer the latest state; it is re-rendered after init completes.
     let uiReady = false;
     let bufferedState = null;
+    let bufferedDownloadUpdate = null;
     // A12: after a local Stop render, ignore stale `running:true` broadcasts
     // (already in flight from the SW) for a short grace period.
     let ignoreRunningUntil = 0;
@@ -116,9 +123,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUI(state);
     }
 
+    function handleDownloadUpdate(message) {
+        if (!uiReady) {
+            bufferedDownloadUpdate = message;
+            return;
+        }
+        if (message.type === 'DOWNLOAD_PROGRESS') {
+            setDownloadBusy(true);
+            downloadBtn.querySelector('[data-i18n="download"]').textContent =
+                `${message.partNumber} / ${message.partCount}`;
+            statusMessage.textContent = templateText(
+                'downloadingPart',
+                { current: message.partNumber, total: message.partCount }
+            );
+        } else if (message.type === 'DOWNLOAD_COMPLETE') {
+            setDownloadBusy(false);
+            if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
+            renderDownloadPlan(lastDownloadPlan);
+            showToast(
+                message.partCount > 1
+                    ? templateText('downloadPartsStarted', { count: message.partCount })
+                    : t('downloadStarted'),
+                'success'
+            );
+            setTimeout(() => {
+                window.XPorterRatePrompt?.maybeShow({
+                    translations: currentTranslations,
+                    lang: currentLang,
+                    onReportBug: openAboutTab
+                });
+            }, 800);
+        } else if (message.type === 'DOWNLOAD_ERROR') {
+            setDownloadBusy(false);
+            if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
+            renderDownloadPlan(lastDownloadPlan);
+            showToast(formatError(message.error || 'DOWNLOAD_FAILED', t), 'error');
+        }
+    }
+
     chrome.runtime.onMessage.addListener((message) => {
         if (message.type === 'EXPORT_STATUS_UPDATE') {
             handleStatusUpdate(message);
+        } else if (message.type === 'DOWNLOAD_PROGRESS' ||
+            message.type === 'DOWNLOAD_COMPLETE' || message.type === 'DOWNLOAD_ERROR') {
+            handleDownloadUpdate(message);
         }
     });
 
@@ -157,6 +205,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (settingsPostsOnly) {
             settingsPostsOnly.classList.toggle('hidden', !isPostsMode);
         }
+        const txtOption = outputFormat.querySelector('option[value="txt"]');
+        if (txtOption) txtOption.disabled = !isPostsMode;
+        if (!isPostsMode && outputFormat.value === 'txt') outputFormat.value = 'csv';
     }
 
     // Apply saved mode or default
@@ -167,10 +218,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     exportMode.addEventListener('change', async () => {
         const previousMode = currentSettings.exportMode || 'posts';
+        const previousFormat = currentSettings.outputFormat || 'csv';
         applyModeUI(exportMode.value);
-        const result = await persistSettingsPatch(currentSettings, { exportMode: exportMode.value });
+        const patch = { exportMode: exportMode.value };
+        if (currentSettings.outputFormat !== outputFormat.value) patch.outputFormat = outputFormat.value;
+        const result = await persistSettingsPatch(currentSettings, patch);
         if (result?.success !== true) {
             exportMode.value = previousMode;
+            outputFormat.value = previousFormat;
             applyModeUI(previousMode);
             showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
             return;
@@ -192,12 +247,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentSettings.outputFormat) {
         outputFormat.value = currentSettings.outputFormat;
     }
+    applyModeUI(exportMode.value);
     outputFormat.addEventListener('change', async () => {
         const previousFormat = currentSettings.outputFormat || 'csv';
         const result = await persistSettingsPatch(currentSettings, { outputFormat: outputFormat.value });
         if (result?.success !== true) {
             outputFormat.value = previousFormat;
             showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+        } else if (lastExportState) {
+            updateUI(lastExportState);
         }
     });
 
@@ -233,6 +291,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     let currentTranslations = {};
+
+    function templateText(key, values = {}) {
+        let text = t(key);
+        for (const [name, value] of Object.entries(values)) {
+            text = text.replaceAll(`{${name}}`, String(value));
+        }
+        return text;
+    }
+
+    function setDownloadBusy(busy) {
+        downloadInProgress = busy;
+        downloadBtn.disabled = busy;
+        outputFormat.disabled = busy || !!lastExportState?.running;
+        exportMode.disabled = busy || !!lastExportState?.running;
+        newExportBtn.disabled = busy;
+        resumeBtn.disabled = busy;
+    }
+
+    function renderDownloadPlan(plan) {
+        lastDownloadPlan = plan || null;
+        const label = downloadBtn.querySelector('[data-i18n="download"]');
+        if (plan?.active) {
+            setDownloadBusy(true);
+        }
+        if (!plan?.multipart) {
+            downloadPlanEl.classList.add('hidden');
+            downloadPlanEl.textContent = '';
+            if (!downloadInProgress) label.textContent = t('download');
+            return;
+        }
+
+        const hint = templateText('multipartDownloadHint', {
+            count: formatNumber(plan.partCount, currentLang),
+            format: String(plan.format || outputFormat.value).toUpperCase(),
+            partSize: formatNumber(plan.partSize, currentLang)
+        });
+        downloadPlanEl.textContent = plan.format === 'csv'
+            ? hint
+            : `${hint} ${t('largeExportCsvTip')}`;
+        downloadPlanEl.classList.remove('hidden');
+        if (!downloadInProgress) {
+            label.textContent = templateText('downloadFiles', { count: plan.partCount });
+        }
+        if (outputFormat.value === 'txt') copyBtn.classList.add('hidden');
+    }
+
+    async function refreshDownloadPlan(state = lastExportState) {
+        const request = ++downloadPlanRequest;
+        const terminal = state && !state.running &&
+            (state.status === 'complete' || state.status === 'stopped' || state.status === 'error') &&
+            (state.tweetCount ?? lastItemCount) > 0;
+        if (!terminal) {
+            renderDownloadPlan(null);
+            return;
+        }
+
+        const plan = await sendMessage({
+            type: 'GET_DOWNLOAD_PLAN',
+            outputFormat: outputFormat.value
+        });
+        if (request !== downloadPlanRequest || plan?.error) return;
+        renderDownloadPlan(plan);
+    }
 
     async function applyLanguage(code) {
         const t = await loadTranslations(code);
@@ -372,24 +493,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     activateTab(document.querySelector('.tab.active') || tabs[0]);
 
+    async function writeClipboardText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch {
+            // Fallback for older browsers / restricted clipboard access.
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            let copied = false;
+            try { copied = document.execCommand('copy'); } catch { /* noop */ }
+            ta.remove();
+            return copied;
+        }
+    }
+
     // ==================== Copy-to-clipboard (About tab email) ====================
     document.querySelectorAll('[data-copy]').forEach(el => {
         el.addEventListener('click', async (e) => {
             e.preventDefault();
             const text = el.getAttribute('data-copy');
             if (!text) return;
-            try {
-                await navigator.clipboard.writeText(text);
-            } catch {
-                // Fallback for older browsers / restricted clipboard access
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                try { document.execCommand('copy'); } catch { /* noop */ }
-                ta.remove();
+            if (!await writeClipboardText(text)) {
+                showToast(t('errCopyFailed'), 'error');
+                return;
             }
             const target = el.closest('.email-action') || el;
             target.classList.add('is-copied');
@@ -562,11 +693,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (status?.status) {
         updateUI(status);
     }
+    if (bufferedDownloadUpdate) {
+        const buffered = bufferedDownloadUpdate;
+        bufferedDownloadUpdate = null;
+        handleDownloadUpdate(buffered);
+    }
 
     // Re-issue GET_STATUS once: catches transitions that happened while the
     // init chain was awaited (before the buffered listener could see them).
     sendMessage({ type: 'GET_STATUS' }).then((fresh) => {
-        if (fresh?.status) handleStatusUpdate(fresh);
+        if (fresh?.status && !downloadInProgress) handleStatusUpdate(fresh);
     });
 
     // Safety poll: broadcasts can be dropped (SW restart, closed port). Poll
@@ -679,28 +815,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Download ====================
     downloadBtn.addEventListener('click', async () => {
-        downloadBtn.disabled = true;
+        setDownloadBusy(true);
         downloadBtn.querySelector('[data-i18n="download"]').textContent = t('preparing');
-        // Building a large XLSX can take far longer than the default timeout.
+        const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: outputFormat.value });
+        if (result?.success === true) {
+            renderDownloadPlan(result);
+        } else {
+            setDownloadBusy(false);
+            showToast(formatError(result?.error || 'DOWNLOAD_FAILED', t), 'error');
+            renderDownloadPlan(lastDownloadPlan);
+        }
+    });
+
+    copyBtn.addEventListener('click', async () => {
+        copyBtn.disabled = true;
         const result = await sendMessage(
-            { type: 'DOWNLOAD_EXPORT', outputFormat: outputFormat.value },
+            { type: 'GET_EXPORT_TEXT' },
             XPORTER_CONFIG.DOWNLOAD_MESSAGE_TIMEOUT || 30000
         );
-        downloadBtn.disabled = false;
-        if (result?.success === true) {
-            showToast(t('downloadStarted'), 'success');
-            // User just got their file — the natural moment to ask for a rating.
-            setTimeout(() => {
-                window.XPorterRatePrompt?.maybeShow({
-                    translations: currentTranslations,
-                    lang: currentLang,
-                    onReportBug: openAboutTab
-                });
-            }, 800);
-        } else {
-            showToast(formatError(result?.error || 'DOWNLOAD_FAILED', t), 'error');
+        let copied = false;
+        if (result?.success === true && typeof result.text === 'string') {
+            copied = await writeClipboardText(result.text);
         }
-        downloadBtn.querySelector('[data-i18n="download"]').textContent = t('download');
+        copyBtn.disabled = false;
+        if (copied) {
+            showToast(t('contactCopied'), 'success');
+        } else {
+            showToast(result?.error ? formatError(result.error, t) : t('errCopyFailed'), 'error');
+        }
     });
 
     // ==================== Resume ====================
@@ -776,17 +918,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         // was collected) and Resume (SW says it can continue) — otherwise
         // "New Export" is the only way out and destroys the collected data.
         const finalError = (status === 'error' && !isRunning);
+        const showTerminalActions = (status === 'complete' || status === 'stopped' || finalError) && itemCount > 0;
+        const showTxtCopy = showTerminalActions && mode === 'posts' && outputFormat.value === 'txt';
         startBtn.classList.toggle('hidden', isRunning || status === 'complete' || status === 'stopped');
         stopBtn.classList.toggle('hidden', !isRunning);
-        downloadBtn.classList.toggle('hidden', !((status === 'complete' || status === 'stopped' || finalError) && itemCount > 0));
-        resumeRow.classList.toggle('hidden', !(status === 'stopped' || status === 'complete' || (finalError && state.canResume)));
+        downloadBtn.classList.toggle('hidden', !showTerminalActions);
+        copyBtn.classList.toggle('hidden', !showTxtCopy);
+        statusActionStack.classList.toggle('txt-actions', showTxtCopy);
+        const canContinueComplete = status === 'complete' && itemCount > 0;
+        resumeRow.classList.toggle('hidden', !(status === 'stopped' || canContinueComplete || (finalError && state.canResume)));
         newExportBtn.classList.toggle('hidden', status !== 'complete' && status !== 'stopped' && status !== 'error');
         exportStatus.classList.toggle('hidden', status === 'idle');
         statusDetail.classList.remove('hidden');
 
         // Lock mode selector only during active export (not when stopped/complete)
-        exportMode.disabled = isRunning;
-        outputFormat.disabled = isRunning;
+        exportMode.disabled = isRunning || downloadInProgress;
+        outputFormat.disabled = isRunning || downloadInProgress;
 
         if (state.username) {
             usernameInput.value = state.username;
@@ -898,7 +1045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusText.innerHTML = ICONS.circleCheck + ' ';
                 statusText.appendChild(document.createTextNode(t('exportComplete')));
                 setDotColor('green');
-                statusMessage.textContent = t('canContinue');
+                statusMessage.textContent = itemCount > 0 ? t('canContinue') : t('errNoData');
                 progressFill.classList.remove('indeterminate');
                 progressFill.style.width = '100%';
                 if (!ratePromptCounted) {
@@ -921,6 +1068,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Resume label follows the export mode (posts vs user-list modes).
         updateResumeQuantityLabel();
+        void refreshDownloadPlan(state);
     }
 
     // ==================== Export History ====================

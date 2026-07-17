@@ -1,6 +1,6 @@
 // XPorter — Export Format Generator
-// Single source of truth for CSV and XLSX export generation.
-// (JSON export is generated directly in background/service-worker.js.)
+// Single source of truth for CSV, XLSX, and AI-friendly posts TXT generation.
+// (JSON export is generated directly in background/downloads.js.)
 // Used by service-worker.js via importScripts.
 
 // ==================== Header Definitions ====================
@@ -56,6 +56,80 @@ function generateCSV(items, isUsers = false, opts = {}) {
     }
 
     return '\uFEFF' + rows.join('\n') + '\n'; // BOM for correct Unicode in Excel
+}
+
+// ==================== Posts TXT ====================
+
+/**
+ * Generate a compact, AI-friendly plain-text document for a single profile's
+ * posts. Optional profile fields are omitted when X did not return them.
+ */
+function generatePostsText(items, profile = {}) {
+    const lines = ['PROFILE'];
+    const addProfileLine = (label, value, options = {}) => {
+        if (value === undefined || value === null || value === '') return;
+        if (options.at) value = '@' + String(value).replace(/^@/, '');
+        lines.push(`${label}: ${value}`);
+    };
+
+    const username = profile.screenName || profile.username || '';
+    addProfileLine('Name', profile.name);
+    addProfileLine('Username', username, { at: true });
+    addProfileLine('Profile', profile.profileUrl || profile.profile_url || (username ? `https://x.com/${username}` : ''));
+    addProfileLine('Bio', cleanTxtValue(profile.bio));
+    addProfileLine('Category', profile.professionalCategory || profile.professional_category);
+    addProfileLine('Location', profile.location);
+    addProfileLine('Website', profile.url);
+    addProfileLine('Joined', formatTxtDate(profile.createdAt || profile.created_at));
+    addProfileLine('Followers', profile.followersCount ?? profile.followers_count);
+    addProfileLine('Following', profile.followingCount ?? profile.following_count);
+    addProfileLine('Subscriptions', profile.subscriptionsCount ?? profile.subscriptions_count);
+    addProfileLine('Posts', profile.tweetCount ?? profile.tweet_count);
+    addProfileLine('Likes', profile.likesCount ?? profile.likes_count);
+    addProfileLine('Listed', profile.listedCount ?? profile.listed_count);
+    addProfileLine('Media', profile.mediaCount ?? profile.media_count);
+    if (profile.isVerified || profile.verified) lines.push('Verified: yes');
+    addProfileLine('Profile image', profile.profileImageUrl || profile.profile_image_url);
+
+    lines.push('', `POSTS (${items.length})`, '');
+    items.forEach((item, index) => {
+        const meta = [];
+        const createdAt = formatTxtDate(item.created_at);
+        if (createdAt) meta.push(createdAt);
+        addMetric(meta, item.view_count, 'views');
+        addMetric(meta, item.favorite_count, 'likes');
+        addMetric(meta, item.retweet_count, 'reposts');
+        addMetric(meta, item.reply_count, 'replies');
+        addMetric(meta, item.quote_count, 'quotes');
+        addMetric(meta, item.bookmark_count, 'bookmarks');
+        if (item.type && item.type !== 'tweet') meta.push(item.type);
+
+        lines.push(`${index + 1}. ${meta.join(', ') || 'Post'}`);
+        lines.push(`Post: (${cleanTxtValue(item.text)})`);
+        if (item.article_text) {
+            const articleHeading = item.article_title ? `${cleanTxtValue(item.article_title)}\n` : '';
+            lines.push(`Article: (${articleHeading}${cleanTxtValue(item.article_text)})`);
+        }
+        if (item.tweet_url) lines.push(`URL: ${item.tweet_url}`);
+        lines.push('');
+    });
+
+    return lines.join('\n').trimEnd() + '\n';
+}
+
+function cleanTxtValue(value) {
+    return String(value ?? '').replace(/\r\n?/g, '\n').trim();
+}
+
+function formatTxtDate(value) {
+    if (!value) return '';
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : cleanTxtValue(value);
+}
+
+function addMetric(target, value, label) {
+    if (value === undefined || value === null || value === '') return;
+    target.push(`${value} ${label}`);
 }
 
 /**
@@ -314,6 +388,15 @@ function generateExportFilename(username, mode, ext, options = {}) {
         parts.push('from', from || 'start', 'to', to || 'latest');
     }
 
+    const partNumber = Number(options.partNumber);
+    const partCount = Number(options.partCount);
+    if (partCount > 1 && partNumber > 0) {
+        const width = Math.max(3, String(partCount).length);
+        parts.push(
+            `part-${String(partNumber).padStart(width, '0')}-of-${String(partCount).padStart(width, '0')}`
+        );
+    }
+
     parts.push('exported', timestamp);
     return `${parts.join('_')}.${cleanPart(ext, 'csv').toLowerCase()}`;
 }
@@ -323,6 +406,7 @@ function generateExportFilename(username, mode, ext, options = {}) {
 if (typeof globalThis !== 'undefined') {
     globalThis.XPorterCSV = {
         generateCSV,
+        generatePostsText,
         generateXLSX,
         generateExportFilename,
         escapeCSVValue,

@@ -88,6 +88,8 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'errHistoryDataGone',
         'STORAGE_FULL': 'errStorageFull',
         'DOWNLOAD_FAILED': 'errDownloadFailed',
+        'DOWNLOAD_IN_PROGRESS': 'errDownloadInProgress',
+        'COPY_TOO_LARGE': 'errCopyTooLarge',
         'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture',
         // Timed-out fetch — same user guidance as a failed connection
         'NETWORK_TIMEOUT': 'errEndpointFailed'
@@ -112,6 +114,8 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'The saved data for this export has expired and can no longer be downloaded',
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
+        'DOWNLOAD_IN_PROGRESS': 'A download is already in progress',
+        'COPY_TOO_LARGE': 'This export is too large to copy — download the numbered files instead',
         'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results — keep the search tab open and press Resume to try again',
         'NETWORK_TIMEOUT': 'Could not connect to X API — make sure x.com is accessible',
         'TIMEOUT': 'No response from the extension — please try again',

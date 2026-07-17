@@ -28,6 +28,9 @@ function walk(dir) {
 
 const manifest = JSON.parse(read('manifest.json'));
 assert.equal(manifest.manifest_version, 3);
+assert.equal(manifest.version, '1.4.11');
+assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
+    'download keepalive relies on Chrome 110+ extension API calls resetting the MV3 idle timer');
 assertFile(manifest.background.service_worker, 'background.service_worker');
 assertFile(manifest.action.default_popup, 'action.default_popup');
 for (const scripts of manifest.content_scripts) {
@@ -68,6 +71,15 @@ const popupRuntime = popupScripts
     .filter(Boolean)
     .map(read)
     .join('\n');
+assert.match(
+    read('popup/popup.js'),
+    /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0/,
+    'zero-item complete exports must not offer a pointless Resume loop'
+);
+assert.match(read('popup/theme-init.js'), /theme === ['"]light['"]/,
+    'the early theme bootstrap must only opt into light when explicitly saved');
+assert.match(read('utils/storage.js'), /theme:\s*['"]dark['"]/,
+    'new settings must default to dark');
 const referencedIds = [...popupRuntime.matchAll(/getElementById\(['"]([^'"]+)['"]\)/g)]
     .map((match) => match[1]);
 for (const id of referencedIds) assert(idSet.has(id), `popup JS references missing id: ${id}`);

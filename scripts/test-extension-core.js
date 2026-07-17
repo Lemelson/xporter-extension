@@ -80,6 +80,13 @@ async function testXlsxIsRealOoxmlZip() {
     }
     assert(archiveText.includes('2075277820528607704'), 'long IDs must remain exact text');
     assert(archiveText.includes('Привет &amp; hello'), 'worksheet strings must be XML-escaped');
+    const partFilename = context.XPorterCSV.generateExportFilename('large', 'followers', 'csv', {
+        exportedAt: '2026-07-14T12:00:00Z',
+        partNumber: 2,
+        partCount: 32
+    });
+    assert.match(partFilename, /_part-002-of-032_exported_.*\.csv$/,
+        'multipart filenames must sort naturally and show their total');
 
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xporter-xlsx-test-'));
     const workbookPath = path.join(tempDir, 'export.xlsx');
@@ -103,6 +110,43 @@ async function testXlsxIsRealOoxmlZip() {
     }
 }
 
+function testPostsTxtIsAiFriendly() {
+    const context = vm.createContext({ Date, Number });
+    vm.runInContext(source('utils/csv.js'), context, { filename: 'utils/csv.js' });
+
+    const text = context.XPorterCSV.generatePostsText([{
+        text: 'First line\nSecond line',
+        created_at: 'Tue Jul 07 12:00:00 +0000 2026',
+        view_count: '1200',
+        favorite_count: 47,
+        retweet_count: 3,
+        reply_count: 2,
+        quote_count: 1,
+        bookmark_count: 9,
+        tweet_url: 'https://x.com/MediaKing/status/1'
+    }], {
+        name: 'Matt Paulson',
+        screenName: 'MediaKing',
+        bio: 'Founder and CEO',
+        location: 'Sioux Falls, South Dakota',
+        url: 'https://mattpaulson.com',
+        followersCount: 76000,
+        followingCount: 3252,
+        subscriptionsCount: 2,
+        createdAt: 'Sat Mar 01 00:00:00 +0000 2008'
+    });
+
+    assert.match(text, /^PROFILE\nName: Matt Paulson\nUsername: @MediaKing/m);
+    assert.match(text, /Profile: https:\/\/x\.com\/MediaKing/);
+    assert.match(text, /Followers: 76000/);
+    assert.match(text, /Subscriptions: 2/);
+    assert.match(text, /POSTS \(1\)/);
+    assert.match(text, /1\. 2026-07-07T12:00:00\.000Z, 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks/);
+    assert.match(text, /Post: \(First line\nSecond line\)/);
+    assert.match(text, /URL: https:\/\/x\.com\/MediaKing\/status\/1/);
+    assert.doesNotMatch(text, /undefined|null/);
+}
+
 async function testStaleBearerRetriesImmediately() {
     const fallbackBearer = 'FALLBACK_BEARER';
     const cachedEndpoints = {
@@ -124,7 +168,19 @@ async function testStaleBearerRetriesImmediately() {
                     result: {
                         rest_id: '1',
                         core: { name: 'Test', screen_name: 'test' },
-                        legacy: {}
+                        is_blue_verified: true,
+                        professional: { category: [{ name: 'Entrepreneur' }] },
+                        creator_subscriptions_count: 2,
+                        legacy: {
+                            description: 'Founder',
+                            location: 'Sioux Falls',
+                            followers_count: 76000,
+                            friends_count: 3252,
+                            listed_count: 900,
+                            favourites_count: 12,
+                            created_at: 'Sat Mar 01 00:00:00 +0000 2008',
+                            entities: { url: { urls: [{ expanded_url: 'https://example.com' }] } }
+                        }
                     }
                 }
             }
@@ -174,6 +230,13 @@ async function testStaleBearerRetriesImmediately() {
     await context.XPorterAPI.discoverEndpoints();
     const user = await context.XPorterAPI.getUserByScreenName('test');
     assert.equal(user.id, '1');
+    assert.equal(user.bio, 'Founder');
+    assert.equal(user.location, 'Sioux Falls');
+    assert.equal(user.url, 'https://example.com');
+    assert.equal(user.followersCount, 76000);
+    assert.equal(user.subscriptionsCount, 2);
+    assert.equal(user.professionalCategory, 'Entrepreneur');
+    assert.equal(user.isVerified, true);
     assert.deepEqual(authHeaders, [
         'Bearer STALE_DYNAMIC_BEARER',
         `Bearer ${fallbackBearer}`
@@ -263,6 +326,10 @@ async function testActiveResponseBodyCanBeAborted() {
 async function testDownloadModulePreservesCurrentExportContract() {
     let downloadRecorded = 0;
     let feedbackRefreshes = 0;
+    let txtProfile = null;
+    let keepAliveCallback = null;
+    let keepAliveCleared = 0;
+    let keepAliveTouches = 0;
     class FakeFileReader {
         readAsDataURL() {
             this.result = 'data:text/csv;base64,ZmFrZQ==';
@@ -272,11 +339,31 @@ async function testDownloadModulePreservesCurrentExportContract() {
     const context = vm.createContext({
         Blob,
         FileReader: FakeFileReader,
+        setInterval(callback) {
+            keepAliveCallback = callback;
+            return 7;
+        },
+        clearInterval(timer) {
+            assert.equal(timer, 7);
+            keepAliveCleared += 1;
+        },
         XLog: { error() {} },
+        XPORTER_CONFIG: {
+            DOWNLOAD_PART_LIMITS: {
+                posts: { csv: 10, json: 10, xlsx: 10, txt: 10 },
+                users: { csv: 10, json: 10, xlsx: 10 }
+            },
+            STORAGE_BATCH_READ_SIZE: 100
+        },
         XPorterStorage: {
-            async loadAllTweets() { return [{ id: '12345', text: 'hello' }]; },
+            async loadTweetBatches() { return [[{ id: '12345', text: 'hello' }]]; },
+            async loadAllTweets() { throw new Error('current downloads must not load the whole export'); },
             async loadExportState() {
-                return { username: 'test', exportMode: 'posts', outputFormat: 'csv' };
+                return {
+                    username: 'test', exportMode: 'posts', outputFormat: 'csv',
+                    tweetCount: 1, totalBatches: 1,
+                    userInfo: { name: 'Test User', screenName: 'test' }
+                };
             },
             async loadSettings() { return { localizeExportHeaders: false, language: 'en' }; },
             async recordDownload() { downloadRecorded += 1; }
@@ -284,13 +371,21 @@ async function testDownloadModulePreservesCurrentExportContract() {
         XPorterPostDB: { async getAllPosts() { return []; } },
         XPorterCSV: {
             generateCSV() { return 'id,text\n12345,hello\n'; },
+            generatePostsText(_items, profile) { txtProfile = profile; return 'PROFILE\n'; },
             generateXLSX() { return new Uint8Array([1]); },
-            generateExportFilename() { return 'XPorter_posts_test.csv'; },
+            generateExportFilename(_username, _mode, extension) { return `XPorter_posts_test.${extension}`; },
             escapeCSVValue(value) { return String(value ?? ''); }
         },
         XPorterFeedback: { refresh() { feedbackRefreshes += 1; } },
         chrome: {
-            runtime: { lastError: null },
+            runtime: {
+                lastError: null,
+                sendMessage: async () => ({}),
+                getPlatformInfo(callback) {
+                    keepAliveTouches += 1;
+                    callback?.({ os: 'mac' });
+                }
+            },
             downloads: { download(_options, callback) { callback(42); } }
         }
     });
@@ -305,6 +400,125 @@ async function testDownloadModulePreservesCurrentExportContract() {
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(downloadRecorded, 1, 'successful export downloads must update usage counters');
     assert.equal(feedbackRefreshes, 1, 'successful export downloads must refresh uninstall telemetry');
+
+    const txtResult = await context.XPorterDownloads.downloadCurrent('txt');
+    assert.equal(txtResult.filename, 'XPorter_posts_test.txt');
+    assert.deepEqual(JSON.parse(JSON.stringify(txtProfile)), { name: 'Test User', screenName: 'test' });
+
+    const clipboardResult = await context.XPorterDownloads.getCurrentPostsText();
+    assert.equal(clipboardResult.success, true);
+    assert.equal(clipboardResult.text, 'PROFILE\n');
+    assert.equal(clipboardResult.count, 1);
+
+    const detached = await context.XPorterDownloads.startCurrentDownload('csv');
+    assert.equal(detached.started, true);
+    assert.equal(typeof keepAliveCallback, 'function',
+        'detached downloads must keep the MV3 worker alive');
+    keepAliveCallback();
+    assert.equal(keepAliveTouches, 1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(keepAliveCleared, 1, 'download keepalive must stop after completion');
+}
+
+async function testLargeDownloadsAreSplitAndReadIncrementally() {
+    const sourceBatches = [
+        [{ id: '1' }, { id: '2' }],
+        [{ id: '3' }, { id: '4' }],
+        [{ id: '5' }]
+    ];
+    const rangeReads = [];
+    const generatedParts = [];
+    const startedDownloads = [];
+    const progressEvents = [];
+    const exportedAtValues = [];
+
+    class FakeFileReader {
+        readAsDataURL() {
+            this.result = 'data:text/csv;base64,ZmFrZQ==';
+            this.onload();
+        }
+    }
+
+    const context = vm.createContext({
+        Blob,
+        FileReader: FakeFileReader,
+        XLog: { error() {} },
+        XPORTER_CONFIG: {
+            DOWNLOAD_PART_LIMITS: {
+                posts: { csv: 2, json: 2, xlsx: 2, txt: 2 },
+                users: { csv: 2, json: 2, xlsx: 2 }
+            },
+            STORAGE_BATCH_READ_SIZE: 2
+        },
+        XPorterStorage: {
+            async loadExportState() {
+                return {
+                    username: 'large', exportMode: 'followers', outputFormat: 'csv',
+                    tweetCount: 5, totalBatches: 3
+                };
+            },
+            async loadTweetBatches(start, count) {
+                rangeReads.push([start, count]);
+                return sourceBatches.slice(start, start + count);
+            },
+            async loadAllTweets() { throw new Error('multipart download loaded all rows at once'); },
+            async loadSettings() { return { localizeExportHeaders: false, language: 'en' }; },
+            async recordDownload() {}
+        },
+        XPorterPostDB: { async getAllPosts() { return []; } },
+        XPorterCSV: {
+            generateCSV(items) { generatedParts.push(items.map(item => item.id)); return 'csv'; },
+            generatePostsText() { return 'txt'; },
+            generateXLSX() { return new Uint8Array([1]); },
+            generateExportFilename(_username, _mode, extension, options) {
+                exportedAtValues.push(options.exportedAt.getTime());
+                const suffix = options.partCount > 1
+                    ? `_part-${String(options.partNumber).padStart(3, '0')}-of-${String(options.partCount).padStart(3, '0')}`
+                    : '';
+                return `XPorter${suffix}.${extension}`;
+            },
+            escapeCSVValue(value) { return String(value ?? ''); }
+        },
+        XPorterFeedback: { refresh() {} },
+        chrome: {
+            runtime: {
+                lastError: null,
+                sendMessage(message) { progressEvents.push(message); return Promise.resolve({}); }
+            },
+            downloads: {
+                download(options, callback) {
+                    startedDownloads.push(options);
+                    callback(startedDownloads.length);
+                }
+            }
+        }
+    });
+
+    vm.runInContext(source('background/downloads.js'), context, { filename: 'background/downloads.js' });
+    const plan = await context.XPorterDownloads.getCurrentPlan('csv');
+    assert.deepEqual(JSON.parse(JSON.stringify(plan)), {
+        count: 5,
+        format: 'csv',
+        partSize: 2,
+        partCount: 3,
+        multipart: true,
+        active: false
+    });
+
+    const result = await context.XPorterDownloads.downloadCurrent('csv');
+    assert.equal(result.success, true);
+    assert.equal(result.partCount, 3);
+    assert.deepEqual(JSON.parse(JSON.stringify(generatedParts)), [['1', '2'], ['3', '4'], ['5']]);
+    assert.deepEqual(rangeReads, [[0, 2], [2, 1]]);
+    assert.deepEqual(startedDownloads.map(download => download.saveAs), [false, false, false]);
+    assert.deepEqual(startedDownloads.map(download => download.filename), [
+        'XPorter_part-001-of-003.csv',
+        'XPorter_part-002-of-003.csv',
+        'XPorter_part-003-of-003.csv'
+    ]);
+    assert.equal(new Set(exportedAtValues).size, 1,
+        'all parts from one export must share the same timestamp');
+    assert(progressEvents.some(event => event.type === 'DOWNLOAD_PROGRESS' && event.partNumber === 2));
 }
 
 async function testUninstallFeedbackModuleKeepsAnonymousContract() {
@@ -356,6 +570,8 @@ function createWorkerHarness() {
     let cleared = false;
     let firstItemRecords = 0;
     let saveStateSucceeds = true;
+    let loadAllCalls = 0;
+    let savedHistory = null;
     const settings = {
         quantityLimit: 500,
         autoExpireEnabled: true,
@@ -407,7 +623,10 @@ function createWorkerHarness() {
             async markInstalled() {},
             async backfillInstalledAt() {},
             async saveSettings() { return true; },
-            async recordFirstItem() { firstItemRecords += 1; }
+            async recordExportPhase() {},
+            async recordFirstItem() { firstItemRecords += 1; },
+            async loadAllTweets() { loadAllCalls += 1; return [{ id: '1' }]; },
+            async saveExportHistory(entry) { savedHistory = entry; return true; }
         },
         RateLimitManager: class {},
         detectBrowserLanguage: () => 'en',
@@ -444,8 +663,133 @@ function createWorkerHarness() {
         getSavedState() { return savedState; },
         wasCleared() { return cleared; },
         firstItemRecords() { return firstItemRecords; },
-        setSaveStateSucceeds(value) { saveStateSucceeds = value; }
+        setSaveStateSucceeds(value) { saveStateSucceeds = value; },
+        loadAllCalls() { return loadAllCalls; },
+        getSavedHistory() { return savedHistory; }
     };
+}
+
+async function testSearchCaptureIsArmedBeforeNavigation() {
+    const harness = createWorkerHarness();
+    let createOptions = null;
+    let updateOptions = null;
+    let armedBeforeNavigation = false;
+    let relayResult = null;
+
+    harness.context.__searchRelayMessage = {
+        operationName: 'SearchTimeline',
+        url: 'https://x.com/i/api/graphql/test/SearchTimeline?variables=%7B%7D',
+        status: 200,
+        bodyText: '{}'
+    };
+    harness.context.__searchRelaySender = { tab: { id: 42 } };
+
+    harness.context.chrome.tabs.create = async (options) => {
+        createOptions = options;
+        return { id: 42 };
+    };
+    harness.context.chrome.tabs.update = async (tabId, options) => {
+        assert.equal(tabId, 42);
+        updateOptions = options;
+        armedBeforeNavigation = vm.runInContext('searchCapture?.tabId === 42', harness.context);
+        relayResult = vm.runInContext(
+            'handlePageGraphqlResponse(__searchRelayMessage, __searchRelaySender)',
+            harness.context
+        );
+    };
+
+    await vm.runInContext("openSearchCaptureTab('(from:test) since:2026-01-01')", harness.context);
+    assert.deepEqual(JSON.parse(JSON.stringify(createOptions)), { url: 'about:blank', active: true });
+    assert.equal(armedBeforeNavigation, true,
+        'capture state must exist before X can emit its first SearchTimeline response');
+    assert.equal(relayResult?.success, true,
+        'a SearchTimeline relay emitted during navigation must be queued, not ignored');
+    assert.equal(vm.runInContext('searchCapture.queue.length', harness.context), 1);
+    assert.match(updateOptions.url, /^https:\/\/x\.com\/search\?/);
+    await vm.runInContext('closeSearchCaptureTab()', harness.context);
+}
+
+async function testUnexpectedEmptyUserListDoesNotComplete() {
+    const harness = createWorkerHarness();
+    let fetchCalls = 0;
+    harness.context.XPorterAPI.fetchFollowers = async () => {
+        fetchCalls += 1;
+        return { users: [], nextCursor: null };
+    };
+    harness.context.__makeRateLimiter = () => ({
+        totalRequests: 0,
+        batchSize: 20,
+        async executeWithRateLimit(request) {
+            this.totalRequests += 1;
+            return request();
+        },
+        getState() { return {}; }
+    });
+
+    vm.runInContext(`
+        currentExport = {
+            running: true,
+            username: 'has-followers',
+            exportMode: 'followers',
+            outputFormat: 'csv',
+            userInfo: { followersCount: 12 },
+            settings: { quantityLimit: 500 },
+            tweetCount: 0,
+            itemsRecordedBase: 0,
+            totalBatches: 0,
+            tweetBuffer: [],
+            cursor: null
+        };
+        rateLimiter = __makeRateLimiter();
+    `, harness.context);
+    await assert.rejects(
+        vm.runInContext('_fetchUsersLoop()', harness.context),
+        /MAX_RETRIES_EXCEEDED/,
+        'an unexpectedly empty first page must not become a successful export'
+    );
+    assert.equal(fetchCalls, 3, 'unexpected empty first pages should be retried');
+
+    fetchCalls = 0;
+    vm.runInContext(`
+        currentExport.userInfo.followersCount = 0;
+        currentExport.cursor = null;
+        rateLimiter = __makeRateLimiter();
+    `, harness.context);
+    await vm.runInContext('_fetchUsersLoop()', harness.context);
+    assert.equal(fetchCalls, 1, 'a genuinely empty profile should still finish normally');
+}
+
+async function testLargeCompletionSkipsHistoryPayloadCopy() {
+    const harness = createWorkerHarness();
+    harness.context.XPORTER_CONFIG.EXPORT_HISTORY_DATA_LIMIT = 5000;
+    await vm.runInContext(`
+        currentExport = {
+            username: 'large', exportMode: 'followers', outputFormat: 'csv',
+            tweetCount: 3124700, completedAt: 123,
+            userInfo: { name: 'Large Account', screenName: 'large' }
+        };
+        saveCompletedExportHistory();
+    `, harness.context);
+
+    assert.equal(harness.loadAllCalls(), 0,
+        'large completion must not load every saved row just to duplicate it into history');
+    assert.equal(harness.getSavedHistory().itemCount, 3124700);
+    assert.equal(Object.hasOwn(harness.getSavedHistory(), 'items'), false,
+        'large history entries should retain metadata without a duplicated payload');
+}
+
+function testCursorDedupMemoryIsBounded() {
+    const harness = createWorkerHarness();
+    const result = vm.runInContext(`
+        (() => {
+            const recent = createRecentIdTracker(new Set(['1', '2']), 3);
+            const added = [recent.add('3'), recent.add('4'), recent.add('4'), recent.add('1')];
+            return { size: recent.size, added };
+        })()
+    `, harness.context);
+    assert.equal(result.size, 3, 'cursor exports must not retain every ID from a multi-million-row run');
+    assert.deepEqual(Array.from(result.added), [true, true, false, true],
+        'recent duplicates must be rejected while IDs outside the overlap window may be seen again');
 }
 
 async function testExportSnapshotSurvivesWorkerRestart() {
@@ -661,17 +1005,28 @@ function testThemeInitializationCanRevertToDark() {
     const mode = vm.runInContext('initTheme("dark", __icon)', context);
     assert.equal(mode, 'dark');
     assert.equal(classes.has('light'), false, 'restoring dark must remove a previously applied light class');
+
+    classes.add('light');
+    const defaultMode = vm.runInContext('initTheme(undefined, __icon)', context);
+    assert.equal(defaultMode, 'dark');
+    assert.equal(classes.has('light'), false, 'missing saved theme must default to dark');
 }
 
 const tests = [
     ['SearchTimeline error relay', testSearchErrorsAreRelayed],
     ['real XLSX OOXML', testXlsxIsRealOoxmlZip],
+    ['AI-friendly posts TXT', testPostsTxtIsAiFriendly],
     ['stale bearer retry', testStaleBearerRetriesImmediately],
     ['active request cancellation', testActiveApiRequestCanBeAborted],
     ['active response-body cancellation', testActiveResponseBodyCanBeAborted],
     ['download module contract', testDownloadModulePreservesCurrentExportContract],
+    ['large downloads split incrementally', testLargeDownloadsAreSplitAndReadIncrementally],
     ['anonymous uninstall module', testUninstallFeedbackModuleKeepsAnonymousContract],
+    ['search capture arms before navigation', testSearchCaptureIsArmedBeforeNavigation],
+    ['unexpected empty user list is not success', testUnexpectedEmptyUserListDoesNotComplete],
     ['export settings snapshot', testExportSnapshotSurvivesWorkerRestart],
+    ['large completion skips history payload copy', testLargeCompletionSkipsHistoryPayloadCopy],
+    ['cursor dedup memory is bounded', testCursorDedupMemoryIsBounded],
     ['resume pacing vs filters', testResumeKeepsFiltersButFollowsCurrentPacing],
     ['XLSX truncation stays valid', testXlsxCellTruncationKeepsXmlValid],
     ['persisted limit override', testPersistedLimitOverrideIsReported],
