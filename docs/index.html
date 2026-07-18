@@ -446,6 +446,60 @@
     .fcard h3 { margin: 0 0 5px; font-size: 15.5px; font-weight: 700; }
     .fcard p { max-width: 44ch; font-size: 13.5px; line-height: 1.6; }
 
+    /* ---------- public growth trajectory ---------- */
+    #growth { border-top: 1px solid var(--glass-border); scroll-margin-top: 68px; }
+    .growth-intro { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr); gap: 48px; align-items: end; }
+    .growth-intro .section-head { margin-bottom: 0; }
+    .growth-disclosure { max-width: 46ch; padding: 0 0 5px 18px; border-left: 1px solid var(--glass-border-strong); color: var(--text-muted); font-size: 12.5px; line-height: 1.7; }
+    .growth-disclosure strong { color: var(--text-secondary); font-weight: 700; }
+    .growth-kpis { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 30px; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
+    .growth-kpi { min-width: 0; padding: 18px 20px 20px; border-right: 1px solid var(--glass-border); }
+    .growth-kpi:last-child { border-right: 0; }
+    .growth-kpi span { display: block; color: var(--text-muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+    .growth-kpi strong { display: block; margin-top: 5px; font-size: clamp(23px, 3vw, 32px); line-height: 1.1; letter-spacing: -1.2px; font-variant-numeric: tabular-nums; }
+    .growth-kpi small { display: block; margin-top: 7px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+    .growth-panel { margin-top: 26px; padding: 22px 22px 18px; border: 1px solid var(--glass-border); border-radius: 16px; background: rgba(255,255,255,.018); }
+    :root[data-theme="light"] .growth-panel { background: rgba(255,255,255,.34); }
+    .growth-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+    .growth-toolbar h3 { font-size: 15px; font-weight: 700; }
+    .growth-toolbar p { margin-top: 3px; color: var(--text-muted); font-size: 11.5px; }
+    .horizon-switch { display: inline-flex; flex: none; padding: 3px; border: 1px solid var(--glass-border); border-radius: 9px; }
+    .horizon-switch button, .model-toggle { appearance: none; border: 0; color: var(--text-muted); background: transparent; font: inherit; cursor: pointer; transition: color .2s, background .2s, transform .1s; }
+    .horizon-switch button { padding: 7px 11px; border-radius: 6px; font-size: 11.5px; font-weight: 700; }
+    .horizon-switch button[aria-pressed="true"] { color: var(--text-primary); background: var(--glass-bg-2); }
+    .horizon-switch button:active, .model-toggle:active { transform: scale(.97); }
+    .growth-chart-wrap { position: relative; min-height: 360px; }
+    #growthChart { display: block; width: 100%; height: auto; overflow: visible; }
+    .chart-grid { stroke: var(--glass-border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .chart-axis-label { fill: var(--text-muted); font: 11px "Manrope", sans-serif; }
+    .chart-history, .chart-ensemble, .chart-model { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+    .chart-history { stroke: var(--text-primary); stroke-width: 2.3; }
+    .chart-ensemble { stroke: var(--accent); stroke-width: 2.5; }
+    .chart-model { stroke: var(--text-secondary); stroke-width: 1.35; opacity: .58; }
+    .chart-model[data-model="power"] { stroke-dasharray: 7 5; }
+    .chart-model[data-model="gompertz"] { stroke-dasharray: 2 5; }
+    .chart-band { fill: var(--accent); opacity: .1; }
+    .chart-divider { stroke: var(--glass-border-strong); stroke-width: 1; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
+    .chart-now-dot { fill: var(--accent); stroke: var(--text-primary); stroke-width: 2; vector-effect: non-scaling-stroke; }
+    .growth-legend { display: flex; flex-wrap: wrap; gap: 7px 16px; margin-top: 8px; }
+    .legend-item, .model-toggle { display: inline-flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11.5px; }
+    .legend-line { width: 20px; height: 2px; background: var(--text-primary); }
+    .legend-line.forecast { background: var(--accent); }
+    .legend-band { width: 20px; height: 9px; background: var(--accent-glow); border: 1px solid var(--accent); opacity: .7; }
+    .model-toggle { padding: 3px 0; }
+    .model-toggle::before { content: ""; width: 16px; height: 0; border-top: 1px dashed var(--text-muted); }
+    .model-toggle[aria-pressed="true"] { color: var(--text-primary); }
+    .model-toggle[aria-pressed="false"] { opacity: .46; }
+    .growth-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 26px; border-top: 1px solid var(--glass-border); }
+    .growth-method { padding: 19px 20px 7px; border-right: 1px solid var(--glass-border); }
+    .growth-method:last-child { border-right: 0; }
+    .growth-method h3 { font-size: 14px; font-weight: 700; }
+    .growth-formula { margin: 7px 0 9px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+    .growth-method p { color: var(--text-muted); font-size: 11.5px; line-height: 1.65; }
+    .growth-method strong { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    .growth-note { margin: 22px 0 0; color: var(--text-muted); font-size: 11.5px; line-height: 1.65; }
+    .growth-error { display: none; padding: 38px 20px; color: var(--text-secondary); text-align: center; }
+
     #how { border-top: 1px solid var(--glass-border); }
     .steps { gap: 0; border-top: 1px solid var(--glass-border); }
     .step { min-height: 172px; padding: 19px 16px 21px; border: 0; border-right: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); border-radius: 0; background: transparent; box-shadow: none; }
@@ -482,6 +536,13 @@
       .privacy-box { grid-template-columns: 56px 1fr; }
       .privacy-box p { grid-column: 1 / -1; }
       .privacy-box p:last-child { grid-column: 1 / -1; margin-top: -12px; }
+      .growth-intro { grid-template-columns: 1fr; gap: 18px; }
+      .growth-kpis { grid-template-columns: 1fr 1fr; }
+      .growth-kpi:nth-child(2) { border-right: 0; }
+      .growth-kpi:nth-child(-n+2) { border-bottom: 1px solid var(--glass-border); }
+      .growth-methods { grid-template-columns: 1fr; }
+      .growth-method { border-right: 0; border-bottom: 1px solid var(--glass-border); padding-bottom: 17px; }
+      .growth-method:last-child { border-bottom: 0; }
     }
     @media (max-width: 720px) {
       .wrap { padding-left: 20px; padding-right: 20px; }
@@ -495,6 +556,11 @@
       .bento { grid-template-columns: 1fr; }
       .fcard:nth-child(odd) { border-right: 0; }
       .fcard { min-height: 0; padding: 17px 12px; }
+      .growth-panel { padding: 18px 12px 14px; }
+      .growth-toolbar { align-items: stretch; flex-direction: column; gap: 12px; }
+      .horizon-switch { align-self: flex-start; }
+      .growth-chart-wrap { min-height: 300px; overflow-x: auto; }
+      #growthChart { min-width: 680px; }
       .steps { grid-template-columns: 1fr 1fr; }
       .step:nth-child(2) { border-right: 0; }
       .final { grid-template-columns: 1fr; }
@@ -541,6 +607,7 @@
       </a>
       <div class="nav-links">
         <a class="minor" href="#features" data-i18n="nav_features">Features</a>
+        <a class="minor" href="#growth" data-i18n="nav_growth">Growth</a>
         <a class="minor" href="#how" data-i18n="nav_how">How it works</a>
         <a class="minor" href="#privacy" data-i18n="nav_privacy">Privacy</a>
         <a class="minor" href="https://github.com/Lemelson" target="_blank" rel="noopener">GitHub</a>
@@ -625,6 +692,56 @@
       </div>
 
     </div>
+  </section>
+
+  <!-- PUBLIC GROWTH TRAJECTORY -->
+  <section id="growth" class="wrap">
+    <div class="growth-intro">
+      <div class="section-head reveal">
+        <span class="eyebrow" data-i18n="growth_eyebrow">Public trajectory</span>
+        <h2 data-i18n="growth_head">From first user to what comes next</h2>
+        <p data-i18n="growth_sub">Real Chrome Web Store weekly-user counts, followed by three mathematical views of the next two years.</p>
+      </div>
+      <p class="growth-disclosure reveal" data-i18n-html="growth_disclosure"><strong>Aggregate data only.</strong> Dates and weekly-user totals; no identities, accounts or exported X content.</p>
+    </div>
+
+    <div class="growth-kpis reveal" aria-live="polite">
+      <div class="growth-kpi"><span data-i18n="growth_now">Now</span><strong id="growthNow">—</strong><small id="growthNowDate">—</small></div>
+      <div class="growth-kpi"><span data-i18n="growth_year">1-year ensemble</span><strong id="growthYear">—</strong><small data-i18n="growth_weighted">Backtest-weighted</small></div>
+      <div class="growth-kpi"><span data-i18n="growth_two_year">2-year ensemble</span><strong id="growthTwoYear">—</strong><small data-i18n="growth_weighted">Backtest-weighted</small></div>
+      <div class="growth-kpi"><span data-i18n="growth_range">2-year range</span><strong id="growthRange">—</strong><small data-i18n="growth_scenarios">Lower to upper scenario</small></div>
+    </div>
+
+    <div class="growth-panel reveal">
+      <div class="growth-toolbar">
+        <div>
+          <h3 data-i18n="growth_chart_title">Weekly users: observed and projected</h3>
+          <p id="growthChartMeta">Loading Chrome Web Store history…</p>
+        </div>
+        <div class="horizon-switch" aria-label="Forecast horizon">
+          <button type="button" data-horizon="365" aria-pressed="true" data-i18n="growth_1y">1 year</button>
+          <button type="button" data-horizon="730" aria-pressed="false" data-i18n="growth_2y">2 years</button>
+        </div>
+      </div>
+      <div class="growth-chart-wrap">
+        <svg id="growthChart" viewBox="0 0 1000 430" role="img" aria-labelledby="growthChartTitle growthChartDesc">
+          <title id="growthChartTitle">XPorter weekly users and forecast</title>
+          <desc id="growthChartDesc">Historical Chrome Web Store weekly-user counts and a scenario forecast.</desc>
+        </svg>
+        <p class="growth-error" id="growthError" data-i18n="growth_error">The growth data could not be loaded.</p>
+      </div>
+      <div class="growth-legend">
+        <span class="legend-item"><span class="legend-line"></span><span data-i18n="growth_actual">Observed</span></span>
+        <span class="legend-item"><span class="legend-line forecast"></span><span data-i18n="growth_ensemble">Weighted ensemble</span></span>
+        <span class="legend-item"><span class="legend-band"></span><span data-i18n="growth_band">Scenario range</span></span>
+        <button class="model-toggle" type="button" data-model="linear" aria-pressed="false" data-i18n="growth_linear">Linear</button>
+        <button class="model-toggle" type="button" data-model="power" aria-pressed="false" data-i18n="growth_power">Power</button>
+        <button class="model-toggle" type="button" data-model="gompertz" aria-pressed="false" data-i18n="growth_gompertz">Gompertz</button>
+      </div>
+    </div>
+
+    <div class="growth-methods reveal" id="growthMethods" aria-label="Forecast methods"></div>
+    <p class="growth-note reveal" data-i18n="growth_note">The shaded area is disagreement between models, not a confidence interval. A 147-day history cannot encode future product launches, promotion or store-policy changes, so the two-year view is a transparent scenario exercise—not a promise.</p>
   </section>
 
   <!-- HOW IT WORKS -->
@@ -788,6 +905,7 @@
     };
 
     Object.assign(I18N.en, {
+      nav_growth: "Growth",
       hero_pill: "Free · unlimited · no API key",
       hero_h1: 'Export <span class="grad">X data</span>.<br>Keep the file.',
       hero_lead: "Posts and audiences from any public profile, saved as CSV, JSON or Excel. Everything is processed in your browser.",
@@ -800,6 +918,33 @@
       f_dates_d: "Export posts from exactly the period you need.",
       f_resume_t: "Stop and continue later",
       f_resume_d: "Progress is saved, so you can resume without starting over.",
+      growth_eyebrow: "Public trajectory",
+      growth_head: "From first user to what comes next",
+      growth_sub: "Real Chrome Web Store weekly-user counts, followed by three mathematical views of the next two years.",
+      growth_disclosure: "<strong>Aggregate data only.</strong> Dates and weekly-user totals; no identities, accounts or exported X content.",
+      growth_now: "Now",
+      growth_year: "1-year ensemble",
+      growth_two_year: "2-year ensemble",
+      growth_range: "2-year range",
+      growth_weighted: "Backtest-weighted",
+      growth_scenarios: "Lower to upper scenario",
+      growth_chart_title: "Weekly users: observed and projected",
+      growth_1y: "1 year",
+      growth_2y: "2 years",
+      growth_actual: "Observed",
+      growth_ensemble: "Weighted ensemble",
+      growth_band: "Scenario range",
+      growth_linear: "Linear",
+      growth_power: "Power",
+      growth_gompertz: "Gompertz",
+      growth_note: "The shaded area is disagreement between models, not a confidence interval. A 147-day history cannot encode future product launches, promotion or store-policy changes, so the two-year view is a transparent scenario exercise—not a promise.",
+      growth_error: "The growth data could not be loaded.",
+      growth_through: "Observed through",
+      growth_forecast_to: "forecast to",
+      growth_first_user: "First user",
+      growth_backtest: "rolling backtest MAE",
+      growth_users_1y: "at 1 year",
+      growth_users_2y: "at 2 years",
       how_head: "From profile to file in four clicks",
       how_sub: "No setup and no XPorter account.",
       priv_d: "Exported data stays in your browser. XPorter uses your signed-in X session, has no server account and never receives your files. On uninstall, it may send a short anonymous usage summary — no X content or personal data.",
@@ -808,6 +953,7 @@
     });
 
     Object.assign(I18N.ru, {
+      nav_growth: "Рост",
       hero_pill: "Бесплатно · без лимитов · без API-ключа",
       hero_h1: 'Данные из X —<br><span class="grad">в твоём файле.</span>',
       hero_lead: "Посты и аудитория любого публичного профиля — в CSV, JSON или Excel. Всё обрабатывается в твоём браузере.",
@@ -821,6 +967,33 @@
       f_dates_d: "Выгружай посты ровно за те даты, которые нужны.",
       f_resume_t: "Остановись и продолжи позже",
       f_resume_d: "Прогресс сохраняется — начинать заново не придётся.",
+      growth_eyebrow: "Открытая траектория",
+      growth_head: "От первого пользователя — к тому, что дальше",
+      growth_sub: "Реальные данные Chrome Web Store по weekly users и три математических сценария на следующие два года.",
+      growth_disclosure: "<strong>Только агрегированные данные.</strong> Даты и число weekly users — без личностей, аккаунтов и экспортированного контента X.",
+      growth_now: "Сейчас",
+      growth_year: "Ансамбль через год",
+      growth_two_year: "Ансамбль через 2 года",
+      growth_range: "Диапазон через 2 года",
+      growth_weighted: "Вес по бэктесту",
+      growth_scenarios: "От нижнего до верхнего сценария",
+      growth_chart_title: "Weekly users: факт и прогноз",
+      growth_1y: "1 год",
+      growth_2y: "2 года",
+      growth_actual: "Факт",
+      growth_ensemble: "Взвешенный ансамбль",
+      growth_band: "Диапазон сценариев",
+      growth_linear: "Линейная",
+      growth_power: "Степенная",
+      growth_gompertz: "Гомпертц",
+      growth_note: "Заливка показывает расхождение моделей, а не доверительный интервал. История длиной 147 дней не знает о будущих релизах, продвижении и правилах магазина, поэтому прогноз на два года — прозрачный сценарный расчёт, а не обещание.",
+      growth_error: "Не удалось загрузить данные о росте.",
+      growth_through: "Факт до",
+      growth_forecast_to: "прогноз до",
+      growth_first_user: "Первый пользователь",
+      growth_backtest: "MAE скользящего бэктеста",
+      growth_users_1y: "через 1 год",
+      growth_users_2y: "через 2 года",
       how_head: "От профиля до файла — четыре клика",
       how_sub: "Без настройки и отдельного аккаунта XPorter.",
       priv_d: "Экспортированные данные остаются в браузере. XPorter использует твою активную сессию X, не требует серверного аккаунта и не получает твои файлы. При удалении может отправиться короткая анонимная статистика — без контента X и персональных данных.",
@@ -857,8 +1030,126 @@
       var o = document.createElement("option"); o.value = code; o.textContent = LANG_NAMES[code] || code;
       if (code === lang) o.selected = true; langSelect.appendChild(o);
     });
-    langSelect.addEventListener("change", function (e) { lang = e.target.value; try { localStorage.setItem("xporter_lang", lang); } catch (err) {} applyI18n(); });
+    langSelect.addEventListener("change", function (e) { lang = e.target.value; try { localStorage.setItem("xporter_lang", lang); } catch (err) {} applyI18n(); if (growthData) renderGrowth(); });
     applyI18n();
+
+    /* ---------------- public growth chart ---------------- */
+    var growthData = null;
+    var growthHorizon = 365;
+    var visibleGrowthModels = { linear: false, power: false, gompertz: false };
+    var SVG_NS = "http://www.w3.org/2000/svg";
+
+    function growthLocale() { return lang.replace("_", "-"); }
+    function formatGrowthNumber(value) { return new Intl.NumberFormat(growthLocale(), { maximumFractionDigits: 0 }).format(value); }
+    function formatGrowthDate(value, short) {
+      return new Intl.DateTimeFormat(growthLocale(), short ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value + "T00:00:00Z"));
+    }
+    function dayOffsetIso(iso, days) {
+      var date = new Date(iso + "T00:00:00Z"); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10);
+    }
+    function svgNode(name, attributes, text) {
+      var node = document.createElementNS(SVG_NS, name);
+      Object.keys(attributes || {}).forEach(function (key) { node.setAttribute(key, attributes[key]); });
+      if (text != null) node.textContent = text;
+      return node;
+    }
+    function chartPath(points, xScale, yScale, field) {
+      return points.map(function (point, index) { return (index ? "L" : "M") + xScale(point.date).toFixed(2) + " " + yScale(field(point)).toFixed(2); }).join(" ");
+    }
+    function niceGrowthMax(value) {
+      var magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(value, 1))));
+      var normalized = value / magnitude;
+      var step = normalized <= 2 ? .5 : normalized <= 5 ? 1 : 2;
+      return Math.ceil(normalized / step) * step * magnitude;
+    }
+    function forecastAt(days) {
+      var target = dayOffsetIso(growthData.dataThrough, days);
+      return growthData.forecast.find(function (point) { return point.date === target; });
+    }
+    function renderGrowthMethods() {
+      var holder = document.getElementById("growthMethods");
+      holder.textContent = "";
+      growthData.models.forEach(function (model) {
+        var article = document.createElement("article"); article.className = "growth-method";
+        var title = document.createElement("h3"); title.textContent = t("growth_" + model.key);
+        var formula = document.createElement("div"); formula.className = "growth-formula"; formula.textContent = model.formula;
+        var detail = document.createElement("p");
+        detail.append(t("growth_backtest") + " ");
+        var mae = document.createElement("strong"); mae.textContent = formatGrowthNumber(model.backtestMae); detail.append(mae);
+        detail.append(" · " + t("growth_users_1y") + " ");
+        var one = document.createElement("strong"); one.textContent = formatGrowthNumber(model.usersAtOneYear); detail.append(one);
+        detail.append(" · " + t("growth_users_2y") + " ");
+        var two = document.createElement("strong"); two.textContent = formatGrowthNumber(model.usersAtTwoYears); detail.append(two);
+        article.append(title, formula, detail); holder.appendChild(article);
+      });
+    }
+    function renderGrowthChart() {
+      var svg = document.getElementById("growthChart");
+      svg.textContent = "";
+      svg.appendChild(svgNode("title", { id: "growthChartTitle" }, t("growth_chart_title")));
+      svg.appendChild(svgNode("desc", { id: "growthChartDesc" }, t("growth_actual") + " + " + t("growth_ensemble") + " + " + t("growth_band")));
+      var width = 1000, height = 430, left = 66, right = 22, top = 22, bottom = 52;
+      var plotWidth = width - left - right, plotHeight = height - top - bottom;
+      var history = growthData.history;
+      var endIso = dayOffsetIso(growthData.dataThrough, growthHorizon);
+      var forecast = growthData.forecast.filter(function (point) { return point.date <= endIso; });
+      var startMs = Date.parse(history[0].date + "T00:00:00Z"), endMs = Date.parse(endIso + "T00:00:00Z");
+      var maxY = niceGrowthMax(Math.max.apply(null, forecast.map(function (point) { return point.upper; })) * 1.05);
+      var xScale = function (iso) { return left + (Date.parse(iso + "T00:00:00Z") - startMs) / (endMs - startMs) * plotWidth; };
+      var yScale = function (value) { return top + plotHeight - value / maxY * plotHeight; };
+
+      for (var gridIndex = 0; gridIndex <= 4; gridIndex += 1) {
+        var value = maxY * gridIndex / 4, y = yScale(value);
+        svg.appendChild(svgNode("line", { x1: left, y1: y, x2: width - right, y2: y, class: "chart-grid" }));
+        svg.appendChild(svgNode("text", { x: left - 12, y: y + 4, "text-anchor": "end", class: "chart-axis-label" }, formatGrowthNumber(value)));
+      }
+      for (var tickIndex = 0; tickIndex <= 4; tickIndex += 1) {
+        var tickDate = new Date(startMs + (endMs - startMs) * tickIndex / 4).toISOString().slice(0, 10);
+        svg.appendChild(svgNode("text", { x: xScale(tickDate), y: height - 18, "text-anchor": tickIndex === 0 ? "start" : tickIndex === 4 ? "end" : "middle", class: "chart-axis-label" }, formatGrowthDate(tickDate, true)));
+      }
+
+      var upperPath = forecast.map(function (point, index) { return (index ? "L" : "M") + xScale(point.date).toFixed(2) + " " + yScale(point.upper).toFixed(2); }).join(" ");
+      var lowerPath = forecast.slice().reverse().map(function (point) { return "L" + xScale(point.date).toFixed(2) + " " + yScale(point.lower).toFixed(2); }).join(" ");
+      svg.appendChild(svgNode("path", { d: upperPath + " " + lowerPath + " Z", class: "chart-band" }));
+      var dividerX = xScale(growthData.dataThrough);
+      svg.appendChild(svgNode("line", { x1: dividerX, y1: top, x2: dividerX, y2: top + plotHeight, class: "chart-divider" }));
+      svg.appendChild(svgNode("text", { x: dividerX + 8, y: top + 14, class: "chart-axis-label" }, t("growth_forecast_to")));
+      svg.appendChild(svgNode("path", { d: chartPath(history, xScale, yScale, function (point) { return point.value; }), class: "chart-history" }));
+      svg.appendChild(svgNode("path", { d: chartPath(forecast, xScale, yScale, function (point) { return point.ensemble; }), class: "chart-ensemble" }));
+      Object.keys(visibleGrowthModels).forEach(function (key) {
+        if (!visibleGrowthModels[key]) return;
+        svg.appendChild(svgNode("path", { d: chartPath(forecast, xScale, yScale, function (point) { return point.models[key]; }), class: "chart-model", "data-model": key }));
+      });
+      svg.appendChild(svgNode("circle", { cx: dividerX, cy: yScale(growthData.latestUsers), r: 5, class: "chart-now-dot" }));
+    }
+    function renderGrowth() {
+      if (!growthData) return;
+      var oneYear = forecastAt(365), twoYears = forecastAt(730);
+      document.getElementById("growthNow").textContent = formatGrowthNumber(growthData.latestUsers);
+      document.getElementById("growthNowDate").textContent = formatGrowthDate(growthData.dataThrough, false);
+      document.getElementById("growthYear").textContent = formatGrowthNumber(oneYear.ensemble);
+      document.getElementById("growthTwoYear").textContent = formatGrowthNumber(twoYears.ensemble);
+      document.getElementById("growthRange").textContent = formatGrowthNumber(twoYears.lower) + "–" + formatGrowthNumber(twoYears.upper);
+      document.getElementById("growthChartMeta").textContent = t("growth_first_user") + " " + formatGrowthDate(growthData.firstUserDate, false) + " · " + t("growth_through") + " " + formatGrowthDate(growthData.dataThrough, false) + " · " + t("growth_forecast_to") + " " + formatGrowthDate(dayOffsetIso(growthData.dataThrough, growthHorizon), false);
+      renderGrowthMethods(); renderGrowthChart();
+    }
+    document.querySelectorAll("[data-horizon]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        growthHorizon = Number(button.getAttribute("data-horizon"));
+        document.querySelectorAll("[data-horizon]").forEach(function (candidate) { candidate.setAttribute("aria-pressed", String(candidate === button)); });
+        renderGrowth();
+      });
+    });
+    document.querySelectorAll(".model-toggle").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var key = button.getAttribute("data-model"); visibleGrowthModels[key] = !visibleGrowthModels[key];
+        button.setAttribute("aria-pressed", String(visibleGrowthModels[key])); renderGrowthChart();
+      });
+    });
+    fetch("assets/growth-forecast.json")
+      .then(function (response) { if (!response.ok) throw new Error("HTTP " + response.status); return response.json(); })
+      .then(function (data) { growthData = data; renderGrowth(); })
+      .catch(function () { document.getElementById("growthChart").style.display = "none"; document.getElementById("growthError").style.display = "block"; });
 
     /* ---------------- scroll reveal ---------------- */
     if ("IntersectionObserver" in window) {
