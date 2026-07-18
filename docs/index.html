@@ -490,14 +490,23 @@
     .model-toggle::before { content: ""; width: 16px; height: 0; border-top: 1px dashed var(--text-muted); }
     .model-toggle[aria-pressed="true"] { color: var(--text-primary); }
     .model-toggle[aria-pressed="false"] { opacity: .46; }
-    .growth-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 26px; border-top: 1px solid var(--glass-border); }
-    .growth-method { padding: 19px 20px 7px; border-right: 1px solid var(--glass-border); }
+    .growth-methods { display: grid; grid-template-columns: repeat(3, 1fr); align-items: start; gap: 0; margin-top: 18px; border-top: 1px solid var(--glass-border); border-bottom: 1px solid var(--glass-border); }
+    .growth-method { min-width: 0; border-right: 1px solid var(--glass-border); }
     .growth-method:last-child { border-right: 0; }
-    .growth-method h3 { font-size: 14px; font-weight: 700; }
-    .growth-formula { margin: 7px 0 9px; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: nowrap; }
-    .growth-method p { color: var(--text-muted); font-size: 11.5px; line-height: 1.65; }
+    .growth-method summary { display: grid; grid-template-columns: minmax(0, 1fr) 18px; align-items: center; gap: 12px; min-height: 66px; padding: 12px 16px; list-style: none; cursor: pointer; transition: background .2s; }
+    .growth-method summary::-webkit-details-marker { display: none; }
+    .growth-method summary:hover { background: var(--glass-bg); }
+    .growth-method h3 { font-size: 13px; font-weight: 700; }
+    .growth-method-simple { margin-top: 2px; overflow: hidden; color: var(--text-muted); font-size: 11.5px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+    .growth-method-chevron { width: 8px; height: 8px; border-right: 1.5px solid var(--text-muted); border-bottom: 1.5px solid var(--text-muted); transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s, border-color .2s; }
+    .growth-method[open] .growth-method-chevron { border-color: var(--accent); transform: rotate(225deg) translate(-1px, -1px); }
+    .growth-method-detail { padding: 13px 16px 16px; border-top: 1px solid var(--glass-border); animation: method-in .2s ease-out both; }
+    @keyframes method-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .growth-formula { margin: 0 0 9px; overflow-x: auto; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; white-space: nowrap; }
+    .growth-method-detail p { color: var(--text-muted); font-size: 11.5px; line-height: 1.6; }
+    .growth-method-stats { margin-top: 8px; }
     .growth-method strong { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-    .growth-note { margin: 22px 0 0; color: var(--text-muted); font-size: 11.5px; line-height: 1.65; }
+    .growth-note { margin: 12px 0 0; color: var(--text-muted); font-size: 11.5px; line-height: 1.65; }
     .growth-error { display: none; padding: 38px 20px; color: var(--text-secondary); text-align: center; }
 
     #how { border-top: 1px solid var(--glass-border); }
@@ -541,7 +550,7 @@
       .growth-kpi:nth-child(2) { border-right: 0; }
       .growth-kpi:nth-child(-n+2) { border-bottom: 1px solid var(--glass-border); }
       .growth-methods { grid-template-columns: 1fr; }
-      .growth-method { border-right: 0; border-bottom: 1px solid var(--glass-border); padding-bottom: 17px; }
+      .growth-method { border-right: 0; border-bottom: 1px solid var(--glass-border); }
       .growth-method:last-child { border-bottom: 0; }
     }
     @media (max-width: 720px) {
@@ -741,7 +750,7 @@
     </div>
 
     <div class="growth-methods reveal" id="growthMethods" aria-label="Forecast methods"></div>
-    <p class="growth-note reveal" data-i18n="growth_note">The shaded area is disagreement between models, not a confidence interval. A 147-day history cannot encode future product launches, promotion or store-policy changes, so the two-year view is a transparent scenario exercise—not a promise.</p>
+    <p class="growth-note reveal" data-i18n="growth_note">Forecasts are scenarios, not promises. Open a model to see the math and backtest.</p>
   </section>
 
   <!-- HOW IT WORKS -->
@@ -937,7 +946,13 @@
       growth_linear: "Linear",
       growth_power: "Power",
       growth_gompertz: "Gompertz",
-      growth_note: "The shaded area is disagreement between models, not a confidence interval. A 147-day history cannot encode future product launches, promotion or store-policy changes, so the two-year view is a transparent scenario exercise—not a promise.",
+      growth_linear_simple: "Same pace, straight ahead.",
+      growth_power_simple: "Momentum keeps building.",
+      growth_gompertz_simple: "Growth slows near a ceiling.",
+      growth_linear_detail: "Adds roughly the same fitted number of users each day. A neutral baseline that cannot capture acceleration or saturation.",
+      growth_power_detail: "Lets absolute gains increase as the audience grows. It performed best in the 30, 60 and 90-day backtests.",
+      growth_gompertz_detail: "Starts fast, then flattens toward an estimated ceiling. This is the conservative saturation scenario.",
+      growth_note: "Forecasts are scenarios, not promises. Open a model to see the math and backtest.",
       growth_error: "The growth data could not be loaded.",
       growth_through: "Observed through",
       growth_forecast_to: "forecast to",
@@ -986,7 +1001,13 @@
       growth_linear: "Линейная",
       growth_power: "Степенная",
       growth_gompertz: "Гомпертц",
-      growth_note: "Заливка показывает расхождение моделей, а не доверительный интервал. История длиной 147 дней не знает о будущих релизах, продвижении и правилах магазина, поэтому прогноз на два года — прозрачный сценарный расчёт, а не обещание.",
+      growth_linear_simple: "Текущий темп продолжается.",
+      growth_power_simple: "Рост продолжает ускоряться.",
+      growth_gompertz_simple: "Рост замедляется у потолка.",
+      growth_linear_detail: "Каждый день прибавляется примерно одинаковое число пользователей. Нейтральная база, которая не учитывает ускорение или насыщение.",
+      growth_power_detail: "Абсолютный прирост увеличивается вместе с аудиторией. Эта модель лучше всех прошла бэктесты на 30, 60 и 90 дней.",
+      growth_gompertz_detail: "Сначала рост быстрый, затем постепенно выходит на предполагаемый потолок. Это консервативный сценарий насыщения.",
+      growth_note: "Это сценарии, а не обещание. Открой модель, чтобы увидеть формулу и бэктест.",
       growth_error: "Не удалось загрузить данные о росте.",
       growth_through: "Факт до",
       growth_forecast_to: "прогноз до",
@@ -1070,17 +1091,26 @@
       var holder = document.getElementById("growthMethods");
       holder.textContent = "";
       growthData.models.forEach(function (model) {
-        var article = document.createElement("article"); article.className = "growth-method";
+        var method = document.createElement("details"); method.className = "growth-method"; method.setAttribute("name", "forecast-method");
+        var summary = document.createElement("summary");
+        var copy = document.createElement("div");
         var title = document.createElement("h3"); title.textContent = t("growth_" + model.key);
+        var simple = document.createElement("p"); simple.className = "growth-method-simple"; simple.textContent = t("growth_" + model.key + "_simple");
+        copy.append(title, simple);
+        var chevron = document.createElement("span"); chevron.className = "growth-method-chevron"; chevron.setAttribute("aria-hidden", "true");
+        summary.append(copy, chevron);
+        var detailBox = document.createElement("div"); detailBox.className = "growth-method-detail";
         var formula = document.createElement("div"); formula.className = "growth-formula"; formula.textContent = model.formula;
-        var detail = document.createElement("p");
-        detail.append(t("growth_backtest") + " ");
-        var mae = document.createElement("strong"); mae.textContent = formatGrowthNumber(model.backtestMae); detail.append(mae);
-        detail.append(" · " + t("growth_users_1y") + " ");
-        var one = document.createElement("strong"); one.textContent = formatGrowthNumber(model.usersAtOneYear); detail.append(one);
-        detail.append(" · " + t("growth_users_2y") + " ");
-        var two = document.createElement("strong"); two.textContent = formatGrowthNumber(model.usersAtTwoYears); detail.append(two);
-        article.append(title, formula, detail); holder.appendChild(article);
+        var explanation = document.createElement("p"); explanation.textContent = t("growth_" + model.key + "_detail");
+        var stats = document.createElement("p"); stats.className = "growth-method-stats";
+        stats.append(t("growth_backtest") + " ");
+        var mae = document.createElement("strong"); mae.textContent = formatGrowthNumber(model.backtestMae); stats.append(mae);
+        stats.append(" · " + t("growth_users_1y") + " ");
+        var one = document.createElement("strong"); one.textContent = formatGrowthNumber(model.usersAtOneYear); stats.append(one);
+        stats.append(" · " + t("growth_users_2y") + " ");
+        var two = document.createElement("strong"); two.textContent = formatGrowthNumber(model.usersAtTwoYears); stats.append(two);
+        detailBox.append(formula, explanation, stats);
+        method.append(summary, detailBox); holder.appendChild(method);
       });
     }
     function renderGrowthChart() {
