@@ -1,0 +1,1830 @@
+{
+  "schemaVersion": 1,
+  "metric": "Chrome Web Store weekly users",
+  "source": "Chrome Web Store developer dashboard export",
+  "generatedFrom": "Weekly users over time_jghmghialodmkmbcpfnhkgllkmjafmja.csv",
+  "dataThrough": "2026-07-16",
+  "seriesBegins": "2025-07-17",
+  "firstUserDate": "2026-02-20",
+  "latestUsers": 511,
+  "observedDays": 147,
+  "zeroDaysBeforeFirstUser": 218,
+  "history": [
+    {
+      "date": "2026-02-20",
+      "value": 1
+    },
+    {
+      "date": "2026-02-21",
+      "value": 2
+    },
+    {
+      "date": "2026-02-22",
+      "value": 2
+    },
+    {
+      "date": "2026-02-23",
+      "value": 3
+    },
+    {
+      "date": "2026-02-24",
+      "value": 7
+    },
+    {
+      "date": "2026-02-25",
+      "value": 11
+    },
+    {
+      "date": "2026-02-26",
+      "value": 12
+    },
+    {
+      "date": "2026-02-27",
+      "value": 14
+    },
+    {
+      "date": "2026-02-28",
+      "value": 18
+    },
+    {
+      "date": "2026-03-01",
+      "value": 21
+    },
+    {
+      "date": "2026-03-02",
+      "value": 23
+    },
+    {
+      "date": "2026-03-03",
+      "value": 25
+    },
+    {
+      "date": "2026-03-04",
+      "value": 28
+    },
+    {
+      "date": "2026-03-05",
+      "value": 32
+    },
+    {
+      "date": "2026-03-06",
+      "value": 34
+    },
+    {
+      "date": "2026-03-07",
+      "value": 36
+    },
+    {
+      "date": "2026-03-08",
+      "value": 40
+    },
+    {
+      "date": "2026-03-09",
+      "value": 46
+    },
+    {
+      "date": "2026-03-10",
+      "value": 53
+    },
+    {
+      "date": "2026-03-11",
+      "value": 58
+    },
+    {
+      "date": "2026-03-12",
+      "value": 62
+    },
+    {
+      "date": "2026-03-13",
+      "value": 64
+    },
+    {
+      "date": "2026-03-14",
+      "value": 65
+    },
+    {
+      "date": "2026-03-15",
+      "value": 71
+    },
+    {
+      "date": "2026-03-16",
+      "value": 70
+    },
+    {
+      "date": "2026-03-17",
+      "value": 73
+    },
+    {
+      "date": "2026-03-18",
+      "value": 75
+    },
+    {
+      "date": "2026-03-19",
+      "value": 82
+    },
+    {
+      "date": "2026-03-20",
+      "value": 87
+    },
+    {
+      "date": "2026-03-21",
+      "value": 89
+    },
+    {
+      "date": "2026-03-22",
+      "value": 89
+    },
+    {
+      "date": "2026-03-23",
+      "value": 91
+    },
+    {
+      "date": "2026-03-24",
+      "value": 92
+    },
+    {
+      "date": "2026-03-25",
+      "value": 95
+    },
+    {
+      "date": "2026-03-26",
+      "value": 99
+    },
+    {
+      "date": "2026-03-27",
+      "value": 100
+    },
+    {
+      "date": "2026-03-28",
+      "value": 97
+    },
+    {
+      "date": "2026-03-29",
+      "value": 102
+    },
+    {
+      "date": "2026-03-30",
+      "value": 101
+    },
+    {
+      "date": "2026-03-31",
+      "value": 102
+    },
+    {
+      "date": "2026-04-01",
+      "value": 101
+    },
+    {
+      "date": "2026-04-02",
+      "value": 99
+    },
+    {
+      "date": "2026-04-03",
+      "value": 101
+    },
+    {
+      "date": "2026-04-04",
+      "value": 98
+    },
+    {
+      "date": "2026-04-05",
+      "value": 103
+    },
+    {
+      "date": "2026-04-06",
+      "value": 110
+    },
+    {
+      "date": "2026-04-07",
+      "value": 109
+    },
+    {
+      "date": "2026-04-08",
+      "value": 110
+    },
+    {
+      "date": "2026-04-09",
+      "value": 111
+    },
+    {
+      "date": "2026-04-10",
+      "value": 115
+    },
+    {
+      "date": "2026-04-11",
+      "value": 116
+    },
+    {
+      "date": "2026-04-12",
+      "value": 119
+    },
+    {
+      "date": "2026-04-13",
+      "value": 115
+    },
+    {
+      "date": "2026-04-14",
+      "value": 120
+    },
+    {
+      "date": "2026-04-15",
+      "value": 123
+    },
+    {
+      "date": "2026-04-16",
+      "value": 128
+    },
+    {
+      "date": "2026-04-17",
+      "value": 125
+    },
+    {
+      "date": "2026-04-18",
+      "value": 127
+    },
+    {
+      "date": "2026-04-19",
+      "value": 131
+    },
+    {
+      "date": "2026-04-20",
+      "value": 133
+    },
+    {
+      "date": "2026-04-21",
+      "value": 144
+    },
+    {
+      "date": "2026-04-22",
+      "value": 149
+    },
+    {
+      "date": "2026-04-23",
+      "value": 153
+    },
+    {
+      "date": "2026-04-24",
+      "value": 157
+    },
+    {
+      "date": "2026-04-25",
+      "value": 159
+    },
+    {
+      "date": "2026-04-26",
+      "value": 161
+    },
+    {
+      "date": "2026-04-27",
+      "value": 168
+    },
+    {
+      "date": "2026-04-28",
+      "value": 168
+    },
+    {
+      "date": "2026-04-29",
+      "value": 172
+    },
+    {
+      "date": "2026-04-30",
+      "value": 176
+    },
+    {
+      "date": "2026-05-01",
+      "value": 181
+    },
+    {
+      "date": "2026-05-02",
+      "value": 185
+    },
+    {
+      "date": "2026-05-03",
+      "value": 181
+    },
+    {
+      "date": "2026-05-04",
+      "value": 171
+    },
+    {
+      "date": "2026-05-05",
+      "value": 170
+    },
+    {
+      "date": "2026-05-06",
+      "value": 173
+    },
+    {
+      "date": "2026-05-07",
+      "value": 170
+    },
+    {
+      "date": "2026-05-08",
+      "value": 174
+    },
+    {
+      "date": "2026-05-09",
+      "value": 177
+    },
+    {
+      "date": "2026-05-10",
+      "value": 179
+    },
+    {
+      "date": "2026-05-11",
+      "value": 189
+    },
+    {
+      "date": "2026-05-12",
+      "value": 199
+    },
+    {
+      "date": "2026-05-13",
+      "value": 203
+    },
+    {
+      "date": "2026-05-14",
+      "value": 211
+    },
+    {
+      "date": "2026-05-15",
+      "value": 218
+    },
+    {
+      "date": "2026-05-16",
+      "value": 226
+    },
+    {
+      "date": "2026-05-17",
+      "value": 232
+    },
+    {
+      "date": "2026-05-18",
+      "value": 240
+    },
+    {
+      "date": "2026-05-19",
+      "value": 244
+    },
+    {
+      "date": "2026-05-20",
+      "value": 245
+    },
+    {
+      "date": "2026-05-21",
+      "value": 256
+    },
+    {
+      "date": "2026-05-22",
+      "value": 261
+    },
+    {
+      "date": "2026-05-23",
+      "value": 263
+    },
+    {
+      "date": "2026-05-24",
+      "value": 257
+    },
+    {
+      "date": "2026-05-25",
+      "value": 258
+    },
+    {
+      "date": "2026-05-26",
+      "value": 262
+    },
+    {
+      "date": "2026-05-27",
+      "value": 272
+    },
+    {
+      "date": "2026-05-28",
+      "value": 282
+    },
+    {
+      "date": "2026-05-29",
+      "value": 280
+    },
+    {
+      "date": "2026-05-30",
+      "value": 283
+    },
+    {
+      "date": "2026-05-31",
+      "value": 284
+    },
+    {
+      "date": "2026-06-01",
+      "value": 278
+    },
+    {
+      "date": "2026-06-02",
+      "value": 279
+    },
+    {
+      "date": "2026-06-03",
+      "value": 273
+    },
+    {
+      "date": "2026-06-04",
+      "value": 270
+    },
+    {
+      "date": "2026-06-05",
+      "value": 278
+    },
+    {
+      "date": "2026-06-06",
+      "value": 282
+    },
+    {
+      "date": "2026-06-07",
+      "value": 283
+    },
+    {
+      "date": "2026-06-08",
+      "value": 292
+    },
+    {
+      "date": "2026-06-09",
+      "value": 295
+    },
+    {
+      "date": "2026-06-10",
+      "value": 302
+    },
+    {
+      "date": "2026-06-11",
+      "value": 299
+    },
+    {
+      "date": "2026-06-12",
+      "value": 308
+    },
+    {
+      "date": "2026-06-13",
+      "value": 313
+    },
+    {
+      "date": "2026-06-14",
+      "value": 313
+    },
+    {
+      "date": "2026-06-15",
+      "value": 311
+    },
+    {
+      "date": "2026-06-16",
+      "value": 309
+    },
+    {
+      "date": "2026-06-17",
+      "value": 317
+    },
+    {
+      "date": "2026-06-18",
+      "value": 330
+    },
+    {
+      "date": "2026-06-19",
+      "value": 326
+    },
+    {
+      "date": "2026-06-20",
+      "value": 333
+    },
+    {
+      "date": "2026-06-21",
+      "value": 340
+    },
+    {
+      "date": "2026-06-22",
+      "value": 347
+    },
+    {
+      "date": "2026-06-23",
+      "value": 356
+    },
+    {
+      "date": "2026-06-24",
+      "value": 363
+    },
+    {
+      "date": "2026-06-25",
+      "value": 372
+    },
+    {
+      "date": "2026-06-26",
+      "value": 375
+    },
+    {
+      "date": "2026-06-27",
+      "value": 381
+    },
+    {
+      "date": "2026-06-28",
+      "value": 384
+    },
+    {
+      "date": "2026-06-29",
+      "value": 385
+    },
+    {
+      "date": "2026-06-30",
+      "value": 386
+    },
+    {
+      "date": "2026-07-01",
+      "value": 393
+    },
+    {
+      "date": "2026-07-02",
+      "value": 397
+    },
+    {
+      "date": "2026-07-03",
+      "value": 411
+    },
+    {
+      "date": "2026-07-04",
+      "value": 420
+    },
+    {
+      "date": "2026-07-05",
+      "value": 427
+    },
+    {
+      "date": "2026-07-06",
+      "value": 432
+    },
+    {
+      "date": "2026-07-07",
+      "value": 441
+    },
+    {
+      "date": "2026-07-08",
+      "value": 455
+    },
+    {
+      "date": "2026-07-09",
+      "value": 458
+    },
+    {
+      "date": "2026-07-10",
+      "value": 448
+    },
+    {
+      "date": "2026-07-11",
+      "value": 462
+    },
+    {
+      "date": "2026-07-12",
+      "value": 471
+    },
+    {
+      "date": "2026-07-13",
+      "value": 477
+    },
+    {
+      "date": "2026-07-14",
+      "value": 501
+    },
+    {
+      "date": "2026-07-15",
+      "value": 498
+    },
+    {
+      "date": "2026-07-16",
+      "value": 511
+    }
+  ],
+  "forecast": [
+    {
+      "date": "2026-07-16",
+      "ensemble": 511,
+      "lower": 511,
+      "upper": 511,
+      "models": {
+        "linear": 511,
+        "power": 511,
+        "gompertz": 511
+      }
+    },
+    {
+      "date": "2026-07-23",
+      "ensemble": 538,
+      "lower": 533,
+      "upper": 540,
+      "models": {
+        "linear": 533,
+        "power": 540,
+        "gompertz": 540
+      }
+    },
+    {
+      "date": "2026-07-30",
+      "ensemble": 566,
+      "lower": 555,
+      "upper": 569,
+      "models": {
+        "linear": 555,
+        "power": 569,
+        "gompertz": 568
+      }
+    },
+    {
+      "date": "2026-08-06",
+      "ensemble": 594,
+      "lower": 576,
+      "upper": 599,
+      "models": {
+        "linear": 576,
+        "power": 599,
+        "gompertz": 595
+      }
+    },
+    {
+      "date": "2026-08-13",
+      "ensemble": 622,
+      "lower": 598,
+      "upper": 628,
+      "models": {
+        "linear": 598,
+        "power": 628,
+        "gompertz": 621
+      }
+    },
+    {
+      "date": "2026-08-20",
+      "ensemble": 650,
+      "lower": 620,
+      "upper": 658,
+      "models": {
+        "linear": 620,
+        "power": 658,
+        "gompertz": 645
+      }
+    },
+    {
+      "date": "2026-08-27",
+      "ensemble": 678,
+      "lower": 642,
+      "upper": 688,
+      "models": {
+        "linear": 642,
+        "power": 688,
+        "gompertz": 669
+      }
+    },
+    {
+      "date": "2026-09-03",
+      "ensemble": 706,
+      "lower": 663,
+      "upper": 719,
+      "models": {
+        "linear": 663,
+        "power": 719,
+        "gompertz": 692
+      }
+    },
+    {
+      "date": "2026-09-10",
+      "ensemble": 734,
+      "lower": 685,
+      "upper": 749,
+      "models": {
+        "linear": 685,
+        "power": 749,
+        "gompertz": 713
+      }
+    },
+    {
+      "date": "2026-09-17",
+      "ensemble": 763,
+      "lower": 707,
+      "upper": 780,
+      "models": {
+        "linear": 707,
+        "power": 780,
+        "gompertz": 733
+      }
+    },
+    {
+      "date": "2026-09-24",
+      "ensemble": 791,
+      "lower": 729,
+      "upper": 811,
+      "models": {
+        "linear": 729,
+        "power": 811,
+        "gompertz": 752
+      }
+    },
+    {
+      "date": "2026-10-01",
+      "ensemble": 820,
+      "lower": 750,
+      "upper": 842,
+      "models": {
+        "linear": 750,
+        "power": 842,
+        "gompertz": 770
+      }
+    },
+    {
+      "date": "2026-10-08",
+      "ensemble": 849,
+      "lower": 772,
+      "upper": 873,
+      "models": {
+        "linear": 772,
+        "power": 873,
+        "gompertz": 787
+      }
+    },
+    {
+      "date": "2026-10-15",
+      "ensemble": 877,
+      "lower": 794,
+      "upper": 905,
+      "models": {
+        "linear": 794,
+        "power": 905,
+        "gompertz": 803
+      }
+    },
+    {
+      "date": "2026-10-22",
+      "ensemble": 906,
+      "lower": 816,
+      "upper": 936,
+      "models": {
+        "linear": 816,
+        "power": 936,
+        "gompertz": 818
+      }
+    },
+    {
+      "date": "2026-10-29",
+      "ensemble": 935,
+      "lower": 832,
+      "upper": 968,
+      "models": {
+        "linear": 837,
+        "power": 968,
+        "gompertz": 832
+      }
+    },
+    {
+      "date": "2026-11-05",
+      "ensemble": 964,
+      "lower": 845,
+      "upper": 1000,
+      "models": {
+        "linear": 859,
+        "power": 1000,
+        "gompertz": 845
+      }
+    },
+    {
+      "date": "2026-11-12",
+      "ensemble": 993,
+      "lower": 857,
+      "upper": 1032,
+      "models": {
+        "linear": 881,
+        "power": 1032,
+        "gompertz": 857
+      }
+    },
+    {
+      "date": "2026-11-19",
+      "ensemble": 1023,
+      "lower": 868,
+      "upper": 1064,
+      "models": {
+        "linear": 903,
+        "power": 1064,
+        "gompertz": 868
+      }
+    },
+    {
+      "date": "2026-11-26",
+      "ensemble": 1052,
+      "lower": 879,
+      "upper": 1097,
+      "models": {
+        "linear": 924,
+        "power": 1097,
+        "gompertz": 879
+      }
+    },
+    {
+      "date": "2026-12-03",
+      "ensemble": 1081,
+      "lower": 889,
+      "upper": 1129,
+      "models": {
+        "linear": 946,
+        "power": 1129,
+        "gompertz": 889
+      }
+    },
+    {
+      "date": "2026-12-10",
+      "ensemble": 1111,
+      "lower": 898,
+      "upper": 1162,
+      "models": {
+        "linear": 968,
+        "power": 1162,
+        "gompertz": 898
+      }
+    },
+    {
+      "date": "2026-12-17",
+      "ensemble": 1140,
+      "lower": 906,
+      "upper": 1195,
+      "models": {
+        "linear": 990,
+        "power": 1195,
+        "gompertz": 906
+      }
+    },
+    {
+      "date": "2026-12-24",
+      "ensemble": 1170,
+      "lower": 914,
+      "upper": 1228,
+      "models": {
+        "linear": 1011,
+        "power": 1228,
+        "gompertz": 914
+      }
+    },
+    {
+      "date": "2026-12-31",
+      "ensemble": 1200,
+      "lower": 921,
+      "upper": 1261,
+      "models": {
+        "linear": 1033,
+        "power": 1261,
+        "gompertz": 921
+      }
+    },
+    {
+      "date": "2027-01-07",
+      "ensemble": 1229,
+      "lower": 928,
+      "upper": 1294,
+      "models": {
+        "linear": 1055,
+        "power": 1294,
+        "gompertz": 928
+      }
+    },
+    {
+      "date": "2027-01-14",
+      "ensemble": 1259,
+      "lower": 934,
+      "upper": 1328,
+      "models": {
+        "linear": 1077,
+        "power": 1328,
+        "gompertz": 934
+      }
+    },
+    {
+      "date": "2027-01-21",
+      "ensemble": 1289,
+      "lower": 940,
+      "upper": 1361,
+      "models": {
+        "linear": 1098,
+        "power": 1361,
+        "gompertz": 940
+      }
+    },
+    {
+      "date": "2027-01-28",
+      "ensemble": 1319,
+      "lower": 945,
+      "upper": 1395,
+      "models": {
+        "linear": 1120,
+        "power": 1395,
+        "gompertz": 945
+      }
+    },
+    {
+      "date": "2027-02-04",
+      "ensemble": 1349,
+      "lower": 950,
+      "upper": 1429,
+      "models": {
+        "linear": 1142,
+        "power": 1429,
+        "gompertz": 950
+      }
+    },
+    {
+      "date": "2027-02-11",
+      "ensemble": 1379,
+      "lower": 955,
+      "upper": 1463,
+      "models": {
+        "linear": 1164,
+        "power": 1463,
+        "gompertz": 955
+      }
+    },
+    {
+      "date": "2027-02-18",
+      "ensemble": 1410,
+      "lower": 959,
+      "upper": 1497,
+      "models": {
+        "linear": 1185,
+        "power": 1497,
+        "gompertz": 959
+      }
+    },
+    {
+      "date": "2027-02-25",
+      "ensemble": 1440,
+      "lower": 963,
+      "upper": 1531,
+      "models": {
+        "linear": 1207,
+        "power": 1531,
+        "gompertz": 963
+      }
+    },
+    {
+      "date": "2027-03-04",
+      "ensemble": 1470,
+      "lower": 966,
+      "upper": 1565,
+      "models": {
+        "linear": 1229,
+        "power": 1565,
+        "gompertz": 966
+      }
+    },
+    {
+      "date": "2027-03-11",
+      "ensemble": 1501,
+      "lower": 970,
+      "upper": 1600,
+      "models": {
+        "linear": 1251,
+        "power": 1600,
+        "gompertz": 970
+      }
+    },
+    {
+      "date": "2027-03-18",
+      "ensemble": 1531,
+      "lower": 973,
+      "upper": 1634,
+      "models": {
+        "linear": 1272,
+        "power": 1634,
+        "gompertz": 973
+      }
+    },
+    {
+      "date": "2027-03-25",
+      "ensemble": 1562,
+      "lower": 975,
+      "upper": 1669,
+      "models": {
+        "linear": 1294,
+        "power": 1669,
+        "gompertz": 975
+      }
+    },
+    {
+      "date": "2027-04-01",
+      "ensemble": 1593,
+      "lower": 978,
+      "upper": 1704,
+      "models": {
+        "linear": 1316,
+        "power": 1704,
+        "gompertz": 978
+      }
+    },
+    {
+      "date": "2027-04-08",
+      "ensemble": 1624,
+      "lower": 980,
+      "upper": 1739,
+      "models": {
+        "linear": 1338,
+        "power": 1739,
+        "gompertz": 980
+      }
+    },
+    {
+      "date": "2027-04-15",
+      "ensemble": 1654,
+      "lower": 983,
+      "upper": 1774,
+      "models": {
+        "linear": 1359,
+        "power": 1774,
+        "gompertz": 983
+      }
+    },
+    {
+      "date": "2027-04-22",
+      "ensemble": 1685,
+      "lower": 985,
+      "upper": 1809,
+      "models": {
+        "linear": 1381,
+        "power": 1809,
+        "gompertz": 985
+      }
+    },
+    {
+      "date": "2027-04-29",
+      "ensemble": 1716,
+      "lower": 987,
+      "upper": 1844,
+      "models": {
+        "linear": 1403,
+        "power": 1844,
+        "gompertz": 987
+      }
+    },
+    {
+      "date": "2027-05-06",
+      "ensemble": 1747,
+      "lower": 988,
+      "upper": 1879,
+      "models": {
+        "linear": 1425,
+        "power": 1879,
+        "gompertz": 988
+      }
+    },
+    {
+      "date": "2027-05-13",
+      "ensemble": 1779,
+      "lower": 990,
+      "upper": 1915,
+      "models": {
+        "linear": 1446,
+        "power": 1915,
+        "gompertz": 990
+      }
+    },
+    {
+      "date": "2027-05-20",
+      "ensemble": 1810,
+      "lower": 991,
+      "upper": 1950,
+      "models": {
+        "linear": 1468,
+        "power": 1950,
+        "gompertz": 991
+      }
+    },
+    {
+      "date": "2027-05-27",
+      "ensemble": 1841,
+      "lower": 993,
+      "upper": 1986,
+      "models": {
+        "linear": 1490,
+        "power": 1986,
+        "gompertz": 993
+      }
+    },
+    {
+      "date": "2027-06-03",
+      "ensemble": 1872,
+      "lower": 994,
+      "upper": 2021,
+      "models": {
+        "linear": 1512,
+        "power": 2021,
+        "gompertz": 994
+      }
+    },
+    {
+      "date": "2027-06-10",
+      "ensemble": 1904,
+      "lower": 995,
+      "upper": 2057,
+      "models": {
+        "linear": 1534,
+        "power": 2057,
+        "gompertz": 995
+      }
+    },
+    {
+      "date": "2027-06-17",
+      "ensemble": 1935,
+      "lower": 996,
+      "upper": 2093,
+      "models": {
+        "linear": 1555,
+        "power": 2093,
+        "gompertz": 996
+      }
+    },
+    {
+      "date": "2027-06-24",
+      "ensemble": 1967,
+      "lower": 997,
+      "upper": 2129,
+      "models": {
+        "linear": 1577,
+        "power": 2129,
+        "gompertz": 997
+      }
+    },
+    {
+      "date": "2027-07-01",
+      "ensemble": 1999,
+      "lower": 998,
+      "upper": 2165,
+      "models": {
+        "linear": 1599,
+        "power": 2165,
+        "gompertz": 998
+      }
+    },
+    {
+      "date": "2027-07-08",
+      "ensemble": 2030,
+      "lower": 999,
+      "upper": 2201,
+      "models": {
+        "linear": 1621,
+        "power": 2201,
+        "gompertz": 999
+      }
+    },
+    {
+      "date": "2027-07-15",
+      "ensemble": 2062,
+      "lower": 999,
+      "upper": 2238,
+      "models": {
+        "linear": 1642,
+        "power": 2238,
+        "gompertz": 999
+      }
+    },
+    {
+      "date": "2027-07-16",
+      "ensemble": 2067,
+      "lower": 1000,
+      "upper": 2243,
+      "models": {
+        "linear": 1645,
+        "power": 2243,
+        "gompertz": 1000
+      }
+    },
+    {
+      "date": "2027-07-22",
+      "ensemble": 2094,
+      "lower": 1000,
+      "upper": 2274,
+      "models": {
+        "linear": 1664,
+        "power": 2274,
+        "gompertz": 1000
+      }
+    },
+    {
+      "date": "2027-07-29",
+      "ensemble": 2126,
+      "lower": 1001,
+      "upper": 2311,
+      "models": {
+        "linear": 1686,
+        "power": 2311,
+        "gompertz": 1001
+      }
+    },
+    {
+      "date": "2027-08-05",
+      "ensemble": 2158,
+      "lower": 1001,
+      "upper": 2347,
+      "models": {
+        "linear": 1708,
+        "power": 2347,
+        "gompertz": 1001
+      }
+    },
+    {
+      "date": "2027-08-12",
+      "ensemble": 2190,
+      "lower": 1002,
+      "upper": 2384,
+      "models": {
+        "linear": 1729,
+        "power": 2384,
+        "gompertz": 1002
+      }
+    },
+    {
+      "date": "2027-08-19",
+      "ensemble": 2222,
+      "lower": 1002,
+      "upper": 2421,
+      "models": {
+        "linear": 1751,
+        "power": 2421,
+        "gompertz": 1002
+      }
+    },
+    {
+      "date": "2027-08-26",
+      "ensemble": 2254,
+      "lower": 1003,
+      "upper": 2457,
+      "models": {
+        "linear": 1773,
+        "power": 2457,
+        "gompertz": 1003
+      }
+    },
+    {
+      "date": "2027-09-02",
+      "ensemble": 2286,
+      "lower": 1003,
+      "upper": 2494,
+      "models": {
+        "linear": 1795,
+        "power": 2494,
+        "gompertz": 1003
+      }
+    },
+    {
+      "date": "2027-09-09",
+      "ensemble": 2319,
+      "lower": 1004,
+      "upper": 2531,
+      "models": {
+        "linear": 1816,
+        "power": 2531,
+        "gompertz": 1004
+      }
+    },
+    {
+      "date": "2027-09-16",
+      "ensemble": 2351,
+      "lower": 1004,
+      "upper": 2568,
+      "models": {
+        "linear": 1838,
+        "power": 2568,
+        "gompertz": 1004
+      }
+    },
+    {
+      "date": "2027-09-23",
+      "ensemble": 2383,
+      "lower": 1004,
+      "upper": 2606,
+      "models": {
+        "linear": 1860,
+        "power": 2606,
+        "gompertz": 1004
+      }
+    },
+    {
+      "date": "2027-09-30",
+      "ensemble": 2416,
+      "lower": 1005,
+      "upper": 2643,
+      "models": {
+        "linear": 1882,
+        "power": 2643,
+        "gompertz": 1005
+      }
+    },
+    {
+      "date": "2027-10-07",
+      "ensemble": 2448,
+      "lower": 1005,
+      "upper": 2680,
+      "models": {
+        "linear": 1903,
+        "power": 2680,
+        "gompertz": 1005
+      }
+    },
+    {
+      "date": "2027-10-14",
+      "ensemble": 2481,
+      "lower": 1005,
+      "upper": 2718,
+      "models": {
+        "linear": 1925,
+        "power": 2718,
+        "gompertz": 1005
+      }
+    },
+    {
+      "date": "2027-10-21",
+      "ensemble": 2514,
+      "lower": 1005,
+      "upper": 2755,
+      "models": {
+        "linear": 1947,
+        "power": 2755,
+        "gompertz": 1005
+      }
+    },
+    {
+      "date": "2027-10-28",
+      "ensemble": 2546,
+      "lower": 1006,
+      "upper": 2793,
+      "models": {
+        "linear": 1969,
+        "power": 2793,
+        "gompertz": 1006
+      }
+    },
+    {
+      "date": "2027-11-04",
+      "ensemble": 2579,
+      "lower": 1006,
+      "upper": 2830,
+      "models": {
+        "linear": 1990,
+        "power": 2830,
+        "gompertz": 1006
+      }
+    },
+    {
+      "date": "2027-11-11",
+      "ensemble": 2612,
+      "lower": 1006,
+      "upper": 2868,
+      "models": {
+        "linear": 2012,
+        "power": 2868,
+        "gompertz": 1006
+      }
+    },
+    {
+      "date": "2027-11-18",
+      "ensemble": 2645,
+      "lower": 1006,
+      "upper": 2906,
+      "models": {
+        "linear": 2034,
+        "power": 2906,
+        "gompertz": 1006
+      }
+    },
+    {
+      "date": "2027-11-25",
+      "ensemble": 2678,
+      "lower": 1006,
+      "upper": 2944,
+      "models": {
+        "linear": 2056,
+        "power": 2944,
+        "gompertz": 1006
+      }
+    },
+    {
+      "date": "2027-12-02",
+      "ensemble": 2711,
+      "lower": 1006,
+      "upper": 2982,
+      "models": {
+        "linear": 2077,
+        "power": 2982,
+        "gompertz": 1006
+      }
+    },
+    {
+      "date": "2027-12-09",
+      "ensemble": 2744,
+      "lower": 1007,
+      "upper": 3020,
+      "models": {
+        "linear": 2099,
+        "power": 3020,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2027-12-16",
+      "ensemble": 2777,
+      "lower": 1007,
+      "upper": 3058,
+      "models": {
+        "linear": 2121,
+        "power": 3058,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2027-12-23",
+      "ensemble": 2810,
+      "lower": 1007,
+      "upper": 3096,
+      "models": {
+        "linear": 2143,
+        "power": 3096,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2027-12-30",
+      "ensemble": 2843,
+      "lower": 1007,
+      "upper": 3134,
+      "models": {
+        "linear": 2164,
+        "power": 3134,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-01-06",
+      "ensemble": 2877,
+      "lower": 1007,
+      "upper": 3173,
+      "models": {
+        "linear": 2186,
+        "power": 3173,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-01-13",
+      "ensemble": 2910,
+      "lower": 1007,
+      "upper": 3211,
+      "models": {
+        "linear": 2208,
+        "power": 3211,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-01-20",
+      "ensemble": 2943,
+      "lower": 1007,
+      "upper": 3249,
+      "models": {
+        "linear": 2230,
+        "power": 3249,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-01-27",
+      "ensemble": 2977,
+      "lower": 1007,
+      "upper": 3288,
+      "models": {
+        "linear": 2251,
+        "power": 3288,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-02-03",
+      "ensemble": 3010,
+      "lower": 1007,
+      "upper": 3327,
+      "models": {
+        "linear": 2273,
+        "power": 3327,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-02-10",
+      "ensemble": 3044,
+      "lower": 1007,
+      "upper": 3365,
+      "models": {
+        "linear": 2295,
+        "power": 3365,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-02-17",
+      "ensemble": 3077,
+      "lower": 1007,
+      "upper": 3404,
+      "models": {
+        "linear": 2317,
+        "power": 3404,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-02-24",
+      "ensemble": 3111,
+      "lower": 1007,
+      "upper": 3443,
+      "models": {
+        "linear": 2338,
+        "power": 3443,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-03-02",
+      "ensemble": 3145,
+      "lower": 1007,
+      "upper": 3482,
+      "models": {
+        "linear": 2360,
+        "power": 3482,
+        "gompertz": 1007
+      }
+    },
+    {
+      "date": "2028-03-09",
+      "ensemble": 3179,
+      "lower": 1008,
+      "upper": 3521,
+      "models": {
+        "linear": 2382,
+        "power": 3521,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-03-16",
+      "ensemble": 3212,
+      "lower": 1008,
+      "upper": 3560,
+      "models": {
+        "linear": 2404,
+        "power": 3560,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-03-23",
+      "ensemble": 3246,
+      "lower": 1008,
+      "upper": 3599,
+      "models": {
+        "linear": 2425,
+        "power": 3599,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-03-30",
+      "ensemble": 3280,
+      "lower": 1008,
+      "upper": 3638,
+      "models": {
+        "linear": 2447,
+        "power": 3638,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-04-06",
+      "ensemble": 3314,
+      "lower": 1008,
+      "upper": 3677,
+      "models": {
+        "linear": 2469,
+        "power": 3677,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-04-13",
+      "ensemble": 3348,
+      "lower": 1008,
+      "upper": 3717,
+      "models": {
+        "linear": 2491,
+        "power": 3717,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-04-20",
+      "ensemble": 3382,
+      "lower": 1008,
+      "upper": 3756,
+      "models": {
+        "linear": 2512,
+        "power": 3756,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-04-27",
+      "ensemble": 3416,
+      "lower": 1008,
+      "upper": 3795,
+      "models": {
+        "linear": 2534,
+        "power": 3795,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-05-04",
+      "ensemble": 3450,
+      "lower": 1008,
+      "upper": 3835,
+      "models": {
+        "linear": 2556,
+        "power": 3835,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-05-11",
+      "ensemble": 3485,
+      "lower": 1008,
+      "upper": 3874,
+      "models": {
+        "linear": 2578,
+        "power": 3874,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-05-18",
+      "ensemble": 3519,
+      "lower": 1008,
+      "upper": 3914,
+      "models": {
+        "linear": 2600,
+        "power": 3914,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-05-25",
+      "ensemble": 3553,
+      "lower": 1008,
+      "upper": 3954,
+      "models": {
+        "linear": 2621,
+        "power": 3954,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-06-01",
+      "ensemble": 3588,
+      "lower": 1008,
+      "upper": 3994,
+      "models": {
+        "linear": 2643,
+        "power": 3994,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-06-08",
+      "ensemble": 3622,
+      "lower": 1008,
+      "upper": 4033,
+      "models": {
+        "linear": 2665,
+        "power": 4033,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-06-15",
+      "ensemble": 3656,
+      "lower": 1008,
+      "upper": 4073,
+      "models": {
+        "linear": 2687,
+        "power": 4073,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-06-22",
+      "ensemble": 3691,
+      "lower": 1008,
+      "upper": 4113,
+      "models": {
+        "linear": 2708,
+        "power": 4113,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-06-29",
+      "ensemble": 3725,
+      "lower": 1008,
+      "upper": 4153,
+      "models": {
+        "linear": 2730,
+        "power": 4153,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-07-06",
+      "ensemble": 3760,
+      "lower": 1008,
+      "upper": 4193,
+      "models": {
+        "linear": 2752,
+        "power": 4193,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-07-13",
+      "ensemble": 3795,
+      "lower": 1008,
+      "upper": 4233,
+      "models": {
+        "linear": 2774,
+        "power": 4233,
+        "gompertz": 1008
+      }
+    },
+    {
+      "date": "2028-07-15",
+      "ensemble": 3804,
+      "lower": 1008,
+      "upper": 4245,
+      "models": {
+        "linear": 2780,
+        "power": 4245,
+        "gompertz": 1008
+      }
+    }
+  ],
+  "models": [
+    {
+      "key": "linear",
+      "label": "Linear trend",
+      "formula": "ŷ(t+h) = yₜ + βh",
+      "weight": 0.2062,
+      "backtestMae": 49.7,
+      "backtestSmape": 15,
+      "parameters": {
+        "dailySlope": 3.1079
+      },
+      "usersAtOneYear": 1645,
+      "usersAtTwoYears": 2780
+    },
+    {
+      "key": "power",
+      "label": "Power curve",
+      "formula": "ŷ(t) = a(t+c)ᵇ",
+      "weight": 0.7511,
+      "backtestMae": 26,
+      "backtestSmape": 7.5,
+      "parameters": {
+        "exponent": 1.1853,
+        "shiftDays": 1
+      },
+      "usersAtOneYear": 2243,
+      "usersAtTwoYears": 4245
+    },
+    {
+      "key": "gompertz",
+      "label": "Gompertz S-curve",
+      "formula": "ŷ(t) = K·exp(−exp(a−bt))",
+      "weight": 0.0427,
+      "backtestMae": 109.1,
+      "backtestSmape": 41.6,
+      "parameters": {
+        "carryingCapacity": 1008.0025,
+        "growthRate": 0.012
+      },
+      "usersAtOneYear": 1000,
+      "usersAtTwoYears": 1008
+    }
+  ],
+  "method": {
+    "ensemble": "Inverse-squared-MAE weighted ensemble",
+    "validation": "Rolling-origin holdouts of 30, 60 and 90 days",
+    "interval": "Scenario envelope: minimum and maximum of the three model forecasts",
+    "caveat": "A scenario range, not a confidence interval. Long-range extension growth depends on product, distribution and Chrome Web Store conditions that this time series cannot observe."
+  }
+}
