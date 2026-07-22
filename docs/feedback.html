@@ -228,7 +228,7 @@
       background: var(--glass-bg-hover); border: 1px solid var(--glass-border-strong);
       padding: 2px 9px; border-radius: 999px; vertical-align: middle;
     }
-    .action-row { display: flex; gap: 12px; align-items: stretch; }
+    .action-row { display: grid; gap: 12px; }
     .detail-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
     textarea {
       width: 100%; min-width: 0; min-height: 112px; resize: vertical;
@@ -241,36 +241,90 @@
     .contact-consent { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; padding-inline: 2px; }
     .contact-consent strong { color: var(--text-secondary); font-weight: 650; }
 
-    /* ~1/4-width tall green CTA next to the comment box (no empty space) */
+    /* Final CTA: organic ocean landscape with a continuous flowing outline. */
+    @property --cta-angle {
+      syntax: "<angle>";
+      initial-value: 0deg;
+      inherits: false;
+    }
     .btn-send {
-      position: relative; flex: 0 0 30%; min-width: 148px;
-      font: inherit; font-size: 16px; font-weight: 750; cursor: pointer; color: #fff; border: none;
-      border-radius: var(--radius-sm); padding: 12px 16px;
-      display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
-      background: linear-gradient(135deg, #36d65f 0%, #1fa34a 100%);
-      /* gentle "breathe" (grow/shrink + glow) to invite the click; uses transform
-         scale so hover/active use filter only (no transform conflict). */
-      animation: send-breathe 2s ease-in-out infinite;
-      transition: filter .15s;
+      --cta-edge: #55caff; --cta-edge-2: #d5f5ff;
+      --cta-border: rgba(117,202,244,.35);
+      --cta-glow: rgba(39,145,218,.15); --cta-glow-strong: rgba(72,189,255,.34);
+      --cta-ring-dim: rgba(85,202,255,.14);
+      --cta-blob-light: rgba(77,181,232,.68); --cta-blob-dark: rgba(2,17,43,.82);
+      position: relative; isolation: isolate; overflow: hidden;
+      width: 100%; min-height: 50px; justify-self: stretch;
+      font: inherit; font-size: 14px; font-weight: 750; letter-spacing: -.1px;
+      cursor: pointer; color: #fff; border: 1px solid var(--cta-border);
+      border-radius: 11px; padding: 0 20px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      background: linear-gradient(132deg, #071b33 0%, #0a3c63 48%, #092b4d 100%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.11), inset 0 -1px 0 rgba(255,255,255,.03), 0 8px 20px var(--cta-glow);
+      transition: transform .2s cubic-bezier(.2,.8,.2,1), filter .2s, box-shadow .2s;
     }
-    @keyframes send-breathe {
-      0%, 100% { transform: scale(1); box-shadow: 0 10px 26px rgba(33,163,74,.45); }
-      50% { transform: scale(1.05); box-shadow: 0 20px 50px rgba(33,163,74,.72); }
+    .btn-send > * { position: relative; z-index: 1; }
+    .btn-send .send-icon {
+      width: 18px; height: 18px; flex: none; color: var(--cta-edge-2);
+      filter: drop-shadow(0 0 5px var(--cta-edge));
     }
-    /* expanding halo ring — strong enough to read on the light theme too */
+    .btn-send .cta-blob {
+      position: absolute; z-index: 0; display: block; pointer-events: none;
+      opacity: 0; filter: blur(11px); will-change: transform;
+    }
+    .btn-send .cta-blob-light {
+      width: 68%; height: 230%; left: -22%; top: -66%; opacity: .72;
+      border-radius: 42% 58% 67% 33% / 57% 35% 65% 43%;
+      background: var(--cta-blob-light);
+      animation: cta-blob-a 24s cubic-bezier(.45,.05,.25,1) infinite;
+    }
+    .btn-send .cta-blob-dark {
+      width: 72%; height: 215%; right: -25%; top: -58%; opacity: .78;
+      border-radius: 64% 36% 44% 56% / 38% 61% 39% 62%;
+      background: var(--cta-blob-dark);
+      animation: cta-blob-b 31s cubic-bezier(.38,.08,.22,1) -8s infinite;
+    }
     .btn-send::after {
-      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-      box-shadow: 0 0 0 0 rgba(28, 200, 90, 0.65);
-      animation: send-ring 1.8s ease-out infinite;
+      content: ""; position: absolute; z-index: 2; inset: 0; padding: 1.2px;
+      border-radius: inherit; pointer-events: none; opacity: .8;
+      background: conic-gradient(from var(--cta-angle),
+        var(--cta-ring-dim) 0 60%, var(--cta-edge) 72%, var(--cta-edge-2) 78%,
+        var(--cta-edge) 84%, var(--cta-ring-dim) 96% 100%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      filter: drop-shadow(0 0 3px var(--cta-edge));
+      animation: cta-orbit 5.2s linear infinite;
     }
-    @keyframes send-ring { 0% { box-shadow: 0 0 0 0 rgba(28,200,90,.65); } 70%, 100% { box-shadow: 0 0 0 20px rgba(28,200,90,0); } }
-    .btn-send svg { width: 22px; height: 22px; }
-    .btn-send:hover { filter: brightness(1.08); }
-    .btn-send:active { filter: brightness(.93); }
-    .btn-send:disabled { opacity: .7; cursor: default; animation: none; }
-    .btn-send:disabled::after { animation: none; }
-    @media (prefers-reduced-motion: reduce) { .btn-send, .btn-send::after { animation: none; } }
-    @media (max-width: 520px) { .action-row { flex-direction: column; } .btn-send { flex-basis: auto; width: 100%; flex-direction: row; padding: 14px; } }
+    .btn-send:hover {
+      transform: translateY(-1px); filter: saturate(1.08) brightness(1.06);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 10px 24px var(--cta-glow-strong);
+    }
+    .btn-send:active { transform: translateY(0) scale(.99); }
+    .btn-send:focus-visible { outline: 3px solid var(--cta-glow-strong); outline-offset: 3px; }
+    .btn-send:disabled { opacity: .62; cursor: default; transform: none; }
+    .btn-send:disabled::after, .btn-send:disabled .cta-blob { animation: none; }
+
+    @keyframes cta-blob-a {
+      0%,100% { transform: translate3d(-12%, -8%, 0) scale(.92, 1.08) rotate(-7deg); }
+      19% { transform: translate3d(42%, -18%, 0) scale(1.14, .86) rotate(4deg); }
+      43% { transform: translate3d(91%, 8%, 0) scale(.82, 1.18) rotate(11deg); }
+      68% { transform: translate3d(53%, 24%, 0) scale(1.2, .8) rotate(-2deg); }
+      84% { transform: translate3d(8%, 13%, 0) scale(.96, 1.12) rotate(-10deg); }
+    }
+    @keyframes cta-blob-b {
+      0%,100% { transform: translate3d(12%, 11%, 0) scale(1.05, .9) rotate(7deg); }
+      27% { transform: translate3d(-38%, 24%, 0) scale(.84, 1.18) rotate(-5deg); }
+      51% { transform: translate3d(-88%, -4%, 0) scale(1.16, .82) rotate(-12deg); }
+      73% { transform: translate3d(-57%, -23%, 0) scale(.9, 1.12) rotate(2deg); }
+      89% { transform: translate3d(-13%, -14%, 0) scale(1.12, .88) rotate(10deg); }
+    }
+    @keyframes cta-orbit { to { --cta-angle: 360deg; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .btn-send::after, .btn-send .cta-blob { animation: none !important; }
+    }
+    @media (max-width: 520px) { .btn-send { min-height: 50px; } }
 
     /* thanks */
     .thanks { display: none; text-align: center; padding: 8px 0 4px; }
@@ -405,7 +459,9 @@
             <p class="contact-consent" id="contactConsent"></p>
           </div>
           <button class="btn-send" id="submitBtn">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            <span class="cta-blob cta-blob-light" aria-hidden="true"></span>
+            <span class="cta-blob cta-blob-dark" aria-hidden="true"></span>
+            <svg class="send-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
             <span data-i18n="submit"></span>
           </button>
         </div>
@@ -592,7 +648,6 @@
       ["r_once", "1️⃣"], ["r_broken", "🛠"], ["r_confusing", "🤔"], ["r_alt", "🔁"],
       ["r_missing", "🧩"], ["r_slow", "🐢"], ["r_privacy", "🔒"], ["r_other", "💬"]
     ];
-
     /* ---------------- helpers ---------------- */
     const params = Object.fromEntries(new URLSearchParams(location.search));
 
