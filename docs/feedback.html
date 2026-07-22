@@ -1478,6 +1478,41 @@
     }
     /* ---------------- helpers ---------------- */
     const params = Object.fromEntries(new URLSearchParams(location.search));
+    const isLocalFeedbackPage = location.protocol === "file:"
+      || location.hostname === "localhost"
+      || location.hostname === "127.0.0.1";
+    // Local design work must not pollute the production uninstall sheet.
+    // Append ?live=1 only when intentionally testing the real collector.
+    const previewMode = params.preview === "1"
+      || (isLocalFeedbackPage && params.live !== "1");
+
+    function createSessionId() {
+      return crypto.randomUUID
+        ? crypto.randomUUID()
+        : String(Math.random()).slice(2) + Date.now();
+    }
+
+    const feedbackSessionStorageKey = "xporter_feedback_session_v1:"
+      + location.pathname + location.search;
+    const feedbackDwellStorageKey = feedbackSessionStorageKey + ":active_ms";
+    let feedbackSessionIsNew = false;
+
+    function getFeedbackSessionId() {
+      // sessionStorage is tab-scoped and survives reloads. Keying by the exact
+      // feedback URL keeps one logical uninstall visit in one Sheet row while
+      // still starting a fresh row for a different uninstall snapshot.
+      try {
+        const existing = sessionStorage.getItem(feedbackSessionStorageKey);
+        if (existing) return existing;
+        const created = createSessionId();
+        sessionStorage.setItem(feedbackSessionStorageKey, created);
+        feedbackSessionIsNew = true;
+        return created;
+      } catch (_) {
+        feedbackSessionIsNew = true;
+        return createSessionId();
+      }
+    }
 
     function pickLang() {
       const valid = (c) => c && I18N[c];
@@ -1766,7 +1801,7 @@
     document.getElementById("reinstallLink").href = STORE_URL;
 
     /* ---------------- state + sending ---------------- */
-    const sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+    const sessionId = getFeedbackSessionId();
     let selectedReason = null;
     let selectedSubreasons = new Set();
     const selectedSubreasonsByReason = new Map();
@@ -1780,27 +1815,33 @@
     // How long this feedback page is actively VISIBLE — tells "read it and
     // answered" from "bounced instantly". Anonymous; counts visible time only.
     let pageActiveMs = 0;
+    try {
+      pageActiveMs = Math.max(0, Number(sessionStorage.getItem(feedbackDwellStorageKey)) || 0);
+    } catch (_) { /* storage can be disabled; the in-memory timer still works */ }
     let lastVisibleAt = (document.visibilityState === "visible") ? Date.now() : 0;
+    function pausePageTimer() {
+      if (!lastVisibleAt) return;
+      pageActiveMs += Date.now() - lastVisibleAt;
+      lastVisibleAt = 0;
+      try { sessionStorage.setItem(feedbackDwellStorageKey, String(pageActiveMs)); } catch (_) { /* best effort */ }
+    }
     function pageSeconds() {
       let total = pageActiveMs;
       if (lastVisibleAt) total += Date.now() - lastVisibleAt;
       return Math.round(total / 1000);
     }
 
-    function basePayload() {
+    function basePayload(includeFeedbackState) {
       const subreasonKeys = Array.from(selectedSubreasons);
       const selectedGroups = REASON_KEYS.map(function (reason) {
         return [reason, Array.from(selectedSubreasonsByReason.get(reason) || [])];
       }).filter(function (entry) { return entry[1].length; });
       const allSubreasonKeys = selectedGroups.flatMap(function (entry) { return entry[1]; });
-      return {
-        sessionId,
-        source: params.src || (Object.keys(params).length ? "uninstall" : "direct"),
-        pageLang: lang,
-        // forward every stat the extension appended to the URL, plus the live
-        // dwell time on this page:
-        stats: Object.assign({}, params, {
-          page_s: pageSeconds(),
+      const forwardedStats = Object.assign({}, params);
+      delete forwardedStats.preview;
+      delete forwardedStats.live;
+      const stats = Object.assign(forwardedStats, { page_s: pageSeconds() });
+      if (includeFeedbackState !== false) Object.assign(stats, {
           subreasons: subreasonKeys.length ? subreasonKeys.join(" | ") : "none",
           subreason_labels: subreasonKeys.length
             ? subreasonKeys.map(key => I18N.en[key] || key).join(" | ")
@@ -1815,7 +1856,14 @@
                   + entry[1].map(key => I18N.en[key] || key).join("; ");
               }).join(" || ")
             : "none"
-        }),
+        });
+      return {
+        sessionId,
+        source: params.src || "direct",
+        pageLang: lang,
+        // forward every stat the extension appended to the URL, plus the live
+        // dwell time on this page:
+        stats,
         ts: new Date().toISOString()
       };
     }
@@ -1824,17 +1872,19 @@
       if (document.visibilityState === "visible") {
         lastVisibleAt = Date.now();
       } else if (lastVisibleAt) {
-        pageActiveMs += Date.now() - lastVisibleAt;
-        lastVisibleAt = 0;
+        pausePageTimer();
         // Push the updated dwell time. No `type` → the upsert won't clobber an
         // already-chosen reason / lastType, it just refreshes page_s.
-        send(basePayload());
+        send(basePayload(false));
       }
     });
-    window.addEventListener("pagehide", function () { send(basePayload()); });
+    window.addEventListener("pagehide", function () {
+      pausePageTimer();
+      send(basePayload(false));
+    });
 
     function send(payload) {
-      if (params.preview === "1") {
+      if (previewMode) {
         console.info("[XPorter feedback preview] Payload not sent:", payload);
         return Promise.resolve(true);
       }
@@ -2275,7 +2325,9 @@
     // Auto-capture the anonymous usage snapshot on load, so churn is recorded
     // even if the visitor closes the tab without picking a reason. Reason/detail
     // (if given) enrich this same row later via the sessionId upsert.
-    send(Object.assign(basePayload(), { type: "open" }));
+    if (feedbackSessionIsNew) {
+      send(Object.assign(basePayload(), { type: "open" }));
+    }
   </script>
 </body>
 
