@@ -133,6 +133,37 @@
     .theme-btn .sun, .theme-btn .moon { display: none; }
     body:not(.light) .theme-btn .moon { display: block; }
     body.light .theme-btn .sun { display: block; }
+    .confetti-replay {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 999px; cursor: pointer;
+      color: var(--text-secondary); background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 0 0 rgba(85, 202, 255, 0);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      transition: color .2s ease, border-color .2s ease, background .2s ease,
+        box-shadow .2s ease, transform .12s ease;
+    }
+    .confetti-replay[hidden] { display: none; }
+    .confetti-replay:hover {
+      color: var(--text-primary); border-color: rgba(112, 211, 255, .68);
+      background: rgba(66, 200, 255, .10);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 0 18px rgba(85, 202, 255, .17);
+      transform: translateY(-1px);
+    }
+    .confetti-replay:active { transform: translateY(0) scale(.93); }
+    .confetti-replay:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 3px; }
+    .confetti-replay svg { width: 18px; height: 18px; overflow: visible; }
+    .confetti-replay .spark-cyan { color: #55caff; }
+    .confetti-replay .spark-gold { color: #ffd15c; }
+    .confetti-replay .spark-mint { color: #55e5a7; }
+    .confetti-replay.is-replaying svg {
+      animation: replay-spark .52s cubic-bezier(.16,.82,.24,1);
+    }
+    @keyframes replay-spark {
+      0% { transform: scale(.78) rotate(-12deg); }
+      48% { transform: scale(1.18) rotate(8deg); }
+      100% { transform: scale(1) rotate(0); }
+    }
     .lang-selector { position: relative; z-index: 20; }
     .lang-btn {
       min-width: 122px;
@@ -746,7 +777,8 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .thanks.show, .card.success-mode::after, .thanks.show .success-mark-circle,
-      .thanks.show .success-mark-check, .confetti-face { animation: none !important; }
+      .thanks.show .success-mark-check, .confetti-face,
+      .confetti-replay.is-replaying svg { animation: none !important; }
       .success-mark-circle, .success-mark-check { stroke-dashoffset: 0; }
       .confetti-layer { display: none; }
     }
@@ -969,6 +1001,15 @@
       XPorter
     </span>
     <span class="tb-tools">
+      <button class="confetti-replay" id="confettiReplay" type="button" hidden
+        aria-label="Replay confetti" title="Replay confetti">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path class="spark-gold" d="M12 2.8c.35 3.15 2.05 4.85 5.2 5.2-3.15.35-4.85 2.05-5.2 5.2-.35-3.15-2.05-4.85-5.2-5.2 3.15-.35 4.85-2.05 5.2-5.2Z" />
+          <path class="spark-cyan" d="M19.1 13.4c.18 1.65 1.05 2.52 2.7 2.7-1.65.18-2.52 1.05-2.7 2.7-.18-1.65-1.05-2.52-2.7-2.7 1.65-.18 2.52-1.05 2.7-2.7Z" />
+          <path class="spark-mint" d="M5.2 14.7c.14 1.25.8 1.91 2.05 2.05-1.25.14-1.91.8-2.05 2.05-.14-1.25-.8-1.91-2.05-2.05 1.25-.14 1.91-.8 2.05-2.05Z" />
+        </svg>
+      </button>
       <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
         <svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -2058,42 +2099,79 @@
         let delay;
         let keyframes;
 
+        function sampleTrajectory(positionAt, rotationAt, scaleAt) {
+          const frames = [];
+          const steps = 30;
+          for (let step = 0; step <= steps; step += 1) {
+            const progress = step / steps;
+            const position = positionAt(progress);
+            const fadeIn = Math.min(1, progress / .055);
+            const fadeOut = Math.min(1, Math.max(0, (1 - progress) / .12));
+            frames.push({
+              offset: progress,
+              opacity: Math.min(fadeIn, fadeOut) * .98,
+              transform: `translate3d(${position.x}px,${position.y}px,0) rotate(${rotationAt(progress)}deg) scale(${scaleAt(progress)})`
+            });
+          }
+          return frames;
+        }
+
         if (particle.type === "shower") {
           const startX = viewportWidth * (.03 + Math.random() * .94);
           const drift = (Math.random() - .5) * 180;
           const sway = (Math.random() - .5) * 84;
           duration = 2500 + Math.random() * 900;
           delay = 90 + Math.random() * 260;
-          keyframes = [
-            { offset: 0, opacity: 0, transform: `translate3d(${startX}px,-28px,0) rotate(0deg) scale(.72)`, easing: "cubic-bezier(.12,.72,.2,1)" },
-            { offset: .10, opacity: .96, transform: `translate3d(${startX + sway * .28}px,${viewportHeight * .08}px,0) rotate(${spin * .12}deg) scale(1)`, easing: "cubic-bezier(.22,.55,.32,1)" },
-            { offset: .62, opacity: .94, transform: `translate3d(${startX + drift * .62 + sway}px,${viewportHeight * .58}px,0) rotate(${spin * .62}deg) scale(.98)`, easing: "cubic-bezier(.26,.2,.48,1)" },
-            { offset: 1, opacity: 0, transform: `translate3d(${startX + drift}px,${viewportHeight + 52}px,0) rotate(${spin}deg) scale(.9)` }
-          ];
+          const seconds = duration / 1000;
+          const startY = -28;
+          const endY = viewportHeight + 52;
+          const initialVelocity = 86 + Math.random() * 64;
+          const gravity = 2 * (endY - startY - initialVelocity * seconds) / (seconds * seconds);
+          const swayPhase = Math.random() * Math.PI * 2;
+          keyframes = sampleTrajectory(function (progress) {
+            const time = progress * seconds;
+            return {
+              x: startX + drift * progress + Math.sin(progress * Math.PI * 2 + swayPhase) * sway * Math.sin(progress * Math.PI),
+              y: startY + initialVelocity * time + .5 * gravity * time * time
+            };
+          }, function (progress) {
+            return spin * progress;
+          }, function (progress) {
+            return (.72 + Math.min(progress / .09, 1) * .28 - Math.max(0, progress - .82) * .44).toFixed(3);
+          });
         } else {
           const fromLeft = particle.type === "left";
           const startX = fromLeft ? leftOrigin : rightOrigin;
           const direction = fromLeft ? 1 : -1;
           const travel = direction * (150 + Math.random() * Math.min(330, viewportWidth * .30));
-          const rise = 120 + Math.random() * Math.min(210, viewportHeight * .24);
-          const landingX = Math.max(-24, Math.min(viewportWidth + 24, startX + travel));
           const startRotation = (Math.random() - .5) * 50;
           duration = 2200 + Math.random() * 820;
           delay = Math.random() * 150;
-          keyframes = [
-            { offset: 0, opacity: 0, transform: `translate3d(${startX}px,${originY}px,0) rotate(${startRotation}deg) scale(.55)`, easing: "cubic-bezier(.08,.74,.18,1)" },
-            { offset: .07, opacity: 1, transform: `translate3d(${startX + travel * .13}px,${originY - rise * .50}px,0) rotate(${startRotation + spin * .12}deg) scale(1)`, easing: "cubic-bezier(.12,.66,.22,1)" },
-            { offset: .24, opacity: 1, transform: `translate3d(${startX + travel * .38}px,${originY - rise}px,0) rotate(${startRotation + spin * .30}deg) scale(1)`, easing: "cubic-bezier(.22,.44,.36,1)" },
-            { offset: .48, opacity: .98, transform: `translate3d(${startX + travel * .65}px,${originY - rise * .72}px,0) rotate(${startRotation + spin * .54}deg) scale(.98)`, easing: "cubic-bezier(.25,.22,.43,1)" },
-            { offset: .82, opacity: .90, transform: `translate3d(${startX + travel * .90}px,${viewportHeight * .62}px,0) rotate(${startRotation + spin * .84}deg) scale(.94)`, easing: "cubic-bezier(.28,.12,.52,1)" },
-            { offset: 1, opacity: 0, transform: `translate3d(${landingX}px,${viewportHeight + 58}px,0) rotate(${startRotation + spin}deg) scale(.86)` }
-          ];
+          const seconds = duration / 1000;
+          const endY = viewportHeight + 58;
+          const initialVelocity = -(430 + Math.random() * 170);
+          const gravity = 2 * (endY - originY - initialVelocity * seconds) / (seconds * seconds);
+          const drag = 2.15 + Math.random() * .7;
+          const dragRange = 1 - Math.exp(-drag);
+          keyframes = sampleTrajectory(function (progress) {
+            const time = progress * seconds;
+            const horizontalProgress = (1 - Math.exp(-drag * progress)) / dragRange;
+            return {
+              x: startX + travel * horizontalProgress,
+              y: originY + initialVelocity * time + .5 * gravity * time * time
+            };
+          }, function (progress) {
+            return startRotation + spin * progress;
+          }, function (progress) {
+            return (.55 + Math.min(progress / .07, 1) * .45 - Math.max(0, progress - .78) * .5).toFixed(3);
+          });
         }
 
         piece.animate(keyframes, {
           duration: duration,
           delay: delay,
-          fill: "forwards"
+          fill: "forwards",
+          easing: "linear"
         });
       });
       confettiTimer = setTimeout(function () { layer.replaceChildren(); }, 3900);
@@ -2103,6 +2181,7 @@
       document.querySelector(".card").classList.add("success-mode");
       document.getElementById("form").style.display = "none";
       document.getElementById("thanks").classList.add("show");
+      document.getElementById("confettiReplay").hidden = !!reduceReasonMotion;
       window.scrollTo({ top: 0, behavior: "smooth" });
       launchConfetti();
     }
@@ -2113,6 +2192,7 @@
       const btn = document.getElementById("submitBtn");
       const label = btn.querySelector("[data-i18n='submit']");
       document.querySelector(".card").classList.remove("success-mode");
+      document.getElementById("confettiReplay").hidden = true;
       thanks.classList.remove("show");
       form.style.display = "";
       btn.disabled = false;
@@ -2163,6 +2243,15 @@
       }
     });
     document.getElementById("backToFeedback").addEventListener("click", returnToFeedback);
+    document.getElementById("confettiReplay").addEventListener("click", function () {
+      const replayButton = this;
+      replayButton.classList.remove("is-replaying");
+      requestAnimationFrame(function () {
+        replayButton.classList.add("is-replaying");
+        launchConfetti();
+        setTimeout(function () { replayButton.classList.remove("is-replaying"); }, 560);
+      });
+    });
 
     /* email copy on click */
     document.getElementById("emailLink").addEventListener("click", (e) => {
