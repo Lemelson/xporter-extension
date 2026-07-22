@@ -3,7 +3,7 @@
 // uninstall URL current without leaking export contents or usernames.
 
 (function () {
-    const FEEDBACK_URL_BASE = 'https://lemelson.github.io/xporter/feedback.html';
+    const FEEDBACK_URL_BASE = 'https://lemelson.github.io/xporter-extension/feedback.html';
     let lastRefresh = 0;
 
     function maybeRefresh(force) {
