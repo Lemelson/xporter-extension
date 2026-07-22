@@ -187,6 +187,7 @@
       font-size: 14.5px;
       margin-bottom: 22px;
     }
+    .subtitle strong { color: var(--text-primary); font-weight: 650; }
     .q {
       font-size: 13px;
       font-weight: 600;
@@ -228,14 +229,17 @@
       padding: 2px 9px; border-radius: 999px; vertical-align: middle;
     }
     .action-row { display: flex; gap: 12px; align-items: stretch; }
+    .detail-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
     textarea {
-      flex: 1; min-width: 0; min-height: 92px; resize: vertical;
+      width: 100%; min-width: 0; min-height: 112px; resize: vertical;
       background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
       color: var(--text-primary); font: inherit; font-size: 14.5px; padding: 11px 14px;
       transition: border-color .15s, box-shadow .15s;
     }
     textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
     textarea::placeholder { color: var(--text-muted); }
+    .contact-consent { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; padding-inline: 2px; }
+    .contact-consent strong { color: var(--text-secondary); font-weight: 650; }
 
     /* ~1/4-width tall green CTA next to the comment box (no empty space) */
     .btn-send {
@@ -396,7 +400,10 @@
       <div class="action" id="action">
         <label class="opt-label" for="detail"><span data-i18n="q2"></span><span class="opt-badge" data-i18n="optional"></span></label>
         <div class="action-row">
-          <textarea id="detail"></textarea>
+          <div class="detail-stack">
+            <textarea id="detail"></textarea>
+            <p class="contact-consent" id="contactConsent"></p>
+          </div>
           <button class="btn-send" id="submitBtn">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
             <span data-i18n="submit"></span>
@@ -574,11 +581,16 @@
       it: "Italiano", pt_BR: "Português", tr: "Türkçe", id: "Indonesia",
       ar: "العربية", hi: "हिन्दी", ja: "日本語", ko: "한국어", zh_CN: "中文"
     };
+    const LANG_FLAGS = {
+      en: "🇺🇸", zh_CN: "🇨🇳", ja: "🇯🇵", es: "🇪🇸", ko: "🇰🇷", ru: "🇷🇺",
+      it: "🇮🇹", pt_BR: "🇧🇷", tr: "🇹🇷", de: "🇩🇪", ar: "🇸🇦", fr: "🇫🇷",
+      hi: "🇮🇳", id: "🇮🇩"
+    };
     const RTL = ["ar"];
 
     const REASON_KEYS = [
-      ["r_broken", "🛠"], ["r_confusing", "🤔"], ["r_slow", "🐢"], ["r_missing", "🧩"],
-      ["r_once", "1️⃣"], ["r_alt", "🔁"], ["r_privacy", "🔒"], ["r_other", "💬"]
+      ["r_once", "1️⃣"], ["r_broken", "🛠"], ["r_confusing", "🤔"], ["r_alt", "🔁"],
+      ["r_missing", "🧩"], ["r_slow", "🐢"], ["r_privacy", "🔒"], ["r_other", "💬"]
     ];
 
     /* ---------------- helpers ---------------- */
@@ -623,19 +635,44 @@
       const isRtl = RTL.includes(lang);
       document.documentElement.lang = lang.replace("_", "-");
       document.documentElement.dir = isRtl ? "rtl" : "ltr";
-      document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll("[data-i18n]").forEach(el => {
+        if (el.dataset.i18n === "subtitle") renderSubtitle(el, t("subtitle"));
+        else el.textContent = t(el.dataset.i18n);
+      });
       document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
       refreshDetailPlaceholder();
     }
 
+    function renderSubtitle(el, text) {
+      const separators = [" — ", "——", ", y "];
+      const separator = separators.find(value => text.includes(value));
+      if (!separator) { el.textContent = text; return; }
+      const splitAt = text.indexOf(separator);
+      el.textContent = text.slice(0, splitAt + separator.length);
+      const strong = document.createElement("strong");
+      strong.textContent = text.slice(splitAt + separator.length);
+      el.appendChild(strong);
+    }
+
     // The comment placeholder adapts to the chosen reason: a reason-specific
-    // prompt (fall back to the generic one) plus the optional-contact line.
+    // prompt (fall back to the generic one). Contact consent stays visible
+    // below the field instead of disappearing with the placeholder.
     function refreshDetailPlaceholder() {
       const detailEl = document.getElementById("detail");
       if (!detailEl) return;
       const base = (selectedReason && t("ph_" + selectedReason)) || t("detailPrompt");
-      const contact = t("phContact");
-      detailEl.placeholder = contact ? (base + " " + contact) : base;
+      detailEl.placeholder = base;
+      renderContactConsent(document.getElementById("contactConsent"), t("phContact"));
+    }
+
+    function renderContactConsent(el, text) {
+      if (!el) return;
+      el.textContent = "";
+      const match = text.match(/^(.+?[?？؟])\s*(.*)$/);
+      if (!match) { el.textContent = text; return; }
+      const strong = document.createElement("strong");
+      strong.textContent = match[1];
+      el.append(strong, document.createTextNode(match[2] ? " " + match[2] : ""));
     }
 
     /* ---------------- theme ---------------- */
@@ -661,7 +698,7 @@
     LANG_ORDER.filter(c => I18N[c])
       .forEach(code => {
         const o = document.createElement("option");
-        o.value = code; o.textContent = LANG_NAMES[code] || code;
+        o.value = code; o.textContent = `${LANG_FLAGS[code] || "🌐"} ${LANG_NAMES[code] || code}`;
         if (code === lang) o.selected = true;
         langSelect.appendChild(o);
       });
