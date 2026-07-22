@@ -133,36 +133,134 @@
     .theme-btn .sun, .theme-btn .moon { display: none; }
     body:not(.light) .theme-btn .moon { display: block; }
     body.light .theme-btn .sun { display: block; }
-    .lang-wrap { position: relative; }
-    .lang-select {
-      appearance: none;
-      -webkit-appearance: none;
-      background: var(--glass-bg);
+    .lang-selector { position: relative; z-index: 20; }
+    .lang-btn {
+      min-width: 122px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
       border: 1px solid var(--glass-border);
+      border-radius: 999px;
       color: var(--text-secondary);
+      background: var(--glass-bg);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+      backdrop-filter: blur(12px) saturate(140%);
+      -webkit-backdrop-filter: blur(12px) saturate(140%);
       font: inherit;
       font-size: 13px;
-      padding: 7px 30px 7px 12px;
-      border-radius: 999px;
+      font-weight: 500;
       cursor: pointer;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      transition: color .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .08s ease;
     }
-    .lang-wrap::after {
-      content: "";
+    .lang-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--glass-border-strong);
+      background: var(--glass-bg-hover);
+    }
+    .lang-btn:active { transform: scale(.98); }
+    .lang-btn[aria-expanded="true"] {
+      color: var(--text-primary);
+      border-color: rgba(96, 184, 255, .72);
+      background: rgba(96, 184, 255, .12);
+      box-shadow: 0 0 0 3px rgba(96, 184, 255, .12), inset 0 1px 0 rgba(255, 255, 255, .08);
+    }
+    .lang-current-flag { flex: 0 0 auto; font-size: 15px; line-height: 1; }
+    .lang-current-name {
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      text-align: start;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lang-chevron {
+      flex: 0 0 auto;
+      opacity: .62;
+      transition: transform .22s cubic-bezier(.2, .8, .2, 1), opacity .2s ease;
+    }
+    .lang-btn[aria-expanded="true"] .lang-chevron { transform: rotate(180deg); opacity: 1; }
+    .lang-menu {
       position: absolute;
-      top: 50%; right: 13px;
-      width: 7px; height: 7px;
-      border-right: 2px solid var(--text-muted);
-      border-bottom: 2px solid var(--text-muted);
-      transform: translateY(-65%) rotate(45deg);
-      pointer-events: none;
+      top: calc(100% + 8px);
+      inset-inline-end: 0;
+      width: 224px;
+      max-width: calc(100vw - 36px);
+      max-height: 316px;
+      padding: 6px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, .20);
+      border-radius: 14px;
+      color: var(--text-primary);
+      background: rgba(20, 34, 55, .94);
+      box-shadow: 0 20px 50px rgba(2, 8, 23, .48), 0 4px 14px rgba(2, 8, 23, .34), inset 0 1px 0 rgba(255, 255, 255, .07);
+      backdrop-filter: blur(24px) saturate(155%);
+      -webkit-backdrop-filter: blur(24px) saturate(155%);
+      transform-origin: top right;
+      animation: lang-menu-in .18s cubic-bezier(.2, .8, .2, 1) both;
     }
-    html[dir="rtl"] .lang-select { padding: 7px 12px 7px 30px; }
-    html[dir="rtl"] .lang-wrap::after { right: auto; left: 13px; }
+    html[dir="rtl"] .lang-menu { transform-origin: top left; }
+    .lang-menu[hidden] { display: none; }
+    .lang-menu::-webkit-scrollbar { width: 5px; }
+    .lang-menu::-webkit-scrollbar-track { background: transparent; }
+    .lang-menu::-webkit-scrollbar-thumb { background: rgba(154, 185, 216, .30); border-radius: 999px; }
+    .lang-menu::-webkit-scrollbar-thumb:hover { background: rgba(154, 185, 216, .52); }
+    @keyframes lang-menu-in {
+      from { opacity: 0; transform: translateY(-5px) scale(.975); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .lang-option {
+      width: 100%;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 9px;
+      color: var(--text-secondary);
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: color .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+    .lang-option:hover { color: var(--text-primary); background: rgba(96, 184, 255, .11); }
+    .lang-option[aria-selected="true"] {
+      color: #b8e0ff;
+      background: rgba(96, 184, 255, .19);
+      box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px rgba(96, 184, 255, .26);
+      font-weight: 650;
+    }
+    html[dir="rtl"] .lang-option[aria-selected="true"] { box-shadow: inset -3px 0 0 var(--accent), inset 0 0 0 1px rgba(96, 184, 255, .26); }
+    .lang-option-flag { flex: 0 0 auto; font-size: 17px; line-height: 1; }
+    .lang-option-name { min-width: 0; flex: 1; text-align: start; }
+    .lang-option-check { flex: 0 0 auto; color: var(--accent-hover); opacity: 0; }
+    .lang-option[aria-selected="true"] .lang-option-check { opacity: 1; }
+    .lang-btn:focus-visible, .lang-option:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    body.light .lang-btn[aria-expanded="true"] {
+      border-color: rgba(10, 111, 219, .58);
+      background: rgba(10, 111, 219, .10);
+      box-shadow: 0 0 0 3px rgba(10, 111, 219, .10), inset 0 1px 0 rgba(255, 255, 255, .65);
+    }
+    body.light .lang-menu {
+      border-color: rgba(16, 46, 84, .16);
+      background: rgba(244, 249, 255, .94);
+      box-shadow: 0 20px 50px rgba(31, 52, 89, .22), 0 4px 12px rgba(31, 52, 89, .12), inset 0 1px 0 rgba(255, 255, 255, .9);
+    }
+    body.light .lang-option:hover { background: rgba(10, 111, 219, .09); }
+    body.light .lang-option[aria-selected="true"] { color: #075aaa; background: rgba(10, 111, 219, .14); }
 
     /* card */
     .card {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
       width: 100%;
       max-width: 560px;
       background: var(--glass-bg);
@@ -173,6 +271,28 @@
       -webkit-backdrop-filter: blur(22px) saturate(140%);
       padding: 30px 28px;
       animation: rise .5s cubic-bezier(.2, .8, .2, 1) both;
+    }
+    .card > * { position: relative; z-index: 1; }
+    .card::before {
+      content: ""; position: absolute; z-index: 0; inset: 0; pointer-events: none;
+      opacity: 0;
+      background:
+        radial-gradient(ellipse 112% 96% at 50% 0%, rgba(70, 220, 170, .13), transparent 78%),
+        radial-gradient(ellipse 130% 116% at 50% 14%, rgba(72, 197, 255, .12), transparent 82%);
+      transition: opacity .5s cubic-bezier(.2,.7,.2,1);
+    }
+    .card::after {
+      content: ""; position: absolute; z-index: 0; inset: 0; pointer-events: none;
+      opacity: 0;
+      background: linear-gradient(115deg, transparent 26%, rgba(255,255,255,.05) 49%, transparent 72%);
+      transform: translate3d(-105%, 0, 0);
+    }
+    .card.success-mode::before { opacity: 1; }
+    .card.success-mode::after { animation: success-card-sheen 1.2s .18s cubic-bezier(.2,.7,.2,1) both; }
+    body.light .card::before {
+      background:
+        radial-gradient(ellipse 112% 96% at 50% 0%, rgba(30, 184, 128, .1), transparent 78%),
+        radial-gradient(ellipse 130% 116% at 50% 14%, rgba(10, 111, 219, .1), transparent 82%);
     }
     @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
@@ -198,13 +318,15 @@
     }
 
     /* reason chips */
-    .reasons { display: flex; flex-direction: column; gap: 10px; }
+    .reasons { display: flex; flex-direction: column; gap: 0; }
     .reason {
-      display: flex; align-items: center; gap: 12px; width: 100%; text-align: start;
+      display: flex; align-items: center; gap: 14px; width: 100%; text-align: start;
       background: var(--input-bg); border: 1px solid var(--glass-border); color: var(--text-primary);
       font: inherit; font-size: 15px; padding: 14px 16px; border-radius: var(--radius-sm); cursor: pointer;
+      margin-bottom: 10px;
       transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .2s, background .2s, border-color .2s;
     }
+    .reason:last-child { margin-bottom: 0; }
     .reason:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-strong); transform: translateX(3px); }
     .reason:active { transform: scale(.99); }
     .reason.selected {
@@ -214,24 +336,197 @@
       transform: translateY(-2px) scale(1.025);
       font-weight: 650;
     }
-    .reason .emoji { font-size: 18px; line-height: 1; flex: none; }
+    .reason-icon {
+      position: relative;
+      width: 38px;
+      height: 38px;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      transition: filter .2s, transform .2s;
+    }
+    .reason-icon::before {
+      content: "";
+      position: relative;
+      z-index: 1;
+      width: 32px;
+      height: 32px;
+      background: var(--reason-color);
+      -webkit-mask-image: var(--reason-icon);
+      mask-image: var(--reason-icon);
+      -webkit-mask-position: center;
+      mask-position: center;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-size: contain;
+      mask-size: contain;
+    }
+    .reason-icon::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      inset: 2px;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--reason-color) 34%, transparent) 0%, transparent 72%);
+      filter: blur(6px);
+      opacity: 0;
+      transform: scale(.72);
+      transition: opacity .22s, transform .22s;
+      pointer-events: none;
+    }
+    .reason:hover .reason-icon {
+      filter: brightness(1.12) saturate(1.12) drop-shadow(0 0 5px var(--reason-glow));
+    }
+    .reason.selected .reason-icon {
+      filter: brightness(1.22) saturate(1.16) drop-shadow(0 0 6px var(--reason-glow));
+      transform: scale(1.08);
+    }
+    .reason.selected .reason-icon::after { opacity: .92; transform: scale(1.42); }
+    .reason[data-reason="r_once"] {
+      --reason-color: #38c7ff; --reason-glow: rgba(56, 199, 255, .55);
+      --reason-icon: url("assets/icons/reasons/number-circle-one-duotone.svg");
+    }
+    .reason[data-reason="r_broken"] {
+      --reason-color: #ff625c; --reason-glow: rgba(255, 98, 92, .52);
+      --reason-icon: url("assets/icons/reasons/wrench-duotone.svg");
+    }
+    .reason[data-reason="r_confusing"] {
+      --reason-color: #ffc52f; --reason-glow: rgba(255, 197, 47, .50);
+      --reason-icon: url("assets/icons/reasons/seal-question-duotone.svg");
+    }
+    .reason[data-reason="r_alt"] {
+      --reason-color: #ae8cff; --reason-glow: rgba(174, 140, 255, .52);
+      --reason-icon: url("assets/icons/reasons/arrows-left-right-duotone.svg");
+    }
+    .reason[data-reason="r_missing"] {
+      --reason-color: #44e298; --reason-glow: rgba(68, 226, 152, .48);
+      --reason-icon: url("assets/icons/reasons/puzzle-piece-duotone.svg");
+    }
+    .reason[data-reason="r_slow"] {
+      --reason-color: #ff913d; --reason-glow: rgba(255, 145, 61, .50);
+      --reason-icon: url("assets/icons/reasons/speedometer-duotone.svg");
+    }
+    .reason[data-reason="r_privacy"] {
+      --reason-color: #668fff; --reason-glow: rgba(102, 143, 255, .52);
+      --reason-icon: url("assets/icons/reasons/lock-key-duotone.svg");
+    }
+    .reason[data-reason="r_other"] {
+      --reason-color: #ee7cff; --reason-glow: rgba(238, 124, 255, .50);
+      --reason-icon: url("assets/icons/reasons/chat-circle-dots-duotone.svg");
+    }
     .reason .check { margin-inline-start: auto; color: var(--accent); display: none; flex: none; }
     .reason.selected .check { display: inline-flex; }
 
-    /* action area — slides in directly under the selected reason */
-    .action { display: none; margin: 6px 0 8px; }
-    .action.show { display: block; animation: rise .3s ease both; }
-    .opt-label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
-    .opt-badge {
-      display: inline-block; margin-inline-start: 8px; font-size: 10.5px; font-weight: 700;
-      letter-spacing: .7px; text-transform: uppercase; color: var(--text-muted);
-      background: var(--glass-bg-hover); border: 1px solid var(--glass-border-strong);
-      padding: 2px 9px; border-radius: 999px; vertical-align: middle;
+    /* During a reason switch, the old and new locations exchange explicitly
+       measured height on the same timeline. Overflow clipping therefore
+       always matches the real space occupied in the list. */
+    .action {
+      display: none;
+      margin: 6px 0 -2px;
+      opacity: 1;
+    }
+    .action:last-child { margin-bottom: -12px; }
+    .action.show { display: block; }
+    .action.is-transitioning { overflow: hidden; pointer-events: none; }
+    .action-transition-ghost { overflow: hidden; pointer-events: none; user-select: none; }
+    /* Keep the CTA's 20px outer glow inside the animated clipping area.
+       Negative outer margins compensate this gutter, preserving layout. */
+    .action-inner { min-height: 0; padding-bottom: 20px; }
+    .subreason-block { margin: 2px 0 18px; }
+    .subreason-block[hidden] { display: none; }
+    .subreason-heading {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      color: var(--text-secondary); font-size: 13px; font-weight: 650; margin-bottom: 10px;
+    }
+    .subreason-hint { color: var(--text-muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+    .subreason-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .subreason {
+      appearance: none; width: 100%; min-height: 42px;
+      display: grid; grid-template-columns: 32px minmax(0, 1fr) 17px; align-items: center; gap: 10px;
+      border: 1px solid var(--glass-border); border-radius: 10px;
+      background: var(--input-bg); color: var(--text-secondary); text-align: start;
+      font: inherit; font-size: 12.5px; line-height: 1.3; padding: 9px 11px; cursor: pointer;
+      transition: border-color .16s, background .16s, color .16s, box-shadow .16s, transform .16s;
+    }
+    .subreason[data-group="r_once"] { --mini-color: #38c7ff; }
+    .subreason[data-group="r_broken"] { --mini-color: #ff625c; }
+    .subreason[data-group="r_confusing"] { --mini-color: #ffc52f; }
+    .subreason[data-group="r_alt"] { --mini-color: #ae8cff; }
+    .subreason[data-group="r_missing"] { --mini-color: #44e298; }
+    .subreason[data-group="r_slow"] { --mini-color: #ff913d; }
+    .subreason[data-group="r_privacy"] { --mini-color: #668fff; }
+    .subreason[data-group="r_other"] { --mini-color: #ee7cff; }
+    .subreason-icon {
+      position: relative;
+      width: 32px; height: 32px; display: grid; place-items: center;
+      color: var(--mini-color, var(--accent));
+      opacity: 1;
+      transform-origin: center;
+      will-change: transform;
+      transition: filter .24s cubic-bezier(.2,.8,.2,1), transform .24s cubic-bezier(.2,.8,.2,1);
+    }
+    .subreason-icon::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--mini-color, var(--accent)) 36%, transparent) 0%, transparent 72%);
+      filter: blur(5px);
+      opacity: 0;
+      transform: scale(.7);
+      transition: opacity .16s, transform .16s;
+      pointer-events: none;
+    }
+    .subreason-icon svg {
+      position: relative; z-index: 1;
+      width: 23px; height: 23px;
+      stroke-width: 2.1;
+      filter: brightness(1.12) saturate(1.12) drop-shadow(0 0 2px color-mix(in srgb, var(--mini-color, var(--accent)) 48%, transparent));
+    }
+    .subreason-label {
+      min-width: 0;
+      text-wrap: pretty;
+      transition: color .22s ease, text-shadow .24s ease;
+    }
+    .subreason-check {
+      width: 16px; height: 16px; box-sizing: border-box; display: grid; place-items: center;
+      border: 1px solid var(--glass-border-strong); border-radius: 5px; color: transparent;
+      transition: color .16s, border-color .16s, background .16s, box-shadow .16s;
+    }
+    .subreason-check svg { width: 11px; height: 11px; }
+    .subreason:hover .subreason-icon {
+      filter: brightness(1.1) saturate(1.08);
+      transform: scale(1.05);
+    }
+    .subreason:hover { border-color: var(--glass-border-strong); color: var(--text-primary); transform: translateY(-1px); }
+    .subreason[aria-pressed="true"] {
+      color: var(--text-primary); border-color: var(--accent);
+      background: linear-gradient(110deg, var(--accent-glow), var(--input-bg) 70%);
+      box-shadow: inset 0 0 0 1px var(--accent-glow), 0 4px 14px var(--accent-glow);
+    }
+    .subreason[aria-pressed="true"] .subreason-icon {
+      filter: brightness(1.22) saturate(1.18);
+      transform: scale(1.16);
+    }
+    .subreason[aria-pressed="true"] .subreason-icon::after { opacity: .9; transform: scale(1.45); }
+    .subreason[aria-pressed="true"] .subreason-label {
+      color: var(--text-primary);
+      text-shadow: .32px 0 currentColor, -.32px 0 currentColor;
+    }
+    .subreason[aria-pressed="true"] .subreason-check {
+      color: #fff; border-color: var(--accent); background: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
     .action-row { display: grid; gap: 12px; }
-    .detail-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+    .detail-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+    .detail-question {
+      color: var(--text-secondary); font-size: 13px; font-weight: 600;
+      line-height: 1.45; padding-inline: 2px; text-wrap: pretty;
+    }
     textarea {
-      width: 100%; min-width: 0; min-height: 112px; resize: vertical;
+      width: 100%; min-width: 0; min-height: 100px; resize: vertical;
       background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
       color: var(--text-primary); font: inherit; font-size: 14.5px; padding: 11px 14px;
       transition: border-color .15s, box-shadow .15s;
@@ -302,8 +597,32 @@
     }
     .btn-send:active { transform: translateY(0) scale(.99); }
     .btn-send:focus-visible { outline: 3px solid var(--cta-glow-strong); outline-offset: 3px; }
-    .btn-send:disabled { opacity: .62; cursor: default; transform: none; }
-    .btn-send:disabled::after, .btn-send:disabled .cta-blob { animation: none; }
+    .btn-send:disabled { cursor: progress; transform: none; }
+    .btn-send:disabled:not(.is-sending) { opacity: .62; }
+    .btn-send:disabled:not(.is-sending)::after,
+    .btn-send:disabled:not(.is-sending) .cta-blob { animation: none; }
+    .btn-send.is-sending {
+      filter: saturate(1.22) brightness(1.09);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.18),
+        0 0 0 1px rgba(91,208,255,.2),
+        0 10px 30px rgba(45,171,239,.4);
+      animation: sending-breathe 1.2s ease-in-out infinite;
+    }
+    .btn-send.is-sending::after {
+      opacity: 1;
+      filter: drop-shadow(0 0 6px var(--cta-edge));
+      animation: cta-orbit .78s linear infinite;
+    }
+    .btn-send.is-sending .cta-blob-light {
+      opacity: .92;
+      animation: cta-blob-a 2.4s cubic-bezier(.45,.05,.25,1) infinite;
+    }
+    .btn-send.is-sending .cta-blob-dark {
+      opacity: .8;
+      animation: cta-blob-b 2.9s cubic-bezier(.38,.08,.22,1) infinite;
+    }
+    .btn-send.is-sending .send-icon { animation: sending-plane 1.1s ease-in-out infinite; }
 
     @keyframes cta-blob-a {
       0%,100% { transform: translate3d(-12%, -8%, 0) scale(.92, 1.08) rotate(-7deg); }
@@ -320,87 +639,303 @@
       89% { transform: translate3d(-13%, -14%, 0) scale(1.12, .88) rotate(10deg); }
     }
     @keyframes cta-orbit { to { --cta-angle: 360deg; } }
+    @keyframes sending-breathe {
+      0%,100% { box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 0 0 1px rgba(91,208,255,.16), 0 8px 24px rgba(45,171,239,.28); }
+      50% { box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 2px rgba(91,208,255,.34), 0 12px 34px rgba(45,171,239,.5); }
+    }
+    @keyframes sending-plane {
+      0%,100% { transform: translate3d(-1px, 1px, 0) rotate(-2deg); }
+      48% { transform: translate3d(3px, -2px, 0) rotate(3deg); }
+    }
 
     @media (prefers-reduced-motion: reduce) {
-      .btn-send::after, .btn-send .cta-blob { animation: none !important; }
+      .btn-send, .btn-send::after, .btn-send .cta-blob, .btn-send .send-icon { animation: none !important; }
     }
     @media (max-width: 520px) { .btn-send { min-height: 50px; } }
 
-    /* thanks */
-    .thanks { display: none; text-align: center; padding: 8px 0 4px; }
-    .thanks.show { display: block; animation: rise .4s ease both; }
-    .thanks .check {
-      width: 56px; height: 56px; border-radius: 50%;
-      display: inline-flex; align-items: center; justify-content: center;
-      background: rgba(63, 185, 80, 0.15);
-      color: var(--ok);
-      margin-bottom: 16px;
+    /* Success state: calm confirmation, with a clear route back to the form. */
+    .thanks {
+      position: relative; display: none; overflow: visible;
+      text-align: center; padding: 24px 18px 20px;
+      border-radius: 0;
+      background: transparent;
     }
-    .thanks h1 { font-size: 21px; }
-    .thanks p { color: var(--text-secondary); font-size: 14.5px; margin-bottom: 4px; }
-
+    .thanks.show { display: block; animation: success-rise .58s cubic-bezier(.16,.78,.24,1) both; }
+    .success-mark {
+      width: 70px; height: 70px; display: block; margin: 0 auto 17px;
+      overflow: visible; color: #5ee2a6;
+      filter: drop-shadow(0 8px 16px rgba(44, 204, 145, .2));
+    }
+    .success-mark-circle {
+      fill: rgba(46, 203, 153, .055); stroke: rgba(105, 231, 190, .5); stroke-width: 1.6;
+      stroke-dasharray: 190; stroke-dashoffset: 190;
+    }
+    .success-mark-check {
+      fill: none; stroke: currentColor; stroke-width: 4.6;
+      stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 54; stroke-dashoffset: 54;
+    }
+    .thanks.show .success-mark-circle { animation: success-draw .72s .12s cubic-bezier(.22,.72,.2,1) forwards; }
+    .thanks.show .success-mark-check { animation: success-draw .48s .52s cubic-bezier(.2,.78,.22,1) forwards; }
+    .thanks h1 {
+      font-size: clamp(22px, 4vw, 27px); line-height: 1.1; letter-spacing: -.55px;
+      margin-bottom: 9px; text-wrap: balance;
+    }
+    .thanks p {
+      max-width: 470px; margin: 0 auto; color: var(--text-secondary);
+      font-size: 14.5px; line-height: 1.55; text-wrap: pretty;
+    }
+    .success-actions {
+      display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+      gap: 10px 18px; margin-top: 22px;
+    }
+    .back-feedback {
+      min-height: 42px; border: 1px solid rgba(101, 199, 255, .4); border-radius: 10px;
+      padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      color: var(--text-primary); background: rgba(55, 148, 205, .11);
+      font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+      transition: transform .2s cubic-bezier(.2,.8,.2,1), border-color .2s, background .2s;
+    }
+    .back-feedback svg { width: 16px; height: 16px; }
+    .back-feedback:hover { transform: translateY(-1px); border-color: rgba(112, 211, 255, .72); background: rgba(55, 148, 205, .18); }
+    .back-feedback:active { transform: translateY(0) scale(.985); }
+    .back-feedback:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 3px; }
     .reinstall {
-      display: inline-block;
-      margin-top: 18px;
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 600;
+      color: var(--accent); text-decoration: none;
+      font-size: 13.5px; font-weight: 650;
     }
     .reinstall:hover { text-decoration: underline; }
+    .reinstall:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 4px; border-radius: 3px; }
 
-    /* contact block */
-    .contact {
-      margin-top: 26px;
-      padding-top: 22px;
-      border-top: 1px solid var(--glass-border);
+    .confetti-layer {
+      position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 20;
+      perspective: 700px;
     }
-    .contact h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-    .contact .lead { color: var(--text-secondary); font-size: 13.5px; margin-bottom: 14px; }
-    .contact-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .confetti-piece {
+      position: absolute; top: 0; left: 0; width: var(--w); height: var(--h);
+      opacity: 0; transform: translate3d(-40px, -40px, 0);
+      will-change: transform, opacity;
+    }
+    .confetti-face {
+      display: block; width: 100%; height: 100%;
+      border-radius: 2px; background: var(--color);
+      box-shadow: 0 0 5px color-mix(in srgb, var(--color) 36%, transparent);
+      animation: confetti-flutter var(--flutter) var(--flutter-delay) ease-in-out infinite alternate;
+      will-change: transform;
+    }
+    .confetti-piece.is-circle .confetti-face { border-radius: 50%; }
+    .confetti-piece.is-ribbon .confetti-face { border-radius: 99px; }
+    .confetti-piece.is-star .confetti-face {
+      clip-path: polygon(50% 0, 61% 34%, 98% 34%, 68% 55%, 79% 91%, 50% 70%, 21% 91%, 32% 55%, 2% 34%, 39% 34%);
+    }
+    @keyframes success-rise {
+      from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); }
+      to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+    }
+    @keyframes success-card-sheen {
+      0% { opacity: 0; transform: translate3d(-105%, 0, 0); }
+      18% { opacity: 1; }
+      100% { opacity: 0; transform: translate3d(105%, 0, 0); }
+    }
+    @keyframes success-draw { to { stroke-dashoffset: 0; } }
+    @keyframes confetti-flutter {
+      0% { transform: rotateX(-16deg) rotateY(0deg) skewX(-3deg); }
+      50% { transform: rotateX(12deg) rotateY(82deg) skewX(4deg); }
+      100% { transform: rotateX(-10deg) rotateY(168deg) skewX(-2deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .thanks.show, .card.success-mode::after, .thanks.show .success-mark-circle,
+      .thanks.show .success-mark-check, .confetti-face { animation: none !important; }
+      .success-mark-circle, .success-mark-check { stroke-dashoffset: 0; }
+      .confetti-layer { display: none; }
+    }
+
+    /* contact block — one clear support action, with email kept deliberately secondary */
+    .contact {
+      position: relative;
+      margin-top: 30px;
+      padding-top: 24px;
+      border-top: 0;
+    }
+    .contact::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      inset-inline-start: 0;
+      width: 100%;
+      height: 1px;
+      opacity: .90;
+      background: linear-gradient(90deg,
+        rgba(112, 197, 255, .40) 0%,
+        rgba(112, 197, 255, .76) 26%,
+        rgba(190, 164, 255, .66) 50%,
+        rgba(112, 197, 255, .72) 74%,
+        rgba(112, 197, 255, .40) 100%);
+      background-size: 220% 100%;
+      box-shadow: 0 0 8px rgba(112, 197, 255, .24);
+      animation: contact-divider-flow 9s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes contact-divider-flow {
+      from { background-position: 0% 50%; }
+      to { background-position: 100% 50%; }
+    }
+    .contact h2 {
+      font-size: 15.5px;
+      font-weight: 700;
+      letter-spacing: -.2px;
+      margin-bottom: 4px;
+    }
+    .contact .lead {
+      max-width: 46ch;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+      line-height: 1.45;
+      margin: 0 0 14px;
+      text-wrap: pretty;
+    }
+    .contact-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
     .contact-link {
-      flex: 1 1 180px;
+      position: relative;
       display: flex;
       align-items: center;
       gap: 11px;
+      min-width: 0;
+      min-height: 64px;
       text-decoration: none;
       color: var(--text-primary);
-      background: var(--input-bg);
+      padding: 10px 14px;
       border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm);
-      padding: 11px 13px;
-      transition: border-color .15s, background .15s;
+      border-radius: 12px;
+      background: var(--input-bg);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+      transition: color .2s, border-color .2s, background .2s, box-shadow .2s;
       cursor: pointer;
     }
-    .contact-link:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-strong); }
+    .contact-link:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 3px; }
+    .contact-link--telegram {
+      color: #fff;
+      border: 1px solid rgba(96, 190, 247, .44);
+      background: linear-gradient(105deg, rgba(17, 92, 137, .56), rgba(5, 38, 67, .66));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .10),
+        0 8px 22px rgba(7, 54, 88, .16);
+    }
+    .contact-link--telegram:hover {
+      border-color: rgba(125, 213, 255, .70);
+      background: linear-gradient(105deg, rgba(20, 105, 155, .64), rgba(6, 45, 76, .72));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .13),
+        0 10px 25px rgba(23, 125, 187, .18);
+    }
+    .contact-link--telegram:active { box-shadow: inset 0 2px 6px rgba(1, 18, 33, .22); }
+    .contact-link--email {
+      justify-self: stretch;
+      color: var(--text-primary);
+    }
+    .contact-link--email:hover {
+      border-color: var(--glass-border);
+      background: var(--glass-bg-hover);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 8px 20px rgba(7, 28, 52, .12);
+    }
+    .contact-link--email:active { box-shadow: inset 0 2px 6px rgba(1, 18, 33, .12); }
     .contact-link .ico {
-      width: 32px; height: 32px; flex: none;
+      width: 40px; height: 40px; flex: none;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 9px;
+      border-radius: 50%;
       background: var(--accent-glow);
       color: var(--accent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10);
+    }
+    .contact-link--telegram .ico {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      color: #fff;
+      background: #229ed9;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .28),
+        0 5px 14px rgba(17, 139, 203, .26);
+    }
+    .contact-link--telegram .ico svg {
+      width: 21px;
+      height: 21px;
+      transform: translate(-1px, 1px);
     }
     .contact-link .txt { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-    .contact-link .txt b { font-size: 13.5px; font-weight: 600; }
-    .contact-link .txt small { font-size: 11.5px; color: var(--text-muted); }
-    .contact-link .badge {
+    .contact-link .txt b { font-size: 14.5px; font-weight: 650; }
+    .contact-link--telegram .txt b { font-size: 14.5px; color: #fff; }
+    .contact-link .txt small { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; }
+    .contact-link--telegram .txt small { color: rgba(255, 255, 255, .68); }
+    .contact-link--email .contact-address { color: var(--text-secondary); overflow-wrap: anywhere; }
+    .contact-link .arrow {
       margin-inline-start: auto;
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .5px;
+      width: 29px;
+      height: 29px;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: rgba(255, 255, 255, .82);
+      background: rgba(255, 255, 255, .10);
+      border: 1px solid rgba(255, 255, 255, .13);
+      transition: transform .2s cubic-bezier(.2,.8,.2,1), background .2s;
+    }
+    .contact-link--telegram:hover .arrow { transform: translateX(2px); background: rgba(255, 255, 255, .17); }
+    .contact-link--email .arrow {
       color: var(--accent);
       background: var(--accent-glow);
-      padding: 2px 7px; border-radius: 999px;
-      align-self: center;
+      border-color: rgba(96, 184, 255, .18);
+    }
+    .contact-link--email:hover .arrow { transform: translateX(2px); background: rgba(96, 184, 255, .18); }
+    html[dir="rtl"] .contact-link .arrow svg { transform: rotate(180deg); }
+    html[dir="rtl"] .contact-link--telegram:hover .arrow { transform: translateX(-2px); }
+    html[dir="rtl"] .contact-link--email:hover .arrow { transform: translateX(-2px); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .contact-link, .contact-link .arrow { transition: none; }
+      .contact::before { animation: none; background-position: 50% 50%; }
+      .lang-menu { animation: none; }
+      .lang-chevron { transition: none; }
     }
 
     .privacy-note {
-      margin-top: 18px;
+      margin: 16px auto 0;
+      max-width: 48ch;
       font-size: 12px;
       color: var(--text-muted);
       text-align: center;
       line-height: 1.5;
     }
-    .privacy-note a { color: var(--text-secondary); }
+    .privacy-note a { color: var(--text-secondary); text-underline-offset: 2px; }
+    .privacy-note a:hover { color: var(--text-primary); }
+
+    body.light .contact-link--telegram {
+      color: #fff;
+      border-color: rgba(17, 135, 198, .38);
+      background: linear-gradient(105deg, #167eb7, #075985);
+    }
+    body.light .contact-link--telegram:hover {
+      border-color: rgba(5, 101, 153, .65);
+      background: linear-gradient(105deg, #1788c4, #07527b);
+    }
+    body.light .contact-link--email:hover { background: rgba(255, 255, 255, .62); }
+    body.light .contact::before {
+      opacity: .65;
+      background: linear-gradient(90deg,
+        rgba(10, 111, 219, .28) 0%,
+        rgba(10, 111, 219, .56) 28%,
+        rgba(126, 87, 194, .44) 50%,
+        rgba(10, 111, 219, .52) 72%,
+        rgba(10, 111, 219, .28) 100%);
+      background-size: 220% 100%;
+    }
 
     .toast {
       position: fixed;
@@ -416,6 +951,8 @@
     @media (max-width: 480px) {
       .card { padding: 24px 18px; }
       h1 { font-size: 21px; }
+      .subreason-options { grid-template-columns: 1fr; }
+      .contact { padding-top: 22px; }
     }
   </style>
 </head>
@@ -436,9 +973,18 @@
         <svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
-      <span class="lang-wrap">
-        <select class="lang-select" id="langSelect" aria-label="Language"></select>
-      </span>
+      <div class="lang-selector" id="langSelector">
+        <button class="lang-btn" id="langBtn" type="button" aria-label="Change language"
+          aria-haspopup="listbox" aria-expanded="false" aria-controls="langMenu">
+          <span class="lang-current-flag" id="langCurrentFlag" aria-hidden="true"></span>
+          <span class="lang-current-name" id="langCurrentName"></span>
+          <svg class="lang-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <div class="lang-menu" id="langMenu" role="listbox" aria-label="Language" hidden></div>
+      </div>
     </span>
   </div>
 
@@ -452,33 +998,49 @@
       <div class="reasons" id="reasons"></div>
 
       <div class="action" id="action">
-        <label class="opt-label" for="detail"><span data-i18n="q2"></span><span class="opt-badge" data-i18n="optional"></span></label>
-        <div class="action-row">
-          <div class="detail-stack">
-            <textarea id="detail"></textarea>
-            <p class="contact-consent" id="contactConsent"></p>
+        <div class="action-inner">
+          <div class="subreason-block" id="subreasonBlock" hidden>
+            <div class="subreason-heading">
+              <span id="subreasonPrompt"></span>
+              <span class="subreason-hint" data-i18n="subreasonHint"></span>
+            </div>
+            <div class="subreason-options" id="subreasonOptions"></div>
           </div>
-          <button class="btn-send" id="submitBtn">
-            <span class="cta-blob cta-blob-light" aria-hidden="true"></span>
-            <span class="cta-blob cta-blob-dark" aria-hidden="true"></span>
-            <svg class="send-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-            <span data-i18n="submit"></span>
-          </button>
+          <div class="action-row">
+            <div class="detail-stack">
+              <label class="detail-question" id="detailQuestion" for="detail"></label>
+              <textarea id="detail"></textarea>
+              <p class="contact-consent" id="contactConsent"></p>
+            </div>
+            <button class="btn-send" id="submitBtn">
+              <span class="cta-blob cta-blob-light" aria-hidden="true"></span>
+              <span class="cta-blob cta-blob-dark" aria-hidden="true"></span>
+              <svg class="send-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              <span data-i18n="submit"></span>
+            </button>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Thanks -->
-    <section class="thanks" id="thanks">
-      <div class="check" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 6L9 17l-5-5" />
-        </svg>
-      </div>
+    <section class="thanks" id="thanks" aria-live="polite">
+      <svg class="success-mark" viewBox="0 0 72 72" aria-hidden="true">
+        <circle class="success-mark-circle" cx="36" cy="36" r="30.5" />
+        <path class="success-mark-check" d="m21.5 37.5 9.5 9.2 20-22" />
+      </svg>
       <h1 data-i18n="thanks"></h1>
       <p data-i18n="thanksSub"></p>
-      <a class="reinstall" id="reinstallLink" target="_blank" rel="noopener" data-i18n="reinstall"></a>
+      <div class="success-actions">
+        <button class="back-feedback" id="backToFeedback" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          <span data-i18n="backToFeedback"></span>
+        </button>
+        <a class="reinstall" id="reinstallLink" target="_blank" rel="noopener" data-i18n="reinstall"></a>
+      </div>
     </section>
 
     <!-- Contact (always visible) -->
@@ -486,7 +1048,7 @@
       <h2 data-i18n="contactTitle"></h2>
       <p class="lead" data-i18n="contactLead"></p>
       <div class="contact-row">
-        <a class="contact-link" id="tgLink" target="_blank" rel="noopener">
+        <a class="contact-link contact-link--telegram" id="tgLink" target="_blank" rel="noopener">
           <span class="ico">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path d="M21.94 4.3 18.6 20.02c-.25 1.1-.9 1.37-1.83.86l-5.05-3.72-2.44 2.35c-.27.27-.5.5-1.02.5l.36-5.16L17.1 6.6c.4-.36-.09-.56-.63-.2L6.06 13.2l-4.96-1.55c-1.08-.34-1.1-1.08.23-1.6L20.5 2.86c.9-.33 1.69.2 1.44 1.44Z" />
@@ -496,28 +1058,38 @@
             <b data-i18n="contactTelegram"></b>
             <small data-i18n="contactTelegramSub"></small>
           </span>
+          <span class="arrow" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </span>
         </a>
-        <a class="contact-link" id="emailLink">
+        <a class="contact-link contact-link--email" id="emailLink">
           <span class="ico">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="m3 7 9 6 9-6" />
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3.5" y="5.25" width="17" height="13.5" rx="3" fill="currentColor" opacity=".16" />
+              <path d="M5.5 7.25 12 12.1l6.5-4.85M5 6.75h14v10.5H5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </span>
           <span class="txt">
             <b data-i18n="contactEmail"></b>
-            <small data-i18n="contactEmailSub"></small>
+            <small class="contact-address" id="emailAddress"></small>
+          </span>
+          <span class="arrow" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
           </span>
         </a>
       </div>
-      <p class="privacy-note">
-        <span data-i18n="privacyNote"></span>
-        <a href="privacy-policy.html" target="_blank" rel="noopener" data-i18n="privacyLink"></a>
-      </p>
     </div>
+    <p class="privacy-note">
+      <span data-i18n="privacyNote"></span>
+      <a href="privacy-policy.html" target="_blank" rel="noopener" data-i18n="privacyLink"></a>
+    </p>
   </main>
 
+  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -539,34 +1111,80 @@
     const I18N = {
       en: {
         title: "Before you go…",
-        subtitle: "You just removed XPorter. Mind telling me why? It's anonymous and takes 10 seconds — it genuinely shapes what I fix next.",
+        subtitle: "You just removed XPorter. Mind telling me why? It takes 10 seconds and directly helps me decide what to fix next. Your feedback is anonymous unless you leave contact details.",
+        subtitleStrong: "It takes 10 seconds and directly helps me decide what to fix next.",
         q1: "What's the main reason?",
-        r_broken: "It didn't work / had errors",
-        r_confusing: "I couldn't figure it out",
-        r_slow: "Too slow or rate-limited",
-        r_missing: "Missing a feature I needed",
+        r_broken: "It didn't work or showed an error",
+        r_confusing: "It was hard to understand",
+        r_slow: "It was too slow or kept hitting X limits",
+        r_missing: "It was missing a feature or data I needed",
         r_once: "I only needed it once",
-        r_alt: "Found a better alternative",
-        r_privacy: "Privacy or permissions concerns",
+        r_alt: "I switched to another tool",
+        r_privacy: "I was worried about account safety, privacy, or permissions",
         r_other: "Something else",
         q2: "Thanks. Anything you'd like to add?",
-        detailPrompt: "What happened, or what would have made you stay? (optional)",
-        phContact: "Want a reply? Leave an email or Telegram, only if you're okay being contacted.",
-        ph_r_broken: "Which feature were you using, and what did you try? What error came up?",
-        ph_r_confusing: "What confused you most, or which feature couldn't you find?",
-        ph_r_slow: "What were you trying to export? How many posts, and from which account?",
-        ph_r_missing: "Which feature was missing? The more specific, the better.",
-        ph_r_once: "What would bring you back? Tell me what you'd want it to do next time.",
+        detailPrompt: "What happened, or what did you expect instead?",
+        detailExample: "For example: what you expected and what happened instead.",
+        phContact: "Want a reply? Add your email or Telegram username at the end.",
+        ph_r_broken: "What were you trying to do, and what happened instead? If you saw an error, paste it here.",
+        ph_r_confusing: "What were you trying to do, and where did you get stuck?",
+        ph_r_slow: "What were you exporting, roughly how many posts, and where did it slow down or pause?",
+        ph_r_missing: "What did you need XPorter to do that it couldn't?",
+        ph_r_once: "What did you use XPorter for, and what might make it useful again?",
         ph_r_alt: "Which tool did you switch to, and what does it do better?",
-        ph_r_privacy: "Which permission or privacy detail worried you?",
-        ph_r_other: "Tell me what happened, or what would have made you stay.",
+        ph_r_privacy: "What felt unclear or uncomfortable about the permissions or privacy?",
+        ph_r_other: "What made you decide to remove XPorter?",
+        ex_r_broken: "For example: I tried to export 2,400 posts from @username, but it stopped at 817 with a network error.",
+        ex_r_confusing: "For example: I wanted posts and replies, but I couldn't tell which export mode to choose.",
+        ex_r_slow: "For example: I was exporting about 3,000 posts; it began pausing around post 800 and never finished.",
+        ex_r_missing: "For example: I needed posts, replies, and media links in one CSV filtered by date.",
+        ex_r_once: "For example: I only needed one backup before deleting an account; I'd return for scheduled backups.",
+        ex_r_alt: "For example: I switched to [tool name or link] because it exports replies too and finished faster.",
+        ex_r_privacy: "For example: I wasn't sure why XPorter needed access to my X account or how that access was used.",
+        ex_r_other: "For example: I was only testing XPorter, but I don't need an export right now.",
+        subreasonPrompt: "What fits best?",
+        subreasonHint: "select any",
+        sr_broken_did_not_start: "Export didn't start",
+        sr_broken_stopped_midway: "Export stopped partway",
+        sr_broken_empty_or_incomplete: "File was empty or incomplete",
+        sr_broken_error_message: "I saw an error message",
+        sr_broken_wrong_data: "The exported data was wrong",
+        sr_confusing_couldnt_find_mode: "Couldn't find how to start",
+        sr_confusing_unclear_input: "Didn't know what to enter",
+        sr_confusing_unclear_options: "Options were unclear",
+        sr_confusing_unclear_progress: "Couldn't tell if it was working",
+        sr_slow_slow_from_start: "Slow from the start",
+        sr_slow_slowed_later: "Slowed down later",
+        sr_slow_kept_pausing: "Kept pausing",
+        sr_slow_never_finished: "Never finished",
+        sr_slow_x_limits: "X kept limiting requests",
+        sr_missing_replies: "Needed replies",
+        sr_missing_articles: "Needed articles",
+        sr_missing_more_fields: "Needed more fields or media data",
+        sr_missing_different_format: "Needed a different file format",
+        sr_missing_filtering_or_dates: "Needed filters or a date range",
+        sr_once_one_time_backup: "One-time backup",
+        sr_once_analysis_or_research: "Research or analysis",
+        sr_once_moving_tools: "Moving data elsewhere",
+        sr_alt_faster: "It was faster",
+        sr_alt_easier: "It was easier to use",
+        sr_alt_more_data: "It exported more data",
+        sr_alt_more_reliable: "It was more reliable",
+        sr_privacy_account_safety: "Risk of my X account being restricted",
+        sr_privacy_x_account_access: "Access to my X account",
+        sr_privacy_browser_permissions: "Browser permissions",
+        sr_privacy_data_handling: "How my data is handled",
+        sr_other_installed_by_mistake: "Installed by mistake",
+        sr_other_testing: "Just testing XPorter",
+        sr_other_no_longer_use_x: "I no longer use X",
+        sr_other_didnt_meet_expectations: "Didn't meet my expectations",
         submit: "Send feedback",
         sending: "Sending…",
         skip: "Skip",
         thanks: "Thank you — feedback sent.",
         thanksSub: "This really helps. You can close this tab now.",
         contactTitle: "Need help or want a reply?",
-        contactLead: "Message me on Telegram — I read and reply to every message.",
+        contactLead: "Message me on Telegram. You'll reach me directly.",
         contactTelegram: "Message on Telegram",
         contactTelegramSub: "Fastest reply",
         contactEmail: "Email me",
@@ -579,34 +1197,80 @@
       },
       ru: {
         title: "Перед тем как уйти…",
-        subtitle: "Ты только что удалил XPorter. Подскажешь почему? Это анонимно и займёт 10 секунд — и реально влияет на то, что я починю дальше.",
+        subtitle: "Ты только что удалил XPorter. Подскажешь почему? Это займёт 10 секунд и напрямую поможет решить, что исправить дальше. Отзыв анонимный, если ты сам не оставишь контакты.",
+        subtitleStrong: "Это займёт 10 секунд и напрямую поможет решить, что исправить дальше.",
         q1: "Главная причина?",
-        r_broken: "Не работало / были ошибки",
-        r_confusing: "Не разобрался, как пользоваться",
-        r_slow: "Слишком медленно или упёрся в лимиты",
-        r_missing: "Не хватило нужной функции",
+        r_broken: "Не работало или появилась ошибка",
+        r_confusing: "Было сложно понять, как пользоваться",
+        r_slow: "Работало слишком медленно или постоянно упиралось в лимиты X",
+        r_missing: "Не хватало нужной функции или данных",
         r_once: "Нужно было всего один раз",
-        r_alt: "Нашёл вариант получше",
-        r_privacy: "Сомнения в приватности или правах доступа",
+        r_alt: "Перешёл на другой инструмент",
+        r_privacy: "Беспокоила безопасность аккаунта, приватность или разрешения",
         r_other: "Другое",
         q2: "Спасибо. Хочешь что-то добавить?",
-        detailPrompt: "Что случилось или что заставило бы тебя остаться? (необязательно)",
-        phContact: "Хочешь ответ? Оставь почту или Telegram, только если не против, что я напишу.",
-        ph_r_broken: "Каким разделом ты пользовался и что пробовал сделать? Какая ошибка появилась?",
-        ph_r_confusing: "Что запутало сильнее всего или какую функцию ты не смог найти?",
-        ph_r_slow: "Что именно ты хотел выгрузить? Сколько постов и с какого аккаунта?",
-        ph_r_missing: "Какой функции не хватило? Чем конкретнее, тем лучше.",
-        ph_r_once: "Что вернуло бы тебя обратно? Расскажи, что хотел бы, чтобы оно умело.",
+        detailPrompt: "Что произошло или чего ты ожидал вместо этого?",
+        detailExample: "Например: чего ты ожидал и что произошло вместо этого.",
+        phContact: "Хочешь ответ? Добавь почту или имя пользователя в Telegram в конце сообщения.",
+        ph_r_broken: "Что ты пытался сделать и что произошло вместо ожидаемого? Если появилась ошибка, вставь её сюда.",
+        ph_r_confusing: "Что ты пытался сделать и на каком месте запутался?",
+        ph_r_slow: "Что ты выгружал, примерно сколько постов и на каком этапе всё замедлилось или остановилось?",
+        ph_r_missing: "Что тебе было нужно от XPorter, но он этого не умел?",
+        ph_r_once: "Для чего ты использовал XPorter и что могло бы снова сделать его полезным?",
         ph_r_alt: "На какой инструмент ты перешёл и что он делает лучше?",
-        ph_r_privacy: "Какое разрешение или момент с приватностью тебя насторожил?",
-        ph_r_other: "Расскажи, что случилось или что заставило бы тебя остаться.",
+        ph_r_privacy: "Что в разрешениях или приватности показалось непонятным или некомфортным?",
+        ph_r_other: "Почему ты решил удалить XPorter?",
+        ex_r_broken: "Например: при выгрузке 2 400 постов из @username процесс остановился на 817-м с ошибкой сети.",
+        ex_r_confusing: "Например: мне нужны были посты и ответы, но я не понял, какой режим выгрузки выбрать.",
+        ex_r_slow: "Например: я выгружал около 3 000 постов; после 800 выгрузка начала останавливаться и так и не завершилась.",
+        ex_r_missing: "Например: мне нужны были посты, ответы и ссылки на медиа в одном CSV с фильтром по дате.",
+        ex_r_once: "Например: мне нужна была одна копия перед удалением аккаунта; для регулярных копий я бы вернулся.",
+        ex_r_alt: "Например: я перешёл на [название или ссылку], потому что там выгружаются ответы и всё работает быстрее.",
+        ex_r_privacy: "Например: я не понял, зачем XPorter нужен доступ к моему аккаунту X и как этот доступ используется.",
+        ex_r_other: "Например: я просто тестировал XPorter, но сейчас мне не нужна выгрузка.",
+        subreasonPrompt: "Что подходит лучше всего?",
+        subreasonHint: "можно несколько",
+        sr_broken_did_not_start: "Выгрузка не началась",
+        sr_broken_stopped_midway: "Выгрузка остановилась в процессе",
+        sr_broken_empty_or_incomplete: "Файл оказался пустым или неполным",
+        sr_broken_error_message: "Появилось сообщение об ошибке",
+        sr_broken_wrong_data: "Выгрузились неправильные данные",
+        sr_confusing_couldnt_find_mode: "Не нашёл, как начать выгрузку",
+        sr_confusing_unclear_input: "Не понял, что нужно ввести",
+        sr_confusing_unclear_options: "Настройки были непонятны",
+        sr_confusing_unclear_progress: "Не понял, идёт ли выгрузка",
+        sr_slow_slow_from_start: "Медленно с самого начала",
+        sr_slow_slowed_later: "Замедлилось позже",
+        sr_slow_kept_pausing: "Постоянно останавливалось",
+        sr_slow_never_finished: "Так и не завершилось",
+        sr_slow_x_limits: "X постоянно ограничивал запросы",
+        sr_missing_replies: "Нужно было выгружать ответы",
+        sr_missing_articles: "Нужно было выгружать статьи",
+        sr_missing_more_fields: "Нужно больше полей или медиаданных",
+        sr_missing_different_format: "Нужен другой формат файла",
+        sr_missing_filtering_or_dates: "Нужны фильтры или диапазон дат",
+        sr_once_one_time_backup: "Разовая резервная копия",
+        sr_once_analysis_or_research: "Исследование или анализ",
+        sr_once_moving_tools: "Перенос данных в другое место",
+        sr_alt_faster: "Он работал быстрее",
+        sr_alt_easier: "Им было проще пользоваться",
+        sr_alt_more_data: "Он выгружал больше данных",
+        sr_alt_more_reliable: "Он работал надёжнее",
+        sr_privacy_account_safety: "Риск ограничений или блокировки аккаунта X",
+        sr_privacy_x_account_access: "Доступ к моему аккаунту X",
+        sr_privacy_browser_permissions: "Разрешения браузера",
+        sr_privacy_data_handling: "Как обрабатываются мои данные",
+        sr_other_installed_by_mistake: "Установил по ошибке",
+        sr_other_testing: "Просто тестировал XPorter",
+        sr_other_no_longer_use_x: "Больше не пользуюсь X",
+        sr_other_didnt_meet_expectations: "Не оправдал ожиданий",
         submit: "Отправить",
         sending: "Отправляю…",
         skip: "Пропустить",
         thanks: "Спасибо — отзыв отправлен.",
         thanksSub: "Это правда помогает. Можешь закрыть вкладку.",
         contactTitle: "Нужна помощь или хочешь ответ?",
-        contactLead: "Напиши мне в Telegram — я читаю и отвечаю на каждое сообщение.",
+        contactLead: "Напиши мне в Telegram. Сообщение попадёт прямо ко мне.",
         contactTelegram: "Написать в Telegram",
         contactTelegramSub: "Отвечаю быстрее всего",
         contactEmail: "Написать на почту",
@@ -631,6 +1295,63 @@
       "zh_CN":{"title":"在你离开之前…","subtitle":"你刚刚卸载了 XPorter。可以告诉我原因吗？匿名，只需 10 秒——它真的会决定我接下来修复什么。","q1":"主要原因是什么？","r_broken":"无法使用／出现错误","r_confusing":"我没弄明白怎么用","r_slow":"太慢或受到速率限制","r_missing":"缺少我需要的功能","r_once":"我只需要用一次","r_alt":"找到了更好的替代品","r_privacy":"对隐私或权限有顾虑","r_other":"其他原因","q2":"谢谢。还有什么想补充的吗？","detailPrompt":"发生了什么，或者怎样你才会继续使用？（可选）","phContact":"想收到回复吗？留下邮箱或Telegram，只有在你愿意被联系时才需要。","ph_r_broken":"你当时在用哪个功能，尝试了什么？出现了什么错误？","ph_r_confusing":"最让你困惑的是什么，或者哪个功能你没找到？","ph_r_slow":"你想导出什么？多少条帖子，来自哪个账号？","ph_r_missing":"缺少哪个功能？越具体越好。","ph_r_once":"什么会让你回来？告诉我下次你希望它能做什么。","ph_r_alt":"你换到了哪个工具，它哪里做得更好？","ph_r_privacy":"哪个权限或隐私细节让你担心？","ph_r_other":"告诉我发生了什么，或者怎样你才会继续使用。","submit":"发送反馈","sending":"发送中…","skip":"跳过","thanks":"谢谢——反馈已发送。","thanksSub":"这真的很有帮助。现在你可以关闭此标签页了。","contactTitle":"需要帮助或想要回复？","contactLead":"通过 Telegram 联系我——我会阅读每条消息并回复。","contactTelegram":"通过 Telegram 联系","contactTelegramSub":"回复最快","contactEmail":"给我发邮件","contactEmailSub":"我很少看邮件，可能会错过","reinstall":"改主意了？重新安装 XPorter","privacyNote":"匿名——不收集任何个人数据，也不收集你的任何 X 内容，仅收集产品使用统计。","privacyLink":"这些数据如何使用","langLabel":"语言","errorMsg":"发送失败——请重试或通过 Telegram 联系我。"}
     };
 
+    // Reason choices are intentionally complete in every supported locale.
+    // These overrides keep the older one-line locale blocks stable while the
+    // feedback taxonomy can evolve independently.
+    const REASON_I18N = {
+      de: {r_broken:"Es funktionierte nicht oder zeigte einen Fehler",r_confusing:"Die Bedienung war schwer zu verstehen",r_slow:"Es war zu langsam oder stieß ständig an X-Limits",r_missing:"Eine benötigte Funktion oder Daten fehlten",r_once:"Ich brauchte XPorter nur einmal",r_alt:"Ich bin zu einem anderen Tool gewechselt",r_privacy:"Ich sorgte mich um Kontosicherheit, Datenschutz oder Berechtigungen",r_other:"Ein anderer Grund",detailExample:"Zum Beispiel: Was hast du erwartet und was ist stattdessen passiert?",subreasonPrompt:"Was trifft am besten zu?",subreasonHint:"Mehrfachauswahl möglich",sr_broken_did_not_start:"Export wurde nicht gestartet",sr_broken_stopped_midway:"Export brach unterwegs ab",sr_broken_empty_or_incomplete:"Datei war leer oder unvollständig",sr_broken_error_message:"Eine Fehlermeldung erschien",sr_broken_wrong_data:"Exportierte Daten waren falsch",sr_confusing_couldnt_find_mode:"Ich fand nicht, wie man den Export startet",sr_confusing_unclear_input:"Ich wusste nicht, was ich eingeben sollte",sr_confusing_unclear_options:"Die Optionen waren unklar",sr_confusing_unclear_progress:"Ich konnte nicht erkennen, ob es funktionierte",sr_slow_slow_from_start:"Von Anfang an langsam",sr_slow_slowed_later:"Wurde später langsamer",sr_slow_kept_pausing:"Pausierte immer wieder",sr_slow_never_finished:"Wurde nie fertig",sr_slow_x_limits:"X begrenzte die Anfragen immer wieder",sr_missing_replies:"Antworten fehlten",sr_missing_articles:"Artikel fehlten",sr_missing_more_fields:"Mehr Felder oder Mediendaten fehlten",sr_missing_different_format:"Ich brauchte ein anderes Dateiformat",sr_missing_filtering_or_dates:"Filter oder Datumsbereich fehlten",sr_once_one_time_backup:"Einmalige Sicherung",sr_once_analysis_or_research:"Recherche oder Analyse",sr_once_moving_tools:"Daten woandershin verschieben",sr_alt_faster:"Es war schneller",sr_alt_easier:"Es war einfacher zu bedienen",sr_alt_more_data:"Es exportierte mehr Daten",sr_alt_more_reliable:"Es war zuverlässiger",sr_privacy_account_safety:"Risiko einer Einschränkung meines X-Kontos",sr_privacy_x_account_access:"Zugriff auf mein X-Konto",sr_privacy_browser_permissions:"Browserberechtigungen",sr_privacy_data_handling:"Umgang mit meinen Daten",sr_other_installed_by_mistake:"Versehentlich installiert",sr_other_testing:"XPorter nur ausprobiert",sr_other_no_longer_use_x:"Ich nutze X nicht mehr",sr_other_didnt_meet_expectations:"Entsprach nicht meinen Erwartungen"},
+      es: {r_broken:"No funcionó o mostró un error",r_confusing:"Era difícil de entender",r_slow:"Era demasiado lento o alcanzaba los límites de X",r_missing:"Le faltaba una función o datos que necesitaba",r_once:"Solo necesitaba XPorter una vez",r_alt:"Cambié a otra herramienta",r_privacy:"Me preocupaban la seguridad de mi cuenta, la privacidad o los permisos",r_other:"Otro motivo",detailExample:"Por ejemplo: qué esperabas y qué ocurrió en su lugar.",subreasonPrompt:"¿Qué opción encaja mejor?",subreasonHint:"puedes elegir varias",sr_broken_did_not_start:"La exportación no comenzó",sr_broken_stopped_midway:"La exportación se detuvo a mitad",sr_broken_empty_or_incomplete:"El archivo estaba vacío o incompleto",sr_broken_error_message:"Apareció un mensaje de error",sr_broken_wrong_data:"Los datos exportados eran incorrectos",sr_confusing_couldnt_find_mode:"No encontré cómo iniciar la exportación",sr_confusing_unclear_input:"No sabía qué introducir",sr_confusing_unclear_options:"Las opciones no estaban claras",sr_confusing_unclear_progress:"No sabía si estaba funcionando",sr_slow_slow_from_start:"Lento desde el principio",sr_slow_slowed_later:"Se volvió más lento después",sr_slow_kept_pausing:"Se detenía constantemente",sr_slow_never_finished:"Nunca terminó",sr_slow_x_limits:"X limitaba constantemente las solicitudes",sr_missing_replies:"Necesitaba exportar respuestas",sr_missing_articles:"Necesitaba exportar artículos",sr_missing_more_fields:"Necesitaba más campos o datos multimedia",sr_missing_different_format:"Necesitaba otro formato de archivo",sr_missing_filtering_or_dates:"Necesitaba filtros o un rango de fechas",sr_once_one_time_backup:"Copia de seguridad única",sr_once_analysis_or_research:"Investigación o análisis",sr_once_moving_tools:"Mover datos a otro lugar",sr_alt_faster:"Era más rápido",sr_alt_easier:"Era más fácil de usar",sr_alt_more_data:"Exportaba más datos",sr_alt_more_reliable:"Era más fiable",sr_privacy_account_safety:"Riesgo de que X restringiera mi cuenta",sr_privacy_x_account_access:"Acceso a mi cuenta de X",sr_privacy_browser_permissions:"Permisos del navegador",sr_privacy_data_handling:"Cómo se gestionan mis datos",sr_other_installed_by_mistake:"Lo instalé por error",sr_other_testing:"Solo estaba probando XPorter",sr_other_no_longer_use_x:"Ya no uso X",sr_other_didnt_meet_expectations:"No cumplió mis expectativas"},
+      fr: {r_broken:"Cela ne fonctionnait pas ou affichait une erreur",r_confusing:"C'était difficile à comprendre",r_slow:"C'était trop lent ou atteignait les limites de X",r_missing:"Il manquait une fonctionnalité ou des données dont j'avais besoin",r_once:"Je n'avais besoin de XPorter qu'une seule fois",r_alt:"Je suis passé à un autre outil",r_privacy:"La sécurité de mon compte, la confidentialité ou les autorisations m'inquiétaient",r_other:"Une autre raison",detailExample:"Par exemple : ce que vous attendiez et ce qui s'est passé à la place.",subreasonPrompt:"Qu'est-ce qui correspond le mieux ?",subreasonHint:"plusieurs choix possibles",sr_broken_did_not_start:"L'exportation n'a pas démarré",sr_broken_stopped_midway:"L'exportation s'est arrêtée en cours",sr_broken_empty_or_incomplete:"Le fichier était vide ou incomplet",sr_broken_error_message:"Un message d'erreur est apparu",sr_broken_wrong_data:"Les données exportées étaient incorrectes",sr_confusing_couldnt_find_mode:"Je n'ai pas trouvé comment démarrer l'exportation",sr_confusing_unclear_input:"Je ne savais pas quoi saisir",sr_confusing_unclear_options:"Les options n'étaient pas claires",sr_confusing_unclear_progress:"Je ne savais pas si cela fonctionnait",sr_slow_slow_from_start:"Lent dès le départ",sr_slow_slowed_later:"A ralenti ensuite",sr_slow_kept_pausing:"S'arrêtait régulièrement",sr_slow_never_finished:"Ne s'est jamais terminé",sr_slow_x_limits:"X limitait régulièrement les requêtes",sr_missing_replies:"J'avais besoin des réponses",sr_missing_articles:"J'avais besoin des articles",sr_missing_more_fields:"J'avais besoin de plus de champs ou de données média",sr_missing_different_format:"J'avais besoin d'un autre format de fichier",sr_missing_filtering_or_dates:"J'avais besoin de filtres ou d'une plage de dates",sr_once_one_time_backup:"Sauvegarde ponctuelle",sr_once_analysis_or_research:"Recherche ou analyse",sr_once_moving_tools:"Déplacer les données ailleurs",sr_alt_faster:"Il était plus rapide",sr_alt_easier:"Il était plus facile à utiliser",sr_alt_more_data:"Il exportait plus de données",sr_alt_more_reliable:"Il était plus fiable",sr_privacy_account_safety:"Risque de restriction de mon compte X",sr_privacy_x_account_access:"Accès à mon compte X",sr_privacy_browser_permissions:"Autorisations du navigateur",sr_privacy_data_handling:"Utilisation de mes données",sr_other_installed_by_mistake:"Installé par erreur",sr_other_testing:"Je testais simplement XPorter",sr_other_no_longer_use_x:"Je n'utilise plus X",sr_other_didnt_meet_expectations:"N'a pas répondu à mes attentes"},
+      it: {r_broken:"Non funzionava o mostrava un errore",r_confusing:"Era difficile da capire",r_slow:"Era troppo lento o raggiungeva spesso i limiti di X",r_missing:"Mancava una funzione o dei dati che mi servivano",r_once:"Mi serviva XPorter una sola volta",r_alt:"Sono passato a un altro strumento",r_privacy:"Mi preoccupavano la sicurezza dell'account, la privacy o i permessi",r_other:"Un altro motivo",detailExample:"Per esempio: cosa ti aspettavi e cosa è successo invece.",subreasonPrompt:"Quale descrizione è più adatta?",subreasonHint:"puoi sceglierne più di una",sr_broken_did_not_start:"L'esportazione non è iniziata",sr_broken_stopped_midway:"L'esportazione si è fermata a metà",sr_broken_empty_or_incomplete:"Il file era vuoto o incompleto",sr_broken_error_message:"È apparso un messaggio di errore",sr_broken_wrong_data:"I dati esportati erano errati",sr_confusing_couldnt_find_mode:"Non trovavo come avviare l'esportazione",sr_confusing_unclear_input:"Non sapevo cosa inserire",sr_confusing_unclear_options:"Le opzioni non erano chiare",sr_confusing_unclear_progress:"Non capivo se stesse funzionando",sr_slow_slow_from_start:"Lento fin dall'inizio",sr_slow_slowed_later:"È rallentato in seguito",sr_slow_kept_pausing:"Continuava a fermarsi",sr_slow_never_finished:"Non è mai terminato",sr_slow_x_limits:"X continuava a limitare le richieste",sr_missing_replies:"Mi servivano le risposte",sr_missing_articles:"Mi servivano gli articoli",sr_missing_more_fields:"Mi servivano più campi o dati multimediali",sr_missing_different_format:"Mi serviva un altro formato di file",sr_missing_filtering_or_dates:"Mi servivano filtri o un intervallo di date",sr_once_one_time_backup:"Backup una tantum",sr_once_analysis_or_research:"Ricerca o analisi",sr_once_moving_tools:"Spostare i dati altrove",sr_alt_faster:"Era più veloce",sr_alt_easier:"Era più facile da usare",sr_alt_more_data:"Esportava più dati",sr_alt_more_reliable:"Era più affidabile",sr_privacy_account_safety:"Rischio di limitazioni al mio account X",sr_privacy_x_account_access:"Accesso al mio account X",sr_privacy_browser_permissions:"Permessi del browser",sr_privacy_data_handling:"Come vengono gestiti i miei dati",sr_other_installed_by_mistake:"Installato per errore",sr_other_testing:"Stavo solo provando XPorter",sr_other_no_longer_use_x:"Non uso più X",sr_other_didnt_meet_expectations:"Non ha soddisfatto le mie aspettative"},
+      pt_BR: {r_broken:"Não funcionou ou mostrou um erro",r_confusing:"Era difícil de entender",r_slow:"Era lento demais ou atingia os limites do X",r_missing:"Faltava um recurso ou dado de que eu precisava",r_once:"Só precisei do XPorter uma vez",r_alt:"Mudei para outra ferramenta",r_privacy:"Eu estava preocupado com a segurança da conta, a privacidade ou as permissões",r_other:"Outro motivo",detailExample:"Por exemplo: o que você esperava e o que aconteceu no lugar.",subreasonPrompt:"Qual opção combina melhor?",subreasonHint:"você pode escolher várias",sr_broken_did_not_start:"A exportação não começou",sr_broken_stopped_midway:"A exportação parou no meio",sr_broken_empty_or_incomplete:"O arquivo estava vazio ou incompleto",sr_broken_error_message:"Apareceu uma mensagem de erro",sr_broken_wrong_data:"Os dados exportados estavam incorretos",sr_confusing_couldnt_find_mode:"Não encontrei como iniciar a exportação",sr_confusing_unclear_input:"Não sabia o que inserir",sr_confusing_unclear_options:"As opções não estavam claras",sr_confusing_unclear_progress:"Não sabia se estava funcionando",sr_slow_slow_from_start:"Lento desde o início",sr_slow_slowed_later:"Ficou mais lento depois",sr_slow_kept_pausing:"Ficava pausando",sr_slow_never_finished:"Nunca terminou",sr_slow_x_limits:"O X continuava limitando as solicitações",sr_missing_replies:"Eu precisava das respostas",sr_missing_articles:"Eu precisava dos artigos",sr_missing_more_fields:"Eu precisava de mais campos ou dados de mídia",sr_missing_different_format:"Eu precisava de outro formato de arquivo",sr_missing_filtering_or_dates:"Eu precisava de filtros ou intervalo de datas",sr_once_one_time_backup:"Backup único",sr_once_analysis_or_research:"Pesquisa ou análise",sr_once_moving_tools:"Mover os dados para outro lugar",sr_alt_faster:"Era mais rápido",sr_alt_easier:"Era mais fácil de usar",sr_alt_more_data:"Exportava mais dados",sr_alt_more_reliable:"Era mais confiável",sr_privacy_account_safety:"Risco de o X restringir minha conta",sr_privacy_x_account_access:"Acesso à minha conta do X",sr_privacy_browser_permissions:"Permissões do navegador",sr_privacy_data_handling:"Como meus dados são tratados",sr_other_installed_by_mistake:"Instalei por engano",sr_other_testing:"Só estava testando o XPorter",sr_other_no_longer_use_x:"Não uso mais o X",sr_other_didnt_meet_expectations:"Não atendeu às minhas expectativas"},
+      tr: {r_broken:"Çalışmadı veya hata gösterdi",r_confusing:"Nasıl kullanılacağını anlamak zordu",r_slow:"Çok yavaştı veya sürekli X sınırlarına takılıyordu",r_missing:"İhtiyacım olan bir özellik veya veri eksikti",r_once:"XPorter'a yalnızca bir kez ihtiyacım vardı",r_alt:"Başka bir araca geçtim",r_privacy:"Hesap güvenliği, gizlilik veya izinler konusunda endişeliydim",r_other:"Başka bir neden",detailExample:"Örneğin: ne bekliyordunuz ve yerine ne oldu?",subreasonPrompt:"Hangisi en uygun?",subreasonHint:"birden fazla seçilebilir",sr_broken_did_not_start:"Dışa aktarma başlamadı",sr_broken_stopped_midway:"Dışa aktarma yarıda durdu",sr_broken_empty_or_incomplete:"Dosya boş veya eksikti",sr_broken_error_message:"Bir hata mesajı gördüm",sr_broken_wrong_data:"Dışa aktarılan veriler yanlıştı",sr_confusing_couldnt_find_mode:"Dışa aktarmayı nasıl başlatacağımı bulamadım",sr_confusing_unclear_input:"Ne girmem gerektiğini bilmiyordum",sr_confusing_unclear_options:"Seçenekler net değildi",sr_confusing_unclear_progress:"Çalışıp çalışmadığını anlayamadım",sr_slow_slow_from_start:"Baştan beri yavaştı",sr_slow_slowed_later:"Sonradan yavaşladı",sr_slow_kept_pausing:"Sürekli duraklıyordu",sr_slow_never_finished:"Hiç tamamlanmadı",sr_slow_x_limits:"X istekleri sürekli sınırlıyordu",sr_missing_replies:"Yanıtları dışa aktarmam gerekiyordu",sr_missing_articles:"Makaleleri dışa aktarmam gerekiyordu",sr_missing_more_fields:"Daha fazla alan veya medya verisi gerekiyordu",sr_missing_different_format:"Farklı bir dosya biçimi gerekiyordu",sr_missing_filtering_or_dates:"Filtreler veya tarih aralığı gerekiyordu",sr_once_one_time_backup:"Tek seferlik yedekleme",sr_once_analysis_or_research:"Araştırma veya analiz",sr_once_moving_tools:"Verileri başka bir yere taşımak",sr_alt_faster:"Daha hızlıydı",sr_alt_easier:"Kullanımı daha kolaydı",sr_alt_more_data:"Daha fazla veri aktarıyordu",sr_alt_more_reliable:"Daha güvenilirdi",sr_privacy_account_safety:"X hesabımın kısıtlanma riski",sr_privacy_x_account_access:"X hesabıma erişim",sr_privacy_browser_permissions:"Tarayıcı izinleri",sr_privacy_data_handling:"Verilerimin nasıl işlendiği",sr_other_installed_by_mistake:"Yanlışlıkla yükledim",sr_other_testing:"XPorter'ı sadece deniyordum",sr_other_no_longer_use_x:"Artık X kullanmıyorum",sr_other_didnt_meet_expectations:"Beklentilerimi karşılamadı"},
+      id: {r_broken:"Tidak berfungsi atau menampilkan kesalahan",r_confusing:"Sulit dipahami",r_slow:"Terlalu lambat atau terus terkena batas X",r_missing:"Fitur atau data yang saya butuhkan tidak tersedia",r_once:"Saya hanya membutuhkan XPorter sekali",r_alt:"Saya beralih ke alat lain",r_privacy:"Saya khawatir tentang keamanan akun, privasi, atau izin",r_other:"Alasan lain",detailExample:"Contoh: apa yang Anda harapkan dan apa yang terjadi sebagai gantinya.",subreasonPrompt:"Mana yang paling sesuai?",subreasonHint:"boleh pilih lebih dari satu",sr_broken_did_not_start:"Ekspor tidak dimulai",sr_broken_stopped_midway:"Ekspor berhenti di tengah",sr_broken_empty_or_incomplete:"File kosong atau tidak lengkap",sr_broken_error_message:"Muncul pesan kesalahan",sr_broken_wrong_data:"Data yang diekspor salah",sr_confusing_couldnt_find_mode:"Tidak menemukan cara memulai ekspor",sr_confusing_unclear_input:"Tidak tahu apa yang harus dimasukkan",sr_confusing_unclear_options:"Pilihannya tidak jelas",sr_confusing_unclear_progress:"Tidak tahu apakah sedang berjalan",sr_slow_slow_from_start:"Lambat sejak awal",sr_slow_slowed_later:"Menjadi lebih lambat kemudian",sr_slow_kept_pausing:"Terus berhenti sementara",sr_slow_never_finished:"Tidak pernah selesai",sr_slow_x_limits:"X terus membatasi permintaan",sr_missing_replies:"Membutuhkan ekspor balasan",sr_missing_articles:"Membutuhkan ekspor artikel",sr_missing_more_fields:"Membutuhkan lebih banyak kolom atau data media",sr_missing_different_format:"Membutuhkan format file lain",sr_missing_filtering_or_dates:"Membutuhkan filter atau rentang tanggal",sr_once_one_time_backup:"Cadangan satu kali",sr_once_analysis_or_research:"Riset atau analisis",sr_once_moving_tools:"Memindahkan data ke tempat lain",sr_alt_faster:"Lebih cepat",sr_alt_easier:"Lebih mudah digunakan",sr_alt_more_data:"Mengekspor lebih banyak data",sr_alt_more_reliable:"Lebih andal",sr_privacy_account_safety:"Risiko akun X saya dibatasi",sr_privacy_x_account_access:"Akses ke akun X saya",sr_privacy_browser_permissions:"Izin browser",sr_privacy_data_handling:"Cara data saya ditangani",sr_other_installed_by_mistake:"Terpasang karena tidak sengaja",sr_other_testing:"Hanya mencoba XPorter",sr_other_no_longer_use_x:"Saya tidak lagi menggunakan X",sr_other_didnt_meet_expectations:"Tidak sesuai harapan saya"},
+      ar: {r_broken:"لم يعمل أو أظهر خطأً",r_confusing:"كان من الصعب فهم طريقة استخدامه",r_slow:"كان بطيئًا جدًا أو كان يصطدم باستمرار بقيود X",r_missing:"كانت تنقصه ميزة أو بيانات أحتاجها",r_once:"كنت أحتاج XPorter لمرة واحدة فقط",r_alt:"انتقلت إلى أداة أخرى",r_privacy:"كنت قلقًا بشأن أمان الحساب أو الخصوصية أو الأذونات",r_other:"سبب آخر",detailExample:"مثلاً: ما الذي توقعته وما الذي حدث بدلاً من ذلك.",subreasonPrompt:"ما الوصف الأنسب؟",subreasonHint:"يمكن اختيار أكثر من خيار",sr_broken_did_not_start:"لم يبدأ التصدير",sr_broken_stopped_midway:"توقف التصدير في المنتصف",sr_broken_empty_or_incomplete:"كان الملف فارغًا أو غير مكتمل",sr_broken_error_message:"ظهرت رسالة خطأ",sr_broken_wrong_data:"كانت البيانات المصدرة غير صحيحة",sr_confusing_couldnt_find_mode:"لم أجد طريقة بدء التصدير",sr_confusing_unclear_input:"لم أعرف ما الذي يجب إدخاله",sr_confusing_unclear_options:"لم تكن الخيارات واضحة",sr_confusing_unclear_progress:"لم أعرف ما إذا كان يعمل",sr_slow_slow_from_start:"بطيء منذ البداية",sr_slow_slowed_later:"أصبح أبطأ لاحقًا",sr_slow_kept_pausing:"كان يتوقف باستمرار",sr_slow_never_finished:"لم يكتمل أبدًا",sr_slow_x_limits:"كان X يقيّد الطلبات باستمرار",sr_missing_replies:"كنت أحتاج إلى تصدير الردود",sr_missing_articles:"كنت أحتاج إلى تصدير المقالات",sr_missing_more_fields:"كنت أحتاج إلى حقول أو بيانات وسائط أكثر",sr_missing_different_format:"كنت أحتاج إلى تنسيق ملف مختلف",sr_missing_filtering_or_dates:"كنت أحتاج إلى فلاتر أو نطاق زمني",sr_once_one_time_backup:"نسخة احتياطية لمرة واحدة",sr_once_analysis_or_research:"بحث أو تحليل",sr_once_moving_tools:"نقل البيانات إلى مكان آخر",sr_alt_faster:"كان أسرع",sr_alt_easier:"كان أسهل في الاستخدام",sr_alt_more_data:"كان يصدّر بيانات أكثر",sr_alt_more_reliable:"كان أكثر موثوقية",sr_privacy_account_safety:"خطر تقييد حسابي على X",sr_privacy_x_account_access:"الوصول إلى حسابي على X",sr_privacy_browser_permissions:"أذونات المتصفح",sr_privacy_data_handling:"كيفية التعامل مع بياناتي",sr_other_installed_by_mistake:"ثبّتّه عن طريق الخطأ",sr_other_testing:"كنت أجرّب XPorter فقط",sr_other_no_longer_use_x:"لم أعد أستخدم X",sr_other_didnt_meet_expectations:"لم يلبِ توقعاتي"},
+      hi: {r_broken:"यह काम नहीं कर रहा था या त्रुटि दिखा रहा था",r_confusing:"इसे समझना कठिन था",r_slow:"यह बहुत धीमा था या बार-बार X की सीमाओं से टकरा रहा था",r_missing:"इसमें वह सुविधा या डेटा नहीं था जिसकी मुझे ज़रूरत थी",r_once:"मुझे XPorter की केवल एक बार ज़रूरत थी",r_alt:"मैंने दूसरा टूल चुन लिया",r_privacy:"मुझे अकाउंट की सुरक्षा, गोपनीयता या अनुमतियों की चिंता थी",r_other:"कोई और कारण",detailExample:"उदाहरण: आपने क्या उम्मीद की थी और उसकी जगह क्या हुआ।",subreasonPrompt:"इनमें से सबसे सही क्या है?",subreasonHint:"एक से अधिक चुन सकते हैं",sr_broken_did_not_start:"एक्सपोर्ट शुरू नहीं हुआ",sr_broken_stopped_midway:"एक्सपोर्ट बीच में रुक गया",sr_broken_empty_or_incomplete:"फ़ाइल खाली या अधूरी थी",sr_broken_error_message:"त्रुटि संदेश दिखाई दिया",sr_broken_wrong_data:"एक्सपोर्ट किया गया डेटा गलत था",sr_confusing_couldnt_find_mode:"एक्सपोर्ट शुरू करने का तरीका नहीं मिला",sr_confusing_unclear_input:"समझ नहीं आया कि क्या दर्ज करना है",sr_confusing_unclear_options:"विकल्प स्पष्ट नहीं थे",sr_confusing_unclear_progress:"समझ नहीं आया कि यह चल रहा है या नहीं",sr_slow_slow_from_start:"शुरू से ही धीमा था",sr_slow_slowed_later:"बाद में धीमा हो गया",sr_slow_kept_pausing:"बार-बार रुक रहा था",sr_slow_never_finished:"कभी पूरा नहीं हुआ",sr_slow_x_limits:"X बार-बार अनुरोध सीमित कर रहा था",sr_missing_replies:"जवाब एक्सपोर्ट करने थे",sr_missing_articles:"आर्टिकल एक्सपोर्ट करने थे",sr_missing_more_fields:"और फ़ील्ड या मीडिया डेटा चाहिए था",sr_missing_different_format:"दूसरा फ़ाइल फ़ॉर्मैट चाहिए था",sr_missing_filtering_or_dates:"फ़िल्टर या तारीख की सीमा चाहिए थी",sr_once_one_time_backup:"एक बार का बैकअप",sr_once_analysis_or_research:"रिसर्च या विश्लेषण",sr_once_moving_tools:"डेटा कहीं और ले जाना",sr_alt_faster:"यह तेज़ था",sr_alt_easier:"इसे इस्तेमाल करना आसान था",sr_alt_more_data:"यह अधिक डेटा एक्सपोर्ट करता था",sr_alt_more_reliable:"यह अधिक भरोसेमंद था",sr_privacy_account_safety:"मेरे X अकाउंट पर प्रतिबंध लगने का जोखिम",sr_privacy_x_account_access:"मेरे X अकाउंट तक पहुँच",sr_privacy_browser_permissions:"ब्राउज़र अनुमतियाँ",sr_privacy_data_handling:"मेरे डेटा का उपयोग कैसे होता है",sr_other_installed_by_mistake:"गलती से इंस्टॉल किया",sr_other_testing:"सिर्फ XPorter आज़मा रहा था",sr_other_no_longer_use_x:"अब X इस्तेमाल नहीं करता",sr_other_didnt_meet_expectations:"मेरी उम्मीदों पर खरा नहीं उतरा"},
+      ja: {r_broken:"動作しなかった、またはエラーが出た",r_confusing:"使い方が分かりにくかった",r_slow:"遅すぎた、またはXの制限に何度もかかった",r_missing:"必要な機能やデータが足りなかった",r_once:"XPorterが必要だったのは一度だけ",r_alt:"別のツールに乗り換えた",r_privacy:"アカウントの安全性、プライバシー、権限が心配だった",r_other:"その他の理由",detailExample:"例：期待していたことと、実際に起きたこと。",subreasonPrompt:"最も近いものは？",subreasonHint:"複数選択可",sr_broken_did_not_start:"エクスポートが始まらなかった",sr_broken_stopped_midway:"エクスポートが途中で止まった",sr_broken_empty_or_incomplete:"ファイルが空または不完全だった",sr_broken_error_message:"エラーメッセージが表示された",sr_broken_wrong_data:"エクスポートされたデータが間違っていた",sr_confusing_couldnt_find_mode:"エクスポートの始め方が分からなかった",sr_confusing_unclear_input:"何を入力すべきか分からなかった",sr_confusing_unclear_options:"設定項目が分かりにくかった",sr_confusing_unclear_progress:"動作中かどうか分からなかった",sr_slow_slow_from_start:"最初から遅かった",sr_slow_slowed_later:"途中から遅くなった",sr_slow_kept_pausing:"何度も一時停止した",sr_slow_never_finished:"最後まで完了しなかった",sr_slow_x_limits:"Xによるリクエスト制限が繰り返された",sr_missing_replies:"返信をエクスポートしたかった",sr_missing_articles:"記事をエクスポートしたかった",sr_missing_more_fields:"より多くの項目やメディアデータが必要だった",sr_missing_different_format:"別のファイル形式が必要だった",sr_missing_filtering_or_dates:"フィルターや期間指定が必要だった",sr_once_one_time_backup:"一度だけのバックアップ",sr_once_analysis_or_research:"調査または分析",sr_once_moving_tools:"データを別の場所へ移す",sr_alt_faster:"より速かった",sr_alt_easier:"より使いやすかった",sr_alt_more_data:"より多くのデータを出力できた",sr_alt_more_reliable:"より安定していた",sr_privacy_account_safety:"Xアカウントが制限されるリスク",sr_privacy_x_account_access:"Xアカウントへのアクセス",sr_privacy_browser_permissions:"ブラウザの権限",sr_privacy_data_handling:"データの取り扱い",sr_other_installed_by_mistake:"間違ってインストールした",sr_other_testing:"XPorterを試していただけ",sr_other_no_longer_use_x:"Xを使わなくなった",sr_other_didnt_meet_expectations:"期待していたものと違った"},
+      ko: {r_broken:"작동하지 않거나 오류가 표시됨",r_confusing:"사용법을 이해하기 어려웠음",r_slow:"너무 느리거나 X 제한에 계속 걸림",r_missing:"필요한 기능이나 데이터가 없었음",r_once:"XPorter가 한 번만 필요했음",r_alt:"다른 도구로 바꿈",r_privacy:"계정 안전, 개인정보 또는 권한이 걱정됨",r_other:"다른 이유",detailExample:"예: 기대한 결과와 실제로 일어난 일.",subreasonPrompt:"가장 가까운 항목은?",subreasonHint:"여러 개 선택 가능",sr_broken_did_not_start:"내보내기가 시작되지 않음",sr_broken_stopped_midway:"내보내기가 중간에 멈춤",sr_broken_empty_or_incomplete:"파일이 비어 있거나 불완전함",sr_broken_error_message:"오류 메시지가 표시됨",sr_broken_wrong_data:"내보낸 데이터가 잘못됨",sr_confusing_couldnt_find_mode:"내보내기 시작 방법을 찾지 못함",sr_confusing_unclear_input:"무엇을 입력할지 몰랐음",sr_confusing_unclear_options:"옵션이 명확하지 않았음",sr_confusing_unclear_progress:"작동 중인지 알 수 없었음",sr_slow_slow_from_start:"처음부터 느렸음",sr_slow_slowed_later:"나중에 느려짐",sr_slow_kept_pausing:"계속 일시 중지됨",sr_slow_never_finished:"끝까지 완료되지 않음",sr_slow_x_limits:"X가 요청을 계속 제한함",sr_missing_replies:"답글 내보내기가 필요했음",sr_missing_articles:"아티클 내보내기가 필요했음",sr_missing_more_fields:"더 많은 필드나 미디어 데이터가 필요했음",sr_missing_different_format:"다른 파일 형식이 필요했음",sr_missing_filtering_or_dates:"필터나 날짜 범위가 필요했음",sr_once_one_time_backup:"일회성 백업",sr_once_analysis_or_research:"조사 또는 분석",sr_once_moving_tools:"데이터를 다른 곳으로 이동",sr_alt_faster:"더 빨랐음",sr_alt_easier:"더 사용하기 쉬웠음",sr_alt_more_data:"더 많은 데이터를 내보냈음",sr_alt_more_reliable:"더 안정적이었음",sr_privacy_account_safety:"X 계정이 제한될 위험",sr_privacy_x_account_access:"내 X 계정 접근",sr_privacy_browser_permissions:"브라우저 권한",sr_privacy_data_handling:"내 데이터 처리 방식",sr_other_installed_by_mistake:"실수로 설치함",sr_other_testing:"XPorter를 시험해 보는 중이었음",sr_other_no_longer_use_x:"더 이상 X를 사용하지 않음",sr_other_didnt_meet_expectations:"기대와 달랐음"},
+      zh_CN: {r_broken:"无法使用或出现错误",r_confusing:"使用方式难以理解",r_slow:"速度太慢或不断触发 X 的限制",r_missing:"缺少我需要的功能或数据",r_once:"我只需要使用一次 XPorter",r_alt:"我换用了其他工具",r_privacy:"我担心账号安全、隐私或权限",r_other:"其他原因",detailExample:"例如：你原本期待什么，以及实际发生了什么。",subreasonPrompt:"哪一项最符合？",subreasonHint:"可多选",sr_broken_did_not_start:"导出没有开始",sr_broken_stopped_midway:"导出中途停止",sr_broken_empty_or_incomplete:"文件为空或不完整",sr_broken_error_message:"出现了错误提示",sr_broken_wrong_data:"导出的数据不正确",sr_confusing_couldnt_find_mode:"找不到如何开始导出",sr_confusing_unclear_input:"不知道应该输入什么",sr_confusing_unclear_options:"选项含义不清楚",sr_confusing_unclear_progress:"不知道是否正在运行",sr_slow_slow_from_start:"从一开始就很慢",sr_slow_slowed_later:"后来变慢了",sr_slow_kept_pausing:"不断暂停",sr_slow_never_finished:"始终没有完成",sr_slow_x_limits:"X 不断限制请求",sr_missing_replies:"需要导出回复",sr_missing_articles:"需要导出文章",sr_missing_more_fields:"需要更多字段或媒体数据",sr_missing_different_format:"需要其他文件格式",sr_missing_filtering_or_dates:"需要筛选器或日期范围",sr_once_one_time_backup:"一次性备份",sr_once_analysis_or_research:"研究或分析",sr_once_moving_tools:"把数据迁移到其他地方",sr_alt_faster:"速度更快",sr_alt_easier:"更容易使用",sr_alt_more_data:"能导出更多数据",sr_alt_more_reliable:"更可靠",sr_privacy_account_safety:"X 账号被限制的风险",sr_privacy_x_account_access:"访问我的 X 账号",sr_privacy_browser_permissions:"浏览器权限",sr_privacy_data_handling:"如何处理我的数据",sr_other_installed_by_mistake:"误安装",sr_other_testing:"只是试用 XPorter",sr_other_no_longer_use_x:"我不再使用 X",sr_other_didnt_meet_expectations:"没有达到我的预期"}
+    };
+    const EXAMPLE_I18N = {
+      de: {ex_r_broken:"Zum Beispiel: Beim Export von 2.400 Posts von @username stoppte der Vorgang bei Post 817 mit einem Netzwerkfehler.",ex_r_confusing:"Zum Beispiel: Ich wollte Posts und Antworten, wusste aber nicht, welchen Exportmodus ich wählen sollte.",ex_r_slow:"Zum Beispiel: Ich exportierte etwa 3.000 Posts; ab Post 800 pausierte der Export ständig und wurde nie fertig.",ex_r_missing:"Zum Beispiel: Ich brauchte Posts, Antworten und Medienlinks in einer nach Datum gefilterten CSV-Datei.",ex_r_once:"Zum Beispiel: Ich brauchte nur ein Backup vor dem Löschen eines Accounts; für regelmäßige Backups würde ich wiederkommen.",ex_r_alt:"Zum Beispiel: Ich bin zu [Toolname oder Link] gewechselt, weil es auch Antworten exportiert und schneller fertig ist.",ex_r_privacy:"Zum Beispiel: Mir war nicht klar, warum XPorter Zugriff auf meinen X-Account braucht oder wie dieser Zugriff genutzt wird.",ex_r_other:"Zum Beispiel: Ich habe XPorter nur getestet, brauche aber gerade keinen Export."},
+      es: {ex_r_broken:"Por ejemplo: intenté exportar 2.400 publicaciones de @username, pero se detuvo en la 817 con un error de red.",ex_r_confusing:"Por ejemplo: quería publicaciones y respuestas, pero no sabía qué modo de exportación elegir.",ex_r_slow:"Por ejemplo: estaba exportando unas 3.000 publicaciones; empezó a pausarse cerca de la 800 y nunca terminó.",ex_r_missing:"Por ejemplo: necesitaba publicaciones, respuestas y enlaces multimedia en un CSV filtrado por fecha.",ex_r_once:"Por ejemplo: solo necesitaba una copia antes de borrar una cuenta; volvería para copias programadas.",ex_r_alt:"Por ejemplo: cambié a [nombre o enlace] porque también exporta respuestas y termina más rápido.",ex_r_privacy:"Por ejemplo: no entendía por qué XPorter necesitaba acceso a mi cuenta de X ni cómo lo utilizaba.",ex_r_other:"Por ejemplo: solo estaba probando XPorter, pero ahora mismo no necesito exportar nada."},
+      fr: {ex_r_broken:"Par exemple : j’ai essayé d’exporter 2 400 posts de @username, mais l’export s’est arrêté au 817e avec une erreur réseau.",ex_r_confusing:"Par exemple : je voulais les posts et les réponses, mais je ne savais pas quel mode d’export choisir.",ex_r_slow:"Par exemple : j’exportais environ 3 000 posts ; l’export a commencé à faire des pauses vers le 800e et ne s’est jamais terminé.",ex_r_missing:"Par exemple : il me fallait les posts, les réponses et les liens médias dans un seul CSV filtré par date.",ex_r_once:"Par exemple : il me fallait une seule sauvegarde avant de supprimer un compte ; je reviendrais pour des sauvegardes planifiées.",ex_r_alt:"Par exemple : je suis passé à [nom ou lien] parce qu’il exporte aussi les réponses et termine plus vite.",ex_r_privacy:"Par exemple : je ne comprenais pas pourquoi XPorter devait accéder à mon compte X ni comment cet accès était utilisé.",ex_r_other:"Par exemple : je testais seulement XPorter, mais je n’ai pas besoin d’exporter quoi que ce soit pour le moment."},
+      it: {ex_r_broken:"Per esempio: ho provato a esportare 2.400 post di @username, ma l’esportazione si è fermata al numero 817 con un errore di rete.",ex_r_confusing:"Per esempio: volevo post e risposte, ma non capivo quale modalità di esportazione scegliere.",ex_r_slow:"Per esempio: stavo esportando circa 3.000 post; ha iniziato a fermarsi verso il numero 800 e non ha mai finito.",ex_r_missing:"Per esempio: mi servivano post, risposte e link ai media in un unico CSV filtrato per data.",ex_r_once:"Per esempio: mi serviva una sola copia prima di eliminare un account; tornerei per backup programmati.",ex_r_alt:"Per esempio: sono passato a [nome o link] perché esporta anche le risposte e finisce più velocemente.",ex_r_privacy:"Per esempio: non capivo perché XPorter avesse bisogno di accedere al mio account X o come usasse tale accesso.",ex_r_other:"Per esempio: stavo solo provando XPorter, ma al momento non devo esportare nulla."},
+      pt_BR: {ex_r_broken:"Por exemplo: tentei exportar 2.400 posts de @username, mas parou no post 817 com um erro de rede.",ex_r_confusing:"Por exemplo: eu queria posts e respostas, mas não sabia qual modo de exportação escolher.",ex_r_slow:"Por exemplo: eu estava exportando cerca de 3.000 posts; começou a pausar perto do post 800 e nunca terminou.",ex_r_missing:"Por exemplo: eu precisava de posts, respostas e links de mídia em um único CSV filtrado por data.",ex_r_once:"Por exemplo: eu só precisava de uma cópia antes de excluir uma conta; voltaria para backups programados.",ex_r_alt:"Por exemplo: mudei para [nome ou link] porque também exporta respostas e termina mais rápido.",ex_r_privacy:"Por exemplo: eu não entendia por que o XPorter precisava acessar minha conta do X nem como esse acesso era usado.",ex_r_other:"Por exemplo: eu só estava testando o XPorter, mas não preciso exportar nada agora."},
+      tr: {ex_r_broken:"Örneğin: @username hesabından 2.400 gönderiyi dışa aktarmayı denedim, ancak 817. gönderide ağ hatasıyla durdu.",ex_r_confusing:"Örneğin: gönderileri ve yanıtları istiyordum, ancak hangi dışa aktarma modunu seçmem gerektiğini anlayamadım.",ex_r_slow:"Örneğin: yaklaşık 3.000 gönderiyi dışa aktarıyordum; 800. gönderi civarında duraklamaya başladı ve hiç bitmedi.",ex_r_missing:"Örneğin: gönderileri, yanıtları ve medya bağlantılarını tarihe göre filtrelenmiş tek bir CSV dosyasında istiyordum.",ex_r_once:"Örneğin: bir hesabı silmeden önce yalnızca bir yedeğe ihtiyacım vardı; zamanlanmış yedeklemeler için geri dönerdim.",ex_r_alt:"Örneğin: yanıtları da dışa aktardığı ve daha hızlı tamamladığı için [araç adı veya bağlantı] aracına geçtim.",ex_r_privacy:"Örneğin: XPorter’ın X hesabıma neden erişmesi gerektiğini veya bu erişimi nasıl kullandığını anlamadım.",ex_r_other:"Örneğin: yalnızca XPorter’ı deniyordum, ancak şu anda dışa aktarma yapmam gerekmiyor."},
+      id: {ex_r_broken:"Contoh: saya mencoba mengekspor 2.400 post dari @username, tetapi berhenti di post ke-817 karena error jaringan.",ex_r_confusing:"Contoh: saya ingin post dan balasan, tetapi tidak tahu mode ekspor mana yang harus dipilih.",ex_r_slow:"Contoh: saya mengekspor sekitar 3.000 post; mulai sering berhenti di sekitar post ke-800 dan tidak pernah selesai.",ex_r_missing:"Contoh: saya membutuhkan post, balasan, dan tautan media dalam satu CSV yang difilter berdasarkan tanggal.",ex_r_once:"Contoh: saya hanya membutuhkan satu salinan sebelum menghapus akun; saya akan kembali untuk backup terjadwal.",ex_r_alt:"Contoh: saya beralih ke [nama alat atau tautan] karena alat itu juga mengekspor balasan dan selesai lebih cepat.",ex_r_privacy:"Contoh: saya tidak memahami mengapa XPorter perlu mengakses akun X saya atau bagaimana akses itu digunakan.",ex_r_other:"Contoh: saya hanya mencoba XPorter, tetapi saat ini tidak perlu mengekspor apa pun."},
+      ar: {ex_r_broken:"مثلاً: حاولت تصدير 2,400 منشور من @username، لكن التصدير توقف عند المنشور 817 بسبب خطأ في الشبكة.",ex_r_confusing:"مثلاً: أردت المنشورات والردود، لكنني لم أعرف وضع التصدير الذي ينبغي اختياره.",ex_r_slow:"مثلاً: كنت أصدّر نحو 3,000 منشور؛ بدأ التصدير يتوقف قرب المنشور 800 ولم يكتمل.",ex_r_missing:"مثلاً: احتجت المنشورات والردود وروابط الوسائط في ملف CSV واحد مع تصفية حسب التاريخ.",ex_r_once:"مثلاً: احتجت نسخة واحدة فقط قبل حذف حساب؛ سأعود من أجل النسخ الاحتياطية المجدولة.",ex_r_alt:"مثلاً: انتقلت إلى [اسم الأداة أو الرابط] لأنه يصدّر الردود أيضاً وينتهي بشكل أسرع.",ex_r_privacy:"مثلاً: لم أفهم لماذا يحتاج XPorter إلى الوصول إلى حسابي على X أو كيف يستخدم هذا الوصول.",ex_r_other:"مثلاً: كنت أختبر XPorter فقط، لكنني لا أحتاج إلى تصدير أي شيء الآن."},
+      hi: {ex_r_broken:"उदाहरण: मैंने @username की 2,400 पोस्ट निर्यात करने की कोशिश की, लेकिन 817वीं पोस्ट पर नेटवर्क त्रुटि के साथ रुक गया।",ex_r_confusing:"उदाहरण: मुझे पोस्ट और जवाब चाहिए थे, लेकिन समझ नहीं आया कि कौन सा निर्यात मोड चुनूँ।",ex_r_slow:"उदाहरण: मैं लगभग 3,000 पोस्ट निर्यात कर रहा था; करीब 800 पोस्ट के बाद यह बार बार रुकने लगा और पूरा नहीं हुआ।",ex_r_missing:"उदाहरण: मुझे पोस्ट, जवाब और मीडिया लिंक तारीख के अनुसार फ़िल्टर किए गए एक CSV में चाहिए थे।",ex_r_once:"उदाहरण: खाता हटाने से पहले मुझे केवल एक बैकअप चाहिए था; निर्धारित बैकअप के लिए मैं वापस आता।",ex_r_alt:"उदाहरण: मैं [टूल का नाम या लिंक] पर चला गया क्योंकि वह जवाब भी निर्यात करता है और जल्दी पूरा होता है।",ex_r_privacy:"उदाहरण: मुझे समझ नहीं आया कि XPorter को मेरे X खाते का एक्सेस क्यों चाहिए या वह इसका उपयोग कैसे करता है।",ex_r_other:"उदाहरण: मैं केवल XPorter आज़मा रहा था, लेकिन अभी मुझे कुछ भी निर्यात नहीं करना है।"},
+      ja: {ex_r_broken:"例：@username の投稿2,400件をエクスポートしようとしましたが、817件目でネットワークエラーになり停止しました。",ex_r_confusing:"例：投稿と返信が必要でしたが、どのエクスポートモードを選べばよいか分かりませんでした。",ex_r_slow:"例：約3,000件をエクスポート中、800件あたりから何度も停止し、完了しませんでした。",ex_r_missing:"例：投稿、返信、メディアリンクを日付で絞り込んだ1つのCSVにまとめる必要がありました。",ex_r_once:"例：アカウント削除前に1回だけバックアップが必要でした。定期バックアップがあればまた使います。",ex_r_alt:"例：[ツール名またはリンク]に移りました。返信もエクスポートでき、より早く完了するためです。",ex_r_privacy:"例：XPorterがXアカウントへのアクセスを必要とする理由と、その使われ方が分かりませんでした。",ex_r_other:"例：XPorterを試していただけで、今はエクスポートする必要がありません。"},
+      ko: {ex_r_broken:"예: @username의 게시물 2,400개를 내보내려 했지만 817번째에서 네트워크 오류로 중단됐습니다.",ex_r_confusing:"예: 게시물과 답글이 필요했지만 어떤 내보내기 모드를 선택해야 할지 알 수 없었습니다.",ex_r_slow:"예: 약 3,000개를 내보내던 중 800개쯤부터 계속 멈췄고 끝내 완료되지 않았습니다.",ex_r_missing:"예: 게시물, 답글, 미디어 링크를 날짜로 필터링한 하나의 CSV에 담아야 했습니다.",ex_r_once:"예: 계정을 삭제하기 전에 백업 한 번만 필요했습니다. 예약 백업이 있다면 다시 사용할 것입니다.",ex_r_alt:"예: 답글도 내보내고 더 빨리 끝나는 [도구 이름 또는 링크]로 옮겼습니다.",ex_r_privacy:"예: XPorter가 왜 제 X 계정에 접근해야 하는지, 그 접근 권한을 어떻게 쓰는지 알 수 없었습니다.",ex_r_other:"예: XPorter를 시험해 본 것뿐이며 지금은 내보낼 필요가 없습니다."},
+      zh_CN: {ex_r_broken:"例如：我尝试导出 @username 的 2,400 条帖子，但在第 817 条时因网络错误停止了。",ex_r_confusing:"例如：我需要帖子和回复，但不知道应该选择哪种导出模式。",ex_r_slow:"例如：我在导出约 3,000 条帖子；到 800 条左右开始反复暂停，最后也没有完成。",ex_r_missing:"例如：我需要把帖子、回复和媒体链接按日期筛选后放进同一个 CSV。",ex_r_once:"例如：删除账号前我只需要备份一次；如果支持定时备份，我还会再用。",ex_r_alt:"例如：我换到了[工具名称或链接]，因为它也能导出回复，而且完成得更快。",ex_r_privacy:"例如：我不明白 XPorter 为什么需要访问我的 X 账号，也不知道它会如何使用该权限。",ex_r_other:"例如：我只是试用一下 XPorter，现在并不需要导出任何内容。"}
+    };
+    const SUCCESS_I18N = {
+      en: {thanks:"Feedback received.",thanksSub:"Thanks for taking the time. Your answers will help shape what I improve next.",backToFeedback:"Back to your feedback"},
+      ru: {thanks:"Отзыв получен.",thanksSub:"Спасибо, что уделил время. Твои ответы помогут решить, что улучшать дальше.",backToFeedback:"Вернуться к отзыву"},
+      de: {thanks:"Feedback erhalten.",thanksSub:"Danke, dass du dir die Zeit genommen hast. Deine Antworten helfen mir zu entscheiden, was ich als Nächstes verbessere.",backToFeedback:"Zurück zu deinem Feedback"},
+      es: {thanks:"Comentarios recibidos.",thanksSub:"Gracias por dedicarle un momento. Tus respuestas me ayudarán a decidir qué mejorar a continuación.",backToFeedback:"Volver a tus comentarios"},
+      fr: {thanks:"Avis reçu.",thanksSub:"Merci d'avoir pris le temps. Vos réponses m'aideront à décider ce que j'améliore ensuite.",backToFeedback:"Revenir à votre avis"},
+      it: {thanks:"Feedback ricevuto.",thanksSub:"Grazie per il tempo che ci hai dedicato. Le tue risposte mi aiuteranno a decidere cosa migliorare.",backToFeedback:"Torna al tuo feedback"},
+      pt_BR: {thanks:"Feedback recebido.",thanksSub:"Obrigado pelo seu tempo. Suas respostas vão me ajudar a decidir o que melhorar a seguir.",backToFeedback:"Voltar ao feedback"},
+      tr: {thanks:"Geri bildirimin alındı.",thanksSub:"Zaman ayırdığın için teşekkürler. Yanıtların bir sonraki geliştirmeyi belirlememe yardımcı olacak.",backToFeedback:"Geri bildirime dön"},
+      id: {thanks:"Masukan diterima.",thanksSub:"Terima kasih sudah meluangkan waktu. Jawaban Anda akan membantu saya menentukan apa yang perlu diperbaiki berikutnya.",backToFeedback:"Kembali ke masukan"},
+      ar: {thanks:"تم استلام ملاحظاتك.",thanksSub:"شكراً لتخصيص وقتك. ستساعدني إجاباتك في تحديد ما سأحسنه بعد ذلك.",backToFeedback:"العودة إلى ملاحظاتك"},
+      hi: {thanks:"फ़ीडबैक मिल गया।",thanksSub:"समय देने के लिए धन्यवाद। आपके जवाब मुझे यह तय करने में मदद करेंगे कि आगे क्या सुधारना है।",backToFeedback:"अपने फ़ीडबैक पर वापस जाएँ"},
+      ja: {thanks:"フィードバックを受け取りました。",thanksSub:"お時間をいただきありがとうございます。いただいた回答を、次に改善する内容に役立てます。",backToFeedback:"フィードバックに戻る"},
+      ko: {thanks:"피드백을 받았습니다.",thanksSub:"시간을 내주셔서 감사합니다. 답변은 다음 개선 사항을 정하는 데 도움이 됩니다.",backToFeedback:"피드백으로 돌아가기"},
+      zh_CN: {thanks:"已收到反馈。",thanksSub:"感谢你花时间填写。你的回答会帮助我决定接下来改进什么。",backToFeedback:"返回反馈"}
+    };
+    Object.keys(REASON_I18N).forEach(function (code) {
+      if (I18N[code]) Object.assign(I18N[code], REASON_I18N[code]);
+    });
+    Object.keys(EXAMPLE_I18N).forEach(function (code) {
+      if (I18N[code]) Object.assign(I18N[code], EXAMPLE_I18N[code]);
+    });
+    Object.keys(SUCCESS_I18N).forEach(function (code) {
+      if (I18N[code]) Object.assign(I18N[code], SUCCESS_I18N[code]);
+    });
+
     // Native language names for the switcher.
     const LANG_NAMES = {
       en: "English", ru: "Русский", de: "Deutsch", es: "Español", fr: "Français",
@@ -645,9 +1366,75 @@
     const RTL = ["ar"];
 
     const REASON_KEYS = [
-      ["r_once", "1️⃣"], ["r_broken", "🛠"], ["r_confusing", "🤔"], ["r_alt", "🔁"],
-      ["r_missing", "🧩"], ["r_slow", "🐢"], ["r_privacy", "🔒"], ["r_other", "💬"]
+      "r_once", "r_broken", "r_confusing", "r_alt",
+      "r_missing", "r_slow", "r_privacy", "r_other"
     ];
+    const SUBREASON_OPTIONS = {
+      r_broken: ["sr_broken_did_not_start", "sr_broken_stopped_midway", "sr_broken_empty_or_incomplete", "sr_broken_error_message", "sr_broken_wrong_data"],
+      r_confusing: ["sr_confusing_couldnt_find_mode", "sr_confusing_unclear_input", "sr_confusing_unclear_options", "sr_confusing_unclear_progress"],
+      r_slow: ["sr_slow_slow_from_start", "sr_slow_slowed_later", "sr_slow_kept_pausing", "sr_slow_never_finished", "sr_slow_x_limits"],
+      r_missing: ["sr_missing_replies", "sr_missing_articles", "sr_missing_more_fields", "sr_missing_different_format", "sr_missing_filtering_or_dates"],
+      r_once: ["sr_once_one_time_backup", "sr_once_analysis_or_research", "sr_once_moving_tools"],
+      r_alt: ["sr_alt_faster", "sr_alt_easier", "sr_alt_more_data", "sr_alt_more_reliable"],
+      r_privacy: ["sr_privacy_account_safety", "sr_privacy_x_account_access", "sr_privacy_browser_permissions", "sr_privacy_data_handling"],
+      r_other: ["sr_other_installed_by_mistake", "sr_other_testing", "sr_other_no_longer_use_x", "sr_other_didnt_meet_expectations"]
+    };
+    const MINI_ICON_PATHS = {
+      play: '<circle cx="12" cy="12" r="8"/><path d="m10 8 6 4-6 4Z"/>',
+      stop: '<circle cx="12" cy="12" r="8"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
+      file: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h5M10 17h3"/>',
+      alert: '<path d="M12 3 2.8 20h18.4z"/><path d="M12 9v5M12 17.5v.5"/>',
+      shuffle: '<path d="M4 7h3c4 0 4 10 8 10h5M17 14l3 3-3 3M4 17h3c1.5 0 2.5-1.2 3.4-2.7M14 7h6M17 4l3 3-3 3"/>',
+      compass: '<circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+      keyboard: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M18 10h.01M7 14h10"/>',
+      sliders: '<path d="M4 6h10M18 6h2M4 12h3M11 12h9M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="14" cy="18" r="2"/>',
+      activity: '<path d="M3 12h4l2.5-6 4.5 12 2.5-6H21"/>',
+      hourglass: '<path d="M7 3h10M7 21h10M8 3c0 4 1 6 4 9-3 3-4 5-4 9M16 3c0 4-1 6-4 9 3 3 4 5 4 9"/>',
+      trending: '<path d="M4 6h6v6M20 18h-6v-6M10 6l-6 6M14 18l6-6"/>',
+      pause: '<circle cx="12" cy="12" r="8"/><path d="M10 9v6M14 9v6"/>',
+      timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6M18 5l1.5-1.5"/>',
+      gauge: '<path d="M4.5 18a8 8 0 1 1 15 0M12 18l4-6M7 15h.01M12 10h.01M17 15h.01"/>',
+      reply: '<path d="m9 8-5 4 5 4v-3h4c3 0 5 1 7 4-1-6-4-8-7-8H9z"/>',
+      article: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+      database: '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+      codeFile: '<path d="M7 3h7l4 4v14H7zM14 3v5h5"/><path d="m11 12-2 2 2 2M14 12l2 2-2 2"/>',
+      filter: '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',
+      archive: '<rect x="4" y="7" width="16" height="13" rx="2"/><path d="M3 4h18v4H3zM9 12h6"/>',
+      search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4M8 11l2 2 3-4"/>',
+      move: '<path d="M5 7h14M15 3l4 4-4 4M19 17H5M9 13l-4 4 4 4"/>',
+      bolt: '<path d="m13 2-8 12h7l-1 8 8-12h-7z"/>',
+      wand: '<path d="m4 20 11-11M14 4l1-2 1 2 2 1-2 1-1 2-1-2-2-1zM18 12l.8-1.6.8 1.6 1.6.8-1.6.8-.8 1.6-.8-1.6-1.6-.8z"/>',
+      layers: '<path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/>',
+      shieldCheck: '<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>',
+      shieldAlert: '<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6z"/><path d="M12 8v5M12 16h.01"/>',
+      key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9M17 12v3M20 12v2"/>',
+      browser: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8h18M7 6h.01M10 6h.01"/>',
+      fingerprint: '<path d="M8 8a6 6 0 0 1 10 4c0 3-1 6-3 8M6 11a6 6 0 0 1 1-2M10 12a2 2 0 0 1 4 0c0 3-.5 6-2 9M7 14c0 2-.5 4-1.5 5.5M10 16c-.2 1.7-.7 3-1.5 4"/>',
+      pointer: '<path d="m5 3 13 9-6 1-3 6z"/><path d="m13 13 5 6"/>',
+      flask: '<path d="M9 3h6M10 3v6l-5 9c-.7 1.3.2 3 1.8 3h10.4c1.6 0 2.5-1.7 1.8-3l-5-9V3M8 15h8"/>',
+      logout: '<path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"/>',
+      target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="m4 4 16 16"/>'
+    };
+    const SUBREASON_ICONS = {
+      sr_broken_did_not_start: "play", sr_broken_stopped_midway: "stop",
+      sr_broken_empty_or_incomplete: "file", sr_broken_error_message: "alert", sr_broken_wrong_data: "shuffle",
+      sr_confusing_couldnt_find_mode: "compass", sr_confusing_unclear_input: "keyboard",
+      sr_confusing_unclear_options: "sliders", sr_confusing_unclear_progress: "activity",
+      sr_slow_slow_from_start: "hourglass", sr_slow_slowed_later: "trending", sr_slow_kept_pausing: "pause",
+      sr_slow_never_finished: "timer", sr_slow_x_limits: "gauge",
+      sr_missing_replies: "reply", sr_missing_articles: "article", sr_missing_more_fields: "database",
+      sr_missing_different_format: "codeFile", sr_missing_filtering_or_dates: "filter",
+      sr_once_one_time_backup: "archive", sr_once_analysis_or_research: "search", sr_once_moving_tools: "move",
+      sr_alt_faster: "bolt", sr_alt_easier: "wand", sr_alt_more_data: "layers", sr_alt_more_reliable: "shieldCheck",
+      sr_privacy_account_safety: "shieldAlert", sr_privacy_x_account_access: "key",
+      sr_privacy_browser_permissions: "browser", sr_privacy_data_handling: "fingerprint",
+      sr_other_installed_by_mistake: "pointer", sr_other_testing: "flask",
+      sr_other_no_longer_use_x: "logout", sr_other_didnt_meet_expectations: "target"
+    };
+    function miniIcon(name) {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + (MINI_ICON_PATHS[name] || MINI_ICON_PATHS.activity) + '</svg>';
+    }
     /* ---------------- helpers ---------------- */
     const params = Object.fromEntries(new URLSearchParams(location.search));
 
@@ -678,10 +1465,6 @@
       return "en";
     }
 
-    // The word "optional" per locale (shown as a badge next to the comment label).
-    const OPTIONAL = { en: "optional", ru: "необязательно", de: "optional", es: "opcional", fr: "facultatif", it: "facoltativo", pt_BR: "opcional", tr: "isteğe bağlı", id: "opsional", ar: "اختياري", hi: "वैकल्पिक", ja: "任意", ko: "선택 사항", zh_CN: "可选" };
-    Object.keys(OPTIONAL).forEach(function (k) { if (I18N[k]) I18N[k].optional = OPTIONAL[k]; });
-
     let lang = pickLang();
 
     function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key; }
@@ -695,10 +1478,20 @@
         else el.textContent = t(el.dataset.i18n);
       });
       document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
-      refreshDetailPlaceholder();
+      refreshDetailField();
+      renderSubreasons();
     }
 
     function renderSubtitle(el, text) {
+      const strongText = I18N[lang] && I18N[lang].subtitleStrong;
+      if (strongText && text.includes(strongText)) {
+        const splitAt = text.indexOf(strongText);
+        el.textContent = text.slice(0, splitAt);
+        const strong = document.createElement("strong");
+        strong.textContent = strongText;
+        el.append(strong, document.createTextNode(text.slice(splitAt + strongText.length)));
+        return;
+      }
       const separators = [" — ", "——", ", y "];
       const separator = separators.find(value => text.includes(value));
       if (!separator) { el.textContent = text; return; }
@@ -709,14 +1502,18 @@
       el.appendChild(strong);
     }
 
-    // The comment placeholder adapts to the chosen reason: a reason-specific
-    // prompt (fall back to the generic one). Contact consent stays visible
-    // below the field instead of disappearing with the placeholder.
-    function refreshDetailPlaceholder() {
+    // Keep the question visible while the placeholder provides a concrete example.
+    function refreshDetailField() {
       const detailEl = document.getElementById("detail");
       if (!detailEl) return;
-      const base = (selectedReason && t("ph_" + selectedReason)) || t("detailPrompt");
-      detailEl.placeholder = base;
+      document.getElementById("detailQuestion").textContent =
+        (selectedReason && t("ph_" + selectedReason)) || t("detailPrompt");
+      const localStrings = I18N[lang] || {};
+      const exampleKey = selectedReason && "ex_" + selectedReason;
+      detailEl.placeholder = (exampleKey && localStrings[exampleKey])
+        || localStrings.detailExample
+        || localStrings.detailPrompt
+        || t("detailExample");
       renderContactConsent(document.getElementById("contactConsent"), t("phContact"));
     }
 
@@ -747,29 +1544,138 @@
     });
 
     /* ---------------- build UI ---------------- */
-    // language switcher — same order as the extension's language list
-    const langSelect = document.getElementById("langSelect");
+    // Custom language switcher, matching the extension without the native select menu.
     const LANG_ORDER = ["en", "zh_CN", "ja", "es", "ko", "ru", "it", "pt_BR", "tr", "de", "ar", "fr", "hi", "id"];
-    LANG_ORDER.filter(c => I18N[c])
-      .forEach(code => {
-        const o = document.createElement("option");
-        o.value = code; o.textContent = `${LANG_FLAGS[code] || "🌐"} ${LANG_NAMES[code] || code}`;
-        if (code === lang) o.selected = true;
-        langSelect.appendChild(o);
+    const langSelector = document.getElementById("langSelector");
+    const langBtn = document.getElementById("langBtn");
+    const langMenu = document.getElementById("langMenu");
+    const langCurrentFlag = document.getElementById("langCurrentFlag");
+    const langCurrentName = document.getElementById("langCurrentName");
+
+    function updateLangButton() {
+      langCurrentFlag.textContent = LANG_FLAGS[lang] || "🌐";
+      langCurrentName.textContent = LANG_NAMES[lang] || lang;
+    }
+
+    function renderLangMenu() {
+      langMenu.textContent = "";
+      LANG_ORDER.filter(code => I18N[code]).forEach(code => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "lang-option";
+        option.dataset.lang = code;
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", String(code === lang));
+
+        const flag = document.createElement("span");
+        flag.className = "lang-option-flag";
+        flag.setAttribute("aria-hidden", "true");
+        flag.textContent = LANG_FLAGS[code] || "🌐";
+
+        const name = document.createElement("span");
+        name.className = "lang-option-name";
+        name.textContent = LANG_NAMES[code] || code;
+
+        const check = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        check.setAttribute("class", "lang-option-check");
+        check.setAttribute("width", "15");
+        check.setAttribute("height", "15");
+        check.setAttribute("viewBox", "0 0 24 24");
+        check.setAttribute("fill", "none");
+        check.setAttribute("stroke", "currentColor");
+        check.setAttribute("stroke-width", "2.5");
+        check.setAttribute("stroke-linecap", "round");
+        check.setAttribute("stroke-linejoin", "round");
+        check.setAttribute("aria-hidden", "true");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "m5 12 5 5L20 7");
+        check.appendChild(path);
+
+        option.append(flag, name, check);
+        option.addEventListener("click", () => selectLanguage(code));
+        langMenu.appendChild(option);
       });
-    langSelect.addEventListener("change", e => { lang = e.target.value; applyI18n(); renderReasons(); });
+    }
+
+    function setLangMenuOpen(open, returnFocus = false) {
+      langMenu.hidden = !open;
+      langBtn.setAttribute("aria-expanded", String(open));
+      if (open) {
+        requestAnimationFrame(() => {
+          const active = langMenu.querySelector('[aria-selected="true"]');
+          if (active) {
+            active.focus({ preventScroll: true });
+            active.scrollIntoView({ block: "nearest" });
+          }
+        });
+      } else if (returnFocus) {
+        langBtn.focus();
+      }
+    }
+
+    function selectLanguage(code) {
+      if (!I18N[code]) return;
+      lang = code;
+      applyI18n();
+      renderReasons();
+      updateLangButton();
+      renderLangMenu();
+      setLangMenuOpen(false, true);
+    }
+
+    function moveLangFocus(direction) {
+      const options = Array.from(langMenu.querySelectorAll(".lang-option"));
+      if (!options.length) return;
+      const current = options.indexOf(document.activeElement);
+      const next = current < 0 ? 0 : (current + direction + options.length) % options.length;
+      options[next].focus();
+      options[next].scrollIntoView({ block: "nearest" });
+    }
+
+    langBtn.addEventListener("click", event => {
+      event.stopPropagation();
+      setLangMenuOpen(langBtn.getAttribute("aria-expanded") !== "true");
+    });
+    langBtn.addEventListener("keydown", event => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      setLangMenuOpen(true);
+      requestAnimationFrame(() => moveLangFocus(event.key === "ArrowDown" ? 1 : -1));
+    });
+    langMenu.addEventListener("keydown", event => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        moveLangFocus(event.key === "ArrowDown" ? 1 : -1);
+      } else if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        const options = langMenu.querySelectorAll(".lang-option");
+        const target = event.key === "Home" ? options[0] : options[options.length - 1];
+        if (target) target.focus();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        setLangMenuOpen(false, true);
+      }
+    });
+    document.addEventListener("click", event => {
+      if (!langMenu.hidden && !langSelector.contains(event.target)) setLangMenuOpen(false);
+    });
+
+    updateLangButton();
+    renderLangMenu();
 
     // reason chips
     const reasonsEl = document.getElementById("reasons");
     const actionEl = document.getElementById("action"); // persistent ref (survives re-render)
+    const subreasonBlockEl = document.getElementById("subreasonBlock");
+    const subreasonOptionsEl = document.getElementById("subreasonOptions");
     function renderReasons() {
       reasonsEl.innerHTML = "";
-      REASON_KEYS.forEach(([key, emoji]) => {
+      REASON_KEYS.forEach((key) => {
         const b = document.createElement("button");
         b.className = "reason";
         b.dataset.reason = key;
         if (key === selectedReason) b.classList.add("selected");
-        b.innerHTML = `<span class="emoji" aria-hidden="true">${emoji}</span><span>${t(key)}</span>`
+        b.innerHTML = `<span class="reason-icon" aria-hidden="true"></span><span>${t(key)}</span>`
           + `<span class="check" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>`;
         b.addEventListener("click", () => onReason(key));
         reasonsEl.appendChild(b);
@@ -782,15 +1688,53 @@
       }
     }
 
+    function renderSubreasons() {
+      if (!subreasonBlockEl || !subreasonOptionsEl) return;
+      const options = SUBREASON_OPTIONS[selectedReason] || [];
+      subreasonBlockEl.hidden = !options.length;
+      document.getElementById("subreasonPrompt").textContent = t("subreasonPrompt");
+      subreasonOptionsEl.innerHTML = "";
+      options.forEach(function (key) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "subreason";
+        button.dataset.subreason = key;
+        button.dataset.group = selectedReason;
+        button.setAttribute("aria-pressed", selectedSubreasons.has(key) ? "true" : "false");
+        button.innerHTML = '<span class="subreason-icon" aria-hidden="true">'
+          + miniIcon(SUBREASON_ICONS[key])
+          + '</span><span class="subreason-label"></span>'
+          + '<span class="subreason-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>';
+        button.querySelector(".subreason-label").textContent = t(key);
+        button.addEventListener("click", function () {
+          if (selectedSubreasons.has(key)) selectedSubreasons.delete(key);
+          else selectedSubreasons.add(key);
+          button.setAttribute("aria-pressed", selectedSubreasons.has(key) ? "true" : "false");
+          // Persist chips immediately. Omitting `type` keeps the last meaningful
+          // event (reason/detail) intact while the Sheet stats are updated.
+          send(basePayload());
+        });
+        subreasonOptionsEl.appendChild(button);
+      });
+    }
+
     // contact links
     document.getElementById("tgLink").href = TELEGRAM_URL;
     document.getElementById("emailLink").href = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("XPorter feedback");
+    document.getElementById("emailAddress").textContent = EMAIL;
     document.getElementById("reinstallLink").href = STORE_URL;
 
     /* ---------------- state + sending ---------------- */
     const sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
     let selectedReason = null;
+    let selectedSubreasons = new Set();
+    const selectedSubreasonsByReason = new Map();
+    const reasonHistory = [];
     let reasonSent = false;
+    let reasonTransitioning = false;
+    let queuedReason = null;
+    const reduceReasonMotion = window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // How long this feedback page is actively VISIBLE — tells "read it and
     // answered" from "bounced instantly". Anonymous; counts visible time only.
@@ -803,13 +1747,34 @@
     }
 
     function basePayload() {
+      const subreasonKeys = Array.from(selectedSubreasons);
+      const selectedGroups = REASON_KEYS.map(function (reason) {
+        return [reason, Array.from(selectedSubreasonsByReason.get(reason) || [])];
+      }).filter(function (entry) { return entry[1].length; });
+      const allSubreasonKeys = selectedGroups.flatMap(function (entry) { return entry[1]; });
       return {
         sessionId,
         source: params.src || (Object.keys(params).length ? "uninstall" : "direct"),
         pageLang: lang,
         // forward every stat the extension appended to the URL, plus the live
         // dwell time on this page:
-        stats: Object.assign({}, params, { page_s: pageSeconds() }),
+        stats: Object.assign({}, params, {
+          page_s: pageSeconds(),
+          subreasons: subreasonKeys.length ? subreasonKeys.join(" | ") : "none",
+          subreason_labels: subreasonKeys.length
+            ? subreasonKeys.map(key => I18N.en[key] || key).join(" | ")
+            : "none",
+          // Keep the final reason easy to analyse in the existing columns, but
+          // also retain every chip selected under earlier reasons.
+          reason_history: reasonHistory.length ? reasonHistory.join(" | ") : "none",
+          subreasons_all: allSubreasonKeys.length ? allSubreasonKeys.join(" | ") : "none",
+          subreason_labels_all: selectedGroups.length
+            ? selectedGroups.map(function (entry) {
+                return (I18N.en[entry[0]] || entry[0]) + ": "
+                  + entry[1].map(key => I18N.en[key] || key).join("; ");
+              }).join(" || ")
+            : "none"
+        }),
         ts: new Date().toISOString()
       };
     }
@@ -828,6 +1793,10 @@
     window.addEventListener("pagehide", function () { send(basePayload()); });
 
     function send(payload) {
+      if (params.preview === "1") {
+        console.info("[XPorter feedback preview] Payload not sent:", payload);
+        return Promise.resolve(true);
+      }
       if (!ENDPOINT || ENDPOINT.startsWith("PASTE_")) {
         console.warn("[XPorter feedback] ENDPOINT not configured. Payload:", payload);
         return Promise.resolve(false);
@@ -845,24 +1814,180 @@
       }).then(() => true).catch(() => false);
     }
 
-    function onReason(key) {
+    const actionCollapsedFrame = {
+      height: "0px",
+      marginTop: "0px",
+      marginBottom: "0px",
+      opacity: 0
+    };
+
+    // A hand-shaped motion graph: brief take-off, an early speed peak, then a
+    // long cubic tail whose velocity joins smoothly and reaches true zero.
+    // First-open and reason-to-reason movement use the same profile.
+    const ACTION_MOTION_DURATION = 700;
+    const ACTION_MOTION_TAIL_EASING = "cubic-bezier(.12, .68, .24, 1)";
+    const ACTION_MOTION_STOPS = [
+      [0, 0],
+      [.031, .01],
+      [.085, .26],
+      [.154, .58],
+      [.247, .79],
+      [.370, .90],
+      [1, 1]
+    ];
+
+    function actionExpandedFrame(height, marginBottom) {
+      return {
+        height: height + "px",
+        marginTop: "6px",
+        marginBottom: marginBottom + "px",
+        opacity: 1
+      };
+    }
+
+    function actionMotionKeyframes(height, marginBottom, opening) {
+      return ACTION_MOTION_STOPS.map(([offset, progress]) => {
+        const amount = opening ? progress : 1 - progress;
+        return {
+          offset,
+          easing: progress === .90 ? ACTION_MOTION_TAIL_EASING : "linear",
+          height: (height * amount) + "px",
+          marginTop: (6 * amount) + "px",
+          marginBottom: (marginBottom * amount) + "px",
+          // Let geometry carry the long tail; reach visual opacity earlier so
+          // the ending remains visible instead of merely fading away.
+          opacity: Math.min(1, amount * 1.7)
+        };
+      });
+    }
+
+    function naturalActionHeight() {
+      const previousHeight = actionEl.style.height;
+      actionEl.style.height = "auto";
+      const height = actionEl.getBoundingClientRect().height;
+      actionEl.style.height = previousHeight;
+      return height;
+    }
+
+    function naturalActionBottomMargin(element) {
+      return parseFloat(getComputedStyle(element).marginBottom) || 0;
+    }
+
+    function clearActionMotionStyles(element) {
+      element.classList.remove("is-transitioning");
+      ["height", "marginTop", "marginBottom", "opacity", "overflow"]
+        .forEach(property => { element.style[property] = ""; });
+    }
+
+    function makeActionGhost() {
+      const oldHeight = actionEl.getBoundingClientRect().height;
+      const oldMarginBottom = parseFloat(getComputedStyle(actionEl).marginBottom) || 0;
+      const ghost = actionEl.cloneNode(true);
+      ghost.removeAttribute("id");
+      ghost.className = "action show action-transition-ghost is-transitioning";
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.setAttribute("inert", "");
+      ghost.querySelectorAll("[id]").forEach(element => element.removeAttribute("id"));
+      ghost.querySelectorAll("[for]").forEach(element => element.removeAttribute("for"));
+      const liveTextareas = actionEl.querySelectorAll("textarea");
+      ghost.querySelectorAll("textarea").forEach((element, index) => {
+        if (liveTextareas[index]) element.value = liveTextareas[index].value;
+      });
+      Object.assign(ghost.style, actionExpandedFrame(oldHeight, oldMarginBottom));
+      actionEl.insertAdjacentElement("beforebegin", ghost);
+      return { ghost, oldHeight, oldMarginBottom };
+    }
+
+    async function animateFirstActionOpen() {
+      actionEl.classList.add("show", "is-transitioning");
+      const targetHeight = naturalActionHeight();
+      const targetMarginBottom = naturalActionBottomMargin(actionEl);
+      if (reduceReasonMotion || typeof actionEl.animate !== "function") {
+        clearActionMotionStyles(actionEl);
+        return;
+      }
+      Object.assign(actionEl.style, actionCollapsedFrame);
+      const animation = actionEl.animate(
+        actionMotionKeyframes(targetHeight, targetMarginBottom, true),
+        { duration: ACTION_MOTION_DURATION, easing: "linear", fill: "forwards" }
+      );
+      try { await animation.finished; } catch (error) {}
+      Object.assign(actionEl.style, actionExpandedFrame(targetHeight, targetMarginBottom));
+      animation.cancel();
+      clearActionMotionStyles(actionEl);
+    }
+
+    async function animateActionTransfer(ghost, oldHeight, oldMarginBottom) {
+      actionEl.classList.add("show", "is-transitioning");
+      const newHeight = naturalActionHeight();
+      const newMarginBottom = naturalActionBottomMargin(actionEl);
+      if (reduceReasonMotion || typeof actionEl.animate !== "function") {
+        if (ghost && ghost.isConnected) ghost.remove();
+        clearActionMotionStyles(actionEl);
+        return;
+      }
+
+      const oldExpanded = actionExpandedFrame(oldHeight, oldMarginBottom);
+      const newExpanded = actionExpandedFrame(newHeight, newMarginBottom);
+      Object.assign(ghost.style, oldExpanded);
+      Object.assign(actionEl.style, actionCollapsedFrame);
+      // Commit both complementary starting sizes before advancing their shared timeline.
+      void actionEl.offsetHeight;
+      const options = {
+        duration: ACTION_MOTION_DURATION,
+        easing: "linear",
+        fill: "forwards"
+      };
+      const closeAnimation = ghost.animate(
+        actionMotionKeyframes(oldHeight, oldMarginBottom, false),
+        options
+      );
+      const openAnimation = actionEl.animate(
+        actionMotionKeyframes(newHeight, newMarginBottom, true),
+        options
+      );
+      try { await Promise.all([closeAnimation.finished, openAnimation.finished]); } catch (error) {}
+      Object.assign(ghost.style, actionCollapsedFrame);
+      Object.assign(actionEl.style, newExpanded);
+      closeAnimation.cancel();
+      openAnimation.cancel();
+      if (ghost.isConnected) ghost.remove();
+      clearActionMotionStyles(actionEl);
+    }
+
+    async function onReason(key) {
+      // Re-clicking the current reason is intentionally a no-op: keep the
+      // form, its values and its visual state exactly as they are.
+      if (key === selectedReason) {
+        if (reasonTransitioning) queuedReason = null;
+        return;
+      }
+      if (reasonTransitioning) {
+        queuedReason = key;
+        return;
+      }
+
+      const hadOpenPanel = selectedReason && actionEl.classList.contains("show");
+      const transfer = hadOpenPanel ? makeActionGhost() : null;
+      reasonTransitioning = true;
+
       selectedReason = key;
+      if (!selectedSubreasonsByReason.has(key)) selectedSubreasonsByReason.set(key, new Set());
+      selectedSubreasons = selectedSubreasonsByReason.get(key);
+      if (!reasonHistory.includes(key)) reasonHistory.push(key);
       // Update selection on the existing chips (no full re-render → the chips
       // smoothly transition in/out of the selected state, no flash).
       reasonsEl.querySelectorAll(".reason").forEach(function (b) {
         b.classList.toggle("selected", b.dataset.reason === key);
       });
       const selBtn = reasonsEl.querySelector(".reason.selected");
-      actionEl.classList.add("show");
-      refreshDetailPlaceholder();
+      actionEl.classList.add("show", "is-transitioning");
+      Object.assign(actionEl.style, actionCollapsedFrame);
+      renderSubreasons();
+      refreshDetailField();
       if (selBtn) selBtn.insertAdjacentElement("afterend", actionEl);
-      // Replay the slide-in each time the panel moves to a different reason.
-      actionEl.style.animation = "none";
-      void actionEl.offsetWidth;
-      actionEl.style.animation = "";
       // Don't auto-focus the textarea — most people just pick a reason and
       // shouldn't get a keyboard popup on mobile.
-      actionEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
       // Save the reason immediately (so we keep it even if they bounce / never hit Send).
       if (!reasonSent) {
         reasonSent = true;
@@ -870,29 +1995,174 @@
       } else {
         send(Object.assign(basePayload(), { type: "reason_update", reason: key }));
       }
+      if (transfer) {
+        await animateActionTransfer(transfer.ghost, transfer.oldHeight, transfer.oldMarginBottom);
+      }
+      else await animateFirstActionOpen();
+      reasonTransitioning = false;
+      actionEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const next = queuedReason;
+      queuedReason = null;
+      if (next && next !== selectedReason) onReason(next);
+    }
+
+    let confettiTimer;
+    function launchConfetti() {
+      if (reduceReasonMotion) return;
+      const layer = document.getElementById("confettiLayer");
+      if (!layer) return;
+      clearTimeout(confettiTimer);
+      layer.replaceChildren();
+      const colors = ["#42c8ff", "#85e9ff", "#a98cff", "#d99bff", "#ffd15c", "#55e5a7", "#ff7187"];
+      const fragment = document.createDocumentFragment();
+      const particles = [];
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const cardRect = document.querySelector(".card").getBoundingClientRect();
+      const originY = Math.min(230, Math.max(128, viewportHeight * .24));
+      const leftOrigin = Math.max(42, cardRect.left + cardRect.width * .24);
+      const rightOrigin = Math.min(viewportWidth - 42, cardRect.right - cardRect.width * .24);
+
+      function createPiece(index, type) {
+        const piece = document.createElement("i");
+        const face = document.createElement("span");
+        const shapeRoll = Math.random();
+        const width = shapeRoll > .88 ? 9 + Math.random() * 4 : 5 + Math.random() * 6;
+        const height = shapeRoll < .18 ? width * (1.7 + Math.random() * .7) : width * (.58 + Math.random() * .9);
+        piece.className = "confetti-piece";
+        if (shapeRoll < .18) piece.classList.add("is-ribbon");
+        else if (shapeRoll > .88) piece.classList.add("is-star");
+        else if (shapeRoll > .68) piece.classList.add("is-circle");
+        face.className = "confetti-face";
+        piece.style.setProperty("--w", width.toFixed(1) + "px");
+        piece.style.setProperty("--h", height.toFixed(1) + "px");
+        piece.style.setProperty("--color", colors[index % colors.length]);
+        piece.style.setProperty("--flutter", (360 + Math.random() * 300).toFixed(0) + "ms");
+        piece.style.setProperty("--flutter-delay", (-Math.random() * 520).toFixed(0) + "ms");
+        piece.appendChild(face);
+        fragment.appendChild(piece);
+        particles.push({ piece: piece, type: type, index: index });
+      }
+
+      // Two restrained cannons give the celebration a clear focal point;
+      // a smaller top shower keeps the full-page fullness of the old effect.
+      for (let index = 0; index < 46; index += 1) createPiece(index, index % 2 ? "right" : "left");
+      for (let index = 46; index < 60; index += 1) createPiece(index, "shower");
+      layer.appendChild(fragment);
+
+      particles.forEach(function (particle) {
+        const piece = particle.piece;
+        const spinDirection = Math.random() > .5 ? 1 : -1;
+        const spin = spinDirection * (620 + Math.random() * 940);
+        let duration;
+        let delay;
+        let keyframes;
+
+        if (particle.type === "shower") {
+          const startX = viewportWidth * (.03 + Math.random() * .94);
+          const drift = (Math.random() - .5) * 180;
+          const sway = (Math.random() - .5) * 84;
+          duration = 2500 + Math.random() * 900;
+          delay = 90 + Math.random() * 260;
+          keyframes = [
+            { offset: 0, opacity: 0, transform: `translate3d(${startX}px,-28px,0) rotate(0deg) scale(.72)`, easing: "cubic-bezier(.12,.72,.2,1)" },
+            { offset: .10, opacity: .96, transform: `translate3d(${startX + sway * .28}px,${viewportHeight * .08}px,0) rotate(${spin * .12}deg) scale(1)`, easing: "cubic-bezier(.22,.55,.32,1)" },
+            { offset: .62, opacity: .94, transform: `translate3d(${startX + drift * .62 + sway}px,${viewportHeight * .58}px,0) rotate(${spin * .62}deg) scale(.98)`, easing: "cubic-bezier(.26,.2,.48,1)" },
+            { offset: 1, opacity: 0, transform: `translate3d(${startX + drift}px,${viewportHeight + 52}px,0) rotate(${spin}deg) scale(.9)` }
+          ];
+        } else {
+          const fromLeft = particle.type === "left";
+          const startX = fromLeft ? leftOrigin : rightOrigin;
+          const direction = fromLeft ? 1 : -1;
+          const travel = direction * (150 + Math.random() * Math.min(330, viewportWidth * .30));
+          const rise = 120 + Math.random() * Math.min(210, viewportHeight * .24);
+          const landingX = Math.max(-24, Math.min(viewportWidth + 24, startX + travel));
+          const startRotation = (Math.random() - .5) * 50;
+          duration = 2200 + Math.random() * 820;
+          delay = Math.random() * 150;
+          keyframes = [
+            { offset: 0, opacity: 0, transform: `translate3d(${startX}px,${originY}px,0) rotate(${startRotation}deg) scale(.55)`, easing: "cubic-bezier(.08,.74,.18,1)" },
+            { offset: .07, opacity: 1, transform: `translate3d(${startX + travel * .13}px,${originY - rise * .50}px,0) rotate(${startRotation + spin * .12}deg) scale(1)`, easing: "cubic-bezier(.12,.66,.22,1)" },
+            { offset: .24, opacity: 1, transform: `translate3d(${startX + travel * .38}px,${originY - rise}px,0) rotate(${startRotation + spin * .30}deg) scale(1)`, easing: "cubic-bezier(.22,.44,.36,1)" },
+            { offset: .48, opacity: .98, transform: `translate3d(${startX + travel * .65}px,${originY - rise * .72}px,0) rotate(${startRotation + spin * .54}deg) scale(.98)`, easing: "cubic-bezier(.25,.22,.43,1)" },
+            { offset: .82, opacity: .90, transform: `translate3d(${startX + travel * .90}px,${viewportHeight * .62}px,0) rotate(${startRotation + spin * .84}deg) scale(.94)`, easing: "cubic-bezier(.28,.12,.52,1)" },
+            { offset: 1, opacity: 0, transform: `translate3d(${landingX}px,${viewportHeight + 58}px,0) rotate(${startRotation + spin}deg) scale(.86)` }
+          ];
+        }
+
+        piece.animate(keyframes, {
+          duration: duration,
+          delay: delay,
+          fill: "forwards"
+        });
+      });
+      confettiTimer = setTimeout(function () { layer.replaceChildren(); }, 3900);
     }
 
     function finish() {
+      document.querySelector(".card").classList.add("success-mode");
       document.getElementById("form").style.display = "none";
       document.getElementById("thanks").classList.add("show");
       window.scrollTo({ top: 0, behavior: "smooth" });
+      launchConfetti();
+    }
+
+    function returnToFeedback() {
+      const form = document.getElementById("form");
+      const thanks = document.getElementById("thanks");
+      const btn = document.getElementById("submitBtn");
+      const label = btn.querySelector("[data-i18n='submit']");
+      document.querySelector(".card").classList.remove("success-mode");
+      thanks.classList.remove("show");
+      form.style.display = "";
+      btn.disabled = false;
+      btn.classList.remove("is-sending");
+      if (label) label.textContent = t("submit");
+      requestAnimationFrame(function () {
+        (selectedReason ? actionEl : form).scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+
+    function composeDetail(manualDetail) {
+      const groups = REASON_KEYS.map(function (reason) {
+        const keys = Array.from(selectedSubreasonsByReason.get(reason) || []);
+        if (!keys.length) return "";
+        return "- " + (I18N.en[reason] || reason) + ": "
+          + keys.map(key => I18N.en[key] || key).join("; ");
+      }).filter(Boolean);
+      const selectedDetails = groups.length ? "Selected details:\n" + groups.join("\n") : "";
+      return [selectedDetails, manualDetail].filter(Boolean).join("\n\n");
     }
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
       const btn = document.getElementById("submitBtn");
-      const label = btn.querySelector("span");
-      const detail = document.getElementById("detail").value.trim();
+      const label = btn.querySelector("[data-i18n='submit']");
+      const detail = composeDetail(document.getElementById("detail").value.trim());
       btn.disabled = true;
+      btn.classList.add("is-sending");
       if (label) label.textContent = t("sending");
-      const ok = await send(Object.assign(basePayload(), { type: "detail", reason: selectedReason, detail }));
-      if (!ok && !(ENDPOINT.startsWith("PASTE_"))) {
+      const delivery = send(Object.assign(basePayload(), { type: "detail", reason: selectedReason, detail }));
+      const minimumWait = new Promise(resolve => setTimeout(resolve, 720));
+      const result = await Promise.race([
+        delivery.then(ok => ({ settled: true, ok })),
+        new Promise(resolve => setTimeout(() => resolve({ settled: false, ok: true }), 1200))
+      ]);
+      await minimumWait;
+      if (result.settled && !result.ok && !(ENDPOINT.startsWith("PASTE_"))) {
         btn.disabled = false;
+        btn.classList.remove("is-sending");
         if (label) label.textContent = t("submit");
         showToast(t("errorMsg"));
         return;
       }
       finish();
+      if (!result.settled) {
+        delivery.then(function (ok) {
+          if (!ok) console.warn("[XPorter feedback] The background detail request did not finish.");
+        });
+      }
     });
+    document.getElementById("backToFeedback").addEventListener("click", returnToFeedback);
 
     /* email copy on click */
     document.getElementById("emailLink").addEventListener("click", (e) => {
