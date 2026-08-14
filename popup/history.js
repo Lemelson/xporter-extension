@@ -44,12 +44,17 @@
                 info.className = 'history-info';
                 const name = document.createElement('div');
                 name.className = 'history-name';
-                name.textContent = entry.displayName || entry.username;
+                const isBookmarks = entry.exportMode === 'bookmarks';
+                name.textContent = isBookmarks
+                    ? modeLabel('bookmarks')
+                    : (entry.displayName || entry.username);
                 info.appendChild(name);
-                const handle = document.createElement('div');
-                handle.className = 'history-handle';
-                handle.textContent = '@' + (entry.username || '');
-                info.appendChild(handle);
+                if (!isBookmarks) {
+                    const handle = document.createElement('div');
+                    handle.className = 'history-handle';
+                    handle.textContent = '@' + (entry.username || '');
+                    info.appendChild(handle);
+                }
                 info.appendChild(createMeta(entry));
                 card.appendChild(info);
 
@@ -89,6 +94,13 @@
             badge.className = 'history-badge';
             badge.textContent = modeLabel(entry.exportMode || 'posts');
             meta.appendChild(badge);
+            if (entry.partialReason === 'replies_unavailable') {
+                const partial = document.createElement('span');
+                partial.className = 'history-badge history-partial-badge';
+                partial.textContent = t('postsOnlyHistory');
+                partial.title = t('postsOnlyFallbackComplete');
+                meta.appendChild(partial);
+            }
             meta.appendChild(document.createTextNode(
                 ` · ${formatNumber(entry.itemCount || 0, getLanguage())} · ${(entry.outputFormat || 'csv').toUpperCase()}`
             ));

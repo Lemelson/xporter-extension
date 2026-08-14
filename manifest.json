@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "1.4.11",
+  "version": "1.5.9",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
   "minimum_chrome_version": "111",
@@ -14,7 +14,8 @@
   ],
   "host_permissions": [
     "https://x.com/*",
-    "https://twitter.com/*"
+    "https://twitter.com/*",
+    "https://pbs.twimg.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -34,6 +35,7 @@
         "https://twitter.com/*"
       ],
       "js": [
+        "utils/native-request-template.js",
         "content/feed-parser.js",
         "content/interceptor.js"
       ],
@@ -46,6 +48,7 @@
         "https://twitter.com/*"
       ],
       "js": [
+        "utils/native-request-template.js",
         "content/content.js"
       ],
       "run_at": "document_start"

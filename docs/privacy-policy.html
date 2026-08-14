@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>XPorter — Privacy Policy</title>
-  <meta name="description" content="How XPorter handles your data. Your X data never leaves your browser; only an anonymous, non-personal usage summary is sent on uninstall." />
+  <meta name="description" content="How XPorter handles your data locally and communicates with X-owned services; only an anonymous, non-personal usage summary is sent outside X on uninstall." />
   <link rel="icon" type="image/png" href="assets/icon128.png" />
   <script>
     (function () {
@@ -133,9 +133,11 @@
   <div class="container">
     <div class="hero-card">
       <h1>Privacy Policy <span class="badge">Plain English</span></h1>
-      <p>Your X (Twitter) data never leaves your browser — XPorter has no servers and no account. The only thing it ever
-        sends is an anonymous, non-personal usage summary when you uninstall, used solely to understand why people leave
-        and to improve the extension. No personal data and none of your exported content is included.</p>
+      <p>Your exported X (Twitter) data never leaves your browser — XPorter has no servers and no account. Normal exports
+        contact only X-owned services (<code>x.com</code> and the public <code>abs.twimg.com</code> client-asset CDN).
+        The only data sent outside X is an anonymous, non-personal usage summary when you uninstall, used solely to
+        understand why people leave and improve the extension. No personal data and none of your exported content is
+        included.</p>
     </div>
 
     <h2>What the extension accesses</h2>
@@ -143,8 +145,16 @@
     <ul>
       <li><strong>X.com session cookies</strong> — to authenticate API requests on your behalf, making the same calls
         X.com already makes in your browser. No credentials are stored or copied.</li>
-      <li><strong>X.com API responses</strong> — profile info, posts and follower/following lists, processed locally to
-        build your export file (CSV, JSON or XLSX).</li>
+      <li><strong>X.com API responses</strong> — profile info, posts, your current account's personal bookmarks, and
+        follower/following lists, processed locally to build your export file (CSV, JSON, XLSX or TXT). Bookmark content
+        is accessed only when you explicitly start a Bookmarks export.</li>
+      <li><strong>X public client assets</strong> — a public JavaScript asset may be downloaded from X's
+        <code>abs.twimg.com</code> CDN and parsed as text to derive a request header required by some X feeds. XPorter
+        does not execute that remote code and sends the CDN no cookies, auth headers, usernames, or export data.</li>
+      <li><strong>X media files</strong> — when you explicitly enable photo embedding and save an XLSX file, XPorter
+        downloads the selected posts' public images from <code>pbs.twimg.com</code> without credentials and embeds them
+        locally in a Media sheet. This is off by default. Images are not sent to XPorter or any third-party server; if a
+        download fails, the original media URL remains in the export.</li>
       <li><strong>Posts already loaded while you browse X.com</strong> — non-reply posts and their public metrics are
         deduplicated by post ID and stored locally in IndexedDB. No additional request is made and page URLs are not
         stored.</li>
@@ -159,7 +169,8 @@
       <li>Does <strong>not</strong> use analytics, advertising, or tracking SDKs during normal use</li>
       <li>Does <strong>not</strong> store browsing history or page URLs; the local dataset contains post data and the X
         timeline operation that supplied it</li>
-      <li>Does <strong>not</strong> modify your X.com account (no posting, following or liking)</li>
+      <li>Does <strong>not</strong> modify your X.com account (no posting, following, liking, bookmarking or removing
+        bookmarks)</li>
       <li>Does <strong>not</strong> inject ads or promotional content</li>
       <li>Does <strong>not</strong> load any remote code — everything runs from the extension package</li>
     </ul>
@@ -186,9 +197,9 @@
         choose to leave a written comment on the feedback page, only the text you type is sent.</p>
     </div>
     <p>The data is stored in a private spreadsheet via Google Apps Script / Google Sheets (Google acts as the data
-      processor). It is used only to improve XPorter and is never sold or shared. This is the only data XPorter ever
-      transmits anywhere other than X.com. The anonymous summary is recorded when the feedback page loads; any written
-      comment is sent only if you choose to submit one.</p>
+      processor). It is used only to improve XPorter and is never sold or shared. This is the only user or
+      extension-usage data XPorter transmits outside X-owned services. The anonymous summary is recorded when the
+      feedback page loads; any written comment is sent only if you choose to submit one.</p>
 
     <h2>Permissions explained</h2>
     <h3><code>cookies</code></h3>
@@ -213,6 +224,9 @@
         expire, you start or clear an export, clear history, or uninstall the extension</li>
       <li>The seen-post dataset keeps one row per post ID, retains the 50,000 most recently seen unique posts, and
         remains until you clear it in Settings or uninstall the extension</li>
+      <li>If you enable detailed “About this Account” data for user lists, public per-account results are cached in
+        <code>storage.local</code> for up to seven days to avoid repeating the same X requests. Failed lookups expire
+        after one hour, and the cache is capped at 25,000 accounts</li>
       <li>Settings are stored in Chrome's <code>storage.local</code> and cleared when you uninstall</li>
       <li>A small anonymous usage counter (including opens, active time, export counts, install date, and last error
         code) is kept in
@@ -220,13 +234,15 @@
     </ul>
 
     <h2>Third-party services</h2>
-    <p>XPorter integrates with no analytics platforms, ad networks or trackers. Apart from X.com (used to fetch the data
-      you export), the only external communication is the anonymous uninstall feedback above, stored via Google (Apps
-      Script / Google Sheets). XPorter loads no remote code.</p>
+    <p>XPorter integrates with no analytics platforms, ad networks or trackers. Normal exports contact X-owned
+      <code>x.com</code> APIs and may read a public <code>abs.twimg.com</code> client asset as text; that asset is never
+      executed, and no authentication or export data is sent to the CDN. The only communication outside X-owned
+      services is the anonymous uninstall feedback above, stored via Google (Apps Script / Google Sheets).</p>
 
     <h2>Data security</h2>
-    <p>All communication with X.com uses HTTPS. Authentication tokens are handled in memory and are never written to disk
-      or sent to any server other than X.com.</p>
+    <p>All communication with X-owned services uses HTTPS. Authentication tokens are handled in memory, are never
+      written to disk, and are sent only to <code>x.com</code> API requests — never to
+      <code>abs.twimg.com</code>.</p>
 
     <h2>Children's privacy</h2>
     <p>XPorter is not directed at children under 13 and does not knowingly collect information from minors.</p>
@@ -240,7 +256,7 @@
       reply), or email <a href="mailto:art.lemelson@gmail.com">art.lemelson@gmail.com</a> (I check it rarely, so I may be
       slow). You can also find me on <a href="https://github.com/Lemelson/xporter-extension">GitHub</a>.</p>
 
-    <p style="margin-top: 30px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong> June 28, 2026</p>
+    <p style="margin-top: 30px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong> July 26, 2026</p>
   </div>
 
   <footer>

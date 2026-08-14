@@ -6,8 +6,10 @@ const STORAGE_KEYS = {
     EXPORT_STATE: 'xporter_export_state',
     SETTINGS: 'xporter_settings',
     USERNAME: 'xporter_detected_username',
+    CURRENT_ACCOUNT: 'xporter_current_account',
     TWEETS_PREFIX: 'xporter_tweets_batch_',
     EXPORT_HISTORY: 'xporter_export_history',
+    ABOUT_ACCOUNT_CACHE: 'xporter_about_account_cache',
     USAGE: 'xporter_usage'
 };
 
@@ -137,6 +139,37 @@ async function loadAllTweets() {
     }
 
     return allTweets;
+}
+
+// ==================== About This Account Cache ====================
+
+async function loadAboutAccountCache() {
+    const result = await safeGet(STORAGE_KEYS.ABOUT_ACCOUNT_CACHE);
+    const stored = result[STORAGE_KEYS.ABOUT_ACCOUNT_CACHE];
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
+
+    const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+    const successTtl = C.ABOUT_ACCOUNT_CACHE_TTL || (7 * 24 * 60 * 60 * 1000);
+    const failureTtl = C.ABOUT_ACCOUNT_FAILURE_CACHE_TTL || (60 * 60 * 1000);
+    const now = Date.now();
+    const fresh = {};
+    for (const [key, entry] of Object.entries(stored)) {
+        if (!entry || typeof entry !== 'object') continue;
+        const cachedAt = Number(entry.cachedAt) || 0;
+        const ttl = entry.failed ? failureTtl : successTtl;
+        if (cachedAt > 0 && now - cachedAt <= ttl) fresh[key] = entry;
+    }
+    return fresh;
+}
+
+async function saveAboutAccountCache(cache) {
+    const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
+    const maxEntries = Math.max(1, Number(C.ABOUT_ACCOUNT_CACHE_MAX_ENTRIES) || 25000);
+    const entries = Object.entries(cache || {})
+        .filter(([, entry]) => entry && typeof entry === 'object')
+        .sort((a, b) => (Number(b[1].cachedAt) || 0) - (Number(a[1].cachedAt) || 0))
+        .slice(0, maxEntries);
+    return safeSet({ [STORAGE_KEYS.ABOUT_ACCOUNT_CACHE]: Object.fromEntries(entries) });
 }
 
 /**
@@ -363,14 +396,26 @@ async function loadSettings() {
     const result = await safeGet(STORAGE_KEYS.SETTINGS);
     return {
         includeRetweets: true,
-        includeReplies: true,
+        includeReplies: false,
         includeArticles: true,
+        includeBookmarkReplyContext: true,
+        includeBookmarkArticles: true,
+        embedPostPhotos: false,
+        embedBookmarkPhotos: false,
+        includeAboutAccountDetails: false,
+        aboutAccountSpeed: 'standard',
+        aboutAccountCustomBatchSize: C.ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE?.[2] ?? 5,
+        aboutAccountMaxRetries: C.ABOUT_ACCOUNT_RETRY_RANGE?.[2] ?? 5,
         quantityLimit: 500,
         requestDelay: C.REQUEST_DELAY || 3000,
         exportSpeed: 'standard',
         customDelaySec: C.CUSTOM_SPEED_LIMITS?.delaySec?.[2] ?? 5,
         customBatchSize: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
         customCooldownMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
+        userExportSpeed: 'standard',
+        userCustomDelaySec: C.CUSTOM_SPEED_LIMITS?.delaySec?.[2] ?? 5,
+        userCustomBatchSize: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
+        userCustomCooldownMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
         batchSize: C.BATCH_SIZE || 20,
         cooldownDuration: C.COOLDOWN_DURATION || 180000,
         adaptivePacing: (C.ADAPTIVE_PACING !== false),
@@ -400,6 +445,23 @@ async function loadDetectedUsername() {
     return result[STORAGE_KEYS.USERNAME] || '';
 }
 
+async function saveCurrentAccount(account) {
+    const username = String(account?.username || '').replace(/^@/, '');
+    if (!/^[a-zA-Z0-9_]{1,15}$/.test(username)) return false;
+    return safeSet({
+        [STORAGE_KEYS.CURRENT_ACCOUNT]: {
+            name: String(account?.name || '').slice(0, 200),
+            username,
+            avatarUrl: String(account?.avatarUrl || '').slice(0, 500)
+        }
+    });
+}
+
+async function loadCurrentAccount() {
+    const result = await safeGet(STORAGE_KEYS.CURRENT_ACCOUNT);
+    return result[STORAGE_KEYS.CURRENT_ACCOUNT] || null;
+}
+
 // ==================== Usage Stats (for uninstall feedback) ====================
 // Anonymous, non-personal counters. Used only to build the uninstall feedback
 // URL so churn can be understood. No X data, nothing identifying. Cleared on
@@ -414,7 +476,7 @@ function defaultUsage() {
         exportsOk: 0,
         exportsErr: 0,
         exportsStopped: 0,
-        byMode: { posts: 0, followers: 0, following: 0, verifiedFollowers: 0 },
+        byMode: { posts: 0, bookmarks: 0, followers: 0, following: 0, verifiedFollowers: 0 },
         byFormat: { csv: 0, json: 0, xlsx: 0 },
         dateRangeExports: 0,
         resumes: 0,
@@ -592,6 +654,7 @@ function recordExportStopped() {
 const KNOWN_ERROR_CODES = new Set([
     'NOT_LOGGED_IN', 'USER_NOT_FOUND', 'USER_SUSPENDED', 'USER_UNAVAILABLE',
     'ACCOUNT_PRIVATE', 'INVALID_DATE_RANGE', 'RATE_LIMITED', 'STALE_QUERY_ID',
+    'REPLIES_UNAVAILABLE',
     'AUTH_ERROR', 'ENDPOINT_DISCOVERY_FAILED', 'MAX_RETRIES_EXCEEDED',
     'ABORTED', 'STORAGE_FULL', 'SEARCH_CAPTURE_TIMEOUT', 'DOWNLOAD_FAILED',
     'NETWORK_TIMEOUT'
@@ -617,9 +680,11 @@ if (typeof globalThis !== 'undefined') {
     globalThis.XPorterStorage = {
         saveExportState, loadExportState,
         saveTweetBatch, loadTweetBatch, loadTweetBatches, loadAllTweets,
+        loadAboutAccountCache, saveAboutAccountCache,
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,
+        saveCurrentAccount, loadCurrentAccount,
         saveExportHistory, loadExportHistory, loadExportHistoryEntry,
         pruneExpiredExportHistory,
         deleteExportHistoryEntry, clearExportHistory,

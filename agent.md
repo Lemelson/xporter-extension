@@ -2,26 +2,26 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.11** (2026-07-17).
+> Last verified against the codebase at **v1.5.9** (2026-08-15).
 
 ---
 
 ## 1. Project Overview
 
-**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, followers, following, and verified followers — into CSV, JSON, or XLSX files, plus AI-friendly posts-only TXT. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
+**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, personal bookmarks, followers, following, and verified followers — into CSV, JSON, or XLSX files, plus AI-friendly post-row TXT. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
 
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.11 (`manifest.json`) |
+| Version | 1.5.9 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
-| Frameworks | None — zero dependencies, no build step, no bundler |
+| Frameworks | None — no package install, build step, or bundler; adapted source is disclosed in `THIRD_PARTY_NOTICES` |
 | Target Browser | Chrome / Chromium-based, 111+ |
 
 ### Key Selling Points
-- **Free & unlimited** — competitors charge $12–15/mo and cap at 150–200 posts
-- **Multi-mode** — posts, followers, following, verified followers
-- **Multi-format** — CSV, JSON, real OOXML XLSX, and posts-only AI-friendly TXT
+- **Transparent quantity controls** — Unlimited requests every accessible item, while actual availability remains bounded by what X exposes
+- **Multi-mode** — posts, personal bookmarks, followers, following, verified followers
+- **Multi-format** — CSV, JSON, real OOXML XLSX, and post-row AI-friendly TXT for Posts and Bookmarks
 - **Date-range filtering** for posts (via an X search tab — see §5)
 - **14 languages** — auto-detected from the browser
 - **Self-healing API** — discovers GraphQL queryIds from X's JS bundles AND captures them live from X's own network traffic
@@ -55,19 +55,19 @@
 All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage`:
 - **popup/export → service-worker**: commands (`START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `DOWNLOAD_EXPORT`, `SAVE_SETTINGS`, …)
 - **service-worker → popup/export**: live status (`EXPORT_STATUS_UPDATE` broadcast)
-- **content.js → service-worker**: username detection (`SET_USERNAME`), captured queryIds, and compact seen-post batches
-- **interceptor.js → content.js**: validated `window.postMessage` events for queryIds, date-range payloads, and passively seen posts (page MAIN world → content-script isolated world)
+- **content.js → service-worker**: username detection (`SET_USERNAME`), sanitized successful native request templates, and compact seen-post batches
+- **interceptor.js → content.js**: validated `window.postMessage` events for native request templates, date-range payloads, and passively seen posts (page MAIN world → content-script isolated world)
 
 ### Export Flow (High-Level)
-1. User enters username + options in the popup
+1. User selects a mode and options in the popup. Profile modes accept a username; Bookmarks disables that field and targets the current signed-in account
 2. UI sends `START_EXPORT` to the service worker
-3. SW resolves user ID via `UserByScreenName` GraphQL
+3. SW resolves profile modes via `UserByScreenName`; Bookmarks opens `https://x.com/i/bookmarks` and uses the viewer-owned `Bookmarks` timeline without a user ID
 4. Fetches data in batches via the appropriate endpoint, parsing each page
 5. Items are buffered in memory and flushed to `chrome.storage.local` in batches of 50
    - Cursor exports retain only a bounded recent-ID overlap window in memory; saved batches remain the durable source of truth
 6. `RateLimitManager` manages spacing, batch cooldowns, and retries
 7. On completion the user clicks Download → small exports become one file; large exports are read from storage incrementally and downloaded as numbered parts through `chrome.downloads`
-8. **Posts + date range** takes a different path — see §5.
+8. **Posts + date range** takes a different path — see §5. Bookmarks use the normal cursor loop and never use date search.
 
 ---
 
@@ -79,7 +79,9 @@ xporter/
 ├── agent.md                     # THIS FILE — detailed AI context
 ├── CLAUDE.md                    # Short orientation / file map (auto-read by Claude Code)
 ├── README.md                    # User-facing documentation
+├── AGENTS.md                    # Repository, verification, and publication policy
 ├── LICENSE                      # Custom license
+├── THIRD_PARTY_NOTICES          # License notice for adapted runtime source
 ├── index.html                  # GitHub Pages landing page (marketing, not part of the extension)
 ├── privacy-policy.html          # Hosted privacy policy
 ├── icon128.png                  # Loose copy of the store icon (also in icons/ and docs/)
@@ -98,7 +100,7 @@ xporter/
 │   │                            #   Manifest-registered at document_start (isolated world).
 │   └── interceptor.js           # Manifest-registered at document_start in the page MAIN
 │                                #   world (Chrome 111+); wraps fetch/XHR to capture live
-│                                #   GraphQL queryIds + timeline payloads
+│                                #   successful GraphQL request shapes + timeline payloads
 │
 ├── popup/                       # Compact popup UI (~350px)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
@@ -106,7 +108,9 @@ xporter/
 │   ├── popup.js                 # Tabs, export controls, settings, live status
 │   ├── history.js               # Export-history rendering/download/delete UI
 │   ├── seen-posts.js            # Passive dataset summary/download/clear UI
+│   ├── acknowledgement-timer.js # Accessible 5-second guard for risk confirmations
 │   ├── ladybug.js               # Easter-egg ladybug on the About tab (see §6.2)
+│   ├── rate-prompt.js/.css      # Store-rating prompt
 │   ├── theme-init.js            # Inline-loaded FIRST: applies saved theme to avoid FOUC
 │   ├── theme.js                 # Theme toggle logic + SVG icon helpers
 │   ├── i18n.js                  # In-app i18n engine + LANGUAGES list + loadTranslations()
@@ -119,10 +123,14 @@ xporter/
 │   ├── api.js                   # 🔑 X GraphQL client, auth, queryId discovery, cancellation
 │   ├── api-parsers.js           # Pure X response normalization (users/posts/cursors)
 │   ├── api-features.js          # GraphQL feature-flag constant objects (split from api.js)
+│   ├── native-request-template.js # Strict shared sanitizer for captured native request shapes
+│   ├── transaction-id.js        # Local x-client-transaction-id-compatible Replies header
 │   ├── rateLimit.js             # RateLimitManager (spacing, batch cooldown, retry, abort)
 │   ├── csv.js                   # CSV / XLSX output generation (JSON is built in the SW)
+│   ├── columns-i18n.js          # Localized CSV/XLSX headers
 │   ├── storage.js               # chrome.storage.local wrapper (quota-aware) + settings
 │   ├── post-database.js         # IndexedDB seen-post store (dedupe by ID; 50k cap)
+│   ├── usage-tracker.js         # Anonymous local usage counters
 │   └── shared.js                # 🔑 Shared popup/UI helpers (see §4.6)
 │
 ├── _locales/                    # Chrome STORE metadata i18n (manifest __MSG_extName__ etc.)
@@ -130,11 +138,15 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── package.sh                             # allowlist-based CWS zip builder (use this!)
+│   ├── tooling-policy.js                      # Codex sandbox guards + safe tool resolution
+│   ├── soffice-headless.js                    # safe XLSX compatibility runner for Codex/macOS
+│   ├── test-tooling-policy.js                 # regression tests for the sandbox guards
 │   ├── discover_endpoints.js                  # find current queryIds from a console
 │   ├── debug-date-range-playwright.mjs        # Playwright repro for date-range
 │   └── debug-extension-date-range-playwright.mjs
 │
-├── docs/                        # GitHub Pages copy (icon, index, privacy)
+├── test-lab/                    # Offline production-code export fixtures/tests
+├── docs/                        # GitHub Pages site, reports, and vendored site notices
 ├── icons/                       # icon16/48/128.png
 └── .github/workflows/           # CI (e.g. Pages deploy)
 ```
@@ -168,15 +180,16 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 
 **`XLog`** — use `XLog.log/warn/error/info()` instead of `console.*` in SW code.
 
-### 4.2. `utils/api.js` + `utils/api-parsers.js` + `utils/api-features.js` — X GraphQL Integration
+### 4.2. `utils/api.js` + request helpers — X GraphQL Integration
 The most complex, most fragile area.
 
 - **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 24 h (persisted; failed passes cache `FALLBACK_ENDPOINTS` for 10 min only). One scan at a time (single-flight), whole pass capped at `DISCOVERY_TOTAL_TIMEOUT`. `FALLBACK_ENDPOINTS` go stale when X ships new bundles — update periodically. On 401/403 a discovered bearer is reverted to the built-in public token (`noteAuthFailure`).
-- **Live queryId capture**: `content/interceptor.js` also captures real queryIds (and `SearchTimeline` bodies) from X's own traffic and forwards them to the SW, which is more reliable than scraping bundles.
-- **Feature flags** (`api-features.js`): `USER_FEATURES`, `TWEETS_FEATURES` (large!), `FOLLOWERS_FEATURES`. Missing/renamed flags → `400 Bad Request`. To fix: copy the live `features` object from a real x.com GraphQL request in DevTools.
-- **`withStaleRetry(key, fn)`**: catches `STALE_QUERY_ID`, forces re-discovery, retries once. Self-healing against X changes.
+- **Native request-template capture**: after X accepts a native GET, `content/interceptor.js` captures one atomic `{operationName, queryId, features, fieldToggles}` template. `native-request-template.js` validates the same low-authority schema in MAIN, isolated, and worker contexts; it deliberately drops headers, cookies, variables, URLs, usernames, user IDs, and cursors. Fresh templates persist for 30 minutes and keep the accepted queryId and boolean flags together across MV3 worker restarts.
+- **Feature flags** (`api-features.js`): per-operation fallback feature and field-toggle maps for profile, post, bookmark, reply-context, and user-list requests. Missing or renamed flags can produce `400 Bad Request`; prefer a newly sanitized successful native request template before refreshing fallback maps from real x.com traffic.
+- **`withStaleRetry(key, fn)`**: tries a valid fresh native template, persisted/discovered bundle IDs, a forced rescan, then the fallback candidate once each. Exhaustion is marked terminal so the outer rate limiter cannot repeat the whole 10/20/30/40/50-second cycle.
 - **Auth**: reads cookies directly — `ct0` → `x-csrf-token`, `auth_token` → session. Requests go to `https://x.com/i/api/graphql/…` and use `encodeURIComponent` (NOT `URLSearchParams` — X rejects `+` for spaces).
-- **Target ops**: `UserByScreenName`, `UserTweets`, `Followers`, `Following`, `BlueVerifiedFollowers`, `SearchTimeline` (date range).
+- **Replies transaction header**: `transaction-id.js` derives `x-client-transaction-id` locally from X's verification key/SVG animation data for each `UserTweetsAndReplies` request path. It sends nothing to a third party and is cancellable with the export.
+- **Target ops**: `UserByScreenName`, `AboutAccountQuery`, `UserTweets`, `UserTweetsAndReplies`, `Bookmarks`, `TweetResultsByRestIds`, `Followers`, `Following`, `BlueVerifiedFollowers`, `SearchTimeline` (date range).
 - **Parser seam**: `api-parsers.js` owns response-shape traversal and normalized rows; `api.js` owns network/auth/queryId behavior only.
 - **Cancellation**: `XPorterAPI.abortActiveRequests()` aborts an in-flight fetch when the user presses Stop; fetch and response-body reads share the same deadline.
 
@@ -186,35 +199,42 @@ Central orchestrator + message router. Loads utils via `importScripts` (§11). K
 ```javascript
 currentExport = {
   running, username,
-  exportMode: 'posts'|'followers'|'following'|'verified_followers',
-  outputFormat: 'csv'|'json'|'xlsx',
+  exportMode: 'posts'|'bookmarks'|'followers'|'following'|'verified_followers',
+  outputFormat: 'csv'|'json'|'xlsx'|'txt',
   dateFrom, dateTo,        // posts only → triggers the search-capture path (§5)
   settings, tweetCount,    // "tweetCount"/"tweetBuffer" = item count/buffer (historical names)
   totalBatches, tweetBuffer, userId, cursor,
-  status: 'resolving_user'|'fetching'|'scrolling'|'complete'|'stopped'|'error'
+  status: 'resolving_user'|'fetching'|'scrolling'|'complete'|'stopped'|'error',
+  partialReason: null|'replies_unavailable',
+  completionReason: null|'limit_reached'|'source_exhausted'
 }
 ```
 
-**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT` (optional `extraItems` — "+N more" becomes a per-export `limitOverride` baked into the settings snapshot and persisted with the export state; the stored `quantityLimit` setting is NEVER modified by a resume. A resume keeps the snapshot's data FILTERS but takes PACING keys from the current stored settings — `buildResumeSettings` in the SW — so slowing the Export Speed down actually applies to the resumed run), `GET_STATUS`, `GET_DOWNLOAD_PLAN`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `GET_EXPORT_TEXT` (returns the already-collected posts-only TXT to the popup for a user-triggered clipboard copy), `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. Worker-to-popup broadcasts include `EXPORT_STATUS_UPDATE` and multipart `DOWNLOAD_PROGRESS`/`DOWNLOAD_COMPLETE`/`DOWNLOAD_ERROR`.
+**Message types** (`onMessage` cases): `SET_USERNAME`/`GET_USERNAME`, `SET_CURRENT_ACCOUNT`/`GET_CURRENT_ACCOUNT`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT` (optional `extraItems` is accepted only after a completed export; stopped/error resumes preserve the original limit), `RESUME_POSTS_ONLY` (explicit zero-row recovery after Replies becomes unavailable; does not change the global `includeReplies` setting), `GET_STATUS`, `GET_DOWNLOAD_PLAN`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `GET_EXPORT_TEXT` (returns the already-collected post-row TXT to the popup for a user-triggered clipboard copy), `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_REQUEST_TEMPLATE`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`, and the local telemetry signals `XP_SESSION_OPEN`/`XP_ACTIVE_TICK`. Worker-to-popup broadcasts include `EXPORT_STATUS_UPDATE` and multipart `DOWNLOAD_PROGRESS`/`DOWNLOAD_COMPLETE`/`DOWNLOAD_ERROR`.
 
 **Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
 
 ### 4.4. `utils/rateLimit.js` — `RateLimitManager`
 Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
 
-**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing: they run at their advertised delay while `remaining > raceReserve`, then hold until the advertised window reset (an explicit `'window'` wait). This fits finite exports: a small job finishes promptly, while a large job waits honestly when X's quota is spent. Missing/stale headers use mode-specific fallback delays plus the existing batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders pacing as a 4→3→2→1 countdown with an amber bar that fills exactly over the wait, then returns to the full blue fetching animation; longer window/batch waits use `m:ss`. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
+**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for `UserTweets`, `UserTweetsAndReplies`, `Bookmarks`, `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. Posts export uses the single combined `UserTweetsAndReplies` timeline when `includeReplies` is enabled and the faster `UserTweets` timeline when disabled; personal bookmarks use `Bookmarks`. The SW supplies only the active mode's actual budget to `RateLimitManager`. All five named presets use burst-first pacing: they run at their advertised delay while `remaining > raceReserve`, then hold until the advertised window reset (an explicit `'window'` wait). This fits finite exports: a small job finishes promptly, while a large job waits honestly when X's quota is spent. Missing/stale headers use mode-specific fallback delays plus the existing batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders pacing as a 4→3→2→1 countdown with an amber bar that fills exactly over the wait, then returns to the full blue fetching animation; longer window/batch waits use `m:ss`. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets/bookmarks `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
 
-**Export Speed presets.** The single user-facing pacing knob: the `exportSpeed` setting (`'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'`, default `'standard'`; a `<select>` in popup settings). The five named tiers advertise 2 / 3 / 4 / 7 / 12 second delays; Standard is the recommended 4-second default. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus fallback-path `fallbackScale`/`batchSize`/`cooldownDuration`; `resolveSpeedPreset()` in the SW resolves it. **`'custom'` (⚠️ in the UI)** is built from the user-typed `customDelaySec`/`customCooldownMin`/`customBatchSize` settings (revealed under the select when picked; clamped to `CUSTOM_SPEED_LIMITS`), and sets `alwaysBatchCooldown` so "pause N min every M requests" is honored even while adaptive pacing is active — named tiers only apply the batch cooldown on the headerless fallback path. Every tier still obeys X's advertised budget. Replaced the old "Request Cooldown" min/batch numeric inputs; the legacy `batchSize`/`cooldownDuration` settings remain stored but are overridden by the preset.
+**Export Speed presets.** Popup settings expose two independent pacing controls: `exportSpeed` for posts/bookmarks and `userExportSpeed` for followers, following, and verified followers. Both accept `'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'` and default to `'standard'`. The post/bookmark tiers advertise 2 / 3 / 4 / 7 / 12 second fallback delays; user-list labels stay relative because the Followers, Following, and BlueVerifiedFollowers endpoints have different fallback budgets. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus fallback-path `fallbackScale`/`batchSize`/`cooldownDuration`; `resolveSpeedPreset(settings, mode)` in the SW selects the matching control. **`'custom'` (⚠️ in the UI)** uses `customDelaySec`/`customCooldownMin`/`customBatchSize` for posts/bookmarks and the separate `userCustomDelaySec`/`userCustomCooldownMin`/`userCustomBatchSize` fields for user lists. Values are clamped to `CUSTOM_SPEED_LIMITS`, and `alwaysBatchCooldown` ensures "pause N min every M requests" is honored even while adaptive pacing is active. Every tier still obeys X's advertised budget. The legacy `batchSize`/`cooldownDuration` settings remain stored but are overridden by the selected mode's preset.
 
 ### 4.5. `utils/storage.js` — Chrome Storage + Settings
-`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by UI patches:
+`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Main keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_current_account`, `xporter_tweets_batch_N`, `xporter_export_history`, `xporter_about_account_cache`, `xporter_usage`, `xporter_discovered_endpoints`, and `xporter_native_request_templates_v1`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by UI patches:
 
 | Setting | Default | Notes |
 |---|---|---|
-| `includeRetweets` / `includeReplies` / `includeArticles` | `true` | posts filter (`includeArticles` gates X long-form Articles, type `article`) |
+| `includeRetweets` / `includeArticles` | `true` | posts filters; `includeArticles` gates X long-form Articles |
+| `includeReplies` | `false` | optional combined Posts + Replies endpoint; on terminal zero-row failure the UI asks before continuing Posts-only |
+| `includeBookmarkReplyContext` / `includeBookmarkArticles` | `true` / `true` | attach available replied-to posts and retain Article payloads in personal bookmark rows |
+| `embedPostPhotos` / `embedBookmarkPhotos` | `false` / `false` | XLSX-only photo downloads from X's media CDN into a mapped Media sheet |
+| `includeAboutAccountDetails` | `false` | opt-in per-user public account transparency fields for user-list modes |
+| `aboutAccountSpeed` / `aboutAccountCustomBatchSize` / `aboutAccountMaxRetries` | `'standard'` / `5` / `5` | concurrency preset, custom batch width, and transient retry ceiling for About details |
 | `quantityLimit` | `500` | 0 = unlimited |
-| `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
-| `customDelaySec` / `customCooldownMin` / `customBatchSize` | `5` / `3` / `20` | the Custom tier's user-typed pace (clamped to `CUSTOM_SPEED_LIMITS`) |
+| `exportSpeed` / `userExportSpeed` | `'standard'` / `'standard'` | independent post and user-list speed tiers → `SPEED_PRESETS` (§4.4) |
+| `customDelaySec` / `customCooldownMin` / `customBatchSize` and `userCustom*` equivalents | `5` / `3` / `20` each | `custom*` applies to posts/bookmarks; `userCustom*` applies to followers/following/verified followers |
 | `requestDelay` / `batchSize` / `cooldownDuration` | from config | legacy rate-limit knobs; preset values override them |
 | `adaptivePacing` | `true` | pace from X's `x-rate-limit-*` headers (see §4.4) |
 | `theme` | `'dark'` | `'dark'`/`'light'` |
@@ -222,6 +242,9 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 | `exportMode` / `outputFormat` | posts / csv | |
 | `autoExpireEnabled` / `autoExpireHours` | `true` / `4` | auto-clear old exports |
 | `ladybugEnabled` | `true` | show the Easter-egg ladybug (§6.2) |
+| `localizeExportHeaders` | `true` | localize CSV/XLSX headers; JSON keys stay English |
+
+`includeReplies:false` is a fresh-install/missing-setting default. Updates intentionally preserve the stored value because older releases did not record whether `true` was the default or an explicit user choice.
 
 ### 4.6. `utils/shared.js` — Shared UI Helpers
 Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
@@ -237,32 +260,39 @@ Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 - RTL + number-formatting helpers
 
 ### 4.7. `content/content.js` + `content/interceptor.js`
-- **content.js** (isolated world, `document_start`): username detection from the URL (filters reserved paths, handles SPA nav via `MutationObserver`/`popstate`), validates + relays `__XPORTER_QUERYID__` messages to the SW (operation whitelist + queryId regex — the channel is page-spoofable), and drives the date-range search-capture tab.
-- **interceptor.js** (page MAIN world via manifest `"world": "MAIN"`, `document_start`, Chrome 111+ — no `web_accessible_resources`, no script-tag injection): wraps `fetch`/`XHR` to read GraphQL queryIds + `SearchTimeline` response bodies (≤8 MB), posting them back via `window.postMessage` with `location.origin` as target.
-- Validation is layered: content.js → SW (`VALID_LIVE_OPERATIONS` + regex) → `api.js setLiveQueryId` (last gate before URL interpolation).
+- **content.js** (isolated world, `document_start`): username detection from the URL (filters reserved paths, handles SPA nav via `MutationObserver`/`popstate`), validates + relays `__XPORTER_NATIVE_REQUEST_TEMPLATE__` messages to the SW, and drives the date-range search-capture tab.
+- **interceptor.js** (page MAIN world via manifest `"world": "MAIN"`, `document_start`, Chrome 111+ — no `web_accessible_resources`, no script-tag injection): wraps fetch/XHR, emitting a sanitized request template only after a successful native response; `SearchTimeline` bodies (≤8 MB) and seen-post capture remain separate.
+- Validation is layered through the shared `native-request-template.js` sanitizer in MAIN → isolated → SW, plus an X-tab sender check in the worker. The `postMessage` channel is page-spoofable, so the schema stays deliberately low-authority and excludes request variables and credentials.
 
 ---
 
 ## 5. Export Modes, Date Range & Data Schemas
 
-### Standard exports (posts without dates, followers, following, verified)
-Direct GraphQL paging from the service worker.
+### Standard exports (posts without dates, bookmarks, followers, following, verified)
+Direct GraphQL paging from the service worker. Progress is measured after
+filtering and de-duplication: three pages with neither a new accepted row nor
+an advanced cursor terminate as `source_exhausted` instead of looping forever.
+Deep `TimelineAddToModule` rows are normalized alongside ordinary entries.
 
 ### Posts + Date Range (special path)
 X has no clean date-filter on the timeline GraphQL, so XPorter:
 1. Opens an **X search tab** at `https://x.com/search?q=…&f=live` (`openSearchCaptureTab` / `buildSearchTimelinePageUrl`).
 2. `interceptor.js` captures the page's own `SearchTimeline` responses; `content.js` scrolls the tab to load more (each scroll ping also clicks X's "Retry" button if the timeline errored).
-3. SW parses captured payloads (`parseSearchTimelineResponse`) and drives the in-page overlay via `XPORTER_SEARCH_CAPTURE_STATUS` (localized via `i18n.js` — that's why the SW imports it). The overlay shows: phase subtitle, a progress bar (determinate when `progressPct` is computable — max of items/limit and date-depth of the oldest collected post via `searchCapture.oldestCollectedMs`, sweeping otherwise), a **Stop export** button (sends `STOP_EXPORT`), and an amber countdown when the SW sends `pauseUntil` (rate-limit pause). Overlay strings are the `ov*` locale keys.
+3. SW parses captured payloads (`parseSearchTimelineResponse`) and drives the in-page overlay via `XPORTER_SEARCH_CAPTURE_STATUS` (localized via `i18n.js` — that's why the SW imports it). The overlay shows: phase subtitle, a progress bar (determinate when `progressPct` is computable — max of items/limit and date-depth of the oldest observed post via `searchCapture.oldestCollectedMs`, sweeping otherwise), a **Stop export** button (sends `STOP_EXPORT`), and an amber countdown when the SW sends `pauseUntil` (rate-limit pause). On Resume, dates from already-saved duplicate rows rebuild range coverage and the subtitle counts how many saved posts were rechecked, so the required top-to-cursor replay does not look idle. Overlay strings are the `ov*` locale keys.
 4. **Stall/ban handling:** HTTP ≥400 captures pause 10–60 s (>5 in a row → `RATE_LIMITED`). If X advertises a cursor but stops answering (timeline stuck on "Something went wrong"), `recoverStalledSearchCapture()` waits 60 s × 3 rounds with the overlay countdown, then the export **errors as `RATE_LIMITED`** (buffer flushed, resumable) — it never fake-"completes" with partial data.
 5. **The user must keep that tab open until the export finishes** — this is what the `dateRangeHelp` tooltip warns about.
+6. Completion persists `completionReason`: reaching the selected maximum allows
+   “+N more”; exhausting X's accessible results explains that the limit is only
+   a maximum and does not offer a no-op Continue action.
 
 ### Passive seen-post dataset
 `feed-parser.js` inspects only post-bearing GraphQL responses that X has already loaded in the page. It emits compact rows; `content.js` validates them before the SW writes them through `post-database.js`. Replies are excluded as rows, while `reply_count` is retained. IndexedDB uses the post ID as its primary key, so repeat sightings update latest metrics, `last_seen_at`, and `seen_count` without creating duplicates. The first metric snapshot is retained in `first_*` columns. No additional X requests are made, page URLs are not stored, and the oldest rows are trimmed above 50,000 unique posts. Settings exposes count, CSV/JSON download, and explicit clear.
 
 ### Schemas
-- **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
+- **Posts CSV/XLSX**: primary post columns remain one row per exported-profile post. Reply scalars (`reply_to_id`, `reply_to_username`, `conversation_id`) and prefixed `reply_to_post_*`, `reply_to_quoted_post_*`, and `quoted_post_*` columns preserve available foreign context without adding rows (types: `tweet`/`retweet`/`reply`/`quote`). The full candidate schema stays in code, but each generated CSV/XLSX file or numbered part omits columns that contain no value anywhere in that file.
+- **Bookmarks**: one primary post row per saved item from the current viewer's `bookmark_timeline_v2`; all authors and post types are retained. The optional `TweetResultsByRestIds` batch hydrates replied-to posts as nested context without changing the bookmark count. TXT/XLSX use `BOOKMARKS (N)` without pretending the rows belong to one profile.
 - **Users CSV**: `id, name, username, bio, location, url, followers_count, following_count, tweet_count, listed_count, verified, protected, created_at, profile_image_url, profile_url`.
-- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for posts only (public profile context followed by compact per-post metrics, full text, and canonical URL). Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially instead of loading every saved row into memory; the popup shows the planned file count and live part progress. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
+- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for post-row modes. JSON recursively omits empty strings, `null`, empty objects, and empty arrays at serialization time while retaining real `0` and `false` values; stored/runtime objects keep their full normalized shape. Seen Posts CSV/JSON follows the same compact-file contract. TXT starts with public profile context; bookmark TXT uses a viewer-neutral heading. Each entry puts `Post: "text"` first (double quotes, never parentheses), then the explicitly labelled metrics for that post, followed by reply/quote/article context, with the date immediately before the final canonical Post URL. Nested context uses its own labelled metrics at the same indentation level, so primary and quoted/replied-to engagement cannot be confused. The exported profile's repeated author is omitted from ordinary posts, replies, quotes, and Articles; reposts and foreign context retain an explicit author. `parseTimelineResponse()` first links each reply to a matching direct parent row as `reply_to_post`; that parent keeps its nested `quoted_post`. The worker then filters standalone foreign rows, so context survives but never changes `tweetCount`, the quantity limit, or `POSTS (N)`. JSON keeps the nested objects, CSV/XLSX flatten them into prefixed context columns, and TXT indents them under the reply. A reply whose parent is another exported-profile row names that parent's post number and shows the full in-export chain (`#1 → #8 → #24`); when X did not return the parent, the direct `Reply to` URL remains without invented content. Included X Articles add their title, available full plain text, Article URL, and Post URL, including nested quote/reply context. Media URLs are always exported. Optional XLSX photo embedding fetches only `https://pbs.twimg.com/` images, keeps videos as links, and creates a separate Media sheet with primary-row ID, media-owner post ID, relationship, URL, and one image per row. Photo-enabled XLSX exports use a 250-primary-row part ceiling to bound workbook memory. Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially instead of loading every saved row into memory; the popup shows the planned file count and live part progress. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
 
 ---
 
@@ -360,10 +390,14 @@ On `status:'error'` the popup still offers **Download** (when items were collect
 DevTools → Network → `graphql` → copy `features` / queryId → update `api-features.js` / `FALLBACK_ENDPOINTS`. Or run `scripts/discover_endpoints.js` in an x.com console.
 
 ### Bump the version
-Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
+Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual. Also move the three-entry `Last updates` history forward: the top row is the current build (label it as a build until publication), followed by the two latest public releases. Update its strings in all 14 popup locales.
 
 ### Testing
-Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. The static-contract suite checks runtime JavaScript syntax, manifest/import/popup assets, DOM IDs, both 14-locale sets, popup i18n references, and the popup/content/worker message protocol without opening a browser. For a real unpacked-browser check, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
+After changing API requests, parsers, posts/replies, user lists, or export formatting, first run `node --test test-lab/tests/offline-lab.test.js` and `node test-lab/run.js --sample 5 --seed local-check`; use `--all --seed full` for larger algorithm changes. This is the default no-Computer-Use check: it loads the current production files directly, replays offline REST/GraphQL-shaped inputs, and validates the generated CSV/JSON/XLSX/TXT outputs.
+
+Also run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, `node scripts/test-feed-capture.js`, and `node scripts/test-tooling-policy.js`. The static-contract suite checks runtime JavaScript syntax, manifest/import/popup assets, DOM IDs, both 14-locale sets, popup i18n references, and the popup/content/worker message protocol without opening a browser. For the remaining unpacked-browser/live-X boundary, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`).
+
+On macOS, never launch bare `soffice` or Playwright Chromium from inside `CODEX_SANDBOX`: both full `.app` binaries abort in LaunchServices and create misleading crash dialogs. Use `node scripts/soffice-headless.js …` for XLSX compatibility. The browser smoke has an intentional sandbox guard; run it only through an approved unsandboxed Codex execution (`sandbox_permissions=require_escalated`) or a normal Terminal session. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 
 **Static-only audit boundary.** A clean local suite proves internal contracts, parsers against fixtures, persistence/rate-limit state, and generated files. It does **not** prove that X's current queryIds, GraphQL feature flags, cookie behavior, or live payload shapes still match the code. Record that distinction explicitly whenever browser/live-X validation is intentionally skipped.
 
@@ -377,19 +411,20 @@ Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.j
 | `activeTab` | username detection on the active x.com tab (`tabs` permission was dropped in v1.4.0 — `tabs.create/remove/update/query` don't need it, and it triggered the "read browsing activity" install warning) |
 | `downloads` | save files |
 | `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
-| `host_permissions` | `https://x.com/*`, `https://twitter.com/*` |
+| `host_permissions` | `https://x.com/*`, `https://twitter.com/*`, `https://pbs.twimg.com/*` (the last host is used only by opt-in XLSX photo embedding) |
 
 Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
+The transaction helper reads one public CORS-enabled asset from X's `abs.twimg.com` CDN as text; it sends no credentials there and does not need an additional host permission.
 
 ---
 
 ## 11. Script Loading Order
 
 **Service worker** (`importScripts`, order matters):
-`config.js` → `api-features.js` → `api-parsers.js` → `api.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
+`config.js` → `api-features.js` → `api-parsers.js` → `native-request-template.js` → `transaction-id.js` → `api.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
 
 **Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
-`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `popup.js` → `ladybug.js`.
+`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `acknowledgement-timer.js` → `popup.js` → `ladybug.js`.
 
 ---
 
@@ -398,7 +433,9 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 | Global | Source | Notes |
 |---|---|---|
 | `XPORTER_CONFIG`, `XLog` | `config.js` | constants + logger |
-| `XPorterAPI` | `api.js` | `.getUserByScreenName`, `.fetchUserTweets`, `.fetchFollowers/Following/VerifiedFollowers`, `.discoverEndpoints`, search-capture parsers |
+| `XPorterNativeTemplate` | `native-request-template.js` | Strict sanitizer for successful native request shapes |
+| `XPorterTransactionId` | `transaction-id.js` | Local transaction-context initialization and per-path header generation |
+| `XPorterAPI` | `api.js` | profile/About lookup, posts/bookmarks/reply-context and user-list fetches, endpoint discovery, rate-limit state, cancellation, and search-capture parsing |
 | `XPorterApiParsers` | `api-parsers.js` | Pure user/tweet/timeline normalization |
 | `RateLimitManager` | `rateLimit.js` | class |
 | `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateXLSX`, `.generateExportFilename` |
@@ -406,12 +443,12 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 | `XPorterFeedback` | `uninstall-feedback.js` | `.refresh`, `.maybeRefresh` |
 | `XPorterDownloads` | `downloads.js` | current download planning/start, incremental multipart generation, history/seen-post downloads |
 
-In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-post modules expose `XPorterHistory` / `XPorterSeenPosts`; `ladybug.js` exposes `window.XPorterLadybug`.
+In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-post modules expose `XPorterHistory` / `XPorterSeenPosts`; `acknowledgement-timer.js` exposes `window.XPorterAcknowledgementTimer`; `ladybug.js` exposes `window.XPorterLadybug`.
 
 ---
 
 ## 13. Future / Backlog
-- Export likes & bookmarks; media download; built-in analytics; threads as units; Firefox build.
+- Export likes; optional original-media download beyond XLSX photo embedding; built-in analytics; threads as units; Firefox build.
 - Refactor: rename `tweetCount`/`tweetBuffer` → `itemCount`/`itemBuffer`; keep expanding focused regression coverage.
 
 ---

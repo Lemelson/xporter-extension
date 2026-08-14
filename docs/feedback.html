@@ -156,6 +156,21 @@
     .confetti-replay .spark-cyan { color: #55caff; }
     .confetti-replay .spark-gold { color: #ffd15c; }
     .confetti-replay .spark-mint { color: #55e5a7; }
+    body.light .confetti-replay {
+      color: #075f91;
+      background: rgba(231, 247, 255, .9);
+      border-color: rgba(18, 103, 151, .38);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .92), 0 5px 14px rgba(26, 92, 138, .13);
+    }
+    body.light .confetti-replay:hover {
+      color: #064c77;
+      background: rgba(218, 242, 255, .98);
+      border-color: rgba(10, 111, 171, .6);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .96), 0 7px 17px rgba(22, 102, 154, .18);
+    }
+    body.light .confetti-replay .spark-cyan { color: #087fbd; }
+    body.light .confetti-replay .spark-gold { color: #c98500; }
+    body.light .confetti-replay .spark-mint { color: #168b61; }
     .confetti-replay.is-replaying svg {
       animation: replay-spark .52s cubic-bezier(.16,.82,.24,1);
     }
@@ -325,6 +340,11 @@
         radial-gradient(ellipse 112% 96% at 50% 0%, rgba(30, 184, 128, .1), transparent 78%),
         radial-gradient(ellipse 130% 116% at 50% 14%, rgba(10, 111, 219, .1), transparent 82%);
     }
+    body.light .card.success-mode::before {
+      background:
+        radial-gradient(ellipse 88% 48% at 50% 0%, rgba(24, 166, 108, .24), transparent 74%),
+        radial-gradient(ellipse 126% 112% at 50% 12%, rgba(10, 111, 219, .1), transparent 82%);
+    }
     @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
     h1 {
@@ -447,6 +467,34 @@
       --reason-color: #ee7cff; --reason-glow: rgba(238, 124, 255, .50);
       --reason-icon: url("assets/icons/reasons/chat-circle-dots-duotone.svg");
     }
+    /* Light theme: keep the card white and place the selection tint beside
+       the checkmark. Icons retain their exact palette without a neon halo. */
+    body.light .reason.selected {
+      background:
+        linear-gradient(to left,
+          rgba(10, 111, 219, .22) 0%,
+          rgba(10, 111, 219, .11) 32%,
+          transparent 58%),
+        rgba(255, 255, 255, .76);
+      box-shadow:
+        0 8px 22px rgba(10, 111, 219, .13),
+        inset 0 0 0 1px rgba(10, 111, 219, .72);
+    }
+    body.light .reason-icon::before {
+      filter: drop-shadow(0 1px .7px rgba(28, 43, 76, .20));
+    }
+    body.light .reason-icon::after,
+    body.light .reason:hover .reason-icon::after,
+    body.light .reason.selected .reason-icon::after {
+      opacity: 0;
+    }
+    body.light .reason:hover .reason-icon { filter: none; }
+    body.light .reason.selected .reason-icon {
+      filter:
+        drop-shadow(0 0 3px var(--reason-glow))
+        drop-shadow(0 0 8px color-mix(in srgb, var(--reason-color) 32%, transparent));
+      transform: scale(1.05);
+    }
     .reason .check { margin-inline-start: auto; color: var(--accent); display: none; flex: none; }
     .reason.selected .check { display: inline-flex; }
 
@@ -496,19 +544,7 @@
       opacity: 1;
       transform-origin: center;
       will-change: transform;
-      transition: filter .24s cubic-bezier(.2,.8,.2,1), transform .24s cubic-bezier(.2,.8,.2,1);
-    }
-    .subreason-icon::after {
-      content: "";
-      position: absolute;
-      inset: 3px;
-      border-radius: 50%;
-      background: radial-gradient(circle, color-mix(in srgb, var(--mini-color, var(--accent)) 36%, transparent) 0%, transparent 72%);
-      filter: blur(5px);
-      opacity: 0;
-      transform: scale(.7);
-      transition: opacity .16s, transform .16s;
-      pointer-events: none;
+      transition: transform .24s cubic-bezier(.2,.8,.2,1);
     }
     .subreason-icon svg {
       position: relative; z-index: 1;
@@ -538,10 +574,9 @@
       box-shadow: inset 0 0 0 1px var(--accent-glow), 0 4px 14px var(--accent-glow);
     }
     .subreason[aria-pressed="true"] .subreason-icon {
-      filter: brightness(1.22) saturate(1.18);
-      transform: scale(1.16);
+      filter: none;
+      transform: scale(1.08);
     }
-    .subreason[aria-pressed="true"] .subreason-icon::after { opacity: .9; transform: scale(1.45); }
     .subreason[aria-pressed="true"] .subreason-label {
       color: var(--text-primary);
       text-shadow: .32px 0 currentColor, -.32px 0 currentColor;
@@ -549,6 +584,25 @@
     .subreason[aria-pressed="true"] .subreason-check {
       color: #fff; border-color: var(--accent); background: var(--accent);
       box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    body.light .subreason[aria-pressed="true"] {
+      background:
+        linear-gradient(to left,
+          rgba(10, 111, 219, .22) 0%,
+          rgba(10, 111, 219, .11) 36%,
+          transparent 66%),
+        rgba(255, 255, 255, .76);
+      box-shadow:
+        0 4px 12px rgba(10, 111, 219, .11),
+        inset 0 0 0 1px rgba(10, 111, 219, .28);
+    }
+    body.light .subreason-icon svg {
+      filter: drop-shadow(0 1px .65px rgba(28, 43, 76, .18));
+    }
+    body.light .subreason:hover .subreason-icon { filter: none; transform: scale(1.03); }
+    body.light .subreason[aria-pressed="true"] .subreason-icon {
+      filter: none;
+      transform: scale(1.08);
     }
     .action-row { display: grid; gap: 12px; }
     .detail-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -655,6 +709,26 @@
     }
     .btn-send.is-sending .send-icon { animation: sending-plane 1.1s ease-in-out infinite; }
 
+    /* Same animated ocean CTA, lifted into a lighter mid-blue palette for
+       the light theme. None of the motion, interaction, or sending states
+       change; only the base and moving-blob colors do. */
+    body.light .btn-send {
+      --cta-edge: #79dcff;
+      --cta-edge-2: #effcff;
+      --cta-border: rgba(20, 117, 169, .50);
+      --cta-glow: rgba(20, 127, 177, .22);
+      --cta-glow-strong: rgba(28, 157, 210, .38);
+      --cta-ring-dim: rgba(91, 208, 247, .22);
+      --cta-blob-light: rgba(108, 220, 245, .78);
+      --cta-blob-dark: rgba(13, 83, 137, .50);
+      background: linear-gradient(132deg, #167faa 0%, #0f75a8 48%, #126e9d 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .24),
+        inset 0 -1px 0 rgba(4, 58, 91, .10),
+        0 8px 20px var(--cta-glow);
+      text-shadow: 0 1px 2px rgba(3, 35, 60, .28);
+    }
+
     @keyframes cta-blob-a {
       0%,100% { transform: translate3d(-12%, -8%, 0) scale(.92, 1.08) rotate(-7deg); }
       19% { transform: translate3d(42%, -18%, 0) scale(1.14, .86) rotate(4deg); }
@@ -706,6 +780,16 @@
       stroke-linecap: round; stroke-linejoin: round;
       stroke-dasharray: 54; stroke-dashoffset: 54;
     }
+    body.light .success-mark {
+      color: #11865d;
+      filter: drop-shadow(0 7px 13px rgba(12, 120, 81, .24));
+    }
+    body.light .success-mark-circle {
+      fill: rgba(20, 157, 101, .15);
+      stroke: rgba(13, 126, 83, .66);
+      stroke-width: 1.9;
+    }
+    body.light .success-mark-check { stroke-width: 5.2; }
     .thanks.show .success-mark-circle { animation: success-draw .72s .12s cubic-bezier(.22,.72,.2,1) forwards; }
     .thanks.show .success-mark-check { animation: success-draw .48s .52s cubic-bezier(.2,.78,.22,1) forwards; }
     .thanks h1 {
@@ -740,25 +824,8 @@
     .reinstall:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 4px; border-radius: 3px; }
 
     .confetti-layer {
-      position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 20;
-      perspective: 700px;
-    }
-    .confetti-piece {
-      position: absolute; top: 0; left: 0; width: var(--w); height: var(--h);
-      opacity: 0; transform: translate3d(-40px, -40px, 0);
-      will-change: transform, opacity;
-    }
-    .confetti-face {
-      display: block; width: 100%; height: 100%;
-      border-radius: 2px; background: var(--color);
-      box-shadow: 0 0 5px color-mix(in srgb, var(--color) 36%, transparent);
-      animation: confetti-flutter var(--flutter) var(--flutter-delay) ease-in-out infinite alternate;
-      will-change: transform;
-    }
-    .confetti-piece.is-circle .confetti-face { border-radius: 50%; }
-    .confetti-piece.is-ribbon .confetti-face { border-radius: 99px; }
-    .confetti-piece.is-star .confetti-face {
-      clip-path: polygon(50% 0, 61% 34%, 98% 34%, 68% 55%, 79% 91%, 50% 70%, 21% 91%, 32% 55%, 2% 34%, 39% 34%);
+      position: fixed; inset: 0; width: 100%; height: 100%; display: block;
+      pointer-events: none; z-index: 20;
     }
     @keyframes success-rise {
       from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); }
@@ -770,19 +837,13 @@
       100% { opacity: 0; transform: translate3d(105%, 0, 0); }
     }
     @keyframes success-draw { to { stroke-dashoffset: 0; } }
-    @keyframes confetti-flutter {
-      0% { transform: rotateX(-16deg) rotateY(0deg) skewX(-3deg); }
-      50% { transform: rotateX(12deg) rotateY(82deg) skewX(4deg); }
-      100% { transform: rotateX(-10deg) rotateY(168deg) skewX(-2deg); }
-    }
     @media (prefers-reduced-motion: reduce) {
       .thanks.show, .card.success-mode::after, .thanks.show .success-mark-circle,
-      .thanks.show .success-mark-check, .confetti-face,
+      .thanks.show .success-mark-check,
       .confetti-replay.is-replaying svg { animation: none !important; }
       .success-mark-circle, .success-mark-check { stroke-dashoffset: 0; }
       .confetti-layer { display: none; }
     }
-
     /* contact block — one clear support action, with email kept deliberately secondary */
     .contact {
       position: relative;
@@ -1130,9 +1191,11 @@
     </p>
   </main>
 
-  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+  <canvas class="confetti-layer" id="confettiLayer" aria-hidden="true"></canvas>
   <div class="toast" id="toast"></div>
 
+  <!-- canvas-confetti 1.9.4, ISC license: vendor/canvas-confetti.LICENSE -->
+  <script src="vendor/canvas-confetti.browser.js"></script>
   <script>
     /* ============================================================
        CONFIG — edit these two before deploying.
@@ -1478,6 +1541,23 @@
     }
     /* ---------------- helpers ---------------- */
     const params = Object.fromEntries(new URLSearchParams(location.search));
+    const safeSource = params.src === "uninstall" ? "uninstall" : "direct";
+    const FORWARDED_STAT_KEYS = Object.freeze([
+      "v", "os", "days", "installed_at", "ui_lang", "theme", "opens", "active_s",
+      "exp_started", "exp_ok", "exp_err", "exp_stopped",
+      "m_posts", "m_followers", "m_following", "m_verified", "m_dates",
+      "resumes", "dl", "f_csv", "f_json", "f_xlsx", "items", "last_days",
+      "last_err", "last_phase", "first_item_ms",
+      "s_retweets", "s_replies", "s_articles", "s_limit", "s_localize",
+      "s_speed", "s_adaptive", "inst_approx"
+    ]);
+    function forwardedAnonymousStats() {
+      const forwarded = { src: safeSource };
+      for (const key of FORWARDED_STAT_KEYS) {
+        if (params[key] !== undefined) forwarded[key] = String(params[key]).slice(0, 128);
+      }
+      return forwarded;
+    }
     const isLocalFeedbackPage = location.protocol === "file:"
       || location.hostname === "localhost"
       || location.hostname === "127.0.0.1";
@@ -1837,10 +1917,7 @@
         return [reason, Array.from(selectedSubreasonsByReason.get(reason) || [])];
       }).filter(function (entry) { return entry[1].length; });
       const allSubreasonKeys = selectedGroups.flatMap(function (entry) { return entry[1]; });
-      const forwardedStats = Object.assign({}, params);
-      delete forwardedStats.preview;
-      delete forwardedStats.live;
-      const stats = Object.assign(forwardedStats, { page_s: pageSeconds() });
+      const stats = Object.assign(forwardedAnonymousStats(), { page_s: pageSeconds() });
       if (includeFeedbackState !== false) Object.assign(stats, {
           subreasons: subreasonKeys.length ? subreasonKeys.join(" | ") : "none",
           subreason_labels: subreasonKeys.length
@@ -1859,10 +1936,10 @@
         });
       return {
         sessionId,
-        source: params.src || "direct",
+        source: safeSource,
         pageLang: lang,
-        // forward every stat the extension appended to the URL, plus the live
-        // dwell time on this page:
+        // Forward the allowlisted extension stats plus the live dwell time on
+        // this page:
         stats,
         ts: new Date().toISOString()
       };
@@ -2097,134 +2174,63 @@
       if (next && next !== selectedReason) onReason(next);
     }
 
-    let confettiTimer;
-    function launchConfetti() {
-      if (reduceReasonMotion) return;
-      const layer = document.getElementById("confettiLayer");
-      if (!layer) return;
-      clearTimeout(confettiTimer);
-      layer.replaceChildren();
-      const colors = ["#42c8ff", "#85e9ff", "#a98cff", "#d99bff", "#ffd15c", "#55e5a7", "#ff7187"];
-      const fragment = document.createDocumentFragment();
-      const particles = [];
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const cardRect = document.querySelector(".card").getBoundingClientRect();
-      const originY = Math.min(230, Math.max(128, viewportHeight * .24));
-      const leftOrigin = Math.max(42, cardRect.left + cardRect.width * .24);
-      const rightOrigin = Math.min(viewportWidth - 42, cardRect.right - cardRect.width * .24);
+    const confettiCanvas = document.getElementById("confettiLayer");
+    const xporterConfetti = window.confetti && confettiCanvas
+      ? window.confetti.create(confettiCanvas, { resize: true, useWorker: true })
+      : null;
+    const confettiColors = ["#42c8ff", "#85e9ff", "#a98cff", "#d99bff", "#ffd15c", "#55e5a7", "#ff7187"];
+    const confettiSides = [
+      { angle: 61, origin: { x: .018, y: .72 }, drift: .12, delay: 0 },
+      { angle: 119, origin: { x: .982, y: .72 }, drift: -.12, delay: 18 }
+    ];
+    const layeredConfettiProfiles = [
+      { ratio: .30, spread: 108, startVelocity: 45, decay: .925, gravity: .62, scalar: .52, ticks: 330, delay: 0 },
+      { ratio: .32, spread: 76, startVelocity: 58, decay: .91, gravity: .91, scalar: .84, ticks: 270, delay: 34 },
+      { ratio: .23, spread: 46, startVelocity: 64, decay: .895, gravity: 1.24, scalar: 1.38, ticks: 210, delay: 68 },
+      { ratio: .15, spread: 122, startVelocity: 34, decay: .935, gravity: .74, scalar: 1.08, ticks: 315, delay: 118 }
+    ];
+    let confettiTimers = [];
 
-      function createPiece(index, type) {
-        const piece = document.createElement("i");
-        const face = document.createElement("span");
-        const shapeRoll = Math.random();
-        const width = shapeRoll > .88 ? 9 + Math.random() * 4 : 5 + Math.random() * 6;
-        const height = shapeRoll < .18 ? width * (1.7 + Math.random() * .7) : width * (.58 + Math.random() * .9);
-        piece.className = "confetti-piece";
-        if (shapeRoll < .18) piece.classList.add("is-ribbon");
-        else if (shapeRoll > .88) piece.classList.add("is-star");
-        else if (shapeRoll > .68) piece.classList.add("is-circle");
-        face.className = "confetti-face";
-        piece.style.setProperty("--w", width.toFixed(1) + "px");
-        piece.style.setProperty("--h", height.toFixed(1) + "px");
-        piece.style.setProperty("--color", colors[index % colors.length]);
-        piece.style.setProperty("--flutter", (360 + Math.random() * 300).toFixed(0) + "ms");
-        piece.style.setProperty("--flutter-delay", (-Math.random() * 520).toFixed(0) + "ms");
-        piece.appendChild(face);
-        fragment.appendChild(piece);
-        particles.push({ piece: piece, type: type, index: index });
-      }
+    function clearConfetti() {
+      confettiTimers.forEach(clearTimeout);
+      confettiTimers = [];
+      if (xporterConfetti && xporterConfetti.reset) xporterConfetti.reset();
+    }
 
-      // Two restrained cannons give the celebration a clear focal point;
-      // a smaller top shower keeps the full-page fullness of the old effect.
-      for (let index = 0; index < 46; index += 1) createPiece(index, index % 2 ? "right" : "left");
-      for (let index = 46; index < 60; index += 1) createPiece(index, "shower");
-      layer.appendChild(fragment);
-
-      particles.forEach(function (particle) {
-        const piece = particle.piece;
-        const spinDirection = Math.random() > .5 ? 1 : -1;
-        const spin = spinDirection * (620 + Math.random() * 940);
-        let duration;
-        let delay;
-        let keyframes;
-
-        function sampleTrajectory(positionAt, rotationAt, scaleAt) {
-          const frames = [];
-          const steps = 30;
-          for (let step = 0; step <= steps; step += 1) {
-            const progress = step / steps;
-            const position = positionAt(progress);
-            const fadeIn = Math.min(1, progress / .055);
-            const fadeOut = Math.min(1, Math.max(0, (1 - progress) / .12));
-            frames.push({
-              offset: progress,
-              opacity: Math.min(fadeIn, fadeOut) * .98,
-              transform: `translate3d(${position.x}px,${position.y}px,0) rotate(${rotationAt(progress)}deg) scale(${scaleAt(progress)})`
+    function fireConfettiProfiles(totalCount, profiles, sides) {
+      profiles.forEach(function (profile) {
+        sides.forEach(function (side) {
+          const timer = setTimeout(function () {
+            xporterConfetti({
+              particleCount: Math.max(1, Math.floor(totalCount * profile.ratio / sides.length)),
+              angle: side.angle + (Math.random() - .5) * (profile.angleJitter || 3),
+              spread: profile.spread,
+              startVelocity: profile.startVelocity,
+              decay: profile.decay,
+              gravity: profile.gravity,
+              scalar: profile.scalar,
+              ticks: profile.ticks,
+              drift: side.drift + (profile.drift || 0) + (Math.random() - .5) * .08,
+              origin: {
+                x: side.origin.x,
+                y: side.origin.y + (profile.originY || 0) + (Math.random() - .5) * .018
+              },
+              colors: confettiColors,
+              shapes: ["square", "circle"],
+              disableForReducedMotion: true,
+              zIndex: 20
             });
-          }
-          return frames;
-        }
-
-        if (particle.type === "shower") {
-          const startX = viewportWidth * (.03 + Math.random() * .94);
-          const drift = (Math.random() - .5) * 180;
-          const sway = (Math.random() - .5) * 84;
-          duration = 2500 + Math.random() * 900;
-          delay = 90 + Math.random() * 260;
-          const seconds = duration / 1000;
-          const startY = -28;
-          const endY = viewportHeight + 52;
-          const initialVelocity = 86 + Math.random() * 64;
-          const gravity = 2 * (endY - startY - initialVelocity * seconds) / (seconds * seconds);
-          const swayPhase = Math.random() * Math.PI * 2;
-          keyframes = sampleTrajectory(function (progress) {
-            const time = progress * seconds;
-            return {
-              x: startX + drift * progress + Math.sin(progress * Math.PI * 2 + swayPhase) * sway * Math.sin(progress * Math.PI),
-              y: startY + initialVelocity * time + .5 * gravity * time * time
-            };
-          }, function (progress) {
-            return spin * progress;
-          }, function (progress) {
-            return (.72 + Math.min(progress / .09, 1) * .28 - Math.max(0, progress - .82) * .44).toFixed(3);
-          });
-        } else {
-          const fromLeft = particle.type === "left";
-          const startX = fromLeft ? leftOrigin : rightOrigin;
-          const direction = fromLeft ? 1 : -1;
-          const travel = direction * (150 + Math.random() * Math.min(330, viewportWidth * .30));
-          const startRotation = (Math.random() - .5) * 50;
-          duration = 2200 + Math.random() * 820;
-          delay = Math.random() * 150;
-          const seconds = duration / 1000;
-          const endY = viewportHeight + 58;
-          const initialVelocity = -(430 + Math.random() * 170);
-          const gravity = 2 * (endY - originY - initialVelocity * seconds) / (seconds * seconds);
-          const drag = 2.15 + Math.random() * .7;
-          const dragRange = 1 - Math.exp(-drag);
-          keyframes = sampleTrajectory(function (progress) {
-            const time = progress * seconds;
-            const horizontalProgress = (1 - Math.exp(-drag * progress)) / dragRange;
-            return {
-              x: startX + travel * horizontalProgress,
-              y: originY + initialVelocity * time + .5 * gravity * time * time
-            };
-          }, function (progress) {
-            return startRotation + spin * progress;
-          }, function (progress) {
-            return (.55 + Math.min(progress / .07, 1) * .45 - Math.max(0, progress - .78) * .5).toFixed(3);
-          });
-        }
-
-        piece.animate(keyframes, {
-          duration: duration,
-          delay: delay,
-          fill: "forwards",
-          easing: "linear"
+          }, (profile.delay || 0) + (side.delay || 0));
+          confettiTimers.push(timer);
         });
       });
-      confettiTimer = setTimeout(function () { layer.replaceChildren(); }, 3900);
+    }
+
+    function launchConfetti() {
+      if (reduceReasonMotion || !xporterConfetti) return;
+      clearConfetti();
+      const mobile = window.innerWidth < 640;
+      fireConfettiProfiles(mobile ? 196 : 264, layeredConfettiProfiles, confettiSides);
     }
 
     function finish() {
@@ -2237,6 +2243,7 @@
     }
 
     function returnToFeedback() {
+      clearConfetti();
       const form = document.getElementById("form");
       const thanks = document.getElementById("thanks");
       const btn = document.getElementById("submitBtn");

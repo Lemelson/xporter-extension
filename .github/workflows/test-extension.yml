@@ -1,0 +1,38 @@
+name: Test extension runtime
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "extension-runtime-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Static contracts
+        run: node scripts/test-static-contracts.js
+
+      - name: Extension core
+        run: node scripts/test-extension-core.js
+
+      - name: Rate limiting
+        run: node scripts/test-rate-limit.js
+
+      - name: Feed capture
+        run: node scripts/test-feed-capture.js

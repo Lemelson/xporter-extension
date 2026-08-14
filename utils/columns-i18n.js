@@ -18,7 +18,11 @@ const COLUMN_LABELS = {
         name: 'Name', username: 'Username', bio: 'Bio', location: 'Location', url: 'URL',
         followers_count: 'Followers', following_count: 'Following', tweet_count: 'Posts',
         listed_count: 'Lists', verified: 'Verified', protected: 'Protected',
-        profile_image_url: 'Profile image URL', profile_url: 'Profile URL'
+        profile_image_url: 'Profile image URL', profile_url: 'Profile URL',
+        account_based_in: 'Account based in', account_location_accurate: 'Account location accurate',
+        premium_since: 'Premium since', account_source: 'Connected via',
+        affiliate_username: 'Affiliate account', username_change_count: 'Username changes',
+        username_last_changed_at: 'Username last changed'
     },
     ru: {
         id: 'ID', text: 'Текст', tweet_url: 'Ссылка на пост', language: 'Язык', type: 'Тип',
@@ -31,7 +35,11 @@ const COLUMN_LABELS = {
         name: 'Имя', username: 'Логин', bio: 'Описание', location: 'Местоположение', url: 'Ссылка',
         followers_count: 'Подписчики', following_count: 'Подписки', tweet_count: 'Посты',
         listed_count: 'Списки', verified: 'Верифицирован', protected: 'Закрытый',
-        profile_image_url: 'Ссылка на аватар', profile_url: 'Ссылка на профиль'
+        profile_image_url: 'Ссылка на аватар', profile_url: 'Ссылка на профиль',
+        account_based_in: 'Страна или регион аккаунта', account_location_accurate: 'Точность региона аккаунта',
+        premium_since: 'Premium с', account_source: 'Подключён через',
+        affiliate_username: 'Связанный аккаунт', username_change_count: 'Смены имени пользователя',
+        username_last_changed_at: 'Последняя смена имени пользователя'
     },
     zh: {
         id: 'ID', text: '文本', tweet_url: '帖子链接', language: '语言', type: '类型',
@@ -44,7 +52,11 @@ const COLUMN_LABELS = {
         name: '名称', username: '用户名', bio: '简介', location: '位置', url: '网址',
         followers_count: '粉丝数', following_count: '关注数', tweet_count: '帖子数',
         listed_count: '列表数', verified: '已认证', protected: '受保护',
-        profile_image_url: '头像链接', profile_url: '主页链接'
+        profile_image_url: '头像链接', profile_url: '主页链接',
+        account_based_in: '账号所在国家或地区', account_location_accurate: '账号位置准确性',
+        premium_since: 'Premium 开通时间', account_source: '连接来源',
+        affiliate_username: '关联账号', username_change_count: '用户名更改次数',
+        username_last_changed_at: '用户名最后更改时间'
     },
     ja: {
         id: 'ID', text: '本文', tweet_url: '投稿URL', language: '言語', type: '種類',
@@ -57,7 +69,11 @@ const COLUMN_LABELS = {
         name: '名前', username: 'ユーザー名', bio: '自己紹介', location: '場所', url: 'URL',
         followers_count: 'フォロワー数', following_count: 'フォロー数', tweet_count: '投稿数',
         listed_count: 'リスト数', verified: '認証済み', protected: '非公開',
-        profile_image_url: 'プロフィール画像URL', profile_url: 'プロフィールURL'
+        profile_image_url: 'プロフィール画像URL', profile_url: 'プロフィールURL',
+        account_based_in: 'アカウントの国または地域', account_location_accurate: 'アカウント地域の正確性',
+        premium_since: 'Premium開始日', account_source: '接続元',
+        affiliate_username: '関連アカウント', username_change_count: 'ユーザー名変更回数',
+        username_last_changed_at: 'ユーザー名の最終変更日'
     },
     es: {
         id: 'ID', text: 'Texto', tweet_url: 'URL de la publicación', language: 'Idioma', type: 'Tipo',
@@ -70,7 +86,11 @@ const COLUMN_LABELS = {
         name: 'Nombre', username: 'Usuario', bio: 'Biografía', location: 'Ubicación', url: 'URL',
         followers_count: 'Seguidores', following_count: 'Siguiendo', tweet_count: 'Publicaciones',
         listed_count: 'Listas', verified: 'Verificado', protected: 'Protegido',
-        profile_image_url: 'URL de la foto de perfil', profile_url: 'URL del perfil'
+        profile_image_url: 'URL de la foto de perfil', profile_url: 'URL del perfil',
+        account_based_in: 'País o región de la cuenta', account_location_accurate: 'Precisión de ubicación',
+        premium_since: 'Premium desde', account_source: 'Conectado mediante',
+        affiliate_username: 'Cuenta afiliada', username_change_count: 'Cambios de usuario',
+        username_last_changed_at: 'Último cambio de usuario'
     },
     ko: {
         id: 'ID', text: '텍스트', tweet_url: '게시물 URL', language: '언어', type: '유형',
@@ -83,7 +103,11 @@ const COLUMN_LABELS = {
         name: '이름', username: '사용자명', bio: '소개', location: '위치', url: 'URL',
         followers_count: '팔로워수', following_count: '팔로잉수', tweet_count: '게시물수',
         listed_count: '리스트수', verified: '인증됨', protected: '비공개',
-        profile_image_url: '프로필 이미지 URL', profile_url: '프로필 URL'
+        profile_image_url: '프로필 이미지 URL', profile_url: '프로필 URL',
+        account_based_in: '계정 기반 국가 또는 지역', account_location_accurate: '계정 위치 정확성',
+        premium_since: 'Premium 시작일', account_source: '연결 출처',
+        affiliate_username: '제휴 계정', username_change_count: '사용자 이름 변경 횟수',
+        username_last_changed_at: '사용자 이름 마지막 변경일'
     },
     it: {
         id: 'ID', text: 'Testo', tweet_url: 'URL del post', language: 'Lingua', type: 'Tipo',
@@ -96,7 +120,11 @@ const COLUMN_LABELS = {
         name: 'Nome', username: 'Username', bio: 'Bio', location: 'Posizione', url: 'URL',
         followers_count: 'Follower', following_count: 'Seguiti', tweet_count: 'Post',
         listed_count: 'Liste', verified: 'Verificato', protected: 'Protetto',
-        profile_image_url: 'URL immagine profilo', profile_url: 'URL profilo'
+        profile_image_url: 'URL immagine profilo', profile_url: 'URL profilo',
+        account_based_in: 'Paese o regione dell’account', account_location_accurate: 'Precisione posizione account',
+        premium_since: 'Premium dal', account_source: 'Connesso tramite',
+        affiliate_username: 'Account affiliato', username_change_count: 'Modifiche nome utente',
+        username_last_changed_at: 'Ultima modifica nome utente'
     },
     pt: {
         id: 'ID', text: 'Texto', tweet_url: 'URL da publicação', language: 'Idioma', type: 'Tipo',
@@ -109,7 +137,11 @@ const COLUMN_LABELS = {
         name: 'Nome', username: 'Usuário', bio: 'Bio', location: 'Localização', url: 'URL',
         followers_count: 'Seguidores', following_count: 'Seguindo', tweet_count: 'Publicações',
         listed_count: 'Listas', verified: 'Verificado', protected: 'Protegido',
-        profile_image_url: 'URL da foto de perfil', profile_url: 'URL do perfil'
+        profile_image_url: 'URL da foto de perfil', profile_url: 'URL do perfil',
+        account_based_in: 'País ou região da conta', account_location_accurate: 'Precisão da localização',
+        premium_since: 'Premium desde', account_source: 'Conectado por',
+        affiliate_username: 'Conta afiliada', username_change_count: 'Alterações de usuário',
+        username_last_changed_at: 'Última alteração de usuário'
     },
     tr: {
         id: 'ID', text: 'Metin', tweet_url: 'Gönderi URL\'si', language: 'Dil', type: 'Tür',
@@ -122,7 +154,11 @@ const COLUMN_LABELS = {
         name: 'Ad', username: 'Kullanıcı adı', bio: 'Biyografi', location: 'Konum', url: 'URL',
         followers_count: 'Takipçi', following_count: 'Takip edilen', tweet_count: 'Gönderi',
         listed_count: 'Liste', verified: 'Doğrulanmış', protected: 'Gizli',
-        profile_image_url: 'Profil resmi URL\'si', profile_url: 'Profil URL\'si'
+        profile_image_url: 'Profil resmi URL\'si', profile_url: 'Profil URL\'si',
+        account_based_in: 'Hesabın bulunduğu ülke veya bölge', account_location_accurate: 'Hesap konumu doğruluğu',
+        premium_since: 'Premium başlangıcı', account_source: 'Bağlantı kaynağı',
+        affiliate_username: 'Bağlı hesap', username_change_count: 'Kullanıcı adı değişiklikleri',
+        username_last_changed_at: 'Son kullanıcı adı değişikliği'
     },
     de: {
         id: 'ID', text: 'Text', tweet_url: 'Beitrags-URL', language: 'Sprache', type: 'Typ',
@@ -135,7 +171,11 @@ const COLUMN_LABELS = {
         name: 'Name', username: 'Benutzername', bio: 'Bio', location: 'Standort', url: 'URL',
         followers_count: 'Follower', following_count: 'Folgt', tweet_count: 'Beiträge',
         listed_count: 'Listen', verified: 'Verifiziert', protected: 'Geschützt',
-        profile_image_url: 'Profilbild-URL', profile_url: 'Profil-URL'
+        profile_image_url: 'Profilbild-URL', profile_url: 'Profil-URL',
+        account_based_in: 'Land oder Region des Kontos', account_location_accurate: 'Genauigkeit des Kontostandorts',
+        premium_since: 'Premium seit', account_source: 'Verbunden über',
+        affiliate_username: 'Verbundenes Konto', username_change_count: 'Nutzernamenänderungen',
+        username_last_changed_at: 'Letzte Nutzernamenänderung'
     },
     ar: {
         id: 'المعرف', text: 'النص', tweet_url: 'رابط المنشور', language: 'اللغة', type: 'النوع',
@@ -148,7 +188,11 @@ const COLUMN_LABELS = {
         name: 'الاسم', username: 'اسم المستخدم', bio: 'النبذة', location: 'الموقع', url: 'الرابط',
         followers_count: 'المتابِعون', following_count: 'المتابَعون', tweet_count: 'المنشورات',
         listed_count: 'القوائم', verified: 'موثّق', protected: 'محمي',
-        profile_image_url: 'رابط صورة الملف الشخصي', profile_url: 'رابط الملف الشخصي'
+        profile_image_url: 'رابط صورة الملف الشخصي', profile_url: 'رابط الملف الشخصي',
+        account_based_in: 'بلد أو منطقة الحساب', account_location_accurate: 'دقة موقع الحساب',
+        premium_since: 'Premium منذ', account_source: 'متصل عبر',
+        affiliate_username: 'الحساب التابع', username_change_count: 'تغييرات اسم المستخدم',
+        username_last_changed_at: 'آخر تغيير لاسم المستخدم'
     },
     fr: {
         id: 'ID', text: 'Texte', tweet_url: 'URL du post', language: 'Langue', type: 'Type',
@@ -161,7 +205,11 @@ const COLUMN_LABELS = {
         name: 'Nom', username: 'Identifiant', bio: 'Bio', location: 'Localisation', url: 'URL',
         followers_count: 'Abonnés', following_count: 'Abonnements', tweet_count: 'Posts',
         listed_count: 'Listes', verified: 'Vérifié', protected: 'Protégé',
-        profile_image_url: 'URL de la photo de profil', profile_url: 'URL du profil'
+        profile_image_url: 'URL de la photo de profil', profile_url: 'URL du profil',
+        account_based_in: 'Pays ou région du compte', account_location_accurate: 'Précision de la localisation',
+        premium_since: 'Premium depuis', account_source: 'Connecté via',
+        affiliate_username: 'Compte affilié', username_change_count: 'Changements d’identifiant',
+        username_last_changed_at: 'Dernier changement d’identifiant'
     },
     hi: {
         id: 'ID', text: 'टेक्स्ट', tweet_url: 'पोस्ट URL', language: 'भाषा', type: 'प्रकार',
@@ -174,7 +222,11 @@ const COLUMN_LABELS = {
         name: 'नाम', username: 'यूज़रनेम', bio: 'बायो', location: 'स्थान', url: 'URL',
         followers_count: 'फ़ॉलोअर्स', following_count: 'फ़ॉलोइंग', tweet_count: 'पोस्ट',
         listed_count: 'लिस्ट', verified: 'सत्यापित', protected: 'संरक्षित',
-        profile_image_url: 'प्रोफ़ाइल इमेज URL', profile_url: 'प्रोफ़ाइल URL'
+        profile_image_url: 'प्रोफ़ाइल इमेज URL', profile_url: 'प्रोफ़ाइल URL',
+        account_based_in: 'खाते का देश या क्षेत्र', account_location_accurate: 'खाते के स्थान की सटीकता',
+        premium_since: 'Premium शुरू होने की तारीख', account_source: 'कनेक्शन स्रोत',
+        affiliate_username: 'संबद्ध खाता', username_change_count: 'यूज़रनेम बदलाव',
+        username_last_changed_at: 'अंतिम यूज़रनेम बदलाव'
     },
     id: {
         id: 'ID', text: 'Teks', tweet_url: 'URL postingan', language: 'Bahasa', type: 'Tipe',
@@ -187,9 +239,103 @@ const COLUMN_LABELS = {
         name: 'Nama', username: 'Username', bio: 'Bio', location: 'Lokasi', url: 'URL',
         followers_count: 'Pengikut', following_count: 'Mengikuti', tweet_count: 'Postingan',
         listed_count: 'Daftar', verified: 'Terverifikasi', protected: 'Terlindungi',
-        profile_image_url: 'URL gambar profil', profile_url: 'URL profil'
+        profile_image_url: 'URL gambar profil', profile_url: 'URL profil',
+        account_based_in: 'Negara atau wilayah akun', account_location_accurate: 'Akurasi lokasi akun',
+        premium_since: 'Premium sejak', account_source: 'Terhubung melalui',
+        affiliate_username: 'Akun afiliasi', username_change_count: 'Perubahan nama pengguna',
+        username_last_changed_at: 'Perubahan nama pengguna terakhir'
     }
 };
+
+// Reply/quote context columns are composed from the already translated base
+// field labels above. This keeps all 14 languages complete without duplicating
+// the same ten field names for each of the three context scopes.
+const CONTEXT_COLUMN_LABELS = {
+    en: {
+        reply_to_id: 'Replied-to post ID', reply_to_username: 'Replied-to username',
+        conversation_id: 'Conversation ID', reply_to_post: 'Replied-to post',
+        reply_to_quoted_post: 'Quote in replied-to post', quoted_post: 'Quoted post'
+    },
+    ru: {
+        reply_to_id: 'ID исходного поста', reply_to_username: 'Логин автора исходного поста',
+        conversation_id: 'ID диалога', reply_to_post: 'Исходный пост',
+        reply_to_quoted_post: 'Цитата в исходном посте', quoted_post: 'Цитируемый пост'
+    },
+    zh: {
+        reply_to_id: '被回复帖子的 ID', reply_to_username: '被回复用户',
+        conversation_id: '对话 ID', reply_to_post: '被回复的帖子',
+        reply_to_quoted_post: '被回复帖子中的引用', quoted_post: '引用的帖子'
+    },
+    ja: {
+        reply_to_id: '返信先の投稿 ID', reply_to_username: '返信先ユーザー名',
+        conversation_id: '会話 ID', reply_to_post: '返信先の投稿',
+        reply_to_quoted_post: '返信先投稿内の引用', quoted_post: '引用された投稿'
+    },
+    es: {
+        reply_to_id: 'ID de la publicación respondida', reply_to_username: 'Usuario respondido',
+        conversation_id: 'ID de conversación', reply_to_post: 'Publicación respondida',
+        reply_to_quoted_post: 'Cita en la publicación respondida', quoted_post: 'Publicación citada'
+    },
+    ko: {
+        reply_to_id: '답글 대상 게시물 ID', reply_to_username: '답글 대상 사용자명',
+        conversation_id: '대화 ID', reply_to_post: '답글 대상 게시물',
+        reply_to_quoted_post: '답글 대상 게시물의 인용', quoted_post: '인용된 게시물'
+    },
+    it: {
+        reply_to_id: 'ID del post a cui si risponde', reply_to_username: 'Utente a cui si risponde',
+        conversation_id: 'ID conversazione', reply_to_post: 'Post a cui si risponde',
+        reply_to_quoted_post: 'Citazione nel post a cui si risponde', quoted_post: 'Post citato'
+    },
+    pt: {
+        reply_to_id: 'ID da publicação respondida', reply_to_username: 'Usuário respondido',
+        conversation_id: 'ID da conversa', reply_to_post: 'Publicação respondida',
+        reply_to_quoted_post: 'Citação na publicação respondida', quoted_post: 'Publicação citada'
+    },
+    tr: {
+        reply_to_id: 'Yanıtlanan gönderi kimliği', reply_to_username: 'Yanıtlanan kullanıcı adı',
+        conversation_id: 'Konuşma kimliği', reply_to_post: 'Yanıtlanan gönderi',
+        reply_to_quoted_post: 'Yanıtlanan gönderideki alıntı', quoted_post: 'Alıntılanan gönderi'
+    },
+    de: {
+        reply_to_id: 'ID des beantworteten Beitrags', reply_to_username: 'Beantworteter Benutzername',
+        conversation_id: 'Unterhaltungs-ID', reply_to_post: 'Beantworteter Beitrag',
+        reply_to_quoted_post: 'Zitat im beantworteten Beitrag', quoted_post: 'Zitierter Beitrag'
+    },
+    ar: {
+        reply_to_id: 'معرّف المنشور المُجاب عليه', reply_to_username: 'اسم المستخدم المُجاب عليه',
+        conversation_id: 'معرّف المحادثة', reply_to_post: 'المنشور المُجاب عليه',
+        reply_to_quoted_post: 'اقتباس داخل المنشور المُجاب عليه', quoted_post: 'المنشور المقتبس'
+    },
+    fr: {
+        reply_to_id: 'ID du post auquel il est répondu', reply_to_username: 'Identifiant auquel il est répondu',
+        conversation_id: 'ID de conversation', reply_to_post: 'Post auquel il est répondu',
+        reply_to_quoted_post: 'Citation dans le post auquel il est répondu', quoted_post: 'Post cité'
+    },
+    hi: {
+        reply_to_id: 'जिस पोस्ट का जवाब दिया उसका ID', reply_to_username: 'जिस यूज़र को जवाब दिया',
+        conversation_id: 'बातचीत ID', reply_to_post: 'जिस पोस्ट का जवाब दिया',
+        reply_to_quoted_post: 'जवाब वाले पोस्ट में कोट', quoted_post: 'कोट किया गया पोस्ट'
+    },
+    id: {
+        reply_to_id: 'ID postingan yang dibalas', reply_to_username: 'Nama pengguna yang dibalas',
+        conversation_id: 'ID percakapan', reply_to_post: 'Postingan yang dibalas',
+        reply_to_quoted_post: 'Kutipan dalam postingan yang dibalas', quoted_post: 'Postingan yang dikutip'
+    }
+};
+
+function contextColumnLabel(key, lang) {
+    const contextLabels = CONTEXT_COLUMN_LABELS[lang] || CONTEXT_COLUMN_LABELS.en;
+    for (const prefix of ['reply_to_quoted_post_', 'reply_to_post_', 'quoted_post_']) {
+        if (!key.startsWith(prefix)) continue;
+        const scopeKey = prefix.slice(0, -1);
+        const field = key.slice(prefix.length);
+        const baseKey = field === 'url' ? 'tweet_url' : field;
+        const fieldLabels = COLUMN_LABELS[lang] || COLUMN_LABELS.en;
+        const fieldLabel = fieldLabels[baseKey] || COLUMN_LABELS.en[baseKey] || field;
+        return `${contextLabels[scopeKey] || CONTEXT_COLUMN_LABELS.en[scopeKey]}: ${fieldLabel}`;
+    }
+    return contextLabels[key] || '';
+}
 
 /**
  * Resolve a localized column label.
@@ -199,7 +345,7 @@ const COLUMN_LABELS = {
  */
 function columnLabel(key, lang) {
     const L = COLUMN_LABELS[lang] || COLUMN_LABELS.en;
-    return L[key] || COLUMN_LABELS.en[key] || key;
+    return L[key] || contextColumnLabel(key, lang) || COLUMN_LABELS.en[key] || key;
 }
 
 if (typeof globalThis !== 'undefined') {

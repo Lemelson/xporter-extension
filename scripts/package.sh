@@ -17,6 +17,17 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 command -v zip >/dev/null 2>&1 || { echo "ERROR: 'zip' not found in PATH" >&2; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "ERROR: 'node' not found in PATH" >&2; exit 1; }
+
+# A Chrome Web Store archive must never be created from code that fails the
+# deterministic runtime gates. Keeping this inside the only supported
+# allowlist packager makes the checks mandatory instead of relying on a release
+# checklist that can be forgotten.
+echo "Running release checks..."
+node scripts/test-static-contracts.js
+node scripts/test-extension-core.js
+node scripts/test-rate-limit.js
+node scripts/test-feed-capture.js
 
 # Read version from manifest.json (no jq dependency).
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json | head -n 1)"
@@ -28,7 +39,7 @@ fi
 OUT="${XPORTER_ZIP_OUT:-$(dirname "$ROOT")/xporter-v${VERSION}.zip}"
 
 # ---- Allowlist: everything that ships, nothing else. ----
-INCLUDE_FILES=(manifest.json LICENSE)
+INCLUDE_FILES=(manifest.json LICENSE THIRD_PARTY_NOTICES)
 INCLUDE_DIRS=(background content popup utils icons _locales)
 
 for f in "${INCLUDE_FILES[@]}"; do

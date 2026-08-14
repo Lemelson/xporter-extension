@@ -147,6 +147,9 @@ body.light .footer {
 
 /* Glass mode: Main popup container */
 .popup {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--glass-bg) !important;
   backdrop-filter: blur(var(--glass-blur)) saturate(1.6) brightness(1.05);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6) brightness(1.05);
@@ -236,6 +239,89 @@ body.light .input-group {
 body.light .input-group:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+.bookmarks-account-card {
+  min-height: 58px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(96, 184, 255, 0.12), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(96, 184, 255, 0.28);
+  box-shadow: var(--glass-edge), 0 8px 22px rgba(14, 38, 74, 0.16);
+}
+
+body.light .bookmarks-account-card {
+  background: linear-gradient(135deg, rgba(39, 145, 220, 0.12), rgba(255, 255, 255, 0.68));
+  border-color: rgba(18, 115, 186, 0.24);
+  box-shadow: var(--glass-inner-glow), 0 4px 14px rgba(14, 38, 74, 0.10);
+}
+
+.bookmarks-account-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  font-size: 19px;
+  background: rgba(96, 184, 255, 0.14);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.10);
+}
+
+body.light .bookmarks-account-avatar {
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.10);
+}
+
+.bookmarks-account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bookmarks-account-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bookmarks-account-copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks-account-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+#bookmarksAccountHandle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks-account-owner {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(96, 184, 255, 0.12);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 /* Glass select */
@@ -537,6 +623,15 @@ input[type="number"] {
   gap: 8px;
 }
 
+.replies-fallback-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.replies-fallback-actions .btn {
+  width: 100%;
+}
+
 .input-resume {
   width: 70px;
   padding: 10px 12px;
@@ -706,6 +801,7 @@ body.light .progress-bar {
 
 /* Glass footer */
 .footer {
+  margin-block-start: auto;
   border-top: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.02);
   padding: 8px 16px;
@@ -926,6 +1022,13 @@ body.light .footer {
   letter-spacing: 0.3px;
   background: rgba(96, 184, 255, 0.15);
   color: var(--accent);
+}
+
+.history-meta .history-partial-badge {
+  background: rgba(255, 173, 31, 0.16);
+  color: var(--warning);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .history-actions {
@@ -1565,6 +1668,137 @@ body.light .lang-option.active {
   margin-bottom: 0;
 }
 
+.mode-settings-group {
+  margin-block-end: 13px;
+  padding-block-end: 4px;
+  border-block-end: 1px solid var(--border);
+}
+
+.mode-settings-heading {
+  margin-block-end: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Keep the expensive About enrichment and its dependent controls legible as
+   one settings group. The horizontal rules mark the group boundary; the
+   logical inline inset keeps the child controls subordinate in both LTR/RTL. */
+.about-settings-group {
+  margin-block: 14px;
+  padding-block: 12px;
+  border-block: 1px solid var(--border);
+}
+
+.about-settings-toggle {
+  margin-bottom: 0;
+}
+
+.about-settings-options {
+  margin-block-start: 12px;
+  margin-inline-start: 18px;
+  padding-inline-start: 14px;
+  border-inline-start: 2px solid var(--border);
+}
+
+.about-settings-options .field {
+  margin-bottom: 12px;
+}
+
+.about-settings-options .field:last-child {
+  margin-bottom: 0;
+}
+
+.about-retries-input {
+  flex: 0 0 72px;
+  width: 72px;
+}
+
+/* Full-popup confirmation for expensive or high-risk About settings. */
+.risk-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(7, 11, 30, 0.58);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overscroll-behavior: contain;
+}
+
+.risk-dialog-card {
+  width: 100%;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 18px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 16px;
+  background: rgba(26, 39, 72, 0.97);
+  box-shadow: 0 20px 56px rgba(5, 9, 25, 0.62), var(--glass-inner-glow);
+  color: var(--text-primary);
+}
+
+body.light .risk-dialog-backdrop {
+  background: rgba(30, 41, 89, 0.30);
+}
+
+body.light .risk-dialog-card {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 56px rgba(30, 41, 89, 0.28), var(--glass-inner-glow);
+}
+
+.risk-dialog-icon {
+  margin-bottom: 8px;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.risk-dialog-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.risk-dialog-body {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.risk-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.risk-dialog-actions .btn {
+  width: 100%;
+}
+
+.risk-dialog-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Input prefix */
 .input-prefix {
   padding: 10px 0 10px 12px;
@@ -1690,10 +1924,39 @@ body.light .lang-option.active {
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
+.help-long .help-pop {
+  top: auto;
+  bottom: calc(100% + 8px);
+  max-height: min(440px, calc(100vh - 80px));
+  overflow-y: auto;
+}
+
 /* RTL: anchor the popover to the inline-start (right) edge instead. */
 [dir="rtl"] .help-pop {
   left: auto;
   right: 0;
+}
+
+/* The detailed-account explanation is much longer than an ordinary tooltip,
+   especially after localization. Give it the popup's usable viewport instead
+   of forcing it above the trigger, where it can disappear behind the header.
+   popup.js updates its geometry custom properties when the tooltip opens. */
+.help-viewport .help-pop {
+  position: absolute;
+  left: var(--help-pop-left, 0);
+  right: auto;
+  top: var(--help-pop-safe-top, 8px);
+  bottom: auto;
+  z-index: 200;
+  width: var(--help-pop-width, min(300px, calc(100vw - 32px)));
+  max-height: var(--help-pop-max-height, calc(100vh - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.help-viewport:hover .help-pop,
+.help-viewport:focus-visible .help-pop {
+  pointer-events: auto;
 }
 
 /* Bold spans (**...**) carry the gist — they read on their own at a glance. */
@@ -1983,16 +2246,38 @@ body.light .detail-head:hover {
 }
 
 .detail-icon {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: var(--accent-glow);
   color: var(--accent);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: color 0.18s ease;
+}
+
+.detail-icon::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  filter: blur(8px);
+  transform: scale(1.12);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.detail-icon > svg {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.25;
 }
 
 .detail-title {
@@ -2013,12 +2298,16 @@ body.light .detail-head:hover {
 }
 
 .detail-item.open .detail-icon {
-  background: var(--accent);
-  color: #fff;
+  color: var(--accent);
 }
 
-/* Colored per-topic icons: each row gets its own accent, closed = tinted
-   chip, open = solid fill. --ic/--ic-bg are set by the modifier classes. */
+.detail-item.open .detail-icon::before {
+  opacity: 0.42;
+  transform: scale(1.28);
+}
+
+/* Colored per-topic icons: the icon stays crisp while its accent becomes a
+   soft, circular glow instead of a rounded-square chip. */
 .detail-icon--green  { --ic: var(--ic-green);  --ic-bg: var(--ic-green-bg); }
 .detail-icon--blue   { --ic: var(--ic-blue);   --ic-bg: var(--ic-blue-bg); }
 .detail-icon--purple { --ic: var(--ic-purple); --ic-bg: var(--ic-purple-bg); }
@@ -2028,13 +2317,11 @@ body.light .detail-head:hover {
 .detail-icon--teal   { --ic: var(--ic-teal);   --ic-bg: var(--ic-teal-bg); }
 
 .detail-icon[class*="detail-icon--"] {
-  background: var(--ic-bg);
   color: var(--ic);
 }
 
 .detail-item.open .detail-icon[class*="detail-icon--"] {
-  background: var(--ic);
-  color: #fff;
+  color: var(--ic);
 }
 
 /* Smooth height expand with no fixed max-height (never clips long translations) */
@@ -2062,6 +2349,75 @@ body.light .detail-head:hover {
 
 [dir="rtl"] .detail-body-inner p {
   padding: 0 50px 12px 12px;
+}
+
+/* ========== RELEASE HISTORY ========== */
+.about-updates {
+  margin-top: 18px;
+}
+
+.update-title {
+  line-height: 1.3;
+}
+
+.update-icon--current {
+  --update-icon: var(--ic-green);
+  --update-icon-bg: var(--ic-green-bg);
+}
+
+.update-icon--previous {
+  --update-icon: var(--ic-amber);
+  --update-icon-bg: var(--ic-amber-bg);
+}
+
+.update-icon--archive {
+  --update-icon: var(--text-muted);
+  --update-icon-bg: rgba(148, 163, 184, 0.13);
+}
+
+.update-icon {
+  color: var(--update-icon);
+}
+
+.detail-item.open .update-icon {
+  color: var(--update-icon);
+}
+
+.detail-body-inner.update-body p {
+  padding-bottom: 9px;
+}
+
+.update-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0 12px 12px 50px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.update-meta time,
+.update-meta-version {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.025em;
+}
+
+.update-meta-version {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.update-meta-separator {
+  opacity: 0.65;
+}
+
+[dir="rtl"] .update-meta {
+  margin: 0 50px 12px 12px;
 }
 
 /* Open-source card — quiet, outlined (secondary to the filled Rate CTA). */

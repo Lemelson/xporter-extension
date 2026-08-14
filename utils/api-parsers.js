@@ -62,6 +62,57 @@
     };
   }
 
+  function parseAboutAccountResponse(data) {
+    const result = data?.data?.user_result_by_screen_name?.result
+      || data?.data?.user?.result;
+    const about = result?.about_profile || {};
+    const usernameChanges = about.username_changes || {};
+    return {
+      accountBasedIn: about.account_based_in || '',
+      locationAccurate: typeof about.location_accurate === 'boolean'
+        ? about.location_accurate
+        : null,
+      accountSource: about.source || '',
+      affiliateUsername: about.affiliate_username || '',
+      premiumSince: normalizeAccountTimestamp(
+        result?.verified_since ?? about.verified_since
+      ),
+      usernameChangeCount: normalizeNonNegativeInteger(usernameChanges.count),
+      usernameLastChangedAt: normalizeAccountTimestamp(
+        usernameChanges.last_changed_at_msec
+      )
+    };
+  }
+
+  function normalizeNonNegativeInteger(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const number = Number(value);
+    return Number.isInteger(number) && number >= 0 ? number : null;
+  }
+
+  function normalizeAccountTimestamp(value) {
+    if (value === undefined || value === null || value === '') return '';
+
+    if (typeof value === 'string' && !/^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? new Date(parsed).toISOString() : '';
+    }
+
+    let milliseconds = Number(value);
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0) return '';
+    if (milliseconds >= 1e14) milliseconds /= 1000;
+    else if (milliseconds < 1e11) milliseconds *= 1000;
+
+    // X launched in 2006. Values outside the product's lifetime are sentinel
+    // or malformed values and should not become misleading export dates.
+    const earliest = Date.UTC(2006, 0, 1);
+    const latest = Date.now() + (366 * 24 * 60 * 60 * 1000);
+    if (milliseconds < earliest || milliseconds > latest) return '';
+
+    const date = new Date(milliseconds);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+  }
+
   function parseTimelineResponse(data) {
     const result = data?.data?.user?.result;
     const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
@@ -74,6 +125,26 @@
   function parseSearchTimelineResponse(data) {
     const timeline = data?.data?.search_by_raw_query?.search_timeline?.timeline;
     return parseTimelineByInstructions(timeline?.instructions || [], 'search_timeline');
+  }
+
+  function parseBookmarksResponse(data) {
+    const timeline = data?.data?.bookmark_timeline_v2?.timeline
+      || data?.data?.bookmark_timeline?.timeline;
+    return parseTimelineByInstructions(timeline?.instructions || [], 'bookmark_timeline_v2');
+  }
+
+  function parseTweetResultsResponse(data) {
+    const results = data?.data?.tweetResult;
+    if (!Array.isArray(results)) return [];
+    const tweets = [];
+    const seenIds = new Set();
+    for (const entry of results) {
+      const parsed = parseTweetObject(entry?.result);
+      if (!parsed?.id || seenIds.has(parsed.id)) continue;
+      seenIds.add(parsed.id);
+      tweets.push(parsed);
+    }
+    return tweets;
   }
 
   function parseTimelineByInstructions(instructions, sourceLabel = 'timeline') {
@@ -104,10 +175,72 @@
       if (instruction.type === 'TimelineAddEntries' || entries.length > 0) {
         for (const entry of entries) extractTimelineEntry(entry, sinks);
       }
+      // Deep conversation/search pages can append rows through
+      // TimelineAddToModule instead of TimelineAddEntries. The module item
+      // wraps itemContent under `item`, so walk the whole item rather than
+      // pretending it has the ordinary entry.content shape.
+      const moduleItems = instruction.moduleItems || [];
+      for (const moduleItem of moduleItems) {
+        walkTimelineNode(moduleItem, sinks);
+      }
     }
 
+    attachReplyContexts(tweets);
     XLog.log(`Parsed ${tweets.length} tweets, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
     return { tweets, nextCursor, previousCursor };
+  }
+
+  // UserTweetsAndReplies includes foreign conversation rows so X can render
+  // the Replies tab. Keep those rows available long enough to attach the
+  // direct parent to the profile reply; the worker may then filter the foreign
+  // row without losing who was answered or what that post said.
+  function attachReplyContexts(tweets) {
+    const byId = new Map();
+    for (const tweet of tweets) {
+      if (tweet?.id && !byId.has(String(tweet.id))) {
+        byId.set(String(tweet.id), tweet);
+      }
+    }
+    for (const tweet of tweets) {
+      const parentId = tweet?.reply_to_id ? String(tweet.reply_to_id) : '';
+      const parent = parentId ? byId.get(parentId) : null;
+      if (!parent || parent === tweet) continue;
+      tweet.reply_to_post = postContext(parent);
+    }
+  }
+
+  function postContext(tweet) {
+    const context = {
+      id: tweet.id,
+      type: tweet.type,
+      text: tweet.text,
+      tweet_url: tweet.tweet_url,
+      author_name: tweet.author_name,
+      author_username: tweet.author_username,
+      created_at: tweet.created_at,
+      media_type: tweet.media_type,
+      media_urls: tweet.media_urls,
+      media_alt_texts: tweet.media_alt_texts,
+      article_title: tweet.article_title,
+      article_url: tweet.article_url,
+      article_text: tweet.article_text,
+      reply_to_id: tweet.reply_to_id,
+      reply_to_username: tweet.reply_to_username,
+      conversation_id: tweet.conversation_id
+    };
+    const metricPresence = tweet._context_metric_presence;
+    for (const key of [
+      'view_count', 'bookmark_count', 'favorite_count',
+      'retweet_count', 'reply_count', 'quote_count'
+    ]) {
+      if (!metricPresence || metricPresence[key] === true) {
+        context[key] = tweet[key];
+      }
+    }
+    if (tweet.quoted_post) {
+      context.quoted_post = { ...tweet.quoted_post };
+    }
+    return context;
   }
 
   function extractTimelineEntry(entry, sinks, options = {}) {
@@ -146,7 +279,7 @@
     return result ? parseTweetObject(result) : null;
   }
 
-  function parseTweetObject(result) {
+  function parseTweetObject(result, options = {}) {
     if (result?.__typename === 'TweetWithVisibilityResults') result = result.tweet;
     if (!result || result.__typename === 'TweetTombstone') return null;
     const legacy = result.legacy;
@@ -167,8 +300,18 @@
     const statusUrl = authorUsername
       ? `https://x.com/${authorUsername}/status/${legacy.id_str}`
       : `https://x.com/i/web/status/${legacy.id_str}`;
+    let quotedResult = options.includeQuotedPost === false
+      ? null
+      : result.quoted_status_result?.result;
+    if (quotedResult?.__typename === 'TweetWithVisibilityResults') {
+      quotedResult = quotedResult.tweet;
+    }
+    const quotedTweet = quotedResult
+      ? parseTweetObject(quotedResult, { includeQuotedPost: false })
+      : null;
+    const quotedLegacy = quotedResult?.legacy || {};
 
-    return {
+    const parsed = {
       id: legacy.id_str,
       text,
       tweet_url: statusUrl,
@@ -176,6 +319,9 @@
       type: detectTweetType(legacy, result),
       author_name: authorName,
       author_username: authorUsername,
+      reply_to_id: legacy.in_reply_to_status_id_str || '',
+      reply_to_username: legacy.in_reply_to_screen_name || '',
+      conversation_id: legacy.conversation_id_str || '',
       view_count: result.views?.count || '',
       bookmark_count: legacy.bookmark_count || 0,
       favorite_count: legacy.favorite_count || 0,
@@ -193,6 +339,41 @@
       article_url: article.url,
       article_text: article.text
     };
+    Object.defineProperty(parsed, '_context_metric_presence', {
+      enumerable: false,
+      value: {
+        view_count: result.views?.count !== undefined && result.views?.count !== null,
+        bookmark_count: legacy.bookmark_count !== undefined && legacy.bookmark_count !== null,
+        favorite_count: legacy.favorite_count !== undefined && legacy.favorite_count !== null,
+        retweet_count: legacy.retweet_count !== undefined && legacy.retweet_count !== null,
+        reply_count: legacy.reply_count !== undefined && legacy.reply_count !== null,
+        quote_count: legacy.quote_count !== undefined && legacy.quote_count !== null
+      }
+    });
+    if (quotedTweet) {
+      parsed.quoted_post = {
+        id: quotedTweet.id,
+        type: quotedTweet.type,
+        text: quotedTweet.text,
+        tweet_url: quotedTweet.tweet_url,
+        author_name: quotedTweet.author_name,
+        author_username: quotedTweet.author_username,
+        created_at: quotedTweet.created_at,
+        media_type: quotedTweet.media_type,
+        media_urls: quotedTweet.media_urls,
+        media_alt_texts: quotedTweet.media_alt_texts,
+        article_title: quotedTweet.article_title,
+        article_url: quotedTweet.article_url,
+        article_text: quotedTweet.article_text,
+        view_count: quotedResult?.views?.count ?? '',
+        bookmark_count: quotedLegacy.bookmark_count ?? '',
+        favorite_count: quotedLegacy.favorite_count ?? '',
+        retweet_count: quotedLegacy.retweet_count ?? '',
+        reply_count: quotedLegacy.reply_count ?? '',
+        quote_count: quotedLegacy.quote_count ?? ''
+      };
+    }
+    return parsed;
   }
 
   function detectTweetType(legacy, result) {
@@ -265,8 +446,12 @@
   globalThis.XPorterApiParsers = {
     parseFollowersResponse,
     parseUserObject,
+    parseAboutAccountResponse,
     parseTimelineResponse,
     parseSearchTimelineResponse,
+    parseBookmarksResponse,
+    parseTweetResultsResponse,
+    toPostContext: postContext,
     parseTweetObject
   };
 })();

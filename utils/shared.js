@@ -80,6 +80,7 @@ function formatError(error, t) {
         'AUTH_ERROR': 'errAuthError',
         'RATE_LIMITED': 'errRateLimited',
         'STALE_QUERY_ID': 'errStaleQuery',
+        'REPLIES_UNAVAILABLE': 'errRepliesUnavailable',
         'ENDPOINT_DISCOVERY_FAILED': 'errEndpointFailed',
         'MAX_RETRIES_EXCEEDED': 'errMaxRetries',
         'ALREADY_RUNNING': 'errAlreadyRunning',
@@ -106,6 +107,7 @@ function formatError(error, t) {
         'AUTH_ERROR': 'Authentication failed — please refresh x.com and try again',
         'RATE_LIMITED': 'Routine pause — progress saved, please wait',
         'STALE_QUERY_ID': 'X API changed — retrying with fresh data...',
+        'REPLIES_UNAVAILABLE': 'The Replies tab is temporarily unavailable',
         'ENDPOINT_DISCOVERY_FAILED': 'Could not connect to X API — make sure x.com is accessible',
         'MAX_RETRIES_EXCEEDED': 'Maximum retries exceeded — please try again later',
         'ALREADY_RUNNING': 'An export is already running — stop it first',
@@ -434,7 +436,9 @@ function pluralLabel(key, count, langCode, translations) {
 }
 
 function collectedLabel(count, mode, langCode, translations) {
-    const key = (mode === 'posts') ? 'postsCollected' : 'usersCollected';
+    const key = (mode === 'posts' || mode === 'bookmarks')
+        ? 'postsCollected'
+        : 'usersCollected';
     return pluralLabel(key, count, langCode, translations);
 }
 

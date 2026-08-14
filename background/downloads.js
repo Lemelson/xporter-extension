@@ -4,6 +4,8 @@
 
 (function () {
     let activeDownload = null;
+    const MAX_EMBEDDED_PHOTO_BYTES = 15 * 1024 * 1024;
+    const EMBEDDED_PHOTO_CONCURRENCY = 4;
 
     function keepWorkerAliveDuringDownload() {
         if (typeof chrome === 'undefined' || !chrome.runtime?.getPlatformInfo) {
@@ -21,17 +23,171 @@
         return () => clearInterval(timer);
     }
 
-    function getPartLimit(format, mode) {
-        const group = mode === 'posts' ? 'posts' : 'users';
+    function collectPhotoTargets(items) {
+        const targets = [];
+        const seen = new Set();
+        const add = (exportedPostId, post, relation) => {
+            if (!post || typeof post !== 'object') return;
+            for (const rawUrl of String(post.media_urls || '').split(/,\s*/)) {
+                const sourceUrl = rawUrl.trim();
+                if (!sourceUrl) continue;
+                let parsed;
+                try {
+                    parsed = new URL(sourceUrl);
+                } catch (_) {
+                    continue;
+                }
+                if (parsed.protocol !== 'https:' || parsed.hostname !== 'pbs.twimg.com') continue;
+                const key = `${exportedPostId}|${relation}|${sourceUrl}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                targets.push({
+                    postId: String(exportedPostId || post.id || ''),
+                    contextPostId: String(post.id || ''),
+                    relation,
+                    sourceUrl
+                });
+            }
+        };
+
+        for (const item of items || []) {
+            const exportedPostId = item?.id || '';
+            add(exportedPostId, item, 'post');
+            add(exportedPostId, item?.quoted_post, 'quoted_post');
+            add(exportedPostId, item?.reply_to_post, 'reply_to_post');
+            add(
+                exportedPostId,
+                item?.reply_to_post?.quoted_post,
+                'reply_to_post.quoted_post'
+            );
+        }
+        return targets;
+    }
+
+    function imageType(response, sourceUrl) {
+        const header = String(response.headers?.get?.('content-type') || '')
+            .split(';')[0].trim().toLowerCase();
+        if (header === 'image/png') return { contentType: header, extension: 'png' };
+        if (header === 'image/jpeg' || header === 'image/jpg') {
+            return { contentType: 'image/jpeg', extension: 'jpg' };
+        }
+        if (header === 'image/gif') return { contentType: header, extension: 'gif' };
+
+        const format = String(sourceUrl).match(/[?&]format=(png|jpe?g|gif)(?:&|$)/i)?.[1]
+            || String(sourceUrl).match(/\.(png|jpe?g|gif)(?:\?|$)/i)?.[1]
+            || '';
+        if (/^png$/i.test(format)) return { contentType: 'image/png', extension: 'png' };
+        if (/^gif$/i.test(format)) return { contentType: 'image/gif', extension: 'gif' };
+        if (/^jpe?g$/i.test(format)) return { contentType: 'image/jpeg', extension: 'jpg' };
+        return null;
+    }
+
+    function imageDimensions(bytes, extension) {
+        if (extension === 'png' && bytes.length >= 24 &&
+            bytes[0] === 0x89 && bytes[1] === 0x50) {
+            const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            return { width: view.getUint32(16), height: view.getUint32(20) };
+        }
+        if (extension === 'gif' && bytes.length >= 10) {
+            const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            return { width: view.getUint16(6, true), height: view.getUint16(8, true) };
+        }
+        if (extension === 'jpg' && bytes.length >= 4 &&
+            bytes[0] === 0xFF && bytes[1] === 0xD8) {
+            let offset = 2;
+            while (offset + 8 < bytes.length) {
+                if (bytes[offset] !== 0xFF) {
+                    offset++;
+                    continue;
+                }
+                const marker = bytes[offset + 1];
+                const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+                if (length < 2 || offset + 2 + length > bytes.length) break;
+                if ((marker >= 0xC0 && marker <= 0xC3) ||
+                    (marker >= 0xC5 && marker <= 0xC7) ||
+                    (marker >= 0xC9 && marker <= 0xCB) ||
+                    (marker >= 0xCD && marker <= 0xCF)) {
+                    return {
+                        height: (bytes[offset + 5] << 8) | bytes[offset + 6],
+                        width: (bytes[offset + 7] << 8) | bytes[offset + 8]
+                    };
+                }
+                offset += 2 + length;
+            }
+        }
+        return { width: 160, height: 96 };
+    }
+
+    async function fetchPhotoAsset(target) {
+        try {
+            const response = await fetch(target.sourceUrl, {
+                method: 'GET',
+                credentials: 'omit',
+                cache: 'force-cache'
+            });
+            if (!response.ok) return null;
+            const type = imageType(response, target.sourceUrl);
+            if (!type) return null;
+            const declaredSize = Number(response.headers?.get?.('content-length')) || 0;
+            if (declaredSize > MAX_EMBEDDED_PHOTO_BYTES) return null;
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            if (bytes.length === 0 || bytes.length > MAX_EMBEDDED_PHOTO_BYTES) return null;
+            return {
+                ...target,
+                ...type,
+                bytes,
+                ...imageDimensions(bytes, type.extension)
+            };
+        } catch (error) {
+            XLog.warn?.(`Could not embed photo ${target.sourceUrl}:`, error.message);
+            return null;
+        }
+    }
+
+    async function fetchPhotoAssets(items) {
+        const targets = collectPhotoTargets(items);
+        if (targets.length === 0) return [];
+        const results = new Array(targets.length);
+        let nextIndex = 0;
+        const worker = async () => {
+            while (nextIndex < targets.length) {
+                const index = nextIndex++;
+                results[index] = await fetchPhotoAsset(targets[index]);
+            }
+        };
+        await Promise.all(
+            Array.from(
+                { length: Math.min(EMBEDDED_PHOTO_CONCURRENCY, targets.length) },
+                () => worker()
+            )
+        );
+        return results.filter(Boolean);
+    }
+
+    function getPartLimit(format, mode, settings = {}) {
+        const group = (mode === 'posts' || mode === 'bookmarks') ? 'posts' : 'users';
         const configured = XPORTER_CONFIG?.DOWNLOAD_PART_LIMITS?.[group]?.[format];
-        if (Number.isFinite(configured) && configured > 0) return configured;
-        return group === 'posts' ? 10000 : 50000;
+        const fallback = group === 'posts' ? 10000 : 50000;
+        const ordinaryLimit = Number.isFinite(configured) && configured > 0
+            ? configured
+            : fallback;
+        const embedsPhotos = format === 'xlsx' && (
+            (mode === 'posts' && settings.embedPostPhotos === true) ||
+            (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
+        );
+        if (!embedsPhotos) return ordinaryLimit;
+        const photoLimit = Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_PART_LIMIT) || 250;
+        return Math.min(ordinaryLimit, photoLimit);
     }
 
     function buildPlan(state, requestedFormat) {
         const format = requestedFormat || state?.outputFormat || 'csv';
         const count = Math.max(0, Number(state?.tweetCount) || 0);
-        const partSize = getPartLimit(format, state?.exportMode || 'posts');
+        const partSize = getPartLimit(
+            format,
+            state?.exportMode || 'posts',
+            state?.settings || {}
+        );
         const partCount = Math.max(1, Math.ceil(count / partSize));
         return {
             count,
@@ -106,6 +262,8 @@
                 mode: state.exportMode || 'posts',
                 format: plan.format,
                 profile: state.userInfo || null,
+                includeAboutAccountDetails:
+                    state.settings?.includeAboutAccountDetails === true,
                 dateFrom: state.dateFrom,
                 dateTo: state.dateTo,
                 exportedAt,
@@ -162,13 +320,17 @@
 
     async function getCurrentPostsText() {
         const state = await XPorterStorage.loadExportState();
-        if (state?.exportMode !== 'posts') return { error: 'NO_DATA' };
+        if (state?.exportMode !== 'posts' && state?.exportMode !== 'bookmarks') {
+            return { error: 'NO_DATA' };
+        }
         const plan = buildPlan(state, 'txt');
         if (plan.multipart) return { error: 'COPY_TOO_LARGE' };
         for await (const items of loadCurrentParts(state, plan.partSize)) {
             return {
                 success: true,
-                text: XPorterCSV.generatePostsText(items, state.userInfo || {}),
+                text: XPorterCSV.generatePostsText(items, state.userInfo || {}, {
+                    mode: state.exportMode
+                }),
                 count: items.length
             };
         }
@@ -190,6 +352,8 @@
                 name: entry.displayName || '',
                 screenName: entry.username || ''
             },
+            includeAboutAccountDetails:
+                entry.includeAboutAccountDetails === true,
             dateFrom: entry.dateFrom,
             dateTo: entry.dateTo,
             exportedAt: entry.completedAt || new Date()
@@ -202,7 +366,8 @@
         const username = options.username || 'unknown';
         const mode = options.mode || 'posts';
         const format = options.format || 'csv';
-        const isUsers = mode !== 'posts';
+        const isPostRows = mode === 'posts' || mode === 'bookmarks';
+        const isUsers = !isPostRows;
         let content;
         let mimeType;
         let extension;
@@ -210,19 +375,31 @@
         const settings = await XPorterStorage.loadSettings();
         const headerOpts = {
             localize: settings.localizeExportHeaders === true,
-            lang: settings.language || 'en'
+            lang: settings.language || 'en',
+            includeAboutAccountDetails:
+                options.includeAboutAccountDetails === true
         };
 
-        if (format === 'txt' && mode === 'posts') {
-            content = XPorterCSV.generatePostsText(allItems, options.profile || {});
+        if (format === 'txt' && isPostRows) {
+            content = XPorterCSV.generatePostsText(allItems, options.profile || {}, { mode });
             mimeType = 'text/plain;charset=utf-8;';
             extension = 'txt';
         } else if (format === 'json') {
-            content = JSON.stringify(allItems, null, 2);
+            content = JSON.stringify(XPorterCSV.compactExportData(allItems), null, 2);
             mimeType = 'application/json;charset=utf-8;';
             extension = 'json';
         } else if (format === 'xlsx') {
-            content = XPorterCSV.generateXLSX(allItems, isUsers, headerOpts);
+            const embedPhotos = isPostRows && (
+                (mode === 'posts' && settings.embedPostPhotos === true) ||
+                (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
+            );
+            const mediaAssets = embedPhotos ? await fetchPhotoAssets(allItems) : [];
+            content = XPorterCSV.generateXLSX(allItems, isUsers, {
+                ...headerOpts,
+                mode,
+                ...(mediaAssets.length > 0 ? { mediaAssets } : {}),
+                ...(!isUsers ? { profile: options.profile || {} } : {})
+            });
             mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
             extension = 'xlsx';
         } else {
@@ -268,12 +445,19 @@
         let mimeType;
 
         if (format === 'json') {
-            content = JSON.stringify(rows.map(({ created_at_ms, ...post }) => post), null, 2);
+            content = JSON.stringify(
+                XPorterCSV.compactExportData(
+                    rows.map(({ created_at_ms, ...post }) => post)
+                ),
+                null,
+                2
+            );
             mimeType = 'application/json;charset=utf-8;';
         } else {
-            const lines = [FEED_EXPORT_HEADERS.map(XPorterCSV.escapeCSVValue).join(',')];
+            const headers = XPorterCSV.selectPopulatedHeaders(rows, FEED_EXPORT_HEADERS);
+            const lines = [headers.map(XPorterCSV.escapeCSVValue).join(',')];
             for (const row of rows) {
-                lines.push(FEED_EXPORT_HEADERS.map(header => XPorterCSV.escapeCSVValue(row[header])).join(','));
+                lines.push(headers.map(header => XPorterCSV.escapeCSVValue(row[header])).join(','));
             }
             content = '\uFEFF' + lines.join('\n') + '\n';
             mimeType = 'text/csv;charset=utf-8;';

@@ -1,24 +1,24 @@
 // Runs in the x.com page context (registered in manifest.json in the
 // MAIN world at document_start).
-// Intercepts fetch/XHR to capture GraphQL queryIds for tracked operations
-// and forwards them to the content script via window.postMessage.
+// Intercepts fetch/XHR to capture successful, sanitized native GraphQL request
+// templates and forwards them to the content script via window.postMessage.
 (function () {
   // Guard against double installation (e.g. stale injection paths or
   // duplicate registration) — wrapping fetch/XHR twice would double-post.
   if (window.__XPORTER_INTERCEPTOR_INSTALLED__) return;
   window.__XPORTER_INTERCEPTOR_INSTALLED__ = true;
 
-  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserByScreenName', 'SearchTimeline'];
+  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'];
   const MAX_BODY_CHARS = 8 * 1024 * 1024; // must match content.js relay cap
   const MAX_FEED_BODY_CHARS = 2 * 1024 * 1024;
   const _origFetch = window.fetch;
   const _origXHROpen = XMLHttpRequest.prototype.open;
 
-  function postQueryId(queryId, operationName) {
+  function postNativeTemplate(template) {
+    if (!template) return;
     window.postMessage({
-      type: '__XPORTER_QUERYID__',
-      queryId,
-      operationName
+      type: '__XPORTER_NATIVE_REQUEST_TEMPLATE__',
+      template
     }, window.location.origin);
   }
 
@@ -57,18 +57,20 @@
   window.fetch = async function (...args) {
     let operationName = null;
     let requestUrl = null;
+    let nativeTemplate = null;
 
     try {
       // Handles string, Request, and URL inputs.
       requestUrl = (typeof args[0] === 'string')
         ? args[0]
         : (args[0] instanceof Request ? args[0].url : String(args[0]));
+      // Fetch init overrides the method stored in a Request object.
+      const method = args[1]?.method ||
+        (args[0] instanceof Request ? args[0].method : 'GET');
       const operation = operationFromUrl(requestUrl);
       if (operation) {
         operationName = operation.operationName;
-        if (TRACKED.includes(operationName)) {
-          postQueryId(operation.queryId, operationName);
-        }
+        nativeTemplate = globalThis.XPorterNativeTemplate?.parseRequestUrl(requestUrl, method) || null;
       }
     } catch (e) { /* ignore */ }
 
@@ -78,6 +80,7 @@
       const capturesExport = operationName === 'SearchTimeline';
       const capturesFeed = window.XPorterFeedParser?.supportsOperation(operationName);
       const successful = response && response.status >= 200 && response.status < 300;
+      if (successful && nativeTemplate) postNativeTemplate(nativeTemplate);
       // SearchTimeline errors are part of the export protocol: the worker uses
       // 429/4xx status codes to show a real countdown and decide whether to
       // retry. Feed collection remains success-only.
@@ -104,6 +107,7 @@
       // listener can never mislabel this request's response.
       this.__xporterOperationName = null;
       this.__xporterRequestUrl = null;
+      this.__xporterNativeTemplate = null;
       this.__xporterOpenToken = (this.__xporterOpenToken || 0) + 1;
 
       const requestUrl = String(url);
@@ -111,19 +115,22 @@
       if (operation) {
         const capturesExport = operation.operationName === 'SearchTimeline';
         const capturesFeed = window.XPorterFeedParser?.supportsOperation(operation.operationName);
+        const nativeTemplate =
+          globalThis.XPorterNativeTemplate?.parseRequestUrl(requestUrl, method) || null;
         if (TRACKED.includes(operation.operationName)) {
           this.__xporterOperationName = operation.operationName;
           this.__xporterRequestUrl = requestUrl;
-          postQueryId(operation.queryId, operation.operationName);
+          this.__xporterNativeTemplate = nativeTemplate;
         }
 
-        if (capturesExport || capturesFeed) {
+        if (nativeTemplate || capturesExport || capturesFeed) {
           // Attach the load listener only for tracked URLs, bound to this open().
           const token = this.__xporterOpenToken;
           this.addEventListener('load', () => {
             try {
               if (this.__xporterOpenToken !== token) return; // re-opened since — stale
               const successful = this.status >= 200 && this.status < 300;
+              if (successful && nativeTemplate) postNativeTemplate(nativeTemplate);
               if (capturesExport || (capturesFeed && successful)) {
                 const bodyText = (this.responseType === '' || this.responseType === 'text') ? this.responseText : '';
                 if (bodyText.length <= MAX_BODY_CHARS && (capturesExport || bodyText)) {

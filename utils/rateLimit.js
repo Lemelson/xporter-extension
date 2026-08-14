@@ -11,8 +11,9 @@ class RateLimitManager {
         this.maxRetries = options.maxRetries || C.MAX_RETRIES || 5;
 
         // Adaptive pacing: when a provider hands us X's live x-rate-limit-*
-        // budget, we space requests to fit that budget instead of using the
-        // configured fallback delay/cooldown above.
+        // budget, use it only to confirm that the selected pace is current.
+        // Advertised exhaustion is advisory: keep trying at the selected pace
+        // and wait only after X actually rejects a request.
         this.adaptivePacing = (options.adaptivePacing !== undefined)
             ? options.adaptivePacing
             : (C.ADAPTIVE_PACING !== false);
@@ -24,9 +25,8 @@ class RateLimitManager {
             ? options.adaptivePad
             : (C.ADAPTIVE_PAD != null ? C.ADAPTIVE_PAD : 2000);
         // Speed-preset knobs (see XPORTER_CONFIG.SPEED_PRESETS):
-        // budgetFraction < 1 paces as if only that share of X's remaining
-        // budget existed; raceReserve > 0 marks a racing preset — hold the
-        // floor pace while the budget lasts, then wait out the window reset.
+        // budgetFraction < 1 remains available to the generic even-spread
+        // mode; raceReserve > 0 marks a fixed-pace preset.
         this.budgetFraction = (options.budgetFraction > 0 && options.budgetFraction <= 1)
             ? options.budgetFraction
             : 1;
@@ -44,7 +44,7 @@ class RateLimitManager {
 
         this.requestCount = 0;
         this.totalRequests = 0;
-        this.status = 'idle'; // idle, fetching, cooldown, error, retrying
+        this.status = 'idle'; // idle, fetching, cooldown, rate_limited, error, retrying
         this.listeners = [];
         this._aborted = false;
         this._abortController = null;
@@ -57,6 +57,55 @@ class RateLimitManager {
      */
     onStatusChange(callback) {
         this.listeners.push(callback);
+    }
+
+    /**
+     * Apply a new pacing preset without replacing this limiter. The current
+     * request or wait is allowed to finish; the next request uses these values.
+     * Counters, listeners, rate-limit history, and abort state stay intact.
+     */
+    reconfigure(options = {}) {
+        const setPositive = (key) => {
+            const value = Number(options[key]);
+            if (Number.isFinite(value) && value > 0) this[key] = value;
+        };
+
+        setPositive('requestDelay');
+        setPositive('batchSize');
+        setPositive('cooldownDuration');
+        setPositive('rateLimitPause');
+        setPositive('maxRetries');
+        setPositive('adaptiveFloor');
+        setPositive('adaptiveHeaderTtl');
+        setPositive('fallbackMinDelay');
+
+        if (options.adaptivePad != null && Number.isFinite(Number(options.adaptivePad))) {
+            this.adaptivePad = Math.max(0, Number(options.adaptivePad));
+        }
+        if (options.budgetFraction > 0 && options.budgetFraction <= 1) {
+            this.budgetFraction = options.budgetFraction;
+        }
+        if (options.raceReserve != null && Number.isFinite(Number(options.raceReserve))) {
+            this.raceReserve = Math.max(0, Number(options.raceReserve));
+        }
+        if (options.adaptivePacing !== undefined) {
+            this.adaptivePacing = options.adaptivePacing !== false;
+        }
+        if (Object.hasOwn(options, 'alwaysBatchCooldown')) {
+            this.alwaysBatchCooldown = !!options.alwaysBatchCooldown;
+        }
+        if (Object.hasOwn(options, 'rateLimitProvider')) {
+            this.rateLimitProvider = typeof options.rateLimitProvider === 'function'
+                ? options.rateLimitProvider
+                : null;
+        }
+        if (options.fallbackMaxDelay != null &&
+            Number.isFinite(Number(options.fallbackMaxDelay))) {
+            this.fallbackMaxDelay = Math.max(
+                this.fallbackMinDelay,
+                Number(options.fallbackMaxDelay)
+            );
+        }
     }
 
     /**
@@ -133,10 +182,10 @@ class RateLimitManager {
 
     /**
      * Work out the wait before the next request from X's advertised budget.
-     * Spreads whatever quota is left evenly across the time remaining in the
-     * window — the same way X's own web client paces itself. Returns null when
-     * adaptive pacing isn't usable (disabled, no provider, or stale/missing
-     * headers) so the caller falls back to its configured delay + batch cooldown.
+     * Uses X's advertised budget when available. Fixed-pace presets do not
+     * schedule a wait until the reset window: they keep the selected delay and
+     * let an actual failed request enter the one-minute retry path. Returns
+     * null when adaptive pacing isn't usable so the caller uses its fallback.
      *
      * @returns {{delay:number, waiting:boolean}|null}
      */
@@ -158,24 +207,20 @@ class RateLimitManager {
 
         const msLeftInWindow = Math.max(0, reset * 1000 - Date.now());
 
-        // Out of quota → hold until the window rolls over, plus a small margin.
+        // Do not treat an advertised zero as a failed request. X's counters can
+        // be shared with the open x.com tab or lag behind concurrent batches.
+        // Keep the user-selected pace until the endpoint actually rejects us.
         if (remaining <= 0) {
             return {
-                delay: msLeftInWindow + this.adaptivePad,
-                waiting: true
+                delay: this.adaptiveFloor + this.adaptivePad,
+                waiting: false
             };
         }
 
-        // Burst-first presets: hold the promised pace while the budget lasts,
-        // then wait out the window reset. Even-spreading the tail silently
-        // turns a short export into 20+ second pauses; an explicit "X limit
-        // reached" hold is honest and no slower overall. The small reserve
-        // absorbs requests the user's own X tab makes against the same budget.
+        // Fixed-pace presets keep their promised speed even when the advertised
+        // budget reaches the old safety reserve. Only a real 429 may pause.
         if (this.raceReserve > 0) {
-            if (remaining > this.raceReserve) {
-                return { delay: this.adaptiveFloor + this.adaptivePad, waiting: false };
-            }
-            return { delay: msLeftInWindow + this.adaptivePad, waiting: true };
+            return { delay: this.adaptiveFloor + this.adaptivePad, waiting: false };
         }
 
         // Quota left → fill the rest of the window evenly. budgetFraction < 1
@@ -238,9 +283,13 @@ class RateLimitManager {
                 });
                 await this._wait(adaptive.delay);
             } else {
-                // Fallback: no live budget — use the configured per-mode delay
-                // and inject a batch cooldown every N requests as a safety net.
-                await this._maybeBatchCooldown();
+                // Fallback: no live budget — use the selected per-mode delay.
+                // A named speed must never invent a multi-minute batch pause;
+                // Custom keeps its explicitly configured batch cooldown.
+                if (this.alwaysBatchCooldown) {
+                    await this._maybeBatchCooldown();
+                    if (this._aborted) throw new Error('ABORTED');
+                }
                 const fallbackDelay = this._computeFallbackDelay();
                 this._emitStatus('cooldown', {
                     duration: fallbackDelay,
@@ -253,15 +302,17 @@ class RateLimitManager {
 
         // Execute with retry logic
         let lastError = null;
+        let retryReason = null;
         for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
             if (this._aborted) throw new Error('ABORTED');
 
             try {
-                this._emitStatus('fetching', {
+                this._emitStatus(attempt === 0 ? 'fetching' : 'retrying', {
                     // User-facing batch = the API page currently being fetched.
                     // The internal cooldown group remains requestInBatch.
                     batch: this.totalRequests + 1,
-                    requestInBatch: (this.requestCount % this.batchSize) + 1
+                    requestInBatch: (this.requestCount % this.batchSize) + 1,
+                    ...(attempt > 0 ? { attempt, reason: retryReason } : {})
                 });
 
                 const result = await requestFn();
@@ -275,17 +326,16 @@ class RateLimitManager {
 
                 if (error.message === 'RATE_LIMITED') {
                     if (attempt >= this.maxRetries) break;
-                    const advertised = this._computeAdaptiveDelay();
-                    const waitTime = advertised?.waiting
-                        ? advertised.delay
-                        : this.rateLimitPause * Math.pow(2, attempt);
-                    this._emitStatus('error', {
-                        error: 'Rate limited (429)',
+                    const waitTime = this.rateLimitPause;
+                    retryReason = 'RATE_LIMITED';
+                    this._emitStatus('rate_limited', {
+                        error: 'RATE_LIMITED',
                         retryIn: waitTime,
-                        attempt: attempt + 1
+                        attempt: attempt + 1,
+                        kind: 'window',
+                        reason: 'X rate limit reached'
                     });
                     await this._wait(waitTime);
-                    this._emitStatus('retrying', { attempt: attempt + 1 });
                     continue;
                 }
 
@@ -295,16 +345,21 @@ class RateLimitManager {
 
                 // Stale query ID — API changed, retry after delay
                 if (error.message === 'STALE_QUERY_ID') {
+                    // api.js already tried every distinct live, discovered,
+                    // freshly-discovered, and fallback candidate. Re-running
+                    // that complete recovery cycle here only repeats the same
+                    // requests and adds 10+20+30+40+50 seconds of dead time.
+                    if (error.staleCandidatesExhausted === true) throw error;
                     if (attempt >= this.maxRetries) break;
                     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
                     const waitTime = (C.STALE_RETRY_BASE_WAIT || 10000) * (attempt + 1);
+                    retryReason = 'STALE_QUERY_ID';
                     this._emitStatus('error', {
                         error: 'API changed, refreshing...',
                         retryIn: waitTime,
                         attempt: attempt + 1
                     });
                     await this._wait(waitTime);
-                    this._emitStatus('retrying', { attempt: attempt + 1 });
                     continue;
                 }
 
@@ -312,15 +367,14 @@ class RateLimitManager {
                 // its deadline in api.js; same recovery path as any drop)
                 if (error.message === 'NETWORK_TIMEOUT' || error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
                     if (attempt >= this.maxRetries) break;
-                    const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
-                    const waitTime = (C.NETWORK_RETRY_BASE_WAIT || 30000) * (attempt + 1);
+                    const waitTime = this.rateLimitPause;
+                    retryReason = 'NETWORK_ERROR';
                     this._emitStatus('error', {
                         error: 'Network error',
                         retryIn: waitTime,
                         attempt: attempt + 1
                     });
                     await this._wait(waitTime);
-                    this._emitStatus('retrying', { attempt: attempt + 1 });
                     continue;
                 }
 

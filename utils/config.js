@@ -9,38 +9,36 @@ const XPORTER_CONFIG = {
     // disabled; header-less adaptive requests use the mode-specific ranges below.
     REQUEST_DELAY: 3000,           // ms between API requests
     COOLDOWN_DURATION: 180000,     // 3 min cooldown after each batch
-    RATE_LIMIT_PAUSE: 60000,       // 60s base wait on 429 (exponential backoff applied)
+    RATE_LIMIT_PAUSE: 60000,       // fixed 60s retry wait after a real 429/network failure
     MAX_RETRIES: 5,                // max retry attempts per request
     BATCH_SIZE: 20,                // requests before cooldown
 
-    // Adaptive pacing — derive the wait between requests from X's own
-    // x-rate-limit-* response headers instead of a blind fixed delay. Much
-    // faster on high-limit GraphQL endpoints, and safer: we stay inside the
-    // exact budget X advertises, so we rarely trip a 429. Falls back to a
-    // conservative per-mode range when no valid current headers are present.
+    // Adaptive pacing — use current x-rate-limit-* headers when available, but
+    // never schedule a wait until the advertised reset. The selected speed
+    // continues until X actually rejects a request; that failure retries after
+    // one minute. Missing headers use the per-mode fallback range below.
     ADAPTIVE_PACING: true,         // master switch
     ADAPTIVE_MIN_DELAY: 5000,      // floor: never pace faster than this (anti-bot)
     ADAPTIVE_PAD: 2000,            // safety margin added to every computed wait
     ADAPTIVE_HEADER_TTL: 300000,   // ignore a captured budget older than 5 min
     FALLBACK_REQUEST_DELAYS: {
         posts: [4000, 5000],
+            bookmarks: [4000, 5000],
+            bookmark_context: [4000, 5000],
         followers: [60000, 60000],
         following: [5000, 10000],
-        verified_followers: [5000, 10000]
+        verified_followers: [5000, 10000],
+        about_account: [5000, 10000]
     },
 
-    // Export speed presets — the single user-facing pacing knob (settings →
-    // "Export Speed"). Adaptive pacing stays the primary throttle in every
-    // preset; these only shift the safety margin around it.
+    // Shared export-speed tiers behind the two independent user-facing controls
+    // ("Posts Export Speed" and "User Lists Export Speed"). Adaptive pacing
+    // stays the primary throttle; these only shift the safety margin around it.
     //   adaptiveFloor/adaptivePad  — override the ADAPTIVE_* values above
     //   budgetFraction             — pace as if only this share of X's
     //                                remaining budget were available (<1 = safer)
-    //   raceReserve                — hold the promised floor pace while X has
-    //                                more than this many requests left, then
-    //                                wait out the window reset. All named
-    //                                presets use this burst-first model because
-    //                                exports are finite foreground jobs, not a
-    //                                continuous background sync.
+    //   raceReserve                — fixed-pace marker; advertised low budget
+    //                                no longer creates a scheduled reset wait
     //   fallbackScale              — multiplier on FALLBACK_REQUEST_DELAYS
     //   batchSize/cooldownDuration — headerless-fallback batch rhythm
     SPEED_PRESETS: {
@@ -70,8 +68,7 @@ const XPORTER_CONFIG = {
             batchSize: 10, cooldownDuration: 480000
         }
         // 'custom' is not listed here — createRateLimiter() builds it from the
-        // user's customDelaySec / customBatchSize / customCooldownMin settings,
-        // clamped to CUSTOM_SPEED_LIMITS below.
+        // mode's own Custom fields, clamped to CUSTOM_SPEED_LIMITS below.
     },
     // Clamp ranges (and defaults) for the Custom speed's user-typed values.
     CUSTOM_SPEED_LIMITS: {
@@ -87,6 +84,7 @@ const XPORTER_CONFIG = {
         posts: { csv: 10000, json: 10000, xlsx: 10000, txt: 10000 },
         users: { csv: 100000, json: 50000, xlsx: 25000 }
     },
+    EMBEDDED_PHOTO_XLSX_PART_LIMIT: 250,
     STORAGE_BATCH_READ_SIZE: 100,
     RECENT_EXPORT_ID_LIMIT: 1000,
     // History duplicates row payloads. Large completed exports keep metadata
@@ -99,8 +97,19 @@ const XPORTER_CONFIG = {
     // export session re-download X's multi-MB JS bundles first — on a slow
     // connection/VPN that is 10-60s of "Resolving user…" dead air (churn).
     ENDPOINT_CACHE_TTL: 24 * 60 * 60 * 1000,
+    ABOUT_ACCOUNT_CACHE_TTL: 7 * 24 * 60 * 60 * 1000,
+    ABOUT_ACCOUNT_FAILURE_CACHE_TTL: 60 * 60 * 1000,
+    ABOUT_ACCOUNT_CACHE_MAX_ENTRIES: 25000,
+    ABOUT_ACCOUNT_BATCH_SIZES: {
+        turtle: 1,
+        careful: 3,
+        standard: 5,
+        fast: 10,
+        turbo: 20
+    },
+    ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE: [1, 50, 5],
+    ABOUT_ACCOUNT_RETRY_RANGE: [1, 1440, 5],
     STALE_RETRY_BASE_WAIT: 10000,        // base wait on STALE_QUERY_ID (multiplied by attempt)
-    NETWORK_RETRY_BASE_WAIT: 30000,      // base wait on network errors
     API_FETCH_TIMEOUT: 30000,            // ms per GraphQL/REST request — a hung fetch must fail visibly, not hang the export forever
     DISCOVERY_FETCH_TIMEOUT: 15000,      // ms per discovery fetch (x.com page / JS bundle)
     DISCOVERY_TOTAL_TIMEOUT: 25000,      // ms cap on a whole discovery pass before falling back to known queryIds

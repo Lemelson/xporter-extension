@@ -49,10 +49,15 @@ async function run() {
     assert(oneLeft.delay >= 600000, 'normal pacing must not be capped before reset');
 
     const exhausted = new RateLimitManager({
+        adaptiveFloor: 3000,
+        adaptivePad: 1000,
         rateLimitProvider: () => budget({ remaining: 0, resetInMs: 600000 })
     })._computeAdaptiveDelay();
-    assert.equal(exhausted.waiting, true);
-    assert(exhausted.delay >= 600000, 'exhausted budget must wait for reset');
+    assert.deepEqual(
+        exhausted,
+        { delay: 4000, waiting: false },
+        'advertised exhaustion must keep the selected pace until X actually rejects a request'
+    );
 
     const invalid = new RateLimitManager({
         rateLimitProvider: () => ({ remaining: Number.NaN, reset: Number.NaN, at: Date.now() })
@@ -114,6 +119,35 @@ async function run() {
     assert.equal(standardEvents[1]?.status, 'fetching', 'fetching must follow the visible countdown');
     assert.equal(standardEvents[1]?.batch, 2, 'the next fetched page must be shown as batch 2');
 
+    // A 429 is a distinct visible phase: first pause with a countdown, then
+    // keep the actual retry labelled as a retry while it is in flight. Calling
+    // that second request "Fetching..." made the popup look stuck and hid why
+    // the same About batch was being attempted again.
+    const retryEvents = [];
+    const retryLimiter = new RateLimitManager({
+        adaptivePacing: false,
+        rateLimitPause: 30000,
+        maxRetries: 1
+    });
+    retryLimiter.onStatusChange(event => retryEvents.push(event));
+    retryLimiter._wait = async () => {};
+    let retryCalls = 0;
+    const retryResult = await retryLimiter.executeWithRateLimit(async () => {
+        retryCalls += 1;
+        if (retryCalls === 1) throw new Error('RATE_LIMITED');
+        return 'recovered';
+    });
+    assert.equal(retryResult, 'recovered');
+    assert.deepEqual(
+        retryEvents.map(event => event.status),
+        ['fetching', 'rate_limited', 'retrying'],
+        'a rate-limit retry must never fall back to the generic fetching label'
+    );
+    assert.equal(retryEvents[1]?.retryIn, 30000);
+    assert.equal(retryEvents[1]?.kind, 'window');
+    assert.equal(retryEvents[2]?.attempt, 1);
+    assert.equal(retryEvents[2]?.batch, 1);
+
     // The shared UI helper resumes an in-flight wait at the correct point and
     // fills smoothly to 100% at the same deadline.
     const uiContext = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval });
@@ -156,17 +190,20 @@ async function run() {
     })._computeAdaptiveDelay();
     assert.equal(race.delay, 3500, 'racing preset must pace at floor + pad');
     assert.equal(race.waiting, false);
-    // …and once the budget hits the reserve, wait out the window reset (an
-    // honest hold) — never quietly stretch the pace to 10× the promised one.
+    // …and once the budget hits the reserve, keep that same selected pace.
+    // The headers are advisory; only an actual failed request may pause the
+    // export for a retry.
     const raceDrained = new RateLimitManager({
         adaptiveFloor: 2500,
         adaptivePad: 0,
         raceReserve: 5,
         rateLimitProvider: () => budget({ remaining: 5, resetInMs: 600000 })
     })._computeAdaptiveDelay();
-    assert.equal(raceDrained.waiting, true, 'drained racing preset must hold for the reset');
-    // (reset is floored to whole seconds, so allow ~1s of slack)
-    assert(raceDrained.delay >= 599000, 'the hold must last until the window rolls over');
+    assert.deepEqual(
+        raceDrained,
+        { delay: 2500, waiting: false },
+        'a low advertised reserve must not schedule a multi-minute hold'
+    );
 
     // Custom preset: alwaysBatchCooldown must inject the batch pause even
     // while adaptive pacing is active (normally adaptive skips it).
@@ -217,6 +254,58 @@ async function run() {
         'resume after elapsed wall-clock cooldown must only use the normal request delay'
     );
 
+    const namedFallback = new RateLimitManager({
+        adaptivePacing: false,
+        batchSize: 20,
+        cooldownDuration: 180000,
+        fallbackMinDelay: 4000,
+        fallbackMaxDelay: 4000
+    });
+    namedFallback.restoreState({
+        requestCount: 20,
+        totalRequests: 20,
+        lastRequestAt: Date.now()
+    });
+    const namedFallbackWaits = [];
+    namedFallback._wait = async (ms) => namedFallbackWaits.push(ms);
+    await namedFallback.executeWithRateLimit(async () => 'ok');
+    assert.deepEqual(
+        namedFallbackWaits,
+        [4000],
+        'a named speed without live headers must not inject a scheduled batch cooldown'
+    );
+
+    const livePacing = new RateLimitManager({
+        adaptiveFloor: 12000,
+        adaptivePad: 4000,
+        batchSize: 10,
+        cooldownDuration: 480000,
+        fallbackMinDelay: 15000,
+        fallbackMaxDelay: 25000
+    });
+    livePacing.restoreState({
+        requestCount: 7,
+        totalRequests: 9,
+        lastRequestAt: 123
+    });
+    livePacing.reconfigure({
+        adaptiveFloor: 2000,
+        adaptivePad: 500,
+        batchSize: 30,
+        cooldownDuration: 45000,
+        fallbackMinDelay: 2000,
+        fallbackMaxDelay: 2500
+    });
+    assert.equal(livePacing.adaptiveFloor, 2000,
+        'a running limiter must accept the newly selected speed');
+    assert.equal(livePacing.batchSize, 30);
+    assert.equal(livePacing.fallbackMinDelay, 2000);
+    assert.equal(livePacing.requestCount, 7,
+        'live pacing changes must preserve request counters');
+    assert.equal(livePacing.totalRequests, 9);
+    assert.equal(livePacing.lastRequestAt, 123,
+        'live pacing changes must preserve cooldown timing');
+
     const changedPacing = new RateLimitManager({
         requestDelay: 12000,
         batchSize: 50,
@@ -240,6 +329,7 @@ async function run() {
     const waits = [];
     const retry = new RateLimitManager({
         rateLimitProvider: () => budget({ remaining: 0, resetInMs: 600000 }),
+        rateLimitPause: 60000,
         maxRetries: 1
     });
     retry._wait = async (ms) => waits.push(ms);
@@ -248,8 +338,49 @@ async function run() {
         return 'ok';
     });
     assert.equal(result, 'ok');
-    assert.equal(waits.length, 1);
-    assert(waits[0] >= 600000, '429 retry must honor the advertised reset');
+    assert.deepEqual(
+        waits,
+        [60000],
+        'an actual 429 must retry after one minute instead of waiting for the advertised reset'
+    );
+
+    let repeatedAttempts = 0;
+    const repeatedWaits = [];
+    const repeated429 = new RateLimitManager({
+        rateLimitPause: 60000,
+        maxRetries: 2
+    });
+    repeated429._wait = async (ms) => repeatedWaits.push(ms);
+    const repeatedResult = await repeated429.executeWithRateLimit(async () => {
+        repeatedAttempts += 1;
+        if (repeatedAttempts < 3) throw new Error('RATE_LIMITED');
+        return 'ok';
+    });
+    assert.equal(repeatedResult, 'ok');
+    assert.deepEqual(
+        repeatedWaits,
+        [60000, 60000],
+        'each repeated 429 must retry on the same one-minute cadence'
+    );
+
+    let networkAttempts = 0;
+    const networkWaits = [];
+    const networkRetry = new RateLimitManager({
+        rateLimitPause: 60000,
+        maxRetries: 1
+    });
+    networkRetry._wait = async (ms) => networkWaits.push(ms);
+    const networkResult = await networkRetry.executeWithRateLimit(async () => {
+        networkAttempts += 1;
+        if (networkAttempts === 1) throw new Error('NETWORK_TIMEOUT');
+        return 'ok';
+    });
+    assert.equal(networkResult, 'ok');
+    assert.deepEqual(
+        networkWaits,
+        [60000],
+        'an actual network failure must retry after one minute'
+    );
 
     const finalFailureWaits = [];
     const finalFailure = new RateLimitManager({ maxRetries: 1 });
@@ -261,6 +392,43 @@ async function run() {
         /RATE_LIMITED/
     );
     assert.equal(finalFailureWaits.length, 1, 'must not sleep after the final failed attempt');
+
+    const exhaustedStaleWaits = [];
+    let exhaustedStaleCalls = 0;
+    const exhaustedStale = new RateLimitManager({ maxRetries: 5 });
+    exhaustedStale._wait = async (ms) => exhaustedStaleWaits.push(ms);
+    await assert.rejects(
+        exhaustedStale.executeWithRateLimit(async () => {
+            exhaustedStaleCalls += 1;
+            const error = new Error('STALE_QUERY_ID');
+            error.staleCandidatesExhausted = true;
+            throw error;
+        }),
+        error => error.message === 'STALE_QUERY_ID' && error.staleCandidatesExhausted === true
+    );
+    assert.equal(
+        exhaustedStaleCalls,
+        1,
+        'a fully exhausted API recovery cycle must not be repeated by RateLimitManager'
+    );
+    assert.deepEqual(
+        exhaustedStaleWaits,
+        [],
+        'terminal stale exhaustion must not add another 10/20/30/40/50 second wait'
+    );
+
+    let recoverableStaleCalls = 0;
+    const recoverableStaleWaits = [];
+    const recoverableStale = new RateLimitManager({ maxRetries: 1 });
+    recoverableStale._wait = async (ms) => recoverableStaleWaits.push(ms);
+    const recoveredStaleResult = await recoverableStale.executeWithRateLimit(async () => {
+        recoverableStaleCalls += 1;
+        if (recoverableStaleCalls === 1) throw new Error('STALE_QUERY_ID');
+        return 'recovered';
+    });
+    assert.equal(recoveredStaleResult, 'recovered');
+    assert.equal(recoverableStaleCalls, 2, 'a non-exhausted stale signal may still use one outer retry');
+    assert.deepEqual(recoverableStaleWaits, [10000]);
 
     globalThis.USER_FEATURES = {};
     globalThis.USER_FIELD_TOGGLES = {};
