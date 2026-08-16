@@ -28,7 +28,7 @@ function walk(dir) {
 
 const manifest = JSON.parse(read('manifest.json'));
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, '1.6.0');
+assert.equal(manifest.version, '1.5.8');
 assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
     'download keepalive relies on Chrome 110+ extension API calls resetting the MV3 idle timer');
 
@@ -164,8 +164,8 @@ assert.match(updateEntries[1], /data-i18n=["']updateReleased["']/,
     'the previous public version must be labelled Released');
 assert.match(
     updateEntries[1],
-    /<span class="update-meta-version">v1\.5\.8<\/span>/,
-    'the previous public release must be v1.5.8'
+    /<span class="update-meta-version">v1\.5\.1<\/span>/,
+    'the previous public release must be v1.5.1'
 );
 const currentBuildDate = /<time data-release-date datetime="([^"]+)"/.exec(updateEntries[0])?.[1];
 const footerBuildDate = /footer-build-date">([^<]+)</.exec(popupHtml)?.[1];
