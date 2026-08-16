@@ -13,8 +13,6 @@
         'AboutAccountQuery',
         'UserTweets',
         'UserTweetsAndReplies',
-        'Bookmarks',
-        'TweetResultsByRestIds',
         'Following',
         'BlueVerifiedFollowers'
     ]);

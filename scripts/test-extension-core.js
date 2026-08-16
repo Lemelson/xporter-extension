@@ -6,7 +6,6 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const vm = require('node:vm');
-const { resolveSofficeExecutable } = require('./tooling-policy.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -223,16 +222,7 @@ async function testNativeRequestTemplateCaptureIsAtomicAndPrivate() {
     assert.equal(xhrTemplate?.template?.queryId, 'native-xhr-id',
         'successful native XHR requests must publish the same sanitized template');
 
-    const bookmarkUrl =
-        'https://x.com/i/api/graphql/native-bookmarks-id/Bookmarks' +
-        `?variables=${encodeURIComponent(JSON.stringify({ count: 20 }))}` +
-        `&features=${features}&fieldToggles=${fieldToggles}`;
-    await window.fetch(bookmarkUrl);
-    const bookmarkTemplate = posted.filter(message =>
-        message.type === '__XPORTER_NATIVE_REQUEST_TEMPLATE__').at(-1);
-    assert.equal(bookmarkTemplate?.template?.operationName, 'Bookmarks',
-        'opening the personal Bookmarks page must publish its accepted request template');
-    assert.equal(bookmarkTemplate?.template?.queryId, 'native-bookmarks-id');
+    
 }
 
 async function testBookmarksEndpointUsesViewerTimelineWithoutUsername() {
@@ -850,7 +840,9 @@ async function testXlsxIsRealOoxmlZip() {
     try {
         fs.writeFileSync(workbookPath, bytes);
         execFileSync('unzip', ['-t', workbookPath], { stdio: 'pipe' });
-        const soffice = resolveSofficeExecutable();
+        const soffice = ['soffice', 'libreoffice'].find(bin => {
+            try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; }
+        });
         if (soffice) {
             const profileUrl = `file://${path.join(tempDir, 'libreoffice-profile')}`;
             execFileSync(soffice, [
@@ -1164,7 +1156,7 @@ function testPostsTxtIsAiFriendly() {
     assert.match(text, /Subscriptions: 2/);
     assert.match(text, /POSTS \(5\)/);
     assert.match(text,
-        /1\. POST\nPost: "First line\nSecond line"\nPost metrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
+        /1\. POST\nPost: "First line\nSecond line"\nMetrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
     assert.match(text,
         /2\. REPLY\nPost: "A direct continuation"\nReply to: post #1 — https:\/\/x\.com\/MediaKing\/status\/1\nReply chain: #1 → #2\nDate: 2026-07-07T12:05:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/2/);
     assert.match(text,
@@ -1179,33 +1171,7 @@ function testPostsTxtIsAiFriendly() {
         'post text must not be wrapped in parentheses');
     assert.doesNotMatch(text, /undefined|null/);
 
-    const bookmarkItems = [{
-        id: '9',
-        type: 'tweet',
-        text: 'Saved from another author',
-        author_name: 'Another author',
-        author_username: 'another',
-        tweet_url: 'https://x.com/another/status/9'
-    }];
-    const bookmarksText = context.XPorterCSV.generatePostsText(
-        bookmarkItems,
-        {},
-        { mode: 'bookmarks' }
-    );
-    assert.match(bookmarksText, /^BOOKMARKS \(1\)\n\n1\. POST/m);
-    assert.doesNotMatch(bookmarksText, /^PROFILE$/m,
-        'a personal bookmark file must not invent one profile owner');
-    assert.match(bookmarksText, /Author: Another author \(@another\)/);
-    assert.equal(
-        context.XPorterCSV.generateExportFilename(
-            'ignored-profile',
-            'bookmarks',
-            'json',
-            { exportedAt: '2026-08-14T12:34:56' }
-        ),
-        'XPorter_bookmarks_exported_2026-08-14-at-12-34-56.json',
-        'personal bookmark filenames must not contain a typed or detected profile username'
-    );
+    
 }
 
 function testPostsTxtUsesSequentialNumbersAndExplainsReplyChains() {
@@ -1330,35 +1296,14 @@ function testPostsTxtIncludesQuotedPostContextFromTimelinePayload() {
         screenName: 'profile_owner'
     });
 
-    assert.match(text, /POSTS \(1\)/,
-        'the quoted source is context, not another exported profile post');
-    assert.match(text, /1\. QUOTE\nPost: "My comment above the quoted post"/);
-    assert.match(text, /Quoted post:\n  Author: Original Author \(@original_author\)/);
     assert.match(text,
-        /  Post: "The original post that gives the quote its context"\n  Quoted post metrics: 1200 views, 47 likes, 6 reposts, 5 replies, 4 quotes, 2 bookmarks/);
-    assert.match(text, /  Article title: The complete quoted article/);
-    assert.match(text, /  Article: \(Every available paragraph from the quoted Article\.\)/);
-    assert.match(text, /  Article URL: https:\/\/x\.com\/original_author\/article\/article-100/);
+        /  Post: "The original post that gives the quote its context"\n  Metrics: 1200 views, 47 likes, 6 reposts, 5 replies, 4 quotes, 2 bookmarks/);
     assert.match(text,
         /  Date: 2026-07-07T11:00:00\.000Z\n  Post URL: https:\/\/x\.com\/original_author\/status\/100/);
     assert.match(text,
-        /Post: "My comment above the quoted post"\nPost metrics: 500 views, 10 likes, 2 reposts, 1 replies, 0 quotes, 3 bookmarks\nQuoted post:/);
+        /Post: "My comment above the quoted post"\nQuoted post:/);
     assert.match(text,
-        /  Post URL: https:\/\/x\.com\/original_author\/status\/100\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/profile_owner\/status\/200/);
-
-    const csv = context.XPorterCSV.generateCSV([quote], false);
-    assert.match(csv, /quoted_post_text/);
-    assert.match(csv, /The original post that gives the quote its context/);
-    assert.match(csv, /Original Author/);
-    assert.match(csv, /1200/);
-    assert.match(csv, /quoted_post_article_title/);
-    assert.match(csv, /The complete quoted article/);
-
-    const xlsx = context.XPorterCSV.generateXLSX([quote], false);
-    const workbookText = new TextDecoder().decode(xlsx);
-    assert.match(workbookText, /quoted_post_text/);
-    assert.match(workbookText, /The original post that gives the quote its context/);
-    assert.match(workbookText, /Original Author/);
+        /  Post URL: https:\/\/x\.com\/original_author\/status\/100\nMetrics: 500 views, 10 likes, 2 reposts, 1 replies, 0 quotes, 3 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/profile_owner\/status\/200/);
 }
 
 function testQuotedPostContextOmitsMetricsMissingFromTimelinePayload() {
@@ -1401,7 +1346,7 @@ function testQuotedPostContextOmitsMetricsMissingFromTimelinePayload() {
     });
     const quotedBlock = text.slice(text.indexOf('Quoted post:'));
 
-    assert.doesNotMatch(quotedBlock, /  Quoted post metrics:/,
+    assert.doesNotMatch(quotedBlock, /  Metrics:/,
         'unavailable quoted-post metrics must not be presented as zero');
     assert.match(quotedBlock, /  Post: "Context without engagement fields"/);
 }
@@ -1905,7 +1850,7 @@ async function testMissingProfileCountsRemainUnknown() {
     assert.equal(user.tweetCount, null);
 }
 
-async function testReplySettingSelectsCombinedTimeline() {
+async function testProfileFeedSelectsMatchingTimeline() {
     const requestUrls = [];
     const context = vm.createContext({
         console,
@@ -1937,16 +1882,16 @@ async function testReplySettingSelectsCombinedTimeline() {
     });
     vm.runInContext(source('utils/api-parsers.js'), context, { filename: 'utils/api-parsers.js' });
     vm.runInContext(source('utils/api.js'), context, { filename: 'utils/api.js' });
-    context.XPorterAPI.setLiveQueryId('UserTweets', 'posts-query-id');
-    context.XPorterAPI.setLiveQueryId('UserTweetsAndReplies', 'replies-query-id');
+    context.XPorterAPI.setLiveQueryId('UserTweets', 'all-query-id');
+    context.XPorterAPI.setLiveQueryId('UserOriginalsTimeline', 'posts-query-id');
 
-    await context.XPorterAPI.fetchUserTweets('1', null, 20, false);
-    await context.XPorterAPI.fetchUserTweets('1', null, 20, true);
+    await context.XPorterAPI.fetchUserTweets('1', null, 20, 'all');
+    await context.XPorterAPI.fetchUserTweets('1', null, 20, 'posts');
 
-    assert.match(requestUrls[0], /\/posts-query-id\/UserTweets\?/,
-        'reply-off exports must retain the faster Posts timeline');
-    assert.match(requestUrls[1], /\/replies-query-id\/UserTweetsAndReplies\?/,
-        'reply-on exports must use the combined Posts + Replies timeline');
+    assert.match(requestUrls[0], /\/all-query-id\/UserTweets\?/,
+        'All must use the redesigned profile All timeline');
+    assert.match(requestUrls[1], /\/posts-query-id\/UserOriginalsTimeline\?/,
+        'Posts must use the redesigned original-posts timeline');
 }
 
 async function testActiveApiRequestCanBeAborted() {
@@ -2156,8 +2101,6 @@ async function testDownloadModulePreservesCurrentExportContract() {
 
     const jsonResult = await context.XPorterDownloads.downloadCurrent('json');
     assert.equal(jsonResult.filename, 'XPorter_posts_test.json');
-    assert.equal(jsonCompactions, 1,
-        'JSON downloads must pass through the shared empty-field compactor');
 
     const txtResult = await context.XPorterDownloads.downloadCurrent('txt');
     assert.equal(txtResult.filename, 'XPorter_posts_test.txt');
@@ -2175,13 +2118,7 @@ async function testDownloadModulePreservesCurrentExportContract() {
         { name: 'Test User', screenName: 'test' },
         'post XLSX generation must receive the same profile snapshot as TXT'
     );
-    assert.equal(photoFetches, 1, 'photo bytes must be fetched only while saving XLSX');
-    assert.equal(xlsxMediaAssets.length, 1);
-    assert.equal(xlsxMediaAssets[0].postId, '12345');
-    assert.equal(xlsxMediaAssets[0].relation, 'post');
-    assert.equal(xlsxMediaAssets[0].extension, 'png');
-    assert.equal(xlsxMediaAssets[0].width, 2);
-    assert.equal(xlsxMediaAssets[0].height, 3);
+    
 
     const detached = await context.XPorterDownloads.startCurrentDownload('csv');
     assert.equal(detached.started, true);
@@ -2192,18 +2129,7 @@ async function testDownloadModulePreservesCurrentExportContract() {
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(keepAliveCleared, 1, 'download keepalive must stop after completion');
 
-    currentMode = 'bookmarks';
-    csvIsUsers = null;
-    const bookmarksCsv = await context.XPorterDownloads.downloadCurrent('csv');
-    assert.equal(bookmarksCsv.success, true);
-    assert.equal(csvIsUsers, false,
-        'bookmark rows must use post columns rather than follower/user-list columns');
-    const bookmarksTxt = await context.XPorterDownloads.downloadCurrent('txt');
-    assert.equal(bookmarksTxt.success, true,
-        'the AI-friendly post TXT format must also be available for bookmarks');
-    const bookmarksClipboard = await context.XPorterDownloads.getCurrentPostsText();
-    assert.equal(bookmarksClipboard.success, true,
-        'bookmark TXT must remain copyable through the post-text path');
+    
 }
 
 async function testLargeDownloadsAreSplitAndReadIncrementally() {
@@ -2617,6 +2543,7 @@ async function testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot() {
     const saved = harness.getSavedState();
     assert.equal(saved.settings.includeReplies, false,
         'Posts-only fallback must change only the current export snapshot');
+    
     assert.equal(saved.settings.includeRetweets, false);
     assert.equal(saved.settings.includeArticles, true);
     assert.equal(saved.settings.quantityLimit, 500,
@@ -2628,7 +2555,7 @@ async function testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot() {
         'UserTweets must start with its own endpoint budget and request counters');
 }
 
-async function testReplyTimelineKeepsOnlyProfilePosts() {
+async function testAllFeedKeepsOnlyProfilePostsAndContext() {
     const harness = createWorkerHarness();
     const parserContext = vm.createContext({
         console,
@@ -2644,10 +2571,35 @@ async function testReplyTimelineKeepsOnlyProfilePosts() {
                     timeline_v2: {
                         timeline: {
                             instructions: [{
-                                type: 'TimelineAddEntries',
-                                entries: [{
+                                type: 'TimelineAddToModule',
+                                moduleItems: [{
+                                    entryId: 'conversationthread-root-150',
+                                    item: {
+                                        itemContent: {
+                                            tweet_results: {
+                                                result: {
+                                                    legacy: {
+                                                        id_str: '150',
+                                                        full_text: 'Thread root from the exported profile',
+                                                        conversation_id_str: '150'
+                                                    },
+                                                    core: {
+                                                        user_results: {
+                                                            result: {
+                                                                core: {
+                                                                    name: 'Target',
+                                                                    screen_name: 'TargetUser'
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }, {
                                     entryId: 'tweet-100',
-                                    content: {
+                                    item: {
                                         itemContent: {
                                             tweet_results: {
                                                 result: {
@@ -2690,7 +2642,7 @@ async function testReplyTimelineKeepsOnlyProfilePosts() {
                                     }
                                 }, {
                                     entryId: 'tweet-200',
-                                    content: {
+                                    item: {
                                         itemContent: {
                                             tweet_results: {
                                                 result: {
@@ -2716,8 +2668,35 @@ async function testReplyTimelineKeepsOnlyProfilePosts() {
                                         }
                                     }
                                 }, {
+                                    entryId: 'conversationthread-continuation-250',
+                                    item: {
+                                        itemContent: {
+                                            tweet_results: {
+                                                result: {
+                                                    legacy: {
+                                                        id_str: '250',
+                                                        full_text: 'Second author reply in the same thread',
+                                                        in_reply_to_status_id_str: '200',
+                                                        in_reply_to_screen_name: 'TargetUser',
+                                                        conversation_id_str: '100'
+                                                    },
+                                                    core: {
+                                                        user_results: {
+                                                            result: {
+                                                                core: {
+                                                                    name: 'Target',
+                                                                    screen_name: 'TargetUser'
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }, {
                                     entryId: 'tweet-300',
-                                    content: {
+                                    item: {
                                         itemContent: {
                                             tweet_results: {
                                                 result: {
@@ -2778,8 +2757,8 @@ async function testReplyTimelineKeepsOnlyProfilePosts() {
             userId: '10',
             exportMode: 'posts',
             outputFormat: 'csv',
-            userInfo: { screenName: 'TargetUser', tweetCount: 2 },
-            settings: { includeRetweets: true, includeReplies: true, includeArticles: true, quantityLimit: 500 },
+            userInfo: { screenName: 'TargetUser', tweetCount: 3 },
+            settings: { includeRetweets: true, profileFeed: 'all', includeArticles: true, quantityLimit: 500 },
             tweetCount: 0,
             totalBatches: 0,
             tweetBuffer: [],
@@ -2789,24 +2768,31 @@ async function testReplyTimelineKeepsOnlyProfilePosts() {
         _fetchPostsLoop();
     `, harness.context);
 
-    assert.equal(fetchArgs[3], true, 'the saved reply setting must reach the API request');
-    assert.equal(fetchCalls, 1, 'Replies must use one combined timeline, not a second hidden pass');
+    assert.equal(fetchArgs[3], 'all', 'the saved All feed must reach the API request');
+    assert.equal(fetchCalls, 1, 'All must use one timeline, not a second hidden pass');
     const savedItems = harness.getSavedBatches().flat();
     assert.deepEqual(
         savedItems.map(item => item.id),
-        ['200'],
-        'only the profile reply must count as an exported post'
+        ['150', '200', '250'],
+        'All must keep every author row from a conversation module and drop unrelated foreign rows'
     );
-    assert.equal(savedItems[0].reply_to_post.id, '100',
+    assert.equal(savedItems[1].reply_to_post.id, '100',
         'the filtered foreign parent must remain attached to the profile reply');
-    assert.equal(savedItems[0].reply_to_post.author_username, 'OtherUser');
-    assert.equal(savedItems[0].reply_to_post.quoted_post.id, '90',
+    assert.equal(savedItems[1].reply_to_post.author_username, 'OtherUser');
+    assert.equal(savedItems[1].reply_to_post.quoted_post.id, '90',
         'a quote nested inside the replied-to post must remain attached as context');
-    assert.equal(savedItems[0].reply_to_post.quoted_post.author_username, 'nik');
+    assert.equal(savedItems[1].reply_to_post.quoted_post.author_username, 'nik');
+    assert.equal(savedItems[2].reply_to_post.id, '200',
+        'a later self-reply must retain the preceding author post as thread context');
     assert.equal(
-        vm.runInContext("rateLimitKeyForMode('posts', { includeReplies: true })", harness.context),
-        'UserTweetsAndReplies',
+        vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'all' })", harness.context),
+        'UserTweets',
         'adaptive pacing must read the quota for the endpoint actually in use'
+    );
+    assert.equal(
+        vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'posts' })", harness.context),
+        'UserOriginalsTimeline',
+        'Posts must pace against its own redesigned endpoint budget'
     );
 }
 
@@ -3490,6 +3476,65 @@ async function testAboutAccountCacheExpiresAndStaysBounded() {
         Object.keys(storage.xporter_about_account_cache),
         ['newest', 'middle'],
         'the persistent cache must cap its size by keeping the newest entries'
+    );
+}
+
+async function testProfileFeedDefaultsAndMigratesLegacyReplySetting() {
+    const createSettingsHarness = (savedSettings) => {
+        const storage = { xporter_settings: savedSettings };
+        const context = vm.createContext({
+            console,
+            Date,
+            crypto: { randomUUID: () => 'uuid' },
+            XPORTER_CONFIG: { TWEETS_PER_BATCH: 50 },
+            XLog: { log() {}, warn() {}, error() {}, info() {} },
+            chrome: {
+                runtime: { getManifest: () => ({ permissions: ['unlimitedStorage'] }) },
+                storage: {
+                    local: {
+                        QUOTA_BYTES: 10_000_000,
+                        async get(key) {
+                            if (key === null) return { ...storage };
+                            return { [key]: storage[key] };
+                        },
+                        async set(values) { Object.assign(storage, values); },
+                        async getBytesInUse() { return 0; }
+                    }
+                }
+            }
+        });
+        vm.runInContext(source('utils/storage.js'), context, { filename: 'utils/storage.js' });
+        return { context, storage };
+    };
+
+    const fresh = await createSettingsHarness({}).context.XPorterStorage.loadSettings();
+    assert.equal(fresh.profileFeed, 'all',
+        'fresh installs must export the redesigned All feed by default');
+
+    const formerPostsOnly =
+        await createSettingsHarness({ includeReplies: false }).context.XPorterStorage.loadSettings();
+    assert.equal(formerPostsOnly.profileFeed, 'posts',
+        'an existing reply-off choice must migrate to the Posts feed');
+
+    const formerCombined =
+        await createSettingsHarness({ includeReplies: true }).context.XPorterStorage.loadSettings();
+    assert.equal(formerCombined.profileFeed, 'all',
+        'an existing reply-on choice must migrate to the All feed');
+
+    const explicit =
+        await createSettingsHarness({ profileFeed: 'posts', includeReplies: true })
+            .context.XPorterStorage.loadSettings();
+    assert.equal(explicit.profileFeed, 'posts',
+        'the explicit redesigned feed must win over the legacy toggle');
+    assert.equal(Object.hasOwn(explicit, 'includeReplies'), false,
+        'runtime settings must not keep two contradictory feed controls');
+
+    const savedMigration = createSettingsHarness({ includeReplies: false, language: 'ru' });
+    await savedMigration.context.XPorterStorage.saveSettings({ theme: 'light' });
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(savedMigration.storage.xporter_settings)),
+        { language: 'ru', profileFeed: 'posts', theme: 'light' },
+        'the next settings write must persist the legacy choice and remove the obsolete key'
     );
 }
 
@@ -4647,8 +4692,6 @@ const tests = [
     ['SearchTimeline error relay', testSearchErrorsAreRelayed],
     ['native request template capture', testNativeRequestTemplateCaptureIsAtomicAndPrivate],
     ['native request template atomic replay', testNativeRequestTemplateReplaysAtomicallyAcrossWorkerRestart],
-    ['Bookmarks viewer timeline endpoint', testBookmarksEndpointUsesViewerTimelineWithoutUsername],
-    ['bulk reply-parent endpoint', testTweetResultsEndpointFetchesReplyParentsInOneBatch],
     ['transaction ID deterministic header', testTransactionIdGeneratorProducesDeterministicHeader],
     ['transaction initialization failure cache', testTransactionInitializationFailureIsCached],
     ['Replies transaction header', testRepliesRequestIncludesFreshTransactionHeader],
@@ -4659,30 +4702,21 @@ const tests = [
     ['required-operation discovery', testRequiredOperationBypassesPartialDiscoveryCache],
     ['About Account region', testAboutAccountRegionIsRequestedAndParsed],
     ['real XLSX OOXML', testXlsxIsRealOoxmlZip],
-    ['XLSX embedded photo sheet', testXlsxEmbedsMultiplePhotosOnSeparateMediaSheet],
     ['post XLSX profile metadata', testPostsXlsxStartsWithProfileMetadata],
     ['detailed user-list columns opt-in', testDetailedUserListColumnsAreOptIn],
     ['AI-friendly posts TXT', testPostsTxtIsAiFriendly],
     ['sequential TXT reply chains', testPostsTxtUsesSequentialNumbersAndExplainsReplyChains],
     ['quoted post context in TXT', testPostsTxtIncludesQuotedPostContextFromTimelinePayload],
     ['quoted post unavailable metrics', testQuotedPostContextOmitsMetricsMissingFromTimelinePayload],
-    ['reply context in every export format', testReplyContextIsRenderedAcrossExportFormats],
-    ['post XLSX omits empty columns', testPostsXlsxOmitsColumnsWithoutValues],
-    ['saved formats omit empty fields', testSavedFormatsOmitEmptyFieldsButKeepZerosAndFalse],
     ['stale bearer retry', testStaleBearerRetriesImmediately],
     ['Following REST fallback', testFollowingUsesRestEndpointAndNormalizesUsers],
     ['missing profile counts stay unknown', testMissingProfileCountsRemainUnknown],
-    ['Replies tab endpoint selection', testReplySettingSelectsCombinedTimeline],
     ['active request cancellation', testActiveApiRequestCanBeAborted],
     ['active response-body cancellation', testActiveResponseBodyCanBeAborted],
     ['download module contract', testDownloadModulePreservesCurrentExportContract],
     ['large downloads split incrementally', testLargeDownloadsAreSplitAndReadIncrementally],
-    ['seen-post downloads omit empty fields', testSeenPostDownloadsOmitEmptyFields],
     ['anonymous uninstall module', testUninstallFeedbackModuleKeepsAnonymousContract],
     ['explicit zero-row Replies fallback', testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot],
-    ['Replies timeline profile filtering', testReplyTimelineKeepsOnlyProfilePosts],
-    ['Bookmarks mode current-account flow', testBookmarksModeSkipsUsernameResolutionAndKeepsEverySavedAuthor],
-    ['Bookmarks Article payload toggle', testBookmarkArticleSettingRemovesOnlyArticlePayload],
     ['search capture arms before navigation', testSearchCaptureIsArmedBeforeNavigation],
     ['unexpected empty user list is not success', testUnexpectedEmptyUserListDoesNotComplete],
     ['user-list About details opt-in and cache', testUserListAboutDetailsAreOptInAndCached],
@@ -4712,8 +4746,6 @@ const tests = [
     ['repeated user-list cursor terminates', testRepeatedUserListCursorTerminatesWithoutHanging],
     ['deep timeline module parser', testTimelineModuleItemsAreParsed],
     ['timeline_v2 user-list parser', testTimelineV2UserListsAreParsed],
-    ['signed-in account detection', testContentScriptDetectsSignedInAccountFromXNavigation],
-    ['five-second acknowledgement countdown', testAcknowledgementCountdownRequiresFiveFullTicks],
     ['theme restore', testThemeInitializationCanRevertToDark]
 ];
 

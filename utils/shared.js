@@ -436,9 +436,7 @@ function pluralLabel(key, count, langCode, translations) {
 }
 
 function collectedLabel(count, mode, langCode, translations) {
-    const key = (mode === 'posts' || mode === 'bookmarks')
-        ? 'postsCollected'
-        : 'usersCollected';
+    const key = (mode === 'posts') ? 'postsCollected' : 'usersCollected';
     return pluralLabel(key, count, langCode, translations);
 }
 

@@ -44,14 +44,6 @@ const FALLBACK_ENDPOINTS = {
     queryId: 'klja8a2iJX_3to5RdfVlgw',
     operationName: 'UserTweetsAndReplies'
   },
-  Bookmarks: {
-    queryId: 'iblrFnKr6PZUR-dWpfXG6g',
-    operationName: 'Bookmarks'
-  },
-  TweetResultsByRestIds: {
-    queryId: 'Pho4sg8jLcrVlMeclMayrg',
-    operationName: 'TweetResultsByRestIds'
-  },
   SearchTimeline: {
     queryId: 'R0u1RWRf748KzyGBXvOYRA',
     operationName: 'SearchTimeline'
@@ -117,7 +109,7 @@ async function _hydrateEndpoints() {
       const r = await chrome.storage.local.get(ENDPOINTS_STORAGE_KEY);
       const cached = r[ENDPOINTS_STORAGE_KEY];
       const requiredCachedOperations = Object.keys(FALLBACK_ENDPOINTS)
-        .filter(key => key !== 'AboutAccountQuery' && key !== 'TweetResultsByRestIds');
+        .filter(key => key !== 'AboutAccountQuery');
       const hasCurrentEndpointSet = cached?.endpoints &&
         requiredCachedOperations.every(key => cached.endpoints[key]?.queryId);
       if (hasCurrentEndpointSet && (Date.now() - (cached.time || 0)) < ENDPOINTS_CACHE_TTL) {
@@ -400,8 +392,7 @@ function getRateLimit(endpointKey) {
 }
 
 // Feature flag constants (USER_FEATURES, USER_FIELD_TOGGLES, TWEETS_FEATURES,
-// BOOKMARKS_FEATURES/BOOKMARKS_FIELD_TOGGLES, and follower equivalents) are
-// loaded from /utils/api-features.js.
+// FOLLOWERS_FEATURES, FOLLOWERS_FIELD_TOGGLES) are loaded from /utils/api-features.js
 
 // ==================== Dynamic QueryId Discovery ====================
 
@@ -482,7 +473,7 @@ async function _discoverEndpointsInner(requiredOperation = null) {
     throw new Error('No JS bundles found');
   }
 
-  const targetOperations = ['UserByScreenName', 'AboutAccountQuery', 'UserTweets', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
+  const targetOperations = ['UserByScreenName', 'AboutAccountQuery', 'UserTweets', 'UserTweetsAndReplies', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
   const found = {};
   let discoveredBearer = null;
 
@@ -573,12 +564,6 @@ async function _discoverEndpointsInner(requiredOperation = null) {
       UserTweetsAndReplies: found.UserTweetsAndReplies
         ? { queryId: found.UserTweetsAndReplies, operationName: 'UserTweetsAndReplies' }
         : FALLBACK_ENDPOINTS.UserTweetsAndReplies,
-      Bookmarks: found.Bookmarks
-        ? { queryId: found.Bookmarks, operationName: 'Bookmarks' }
-        : FALLBACK_ENDPOINTS.Bookmarks,
-      TweetResultsByRestIds: found.TweetResultsByRestIds
-        ? { queryId: found.TweetResultsByRestIds, operationName: 'TweetResultsByRestIds' }
-        : FALLBACK_ENDPOINTS.TweetResultsByRestIds,
       SearchTimeline: found.SearchTimeline
         ? { queryId: found.SearchTimeline, operationName: 'SearchTimeline' }
         : FALLBACK_ENDPOINTS.SearchTimeline,
@@ -816,25 +801,6 @@ async function withStaleRetry(endpointKey, makeRequest) {
     }
   }
 
-  // A viewer-owned page (notably Bookmarks) may have opened while discovery
-  // and fallback attempts were running. Re-check once so the accepted native
-  // query/template captured from that page can rescue the same first export
-  // instead of forcing the user to press Resume after an X deploy.
-  const lateNativeTemplate = await _getLiveRequestTemplate(endpointKey);
-  if (lateNativeTemplate && !triedIds.has(lateNativeTemplate.queryId)) {
-    triedIds.add(lateNativeTemplate.queryId);
-    try {
-      return await requestCandidate({
-        queryId: lateNativeTemplate.queryId,
-        operationName: endpointKey,
-        nativeTemplate: lateNativeTemplate
-      });
-    } catch (err) {
-      if (err.message !== 'STALE_QUERY_ID') throw err;
-      await _invalidateLiveRequestTemplate(lateNativeTemplate);
-    }
-  }
-
   XLog.error(`All queryIds exhausted for ${endpointKey}. Tried: ${[...triedIds].join(', ')}`);
   const error = new Error(
     endpointKey === 'UserTweetsAndReplies' ? 'REPLIES_UNAVAILABLE' : 'STALE_QUERY_ID'
@@ -1069,58 +1035,6 @@ async function fetchUserTweets(userId, cursor = null, count = 20, includeReplies
   });
 }
 
-async function fetchBookmarks(cursor = null, count = 20) {
-  const variables = {
-    count,
-    includePromotedContent: true
-  };
-  if (cursor) variables.cursor = cursor;
-
-  return withStaleRetry('Bookmarks', async (endpoint) => {
-    const data = await graphqlRequest(
-      endpoint,
-      variables,
-      BOOKMARKS_FEATURES,
-      BOOKMARKS_FIELD_TOGGLES
-    );
-    const timeline = data?.data?.bookmark_timeline_v2?.timeline
-      || data?.data?.bookmark_timeline?.timeline;
-    if (!Array.isArray(timeline?.instructions)) {
-      XLog.error('GraphQL Bookmarks returned no usable timeline');
-      throw new Error('STALE_QUERY_ID');
-    }
-    return XPorterApiParsers.parseBookmarksResponse(data);
-  });
-}
-
-async function fetchTweetsByIds(tweetIds) {
-  const ids = [...new Set((Array.isArray(tweetIds) ? tweetIds : [])
-    .map((id) => String(id || '').trim())
-    .filter((id) => /^\d{5,30}$/.test(id)))].slice(0, 100);
-  if (ids.length === 0) return [];
-
-  const variables = {
-    tweetIds: ids,
-    includePromotedContent: true,
-    withBirdwatchNotes: true,
-    withVoice: true,
-    withCommunity: true
-  };
-  const data = await withStaleRetry('TweetResultsByRestIds', (endpoint) =>
-    graphqlRequest(
-      endpoint,
-      variables,
-      TWEET_RESULTS_FEATURES,
-      TWEET_RESULTS_FIELD_TOGGLES
-    )
-  );
-  if (!Array.isArray(data?.data?.tweetResult)) {
-    XLog.error('GraphQL TweetResultsByRestIds returned no usable results');
-    throw new Error('STALE_QUERY_ID');
-  }
-  return XPorterApiParsers.parseTweetResultsResponse(data);
-}
-
 // Export for use in service worker
 if (typeof globalThis !== 'undefined') {
   globalThis.XPorterAPI = {
@@ -1128,13 +1042,10 @@ if (typeof globalThis !== 'undefined') {
     getUserByScreenName,
     getAccountAbout,
     fetchUserTweets,
-    fetchBookmarks,
-    fetchTweetsByIds,
     fetchFollowers,
     fetchFollowing,
     fetchVerifiedFollowers,
     parseTweetObject: XPorterApiParsers.parseTweetObject,
-    toPostContext: XPorterApiParsers.toPostContext,
     parseUserObject: XPorterApiParsers.parseUserObject,
     parseSearchTimelineResponse: XPorterApiParsers.parseSearchTimelineResponse,
     discoverEndpoints,

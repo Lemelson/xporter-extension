@@ -127,26 +127,6 @@
     return parseTimelineByInstructions(timeline?.instructions || [], 'search_timeline');
   }
 
-  function parseBookmarksResponse(data) {
-    const timeline = data?.data?.bookmark_timeline_v2?.timeline
-      || data?.data?.bookmark_timeline?.timeline;
-    return parseTimelineByInstructions(timeline?.instructions || [], 'bookmark_timeline_v2');
-  }
-
-  function parseTweetResultsResponse(data) {
-    const results = data?.data?.tweetResult;
-    if (!Array.isArray(results)) return [];
-    const tweets = [];
-    const seenIds = new Set();
-    for (const entry of results) {
-      const parsed = parseTweetObject(entry?.result);
-      if (!parsed?.id || seenIds.has(parsed.id)) continue;
-      seenIds.add(parsed.id);
-      tweets.push(parsed);
-    }
-    return tweets;
-  }
-
   function parseTimelineByInstructions(instructions, sourceLabel = 'timeline') {
     XLog.log(`Response path: ${sourceLabel}, instructions: ${instructions.length}`);
     const tweets = [];
@@ -185,62 +165,8 @@
       }
     }
 
-    attachReplyContexts(tweets);
     XLog.log(`Parsed ${tweets.length} tweets, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
     return { tweets, nextCursor, previousCursor };
-  }
-
-  // UserTweetsAndReplies includes foreign conversation rows so X can render
-  // the Replies tab. Keep those rows available long enough to attach the
-  // direct parent to the profile reply; the worker may then filter the foreign
-  // row without losing who was answered or what that post said.
-  function attachReplyContexts(tweets) {
-    const byId = new Map();
-    for (const tweet of tweets) {
-      if (tweet?.id && !byId.has(String(tweet.id))) {
-        byId.set(String(tweet.id), tweet);
-      }
-    }
-    for (const tweet of tweets) {
-      const parentId = tweet?.reply_to_id ? String(tweet.reply_to_id) : '';
-      const parent = parentId ? byId.get(parentId) : null;
-      if (!parent || parent === tweet) continue;
-      tweet.reply_to_post = postContext(parent);
-    }
-  }
-
-  function postContext(tweet) {
-    const context = {
-      id: tweet.id,
-      type: tweet.type,
-      text: tweet.text,
-      tweet_url: tweet.tweet_url,
-      author_name: tweet.author_name,
-      author_username: tweet.author_username,
-      created_at: tweet.created_at,
-      media_type: tweet.media_type,
-      media_urls: tweet.media_urls,
-      media_alt_texts: tweet.media_alt_texts,
-      article_title: tweet.article_title,
-      article_url: tweet.article_url,
-      article_text: tweet.article_text,
-      reply_to_id: tweet.reply_to_id,
-      reply_to_username: tweet.reply_to_username,
-      conversation_id: tweet.conversation_id
-    };
-    const metricPresence = tweet._context_metric_presence;
-    for (const key of [
-      'view_count', 'bookmark_count', 'favorite_count',
-      'retweet_count', 'reply_count', 'quote_count'
-    ]) {
-      if (!metricPresence || metricPresence[key] === true) {
-        context[key] = tweet[key];
-      }
-    }
-    if (tweet.quoted_post) {
-      context.quoted_post = { ...tweet.quoted_post };
-    }
-    return context;
   }
 
   function extractTimelineEntry(entry, sinks, options = {}) {
@@ -339,32 +265,14 @@
       article_url: article.url,
       article_text: article.text
     };
-    Object.defineProperty(parsed, '_context_metric_presence', {
-      enumerable: false,
-      value: {
-        view_count: result.views?.count !== undefined && result.views?.count !== null,
-        bookmark_count: legacy.bookmark_count !== undefined && legacy.bookmark_count !== null,
-        favorite_count: legacy.favorite_count !== undefined && legacy.favorite_count !== null,
-        retweet_count: legacy.retweet_count !== undefined && legacy.retweet_count !== null,
-        reply_count: legacy.reply_count !== undefined && legacy.reply_count !== null,
-        quote_count: legacy.quote_count !== undefined && legacy.quote_count !== null
-      }
-    });
     if (quotedTweet) {
       parsed.quoted_post = {
         id: quotedTweet.id,
-        type: quotedTweet.type,
         text: quotedTweet.text,
         tweet_url: quotedTweet.tweet_url,
         author_name: quotedTweet.author_name,
         author_username: quotedTweet.author_username,
         created_at: quotedTweet.created_at,
-        media_type: quotedTweet.media_type,
-        media_urls: quotedTweet.media_urls,
-        media_alt_texts: quotedTweet.media_alt_texts,
-        article_title: quotedTweet.article_title,
-        article_url: quotedTweet.article_url,
-        article_text: quotedTweet.article_text,
         view_count: quotedResult?.views?.count ?? '',
         bookmark_count: quotedLegacy.bookmark_count ?? '',
         favorite_count: quotedLegacy.favorite_count ?? '',
@@ -449,9 +357,6 @@
     parseAboutAccountResponse,
     parseTimelineResponse,
     parseSearchTimelineResponse,
-    parseBookmarksResponse,
-    parseTweetResultsResponse,
-    toPostContext: postContext,
     parseTweetObject
   };
 })();

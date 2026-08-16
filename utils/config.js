@@ -23,8 +23,6 @@ const XPORTER_CONFIG = {
     ADAPTIVE_HEADER_TTL: 300000,   // ignore a captured budget older than 5 min
     FALLBACK_REQUEST_DELAYS: {
         posts: [4000, 5000],
-            bookmarks: [4000, 5000],
-            bookmark_context: [4000, 5000],
         followers: [60000, 60000],
         following: [5000, 10000],
         verified_followers: [5000, 10000],
@@ -84,7 +82,6 @@ const XPORTER_CONFIG = {
         posts: { csv: 10000, json: 10000, xlsx: 10000, txt: 10000 },
         users: { csv: 100000, json: 50000, xlsx: 25000 }
     },
-    EMBEDDED_PHOTO_XLSX_PART_LIMIT: 250,
     STORAGE_BATCH_READ_SIZE: 100,
     RECENT_EXPORT_ID_LIMIT: 1000,
     // History duplicates row payloads. Large completed exports keep metadata

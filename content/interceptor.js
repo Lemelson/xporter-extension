@@ -8,7 +8,7 @@
   if (window.__XPORTER_INTERCEPTOR_INSTALLED__) return;
   window.__XPORTER_INTERCEPTOR_INSTALLED__ = true;
 
-  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'];
+  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserTweetsAndReplies', 'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'];
   const MAX_BODY_CHARS = 8 * 1024 * 1024; // must match content.js relay cap
   const MAX_FEED_BODY_CHARS = 2 * 1024 * 1024;
   const _origFetch = window.fetch;

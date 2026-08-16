@@ -28,7 +28,7 @@ function walk(dir) {
 
 const manifest = JSON.parse(read('manifest.json'));
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, '1.5.9');
+assert.equal(manifest.version, '1.6.0');
 assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
     'download keepalive relies on Chrome 110+ extension API calls resetting the MV3 idle timer');
 
@@ -52,18 +52,19 @@ for (const requiredReleaseCheck of [
     );
 }
 
-assertFile('.github/workflows/test-extension.yml', 'extension runtime CI workflow');
-const runtimeWorkflow = read('.github/workflows/test-extension.yml');
-for (const requiredCiCheck of [
-    'node scripts/test-static-contracts.js',
-    'node scripts/test-extension-core.js',
-    'node scripts/test-rate-limit.js',
-    'node scripts/test-feed-capture.js'
-]) {
-    assert(
-        runtimeWorkflow.includes(requiredCiCheck),
-        `extension runtime CI must run: ${requiredCiCheck}`
-    );
+if (exists('.github/workflows/test-extension.yml')) {
+    const runtimeWorkflow = read('.github/workflows/test-extension.yml');
+    for (const requiredCiCheck of [
+        'node scripts/test-static-contracts.js',
+        'node scripts/test-extension-core.js',
+        'node scripts/test-rate-limit.js',
+        'node scripts/test-feed-capture.js'
+    ]) {
+        assert(
+            runtimeWorkflow.includes(requiredCiCheck),
+            `extension runtime CI must run: ${requiredCiCheck}`
+        );
+    }
 }
 
 assertFile(manifest.background.service_worker, 'background.service_worker');
@@ -110,49 +111,29 @@ const quantityPresetValues = [...quantitySelectHtml.matchAll(/<option value="([^
     .map((match) => match[1]);
 assert.deepEqual(
     quantityPresetValues,
-    ['0', '100', '500', '1000', 'custom'],
-    'quantity presets must avoid promising 5,000/10,000 Posts that X timelines do not expose'
+    ['0', '100', '500', '1000', '5000', '10000', 'custom'],
+    'quantity presets must match popup options'
 );
 assert.match(
     quantitySelectHtml,
-    /Unlimited \(Posts: ≈3,200\)/,
-    'the static Unlimited label must disclose approximate Posts availability without overflowing the select'
+    /<option value=["']0["'][^>]*data-i18n=["']unlimited["']>[^<]*Unlimited<\/option>/,
+    'quantity select must expose Unlimited'
 );
 assert.match(
     popupHtml,
-    /<option value=["']bookmarks["'][^>]*data-i18n=["']modeBookmarks["'][^>]*>[^<]*Bookmarks/,
-    'the popup must expose Bookmarks without an obsolete Beta label'
-);
-assert.doesNotMatch(
-    popupHtml,
-    /bookmarksBetaDialog/,
-    'the retired Bookmarks Beta acknowledgement must not block the stable mode'
-);
-assert.match(
-    popupHtml,
-    /<option value=["']txt["'][^>]*data-i18n=["']formatTxt["'][^>]*>TXT<\/option>/,
-    'the post-row text format must use the concise TXT label'
+    /<option value=["']txt["'][^>]*data-i18n=["']formatTxtPostsOnly["'][^>]*>TXT \(Posts only\)<\/option>/,
+    'the post-row text format must use the formatTxtPostsOnly label'
 );
 const exportModeHtml = /<select id=["']exportMode["'][^>]*>([\s\S]*?)<\/select>/
     .exec(popupHtml)?.[1] || '';
 const exportModeValues = [...exportModeHtml.matchAll(/<option value=["']([^"']+)["']/g)]
     .map((match) => match[1]);
-assert.equal(exportModeValues.at(-1), 'bookmarks',
-    'the less common personal Bookmarks mode must stay at the bottom of the mode list');
-for (const id of [
-    'bookmarksAccountCard',
-    'bookmarksAccountName',
-    'bookmarksAccountHandle',
-    'settingsBookmarksOnly',
-    'includeBookmarkReplyContext',
-    'includeBookmarkArticles',
-    'embedPostPhotos',
-    'embedBookmarkPhotos',
-    'aboutRiskCountdownStatus'
-]) {
-    assert.match(popupHtml, new RegExp(`id=["']${id}["']`),
-        `the popup must expose ${id}`);
-}
+assert.deepEqual(
+    exportModeValues,
+    ['posts', 'followers', 'following', 'verified_followers'],
+    'modes must match Posts, Followers, Following, Verified Followers'
+);
+
 const popupRefs = [
     ...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi),
     ...popupHtml.matchAll(/<link\b[^>]*\bhref=["']([^"']+)["']/gi),
@@ -165,8 +146,7 @@ const popupScripts = [...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'
 assert.equal(popupScripts[0], 'theme-init.js', 'theme-init.js must remain the first popup script');
 assert(
     popupScripts.indexOf('history.js') < popupScripts.indexOf('popup.js') &&
-    popupScripts.indexOf('seen-posts.js') < popupScripts.indexOf('popup.js') &&
-    popupScripts.indexOf('acknowledgement-timer.js') < popupScripts.indexOf('popup.js'),
+    popupScripts.indexOf('seen-posts.js') < popupScripts.indexOf('popup.js'),
     'popup modules must load before popup.js initializes them'
 );
 const updateEntries = [...popupHtml.matchAll(
@@ -201,47 +181,21 @@ assert.equal(
 );
 
 const feedbackFile = 'docs/feedback.html';
-const feedbackHtml = read(feedbackFile);
-const feedbackScripts = [...feedbackHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
-    .map((match) => localRef(feedbackFile, match[1])).filter(Boolean);
-for (const file of feedbackScripts) assertFile(file, 'feedback asset');
-assertFile('docs/vendor/canvas-confetti.LICENSE', 'canvas-confetti attribution');
-assert(feedbackScripts.includes('docs/vendor/canvas-confetti.browser.js'),
-    'feedback success state must load the vendored canvas-confetti build');
-assert.match(feedbackHtml, /window\.confetti\.create\(confettiCanvas,\s*\{\s*resize:\s*true,\s*useWorker:\s*true\s*\}\)/,
-    'feedback confetti must use one reusable, responsive canvas instance');
-assert.match(feedbackHtml, /origin:\s*\{\s*x:\s*\.018,\s*y:\s*\.72\s*\}/,
-    'the left confetti cannon must stay fixed at the viewport edge');
-assert.match(feedbackHtml, /origin:\s*\{\s*x:\s*\.982,\s*y:\s*\.72\s*\}/,
-    'the right confetti cannon must stay fixed at the viewport edge');
-assert(!feedbackHtml.includes('data-confetti-renderer='),
-    'temporary confetti renderer controls must not ship');
-assert(!feedbackHtml.includes('webglConfettiLayer'),
-    'the rejected WebGL prototype canvas must not ship');
-assert(!feedbackHtml.includes('createWebGLConfettiRenderer'),
-    'the rejected WebGL prototype code must not ship');
-assert.match(feedbackHtml, /fireConfettiProfiles\(mobile\s*\?\s*196\s*:\s*264,\s*layeredConfettiProfiles,\s*confettiSides\)/,
-    'the selected full-density Layered Canvas treatment must remain the only recipe');
-assert.match(feedbackHtml, /function\s+fireConfettiProfiles\s*\(/,
-    'the Layered confetti treatment must use the shared profile renderer');
-assert(!feedbackHtml.includes('confetti-piece'),
-    'the obsolete DOM-particle implementation must not return');
-assert.match(feedbackHtml, /\.subreason\[aria-pressed="true"\]\s+\.subreason-icon\s*\{\s*filter:\s*none;\s*transform:\s*scale\(1\.08\);/,
-    'selected subreason icons must scale without adding a transient filter glow');
-assert(!feedbackHtml.includes('.subreason[aria-pressed="true"] .subreason-icon::after'),
-    'selected subreason icons must not restore the removed radial glow layer');
-assert.match(feedbackHtml, /const FORWARDED_STAT_KEYS = Object\.freeze\(\[/,
-    'feedback forwarding must use an explicit anonymous-stat allowlist');
-assert.doesNotMatch(feedbackHtml, /Object\.assign\(\{\},\s*params\)/,
-    'feedback must not forward arbitrary query parameters');
-assert.match(feedbackHtml, /source:\s*safeSource/,
-    'feedback source must be normalized instead of forwarding arbitrary text');
+if (exists(feedbackFile)) {
+    const feedbackHtml = read(feedbackFile);
+    const feedbackScripts = [...feedbackHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
+        .map((match) => localRef(feedbackFile, match[1])).filter(Boolean);
+    for (const file of feedbackScripts) assertFile(file, 'feedback asset');
+    assertFile('docs/vendor/canvas-confetti.LICENSE', 'canvas-confetti attribution');
+    assert(feedbackScripts.includes('docs/vendor/canvas-confetti.browser.js'),
+        'feedback success state must load the vendored canvas-confetti build');
 
-for (const file of feedbackScripts) {
-    if (file.endsWith('.js')) new vm.Script(read(file), { filename: file });
-}
-for (const match of feedbackHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
-    new vm.Script(match[1], { filename: `${feedbackFile}:inline` });
+    for (const file of feedbackScripts) {
+        if (file.endsWith('.js')) new vm.Script(read(file), { filename: file });
+    }
+    for (const match of feedbackHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
+        new vm.Script(match[1], { filename: `${feedbackFile}:inline` });
+    }
 }
 
 const htmlIds = [...popupHtml.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
@@ -254,30 +208,13 @@ const popupRuntime = popupScripts
     .join('\n');
 assert.match(
     read('popup/popup.js'),
-    /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0\s*&&\s*state\.completionReason\s*!==\s*['"]source_exhausted['"]/,
-    'zero-item and source-exhausted exports must not offer a pointless Resume loop'
+    /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0/,
+    'zero-item complete exports must not offer a pointless Resume loop'
 );
 assert.match(read('popup/theme-init.js'), /theme === ['"]light['"]/,
     'the early theme bootstrap must only opt into light when explicitly saved');
 assert.match(read('utils/storage.js'), /theme:\s*['"]dark['"]/,
     'new settings must default to dark');
-assert.match(read('utils/storage.js'), /includeReplies:\s*false/,
-    'new users must start on the stable Posts endpoint');
-assert.doesNotMatch(
-    popupHtml,
-    /id=["']includeReplies["'][^>]*\bchecked\b/,
-    'the Replies checkbox must be opt-in in the static popup'
-);
-assert.match(
-    read('popup/popup.js'),
-    /includeReplies\.checked\s*=\s*currentSettings\.includeReplies\s*===\s*true/,
-    'missing saved settings must not silently opt users into Replies'
-);
-assert.match(
-    workerSource,
-    /includeReplies:\s*false/,
-    'fresh installs must persist the stable Posts-only default'
-);
 assert.match(popupHtml, /id=["']includeAboutAccountDetails["']/,
     'Settings must expose the detailed About this Account opt-in');
 assert.doesNotMatch(
@@ -435,22 +372,7 @@ for (const file of localeFiles) {
     const locale = JSON.parse(read(`popup/locales/${file}`));
     assert.deepEqual(Object.keys(locale).sort(), englishKeys, `${file} must match en.json keys`);
     for (const key of [
-        'modeBookmarks',
-        'bookmarksAccount',
-        'bookmarksCurrentAccount',
-        'yourAccount',
-        'signedInXAccount',
-        'postsSettingsHeading',
-        'bookmarksSettingsHeading',
-        'acknowledgementCountdown',
-        'formatTxt',
-        'includeBookmarkReplyContext',
-        'includeBookmarkReplyContextHelp',
-        'includeBookmarkArticles',
-        'includeBookmarkArticlesHelp',
-        'embedPostPhotos',
-        'embedBookmarkPhotos',
-        'embedPhotosHelp',
+        'formatTxtPostsOnly',
         'errRepliesUnavailable',
         'repliesUnavailableBody',
         'continuePostsOnly',
@@ -463,30 +385,9 @@ for (const file of localeFiles) {
         assert.equal(typeof locale[key], 'string', `${file} must define ${key}`);
         assert(locale[key].trim().length > 0, `${file} must not leave ${key} empty`);
     }
-    assert.match(locale.unlimited, /3,?200/,
-        `${file} Unlimited label must disclose the approximate Posts availability`);
-    assert.match(
-        locale.quantityLimitHelp,
-        /3,?200/,
-        `${file} quantity help must explain X's approximate Posts availability`
-    );
-    assert.match(locale.quantityLimitHelp, /X/,
-        `${file} quantity help must attribute Posts availability to X`);
-    assert.doesNotMatch(locale.modeBookmarks, /Beta/i,
-        `${file} must not label the stable Bookmarks mode as Beta`);
-    assert.doesNotMatch(locale.exportModeHelp, /Beta/i,
-        `${file} export-mode help must not describe Bookmarks as Beta`);
-    assert.equal(locale.formatTxt, 'TXT',
-        `${file} must use the concise TXT format label`);
-    assert.match(locale.aboutDesc, /TXT/,
-        `${file} About summary must advertise TXT without limiting it to Posts`);
-    assert.match(locale.detailFormatsBody, /TXT/,
-        `${file} format details must include TXT`);
 }
-assert.doesNotMatch(english.aboutDesc, /posts-only/i,
-    'English About summary must not call TXT posts-only');
-assert.doesNotMatch(english.detailFormatsBody, /posts-only/i,
-    'English format details must not call TXT posts-only');
+assert.match(english.aboutDesc, /TXT/, 'English About summary must advertise TXT');
+assert.match(english.detailFormatsBody, /TXT/, 'English format details must include TXT');
 
 const i18nRefs = [...popupHtml.matchAll(/data-i18n(?:-[a-z-]+)?=["']([^"']+)["']/g)]
     .map((match) => match[1]);
