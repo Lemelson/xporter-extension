@@ -70,9 +70,11 @@ guarantee 3,200 rows.
 
 For an existing 1.5.8 installation, a saved `includeReplies: false` selection
 was migrated to **Posts** and therefore moved from `UserTweets` to the new
-`UserOriginalsTimeline` operation. New installs defaulted to **All**, which used
-`UserTweets` with replies and thread context. The packaged fallback query IDs
-for `UserTweets` and `UserTweetsAndReplies` also changed.
+`UserOriginalsTimeline` operation. A saved `includeReplies: true` selection was
+migrated to **All** and moved from `UserTweetsAndReplies` to `UserTweets`. New
+installs also defaulted to **All**, whose UI promised replies and thread context.
+The packaged fallback query IDs for `UserTweets` and `UserTweetsAndReplies` also
+changed.
 
 These endpoint and migration changes are the strongest code-level candidates
 for the observed difference in available rows: an unsupported or rotated
