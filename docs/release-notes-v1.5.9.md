@@ -68,6 +68,19 @@ with experimental **All** and **Posts** profile-feed choices, introduced a new
 presets. `Unlimited` still meant no local XPorter quantity cap; it did not
 guarantee 3,200 rows.
 
+For an existing 1.5.8 installation, a saved `includeReplies: false` selection
+was migrated to **Posts** and therefore moved from `UserTweets` to the new
+`UserOriginalsTimeline` operation. New installs defaulted to **All**, which used
+`UserTweets` with replies and thread context. The packaged fallback query IDs
+for `UserTweets` and `UserTweetsAndReplies` also changed.
+
+These endpoint and migration changes are the strongest code-level candidates
+for the observed difference in available rows: an unsupported or rotated
+operation can return no continuation cursor and make the generic loop report
+`source_exhausted`. Dynamic request capture and discovery normally take
+priority over fallback IDs, however, so the artifacts alone do not prove which
+endpoint response each affected user received.
+
 XPorter uses X's private browser GraphQL timelines. X may return fewer rows,
 omit a continuation cursor, change an operation, or rate-limit requests.
 Therefore, the approximately 3,200-post figure is an upstream availability
@@ -114,7 +127,11 @@ Photo embedding can return without disabling existing installations:
 
 ## Artifact record
 
-- Source commit: `805520dacd7e4c02b9dde02356e7dddc698860ce`
+- Initial 1.5.9 source commit:
+  `805520dacd7e4c02b9dde02356e7dddc698860ce`
+- The packaged ZIP is not byte-identical to that commit. It was built from a
+  later uncommitted working state that also contained the **All / Posts**
+  profile-feed redesign and `UserOriginalsTimeline`.
 - Withdrawn package: `xporter-v1.5.9.zip`
 - Package SHA-256:
   `34ff063b0c1851ba47cbd0bb1434ee82c905eb2197793c312fcde44c8d4cf906`
