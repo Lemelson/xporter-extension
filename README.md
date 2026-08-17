@@ -22,6 +22,23 @@
 
 ---
 
+## Release status
+
+The current `1.6.0` build is based on the stable `1.5.8` code line.
+
+> [!WARNING]
+> **XPorter 1.5.9 was withdrawn and is not recommended.** Its update added a
+> required `pbs.twimg.com` host permission for an optional XLSX photo-embedding
+> feature. Chrome could therefore disable the extension until users reviewed
+> the new access. The release also introduced experimental Bookmarks and
+> profile-feed paths that proved unsuitable for dependable large exports:
+> real-world runs could hit X limits or exhaust the available timeline after
+> only hundreds of rows. Do not use 1.5.9 when a large or complete export
+> matters.
+
+See the [XPorter 1.5.9 withdrawn release notes](docs/release-notes-v1.5.9.md)
+for the complete change list, incident explanation, and safer permission design.
+
 ## Features
 
 - **Full engagement metrics** — views, likes, retweets, replies, quotes, bookmarks
