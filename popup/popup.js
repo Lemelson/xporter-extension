@@ -957,15 +957,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveSettingsDebounced();
     });
 
+    // Photo embedding needs https://pbs.twimg.com/* access. That origin lives
+    // in optional_host_permissions (never required), so extension updates can
+    // not disable existing installations — the 1.5.9 incident. The grant is
+    // requested here, from the checkbox's own user gesture; declining keeps
+    // ordinary URL-only exports fully functional.
+    const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
+    async function ensurePhotoEmbedPermission(checkbox) {
+        if (!checkbox.checked) return true;
+        if (typeof chrome === 'undefined' || !chrome.permissions?.request) return true;
+        try {
+            const alreadyGranted = await chrome.permissions.contains({
+                origins: [PHOTO_EMBED_ORIGIN]
+            });
+            if (alreadyGranted) return true;
+            return await chrome.permissions.request({ origins: [PHOTO_EMBED_ORIGIN] });
+        } catch (_) {
+            return false;
+        }
+    }
+    async function handleEmbedPhotosChange(checkbox) {
+        if (!await ensurePhotoEmbedPermission(checkbox)) {
+            checkbox.checked = false;
+        }
+        saveSettingsDebounced();
+    }
+
     [includeRetweets, profileFeed, includeArticles,
         includeBookmarkReplyContext, includeBookmarkArticles,
-        embedPostPhotos, embedBookmarkPhotos,
         quantityLimit, exportSpeed, customQuantity, autoExpireHours,
         customDelaySec, customCooldownMin, customBatchSize, userExportSpeed,
         userCustomDelaySec, userCustomCooldownMin, userCustomBatchSize,
         aboutAccountSpeed, aboutAccountCustomBatchSize].forEach(el => {
         el.addEventListener('change', saveSettingsDebounced);
     });
+    embedPostPhotos.addEventListener('change', () => handleEmbedPhotosChange(embedPostPhotos));
+    embedBookmarkPhotos.addEventListener('change', () => handleEmbedPhotosChange(embedBookmarkPhotos));
     customQuantity.addEventListener('input', saveSettingsDebounced);
     resumeQuantity.addEventListener('input', updateResumeQuantityLabel);
 

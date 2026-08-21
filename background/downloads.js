@@ -6,6 +6,24 @@
     let activeDownload = null;
     const MAX_EMBEDDED_PHOTO_BYTES = 15 * 1024 * 1024;
     const EMBEDDED_PHOTO_CONCURRENCY = 4;
+    const PHOTO_HOST_ORIGIN = 'https://pbs.twimg.com/*';
+
+    // Photo embedding is an optional capability: pbs.twimg.com lives in
+    // optional_host_permissions and is granted from the popup toggle, so an
+    // update can never disable existing installations (the 1.5.9 incident).
+    // A missing grant must never block a download — the workbook silently
+    // keeps plain media URLs instead. Environments without the permissions
+    // API (test harnesses) keep the legacy direct-fetch behavior.
+    async function hasPhotoHostAccess() {
+        try {
+            if (typeof chrome === 'undefined' || !chrome.permissions?.contains) {
+                return true;
+            }
+            return await chrome.permissions.contains({ origins: [PHOTO_HOST_ORIGIN] });
+        } catch (_) {
+            return true;
+        }
+    }
 
     function keepWorkerAliveDuringDownload() {
         if (typeof chrome === 'undefined' || !chrome.runtime?.getPlatformInfo) {
@@ -393,7 +411,9 @@
                 (mode === 'posts' && settings.embedPostPhotos === true) ||
                 (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
             );
-            const mediaAssets = embedPhotos ? await fetchPhotoAssets(allItems) : [];
+            const mediaAssets = (embedPhotos && await hasPhotoHostAccess())
+                ? await fetchPhotoAssets(allItems)
+                : [];
             content = XPorterCSV.generateXLSX(allItems, isUsers, {
                 ...headerOpts,
                 mode,

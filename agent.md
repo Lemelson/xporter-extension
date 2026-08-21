@@ -378,6 +378,7 @@ Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.j
 | `downloads` | save files |
 | `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
 | `host_permissions` | `https://x.com/*`, `https://twitter.com/*` |
+| `optional_host_permissions` | `https://pbs.twimg.com/*` — requested via `chrome.permissions.request()` from the "Embed photos in XLSX" toggle click; declining keeps URL-only exports fully functional. Never a required permission: a required increase is what disabled every 1.5.8 installation during the withdrawn 1.5.9 update. Before embedding images, `downloads.js` re-checks the grant with `chrome.permissions.contains()` and falls back to plain media URLs when it is missing. |
 
 Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
 

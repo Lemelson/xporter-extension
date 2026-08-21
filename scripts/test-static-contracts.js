@@ -141,8 +141,10 @@ assert.deepEqual(profileFeedValues, ['all', 'posts'],
     'Posts settings must restore the 1.5.9 All and Posts feed choices');
 assert.doesNotMatch(popupHtml, /id=["']includeReplies["']/,
     'the 1.5.9 profile feed selector must replace the old Include replies checkbox');
-assert(manifest.host_permissions.includes('https://pbs.twimg.com/*'),
-    'the exact local 1.5.9 runtime must restore its photo host permission');
+assert(!manifest.host_permissions.includes('https://pbs.twimg.com/*'),
+    'photo host access must never be a required permission — that is what disabled every 1.5.8 installation');
+assert.deepEqual(manifest.optional_host_permissions, ['https://pbs.twimg.com/*'],
+    'photo embedding must request pbs.twimg.com access optionally, from a user gesture');
 
 const popupRefs = [
     ...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi),

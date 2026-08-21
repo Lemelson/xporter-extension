@@ -29,6 +29,12 @@ packaged `1.5.9` feature set for local verification. The published `1.6.0`
 release remains on the stable `1.5.8` code line. Do not publish or upload this
 local experiment without a separate release decision.
 
+Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
+`optional_host_permissions`. The access is requested from the user's click on
+an "Embed photos in XLSX" toggle, so updating from 1.5.8 is never a privilege
+increase and cannot disable existing installations. Declining the request keeps
+every export fully functional with media URLs instead of embedded images.
+
 > [!WARNING]
 > **XPorter 1.5.9 was withdrawn and is not recommended.** Its update added a
 > required `pbs.twimg.com` host permission for an optional XLSX photo-embedding

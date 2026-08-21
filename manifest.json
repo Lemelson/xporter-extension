@@ -14,7 +14,9 @@
   ],
   "host_permissions": [
     "https://x.com/*",
-    "https://twitter.com/*",
+    "https://twitter.com/*"
+  ],
+  "optional_host_permissions": [
     "https://pbs.twimg.com/*"
   ],
   "action": {
