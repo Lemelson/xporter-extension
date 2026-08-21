@@ -1156,7 +1156,7 @@ function testPostsTxtIsAiFriendly() {
     assert.match(text, /Subscriptions: 2/);
     assert.match(text, /POSTS \(5\)/);
     assert.match(text,
-        /1\. POST\nPost: "First line\nSecond line"\nMetrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
+        /1\. POST\nPost: "First line\nSecond line"\nPost metrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
     assert.match(text,
         /2\. REPLY\nPost: "A direct continuation"\nReply to: post #1 — https:\/\/x\.com\/MediaKing\/status\/1\nReply chain: #1 → #2\nDate: 2026-07-07T12:05:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/2/);
     assert.match(text,
@@ -1297,13 +1297,13 @@ function testPostsTxtIncludesQuotedPostContextFromTimelinePayload() {
     });
 
     assert.match(text,
-        /  Post: "The original post that gives the quote its context"\n  Metrics: 1200 views, 47 likes, 6 reposts, 5 replies, 4 quotes, 2 bookmarks/);
+        /  Post: "The original post that gives the quote its context"\n  Quoted post metrics: 1200 views, 47 likes, 6 reposts, 5 replies, 4 quotes, 2 bookmarks/);
     assert.match(text,
         /  Date: 2026-07-07T11:00:00\.000Z\n  Post URL: https:\/\/x\.com\/original_author\/status\/100/);
     assert.match(text,
-        /Post: "My comment above the quoted post"\nQuoted post:/);
+        /  Post URL: https:\/\/x\.com\/original_author\/status\/100\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/profile_owner\/status\/200/);
     assert.match(text,
-        /  Post URL: https:\/\/x\.com\/original_author\/status\/100\nMetrics: 500 views, 10 likes, 2 reposts, 1 replies, 0 quotes, 3 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/profile_owner\/status\/200/);
+        /Post: "My comment above the quoted post"\nPost metrics: 500 views, 10 likes, 2 reposts, 1 replies, 0 quotes, 3 bookmarks\nQuoted post:/);
 }
 
 function testQuotedPostContextOmitsMetricsMissingFromTimelinePayload() {
@@ -2541,8 +2541,10 @@ async function testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot() {
     const result = await vm.runInContext('resumePostsOnly()', harness.context);
     assert.equal(result.success, true);
     const saved = harness.getSavedState();
-    assert.equal(saved.settings.includeReplies, false,
-        'Posts-only fallback must change only the current export snapshot');
+    assert.equal(saved.settings.profileFeed, 'legacy_posts',
+        'Posts-only fallback must switch only the current export snapshot to UserTweets');
+    assert.equal(saved.settings.includeReplies, undefined,
+        'the legacy Include replies flag must be migrated out of the export snapshot');
     
     assert.equal(saved.settings.includeRetweets, false);
     assert.equal(saved.settings.includeArticles, true);
@@ -4689,6 +4691,7 @@ async function testAcknowledgementCountdownRequiresFiveFullTicks() {
 }
 
 const tests = [
+    ['Bookmarks viewer timeline', testBookmarksEndpointUsesViewerTimelineWithoutUsername],
     ['SearchTimeline error relay', testSearchErrorsAreRelayed],
     ['native request template capture', testNativeRequestTemplateCaptureIsAtomicAndPrivate],
     ['native request template atomic replay', testNativeRequestTemplateReplaysAtomicallyAcrossWorkerRestart],
@@ -4702,21 +4705,27 @@ const tests = [
     ['required-operation discovery', testRequiredOperationBypassesPartialDiscoveryCache],
     ['About Account region', testAboutAccountRegionIsRequestedAndParsed],
     ['real XLSX OOXML', testXlsxIsRealOoxmlZip],
+    ['photo XLSX Media sheet', testXlsxEmbedsMultiplePhotosOnSeparateMediaSheet],
     ['post XLSX profile metadata', testPostsXlsxStartsWithProfileMetadata],
     ['detailed user-list columns opt-in', testDetailedUserListColumnsAreOptIn],
     ['AI-friendly posts TXT', testPostsTxtIsAiFriendly],
     ['sequential TXT reply chains', testPostsTxtUsesSequentialNumbersAndExplainsReplyChains],
     ['quoted post context in TXT', testPostsTxtIncludesQuotedPostContextFromTimelinePayload],
     ['quoted post unavailable metrics', testQuotedPostContextOmitsMetricsMissingFromTimelinePayload],
+    ['compact saved formats', testSavedFormatsOmitEmptyFieldsButKeepZerosAndFalse],
+    ['reply context across formats', testReplyContextIsRenderedAcrossExportFormats],
     ['stale bearer retry', testStaleBearerRetriesImmediately],
     ['Following REST fallback', testFollowingUsesRestEndpointAndNormalizesUsers],
     ['missing profile counts stay unknown', testMissingProfileCountsRemainUnknown],
+    ['profile feed endpoint selection', testProfileFeedSelectsMatchingTimeline],
     ['active request cancellation', testActiveApiRequestCanBeAborted],
     ['active response-body cancellation', testActiveResponseBodyCanBeAborted],
     ['download module contract', testDownloadModulePreservesCurrentExportContract],
     ['large downloads split incrementally', testLargeDownloadsAreSplitAndReadIncrementally],
     ['anonymous uninstall module', testUninstallFeedbackModuleKeepsAnonymousContract],
     ['explicit zero-row Replies fallback', testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot],
+    ['All feed profile filtering and context', testAllFeedKeepsOnlyProfilePostsAndContext],
+    ['Bookmarks mode and reply context', testBookmarksModeSkipsUsernameResolutionAndKeepsEverySavedAuthor],
     ['search capture arms before navigation', testSearchCaptureIsArmedBeforeNavigation],
     ['unexpected empty user list is not success', testUnexpectedEmptyUserListDoesNotComplete],
     ['user-list About details opt-in and cache', testUserListAboutDetailsAreOptInAndCached],
@@ -4746,7 +4755,8 @@ const tests = [
     ['repeated user-list cursor terminates', testRepeatedUserListCursorTerminatesWithoutHanging],
     ['deep timeline module parser', testTimelineModuleItemsAreParsed],
     ['timeline_v2 user-list parser', testTimelineV2UserListsAreParsed],
-    ['theme restore', testThemeInitializationCanRevertToDark]
+    ['theme restore', testThemeInitializationCanRevertToDark],
+    ['profile feed defaults and migration', testProfileFeedDefaultsAndMigratesLegacyReplySetting]
 ];
 
 (async () => {

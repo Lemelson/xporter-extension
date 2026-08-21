@@ -29,6 +29,7 @@ if (chrome.storage?.local?.setAccessLevel) {
 // Current export state
 let currentExport = null;
 let rateLimiter = null;
+let bookmarkContextRateLimiter = null;
 let aboutRateLimiter = null;
 let aboutAccountCache = null;
 let searchCapture = null;
@@ -38,15 +39,36 @@ let manualWaitUntil = null;
 
 const RATE_LIMIT_KEYS_BY_MODE = {
     posts: 'UserTweets',
+    bookmarks: 'Bookmarks',
+    bookmark_context: 'TweetResultsByRestIds',
     followers: 'Followers',
     following: 'Following',
     verified_followers: 'BlueVerifiedFollowers'
 };
 
+function profileFeedForSettings(settings = {}) {
+    if (['all', 'posts', 'legacy_with_replies', 'legacy_posts']
+        .includes(settings.profileFeed)) {
+        return settings.profileFeed;
+    }
+    if (Object.hasOwn(settings, 'includeReplies')) {
+        return settings.includeReplies === true
+            ? 'legacy_with_replies'
+            : 'legacy_posts';
+    }
+    return 'all';
+}
+
+function profileFeedIncludesReplies(settings = {}) {
+    return !['posts', 'legacy_posts'].includes(profileFeedForSettings(settings));
+}
+
 function rateLimitKeyForMode(mode, settings) {
     if (mode === 'about_account') return 'AboutAccountQuery';
-    if (mode === 'posts' && settings?.includeReplies === true) {
-        return 'UserTweetsAndReplies';
+    if (mode === 'posts') {
+        const feed = profileFeedForSettings(settings);
+        if (feed === 'posts') return 'UserOriginalsTimeline';
+        if (feed === 'legacy_with_replies') return 'UserTweetsAndReplies';
     }
     return RATE_LIMIT_KEYS_BY_MODE[mode];
 }
@@ -79,7 +101,7 @@ function resolveAboutAccountMaxRetries(settings = {}) {
 // different budgets and safe fallback delays.
 function resolveSpeedPreset(settings, mode = 'posts') {
     const presets = XPORTER_CONFIG.SPEED_PRESETS || {};
-    const isUserList = mode !== 'posts';
+    const isUserList = mode !== 'posts' && mode !== 'bookmarks' && mode !== 'bookmark_context';
     const speed = settings[isUserList ? 'userExportSpeed' : 'exportSpeed'] || 'standard';
     const customDelayKey = isUserList ? 'userCustomDelaySec' : 'customDelaySec';
     const customBatchKey = isUserList ? 'userCustomBatchSize' : 'customBatchSize';
@@ -225,6 +247,16 @@ async function handleMessage(message, sender) {
         case 'GET_USERNAME':
             const username = await XPorterStorage.loadDetectedUsername();
             return { username };
+
+        case 'SET_CURRENT_ACCOUNT':
+            return {
+                success: await XPorterStorage.saveCurrentAccount(message.account)
+            };
+
+        case 'GET_CURRENT_ACCOUNT':
+            return {
+                account: await XPorterStorage.loadCurrentAccount()
+            };
 
         case 'START_EXPORT':
             return await startExport(message);
@@ -393,6 +425,7 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
 async function _startExportInner({ username, dateFrom, dateTo, exportMode, outputFormat }) {
     const settings = await XPorterStorage.loadSettings();
     const mode = exportMode || 'posts';
+    const isBookmarks = mode === 'bookmarks';
     const normalizedDateFrom = (mode === 'posts') ? normalizeDateBoundary(dateFrom, 'start') : null;
     const normalizedDateTo = (mode === 'posts') ? normalizeDateBoundary(dateTo, 'end') : null;
 
@@ -403,6 +436,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     // Initialize rate limiter with current settings. The provider lets it pace
     // adaptively from X's live x-rate-limit-* budget (fixed delay is fallback).
     rateLimiter = createRateLimiter(settings, mode);
+    bookmarkContextRateLimiter = null;
     aboutRateLimiter = null;
     aboutAccountCache = null;
     lastTransientStatus = null;
@@ -420,7 +454,9 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
 
     currentExport = {
         running: true,
-        username: username,
+        // Bookmarks are owned by the signed-in viewer. Never carry a typed or
+        // tab-detected profile handle into this personal export.
+        username: isBookmarks ? '' : username,
         exportMode: mode,
         outputFormat: outputFormat || 'csv',
         dateFrom: normalizedDateFrom,
@@ -430,7 +466,10 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
         itemsRecordedBase: 0,
         totalBatches: 0,
         tweetBuffer: [], // used for both tweets and users
-        userId: null,
+        userId: isBookmarks ? 'current-account' : null,
+        userInfo: isBookmarks
+            ? { name: '', screenName: '', tweetCount: null }
+            : null,
         cursor: null,
         startedAt: Date.now(),
         status: 'resolving_user',
@@ -455,6 +494,17 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
 
     // Start the export process (non-blocking)
     launchExportLoop('Export loop error:');
+    if (isBookmarks) {
+        // Opening the viewer-owned page both gives the user the expected X
+        // context and lets the MAIN-world interceptor capture X's current,
+        // accepted Bookmarks request template for query-ID rotation recovery.
+        Promise.resolve()
+            .then(() => chrome.tabs.create({
+                url: 'https://x.com/i/bookmarks',
+                active: true
+            }))
+            .catch((error) => XLog.warn('Could not open Bookmarks tab:', error.message));
+    }
 
     return { success: true, status: 'started' };
 }
@@ -530,6 +580,8 @@ async function runExportLoop() {
         // Step 2: Run the appropriate fetch loop based on mode
         if (currentExport.exportMode === 'posts') {
             await _fetchPostsLoop();
+        } else if (currentExport.exportMode === 'bookmarks') {
+            await _fetchBookmarksLoop();
         } else {
             await _fetchUsersLoop();
         }
@@ -585,13 +637,14 @@ async function runExportLoop() {
 
 async function saveCompletedExportHistory() {
     const ui = currentExport.userInfo || {};
+    const isBookmarks = currentExport.exportMode === 'bookmarks';
     const historyLimit = Number(XPORTER_CONFIG.EXPORT_HISTORY_DATA_LIMIT) || 5000;
     const keepPayload = currentExport.tweetCount <= historyLimit;
     const historyItems = keepPayload ? await XPorterStorage.loadAllTweets() : null;
     await XPorterStorage.saveExportHistory({
-        username: ui.screenName || currentExport.username,
-        displayName: ui.name || currentExport.username,
-        profileImageUrl: ui.profileImageUrl || '',
+        username: isBookmarks ? '' : (ui.screenName || currentExport.username),
+        displayName: isBookmarks ? 'Bookmarks' : (ui.name || currentExport.username),
+        profileImageUrl: isBookmarks ? '' : (ui.profileImageUrl || ''),
         userInfo: { ...ui },
         exportMode: currentExport.exportMode,
         itemCount: currentExport.tweetCount,
@@ -707,6 +760,95 @@ async function _fetchPostsLoop() {
         return;
     }
 
+    const expectedUsername =
+        currentExport.userInfo?.screenName || currentExport.username || '';
+    const profileFeed = profileFeedForSettings(currentExport.settings);
+    await _fetchPostTimelineLoop(
+        (cursor) => XPorterAPI.fetchUserTweets(
+            currentExport.userId,
+            cursor,
+            20,
+            profileFeed
+        ),
+        (tweet) => {
+            if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') return false;
+            if (!profileFeedIncludesReplies(currentExport.settings) &&
+                tweet.type === 'reply') return false;
+            if (currentExport.settings.includeArticles === false && tweet.type === 'article') return false;
+
+            // All/legacy reply timelines can contain foreign conversation rows
+            // so X can draw context. The parser has already attached a matching
+            // direct parent (and any quote inside it) to the profile reply as
+            // `reply_to_post`; filter only the standalone foreign row.
+            return !(tweet.author_username && expectedUsername &&
+                tweet.author_username.toLowerCase() !== expectedUsername.toLowerCase());
+        }
+    );
+}
+
+async function _fetchBookmarksLoop() {
+    // A bookmark is a primary row because the viewer explicitly saved it.
+    // Do not apply profile-author, repost, reply, or article filters here.
+    await _fetchPostTimelineLoop(
+        async (cursor) => {
+            const page = await XPorterAPI.fetchBookmarks(cursor, 20);
+            if (currentExport.settings.includeBookmarkReplyContext !== false) {
+                await enrichBookmarkReplyContexts(page.tweets || []);
+            }
+            if (currentExport.settings.includeBookmarkArticles === false) {
+                for (const tweet of (page.tweets || [])) {
+                    removeArticlePayload(tweet);
+                }
+            }
+            return page;
+        },
+        () => true
+    );
+}
+
+function removeArticlePayload(post, seen = new Set()) {
+    if (!post || typeof post !== 'object' || seen.has(post)) return;
+    seen.add(post);
+    post.article_title = '';
+    post.article_url = '';
+    post.article_text = '';
+    removeArticlePayload(post.reply_to_post, seen);
+    removeArticlePayload(post.quoted_post, seen);
+}
+
+async function enrichBookmarkReplyContexts(tweets) {
+    const parentIds = [...new Set(tweets
+        .filter((tweet) => tweet?.reply_to_id && !tweet.reply_to_post)
+        .map((tweet) => String(tweet.reply_to_id)))];
+    if (parentIds.length === 0) return;
+
+    if (!bookmarkContextRateLimiter) {
+        bookmarkContextRateLimiter = createRateLimiter(
+            currentExport.settings,
+            'bookmark_context'
+        );
+        bookmarkContextRateLimiter.onStatusChange((event) => {
+            lastTransientStatus = event;
+            broadcastStatus({ ...event, exportMode: 'bookmarks' });
+        });
+    }
+    const parents = await bookmarkContextRateLimiter.executeWithRateLimit(
+        () => XPorterAPI.fetchTweetsByIds(parentIds)
+    );
+    const parentById = new Map((parents || []).map((parent) => [
+        String(parent.id),
+        parent
+    ]));
+    for (const tweet of tweets) {
+        if (!tweet?.reply_to_id || tweet.reply_to_post) continue;
+        const parent = parentById.get(String(tweet.reply_to_id));
+        if (parent) {
+            tweet.reply_to_post = XPorterAPI.toPostContext(parent);
+        }
+    }
+}
+
+async function _fetchPostTimelineLoop(fetchPage, acceptTweet) {
     let hasMore = true;
     let noProgressPages = 0;
     const seenIds = new Set();
@@ -721,40 +863,24 @@ async function _fetchPostsLoop() {
         }
 
         const requestCursor = currentExport.cursor;
-        const result = await rateLimiter.executeWithRateLimit(async () => {
-            return await XPorterAPI.fetchUserTweets(
-                currentExport.userId,
-                requestCursor,
-                20,
-                currentExport.settings.includeReplies === true
-            );
-        });
+        const result = await rateLimiter.executeWithRateLimit(() => fetchPage(requestCursor));
         if (!currentExport.running) break;
 
         const countBeforePage = currentExport.tweetCount;
 
-        // Process tweets. (No date filtering here: exports with a date range are
-        // diverted to _fetchPostsByDateRangeLoop at the top of _fetchPostsLoop.)
         for (const tweet of (result.tweets || [])) {
-            if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
-            if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
-            if (currentExport.settings.includeArticles === false && tweet.type === 'article') continue;
-
-            // UserTweetsAndReplies contains conversation context so X can draw
-            // the Replies tab. Keep only rows authored by the exported profile;
-            // otherwise a parent post from another account can leak into the
-            // export as if it belonged to this user.
-            const expectedUsername = currentExport.userInfo?.screenName || currentExport.username || '';
-            if (tweet.author_username && expectedUsername &&
-                tweet.author_username.toLowerCase() !== expectedUsername.toLowerCase()) continue;
+            if (!acceptTweet(tweet)) continue;
 
             if (!recentIds.add(tweet.id)) continue;
             if (quantityLimitReached()) {
                 hasMore = false;
                 break;
             }
-            // Inject author info if missing
-            if (!tweet.author_name && currentExport.userInfo) {
+            // Profile timelines can omit repeated author fields. Bookmark
+            // rows are authored by arbitrary accounts, so never inject the
+            // viewer sentinel into those rows.
+            if (currentExport.exportMode === 'posts' &&
+                !tweet.author_name && currentExport.userInfo) {
                 tweet.author_name = currentExport.userInfo.name || '';
                 tweet.author_username = currentExport.userInfo.screenName || currentExport.username || '';
                 if (tweet.tweet_url && tweet.tweet_url.includes('/undefined/')) {
@@ -934,7 +1060,8 @@ async function _fetchPostsByDateRangeLoop() {
                 // de-duplication so a completed replay does not look stalled.
                 noteSearchTimelineCoverage(tweet);
                 if (!currentExport.settings.includeRetweets && tweet.type === 'retweet') continue;
-                if (!currentExport.settings.includeReplies && tweet.type === 'reply') continue;
+                if (!profileFeedIncludesReplies(currentExport.settings) &&
+                    tweet.type === 'reply') continue;
                 if (currentExport.settings.includeArticles === false && tweet.type === 'article') continue;
                 if (seenIds.has(tweet.id)) {
                     if (currentExport.dateResume && searchCapture) {
@@ -1651,7 +1778,7 @@ function canFallbackWithoutReplies(state) {
         state.exportMode === 'posts' &&
         (state.tweetCount || 0) === 0 &&
         !!state.userId &&
-        state.settings?.includeReplies === true;
+        profileFeedForSettings(state.settings) === 'legacy_with_replies';
 }
 
 async function resumePostsOnly() {
@@ -1709,6 +1836,15 @@ function applyLivePacingSettings(settingsPatch = {}) {
 // were persisted working.
 function buildResumeSettings(storedSettings, snapshot) {
     const settings = { ...storedSettings, ...(snapshot || {}) };
+    if (snapshot && !snapshot.profileFeed && Object.hasOwn(snapshot, 'includeReplies')) {
+        // A saved cursor belongs to the exact endpoint that produced it. Keep
+        // pre-redesign exports on their legacy operation until that export is
+        // completed instead of reusing the cursor against a different feed.
+        settings.profileFeed = snapshot.includeReplies === true
+            ? 'legacy_with_replies'
+            : 'legacy_posts';
+        delete settings.includeReplies;
+    }
     for (const key of PACING_SETTING_KEYS) {
         if (storedSettings[key] !== undefined) settings[key] = storedSettings[key];
     }
@@ -1726,7 +1862,7 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
 
     const storedSettings = await XPorterStorage.loadSettings();
     const settings = buildResumeSettings(storedSettings, savedState.settings);
-    if (postsOnlyFallback) settings.includeReplies = false;
+    if (postsOnlyFallback) settings.profileFeed = 'legacy_posts';
 
     // "+N more" resumes raise the limit for THIS export only, by overriding
     // the per-export settings snapshot — the stored quantityLimit setting is
@@ -2152,7 +2288,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === 'install') {
         await XPorterStorage.saveSettings({
             includeRetweets: true,
-            includeReplies: false,
+            profileFeed: 'all',
             includeArticles: true,
             includeAboutAccountDetails: false,
             aboutAccountSpeed: 'standard',

@@ -247,6 +247,96 @@ const COLUMN_LABELS = {
     }
 };
 
+// Reply/quote context columns are composed from the already translated base
+// field labels above. This keeps all 14 languages complete without duplicating
+// the same ten field names for each of the three context scopes.
+const CONTEXT_COLUMN_LABELS = {
+    en: {
+        reply_to_id: 'Replied-to post ID', reply_to_username: 'Replied-to username',
+        conversation_id: 'Conversation ID', reply_to_post: 'Replied-to post',
+        reply_to_quoted_post: 'Quote in replied-to post', quoted_post: 'Quoted post'
+    },
+    ru: {
+        reply_to_id: 'ID исходного поста', reply_to_username: 'Логин автора исходного поста',
+        conversation_id: 'ID диалога', reply_to_post: 'Исходный пост',
+        reply_to_quoted_post: 'Цитата в исходном посте', quoted_post: 'Цитируемый пост'
+    },
+    zh: {
+        reply_to_id: '被回复帖子的 ID', reply_to_username: '被回复用户',
+        conversation_id: '对话 ID', reply_to_post: '被回复的帖子',
+        reply_to_quoted_post: '被回复帖子中的引用', quoted_post: '引用的帖子'
+    },
+    ja: {
+        reply_to_id: '返信先の投稿 ID', reply_to_username: '返信先ユーザー名',
+        conversation_id: '会話 ID', reply_to_post: '返信先の投稿',
+        reply_to_quoted_post: '返信先投稿内の引用', quoted_post: '引用された投稿'
+    },
+    es: {
+        reply_to_id: 'ID de la publicación respondida', reply_to_username: 'Usuario respondido',
+        conversation_id: 'ID de conversación', reply_to_post: 'Publicación respondida',
+        reply_to_quoted_post: 'Cita en la publicación respondida', quoted_post: 'Publicación citada'
+    },
+    ko: {
+        reply_to_id: '답글 대상 게시물 ID', reply_to_username: '답글 대상 사용자명',
+        conversation_id: '대화 ID', reply_to_post: '답글 대상 게시물',
+        reply_to_quoted_post: '답글 대상 게시물의 인용', quoted_post: '인용된 게시물'
+    },
+    it: {
+        reply_to_id: 'ID del post a cui si risponde', reply_to_username: 'Utente a cui si risponde',
+        conversation_id: 'ID conversazione', reply_to_post: 'Post a cui si risponde',
+        reply_to_quoted_post: 'Citazione nel post a cui si risponde', quoted_post: 'Post citato'
+    },
+    pt: {
+        reply_to_id: 'ID da publicação respondida', reply_to_username: 'Usuário respondido',
+        conversation_id: 'ID da conversa', reply_to_post: 'Publicação respondida',
+        reply_to_quoted_post: 'Citação na publicação respondida', quoted_post: 'Publicação citada'
+    },
+    tr: {
+        reply_to_id: 'Yanıtlanan gönderi kimliği', reply_to_username: 'Yanıtlanan kullanıcı adı',
+        conversation_id: 'Konuşma kimliği', reply_to_post: 'Yanıtlanan gönderi',
+        reply_to_quoted_post: 'Yanıtlanan gönderideki alıntı', quoted_post: 'Alıntılanan gönderi'
+    },
+    de: {
+        reply_to_id: 'ID des beantworteten Beitrags', reply_to_username: 'Beantworteter Benutzername',
+        conversation_id: 'Unterhaltungs-ID', reply_to_post: 'Beantworteter Beitrag',
+        reply_to_quoted_post: 'Zitat im beantworteten Beitrag', quoted_post: 'Zitierter Beitrag'
+    },
+    ar: {
+        reply_to_id: 'معرّف المنشور المُجاب عليه', reply_to_username: 'اسم المستخدم المُجاب عليه',
+        conversation_id: 'معرّف المحادثة', reply_to_post: 'المنشور المُجاب عليه',
+        reply_to_quoted_post: 'اقتباس داخل المنشور المُجاب عليه', quoted_post: 'المنشور المقتبس'
+    },
+    fr: {
+        reply_to_id: 'ID du post auquel il est répondu', reply_to_username: 'Identifiant auquel il est répondu',
+        conversation_id: 'ID de conversation', reply_to_post: 'Post auquel il est répondu',
+        reply_to_quoted_post: 'Citation dans le post auquel il est répondu', quoted_post: 'Post cité'
+    },
+    hi: {
+        reply_to_id: 'जिस पोस्ट का जवाब दिया उसका ID', reply_to_username: 'जिस यूज़र को जवाब दिया',
+        conversation_id: 'बातचीत ID', reply_to_post: 'जिस पोस्ट का जवाब दिया',
+        reply_to_quoted_post: 'जवाब वाले पोस्ट में कोट', quoted_post: 'कोट किया गया पोस्ट'
+    },
+    id: {
+        reply_to_id: 'ID postingan yang dibalas', reply_to_username: 'Nama pengguna yang dibalas',
+        conversation_id: 'ID percakapan', reply_to_post: 'Postingan yang dibalas',
+        reply_to_quoted_post: 'Kutipan dalam postingan yang dibalas', quoted_post: 'Postingan yang dikutip'
+    }
+};
+
+function contextColumnLabel(key, lang) {
+    const contextLabels = CONTEXT_COLUMN_LABELS[lang] || CONTEXT_COLUMN_LABELS.en;
+    for (const prefix of ['reply_to_quoted_post_', 'reply_to_post_', 'quoted_post_']) {
+        if (!key.startsWith(prefix)) continue;
+        const scopeKey = prefix.slice(0, -1);
+        const field = key.slice(prefix.length);
+        const baseKey = field === 'url' ? 'tweet_url' : field;
+        const fieldLabels = COLUMN_LABELS[lang] || COLUMN_LABELS.en;
+        const fieldLabel = fieldLabels[baseKey] || COLUMN_LABELS.en[baseKey] || field;
+        return `${contextLabels[scopeKey] || CONTEXT_COLUMN_LABELS.en[scopeKey]}: ${fieldLabel}`;
+    }
+    return contextLabels[key] || '';
+}
+
 /**
  * Resolve a localized column label.
  * @param {string} key - the English data key (e.g. 'favorite_count')
@@ -255,7 +345,7 @@ const COLUMN_LABELS = {
  */
 function columnLabel(key, lang) {
     const L = COLUMN_LABELS[lang] || COLUMN_LABELS.en;
-    return L[key] || COLUMN_LABELS.en[key] || key;
+    return L[key] || contextColumnLabel(key, lang) || COLUMN_LABELS.en[key] || key;
 }
 
 if (typeof globalThis !== 'undefined') {

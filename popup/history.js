@@ -44,12 +44,17 @@
                 info.className = 'history-info';
                 const name = document.createElement('div');
                 name.className = 'history-name';
-                name.textContent = entry.displayName || entry.username;
+                const isBookmarks = entry.exportMode === 'bookmarks';
+                name.textContent = isBookmarks
+                    ? modeLabel('bookmarks')
+                    : (entry.displayName || entry.username);
                 info.appendChild(name);
-                const handle = document.createElement('div');
-                handle.className = 'history-handle';
-                handle.textContent = '@' + (entry.username || '');
-                info.appendChild(handle);
+                if (!isBookmarks) {
+                    const handle = document.createElement('div');
+                    handle.className = 'history-handle';
+                    handle.textContent = '@' + (entry.username || '');
+                    info.appendChild(handle);
+                }
                 info.appendChild(createMeta(entry));
                 card.appendChild(info);
 

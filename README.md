@@ -24,7 +24,10 @@
 
 ## Release status
 
-The current `1.6.0` build is based on the stable `1.5.8` code line.
+The local worktree is an experimental `1.6.1` build that restores the complete
+packaged `1.5.9` feature set for local verification. The published `1.6.0`
+release remains on the stable `1.5.8` code line. Do not publish or upload this
+local experiment without a separate release decision.
 
 > [!WARNING]
 > **XPorter 1.5.9 was withdrawn and is not recommended.** Its update added a
@@ -43,8 +46,8 @@ for the complete change list, incident explanation, and safer permission design.
 
 - **Full engagement metrics** — views, likes, retweets, replies, quotes, bookmarks
 - **Passive seen-post dataset** — stores one local row per non-reply post already loaded while you browse X, with first/latest metrics and no extra API requests
-- **Multiple export modes** — posts, followers, following, and verified followers
-- **CSV, JSON, XLSX, and posts-only TXT output** — download the AI-friendly TXT or copy it straight to your clipboard
+- **Multiple export modes** — posts, personal bookmarks, followers, following, and verified followers
+- **CSV, JSON, XLSX, and TXT output** — download the AI-friendly TXT or copy it straight to your clipboard
 - **Date range filtering** — export posts from a specific time window
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
@@ -164,17 +167,18 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 | Setting | Default | Description |
 |---|---|---|
 | Include retweets | On | Export retweets alongside original posts |
-| Include replies | On | Export replies alongside original posts |
+| Profile feed | All | Choose All (posts, replies, and threads) or Posts (originals and quotes) |
 | Include articles | On | Export X Articles alongside ordinary posts |
-| Export mode | Posts | Data type to export: posts, followers, following, or verified followers |
-| Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for posts |
+| Embed post photos | Off | Download X photos and embed them in a separate XLSX Media sheet |
+| Export mode | Posts | Data type to export: posts, personal bookmarks, followers, following, or verified followers |
+| Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for post-shaped exports |
 | Quantity limit | 500 | Maximum posts or users per export (0 = unlimited) |
 | Export Speed | Standard | Turbo, Fast, Standard, Careful, Turtle, or Custom request pacing |
 | Custom pacing | 5 s / 20 / 3 min | Delay, requests per batch, and batch pause used only by Custom |
 | Auto-clear old exports | On / 4 hours | Removes old downloadable payloads while keeping history metadata |
 | Localize column titles | On | Translate CSV/XLSX headers; JSON keys always remain English |
 
-Preset quantity options: 100, 500, 1,000, 5,000, 10,000, unlimited, or a custom value.
+Preset quantity options: 100, 500, 1,000, unlimited, or a custom value.
 
 ## Supported Languages
 

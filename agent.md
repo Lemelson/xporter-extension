@@ -2,26 +2,26 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the codebase at **v1.4.11** (2026-07-17).
+> Last verified against the local experimental **v1.6.1** runtime (2026-08-17), which restores the packaged v1.5.9 feature set for local testing.
 
 ---
 
 ## 1. Project Overview
 
-**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, followers, following, and verified followers — into CSV, JSON, or XLSX files, plus AI-friendly posts-only TXT. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
+**XPorter** is a Chrome Extension (Manifest V3) for exporting data from X (Twitter) — posts, personal bookmarks, followers, following, and verified followers — into CSV, JSON, XLSX, or TXT files. It uses X's **internal GraphQL API** through the user's authenticated browser session (no official paid API required).
 
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.4.11 (`manifest.json`) |
+| Version | Local experimental 1.6.1 (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
 
 ### Key Selling Points
 - **Free & unlimited** — competitors charge $12–15/mo and cap at 150–200 posts
-- **Multi-mode** — posts, followers, following, verified followers
-- **Multi-format** — CSV, JSON, real OOXML XLSX, and posts-only AI-friendly TXT
+- **Multi-mode** — posts, personal bookmarks, followers, following, verified followers
+- **Multi-format** — CSV, JSON, real OOXML XLSX, and AI-friendly TXT for post-shaped exports
 - **Date-range filtering** for posts (via an X search tab — see §5)
 - **14 languages** — auto-detected from the browser
 - **Self-healing API** — discovers GraphQL queryIds from X's JS bundles AND captures them live from X's own network traffic

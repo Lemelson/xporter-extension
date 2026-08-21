@@ -42,19 +42,12 @@
 
   /* Per-topic icon accents (About "How XPorter works" rows) */
   --ic-green: #00BA7C;
-  --ic-green-bg: rgba(0, 186, 124, 0.16);
   --ic-blue: #60B8FF;
-  --ic-blue-bg: rgba(96, 184, 255, 0.16);
   --ic-purple: #A78BFA;
-  --ic-purple-bg: rgba(167, 139, 250, 0.16);
   --ic-cyan: #22D3EE;
-  --ic-cyan-bg: rgba(34, 211, 238, 0.14);
   --ic-amber: #FFC94D;
-  --ic-amber-bg: rgba(255, 201, 77, 0.14);
   --ic-pink: #F472B6;
-  --ic-pink-bg: rgba(244, 114, 182, 0.14);
   --ic-teal: #2DD4BF;
-  --ic-teal-bg: rgba(45, 212, 191, 0.14);
 }
 
 /* ========== LIGHT THEME ========== */
@@ -88,19 +81,12 @@ body.light {
 
   /* Per-topic icon accents — darker fills for light backgrounds */
   --ic-green: #059669;
-  --ic-green-bg: rgba(5, 150, 105, 0.14);
   --ic-blue: #0A6FDB;
-  --ic-blue-bg: rgba(10, 111, 219, 0.14);
   --ic-purple: #7C3AED;
-  --ic-purple-bg: rgba(124, 58, 237, 0.13);
   --ic-cyan: #0891B2;
-  --ic-cyan-bg: rgba(8, 145, 178, 0.13);
   --ic-amber: #B45309;
-  --ic-amber-bg: rgba(180, 83, 9, 0.13);
   --ic-pink: #DB2777;
-  --ic-pink-bg: rgba(219, 39, 119, 0.12);
   --ic-teal: #0D9488;
-  --ic-teal-bg: rgba(13, 148, 136, 0.13);
 }
 
 /* Force light theme overrides for elements that use explicit colors */
@@ -147,6 +133,8 @@ body.light .footer {
 
 /* Glass mode: Main popup container */
 .popup {
+  display: flex;
+  flex-direction: column;
   background: var(--glass-bg) !important;
   backdrop-filter: blur(var(--glass-blur)) saturate(1.6) brightness(1.05);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6) brightness(1.05);
@@ -236,6 +224,89 @@ body.light .input-group {
 body.light .input-group:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+.bookmarks-account-card {
+  min-height: 58px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(96, 184, 255, 0.12), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(96, 184, 255, 0.28);
+  box-shadow: var(--glass-edge), 0 8px 22px rgba(14, 38, 74, 0.16);
+}
+
+body.light .bookmarks-account-card {
+  background: linear-gradient(135deg, rgba(39, 145, 220, 0.12), rgba(255, 255, 255, 0.68));
+  border-color: rgba(18, 115, 186, 0.24);
+  box-shadow: var(--glass-inner-glow), 0 4px 14px rgba(14, 38, 74, 0.10);
+}
+
+.bookmarks-account-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  font-size: 19px;
+  background: rgba(96, 184, 255, 0.14);
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.10);
+}
+
+body.light .bookmarks-account-avatar {
+  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.10);
+}
+
+.bookmarks-account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bookmarks-account-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bookmarks-account-copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks-account-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+#bookmarksAccountHandle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks-account-owner {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(96, 184, 255, 0.12);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 /* Glass select */
@@ -715,6 +786,7 @@ body.light .progress-bar {
 
 /* Glass footer */
 .footer {
+  margin-block-start: auto;
   border-top: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.02);
   padding: 8px 16px;
@@ -1581,6 +1653,21 @@ body.light .lang-option.active {
   margin-bottom: 0;
 }
 
+.mode-settings-group {
+  margin-block-end: 13px;
+  padding-block-end: 4px;
+  border-block-end: 1px solid var(--border);
+}
+
+.mode-settings-heading {
+  margin-block-end: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 /* Keep the expensive About enrichment and its dependent controls legible as
    one settings group. The horizontal rules mark the group boundary; the
    logical inline inset keeps the child controls subordinate in both LTR/RTL. */
@@ -1678,6 +1765,23 @@ body.light .risk-dialog-card {
 
 .risk-dialog-actions .btn {
   width: 100%;
+}
+
+.risk-dialog-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Input prefix */
@@ -2127,16 +2231,38 @@ body.light .detail-head:hover {
 }
 
 .detail-icon {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: var(--accent-glow);
   color: var(--accent);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: color 0.18s ease;
+}
+
+.detail-icon::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  filter: blur(8px);
+  transform: scale(1.12);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.detail-icon > svg {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.25;
 }
 
 .detail-title {
@@ -2157,28 +2283,30 @@ body.light .detail-head:hover {
 }
 
 .detail-item.open .detail-icon {
-  background: var(--accent);
-  color: #fff;
+  color: var(--accent);
 }
 
-/* Colored per-topic icons: each row gets its own accent, closed = tinted
-   chip, open = solid fill. --ic/--ic-bg are set by the modifier classes. */
-.detail-icon--green  { --ic: var(--ic-green);  --ic-bg: var(--ic-green-bg); }
-.detail-icon--blue   { --ic: var(--ic-blue);   --ic-bg: var(--ic-blue-bg); }
-.detail-icon--purple { --ic: var(--ic-purple); --ic-bg: var(--ic-purple-bg); }
-.detail-icon--cyan   { --ic: var(--ic-cyan);   --ic-bg: var(--ic-cyan-bg); }
-.detail-icon--amber  { --ic: var(--ic-amber);  --ic-bg: var(--ic-amber-bg); }
-.detail-icon--pink   { --ic: var(--ic-pink);   --ic-bg: var(--ic-pink-bg); }
-.detail-icon--teal   { --ic: var(--ic-teal);   --ic-bg: var(--ic-teal-bg); }
+.detail-item.open .detail-icon::before {
+  opacity: 0.42;
+  transform: scale(1.28);
+}
+
+/* Colored per-topic icons: the icon stays crisp while its accent becomes a
+   soft, circular glow instead of a rounded-square chip. */
+.detail-icon--green  { --ic: var(--ic-green); }
+.detail-icon--blue   { --ic: var(--ic-blue); }
+.detail-icon--purple { --ic: var(--ic-purple); }
+.detail-icon--cyan   { --ic: var(--ic-cyan); }
+.detail-icon--amber  { --ic: var(--ic-amber); }
+.detail-icon--pink   { --ic: var(--ic-pink); }
+.detail-icon--teal   { --ic: var(--ic-teal); }
 
 .detail-icon[class*="detail-icon--"] {
-  background: var(--ic-bg);
   color: var(--ic);
 }
 
 .detail-item.open .detail-icon[class*="detail-icon--"] {
-  background: var(--ic);
-  color: #fff;
+  color: var(--ic);
 }
 
 /* Smooth height expand with no fixed max-height (never clips long translations) */
@@ -2219,27 +2347,22 @@ body.light .detail-head:hover {
 
 .update-icon--current {
   --update-icon: var(--ic-green);
-  --update-icon-bg: var(--ic-green-bg);
 }
 
 .update-icon--previous {
   --update-icon: var(--ic-amber);
-  --update-icon-bg: var(--ic-amber-bg);
 }
 
 .update-icon--archive {
   --update-icon: var(--text-muted);
-  --update-icon-bg: rgba(148, 163, 184, 0.13);
 }
 
 .update-icon {
-  background: var(--update-icon-bg);
   color: var(--update-icon);
 }
 
 .detail-item.open .update-icon {
-  background: var(--update-icon);
-  color: #fff;
+  color: var(--update-icon);
 }
 
 .detail-body-inner.update-body p {

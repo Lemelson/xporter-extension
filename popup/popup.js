@@ -5,6 +5,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
     const usernameInput = document.getElementById('usernameInput');
+    const usernameLabel = document.getElementById('usernameLabel');
+    const usernamePrefix = document.getElementById('usernamePrefix');
+    const usernameField = document.getElementById('usernameField');
+    const bookmarksAccountField = document.getElementById('bookmarksAccountField');
+    const bookmarksAccountName = document.getElementById('bookmarksAccountName');
+    const bookmarksAccountHandle = document.getElementById('bookmarksAccountHandle');
+    const bookmarksAccountAvatar = document.getElementById('bookmarksAccountAvatar');
+    const bookmarksAccountAvatarFallback =
+        document.getElementById('bookmarksAccountAvatarFallback');
     const exportMode = document.getElementById('exportMode');
     const outputFormat = document.getElementById('outputFormat');
     const postsOnlyOptions = document.getElementById('postsOnlyOptions');
@@ -39,8 +48,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Settings elements
     const includeRetweets = document.getElementById('includeRetweets');
-    const includeReplies = document.getElementById('includeReplies');
+    const profileFeed = document.getElementById('profileFeed');
     const includeArticles = document.getElementById('includeArticles');
+    const includeBookmarkReplyContext =
+        document.getElementById('includeBookmarkReplyContext');
+    const includeBookmarkArticles = document.getElementById('includeBookmarkArticles');
+    const embedPostPhotos = document.getElementById('embedPostPhotos');
+    const embedBookmarkPhotos = document.getElementById('embedBookmarkPhotos');
     const quantityLimit = document.getElementById('quantityLimit');
     const exportSpeed = document.getElementById('exportSpeed');
     const customSpeedRows = document.getElementById('customSpeedRows');
@@ -63,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const aboutRiskBody = document.getElementById('aboutRiskBody');
     const aboutRiskCancel = document.getElementById('aboutRiskCancel');
     const aboutRiskConfirm = document.getElementById('aboutRiskConfirm');
+    const aboutRiskCountdownStatus = document.getElementById('aboutRiskCountdownStatus');
     const customQuantityRow = document.getElementById('customQuantityRow');
     const customQuantity = document.getElementById('customQuantity');
     const autoExpireEnabled = document.getElementById('autoExpireEnabled');
@@ -82,8 +97,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             tabsRect.bottom > 0 &&
             tabsRect.top < window.innerHeight;
         const safeTop = tabsAreVisible ? Math.max(8, tabsRect.bottom + 8) : 8;
-        const tooltipTop = safeTop + 4;
-        const maxHeight = Math.max(80, window.innerHeight - tooltipTop - 8);
+        const footerRect = document.querySelector('.footer')?.getBoundingClientRect();
+        const safeBottom = footerRect && footerRect.top > 0 && footerRect.top < window.innerHeight
+            ? footerRect.top - 8
+            : window.innerHeight - 8;
+        const triggerRect = trigger.getBoundingClientRect();
+        const tooltipTop = trigger.classList.contains('help-below')
+            ? Math.max(safeTop + 4, triggerRect.bottom + 8)
+            : safeTop + 4;
+        const maxHeight = Math.max(48, safeBottom - tooltipTop);
         // The active tab briefly animates with transform, so a fixed child can
         // unexpectedly become relative to that tab. Position explicitly from
         // the tooltip's actual offset parent to keep viewport geometry stable.
@@ -103,6 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Settings tab — posts-only elements
     const settingsPostsOnly = document.getElementById('settingsPostsOnly');
+    const settingsBookmarksOnly = document.getElementById('settingsBookmarksOnly');
 
     // Language selector elements
     const langBtn = document.getElementById('langBtn');
@@ -125,6 +148,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let downloadPlanRequest = 0;
     let downloadInProgress = false;
     let resumeAddsItems = false;
+    let bookmarksUsernameBackup = '';
+    let detectedCurrentAccount = null;
+    let currentTranslations = {};
 
     function ratePromptExportKey(state) {
         const completedAt = state?.completedAt || 'complete';
@@ -222,14 +248,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Parallel Init ====================
     // Fire all independent async requests at once instead of sequentially
-    const [settingsResult, authResult, status, activeTabs] = await Promise.all([
+    const [settingsResult, authResult, status, activeTabs, currentAccountResult] = await Promise.all([
         sendMessage({ type: 'GET_SETTINGS' }),
         checkAuth().catch(() => null),
         sendMessage({ type: 'GET_STATUS' }),
-        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => [])
+        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []),
+        sendMessage({ type: 'GET_CURRENT_ACCOUNT' }).catch(() => null)
     ]);
 
     const currentSettings = settingsResult?.settings || {};
+    detectedCurrentAccount = currentAccountResult?.account || null;
 
     // ==================== Theme & Design ====================
     initTheme(currentSettings.theme, themeIcon);
@@ -249,15 +277,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Export Mode Switching ====================
     function applyModeUI(mode) {
         const isPostsMode = (mode === 'posts');
+        const isBookmarksMode = (mode === 'bookmarks');
+        const isPostRows = isPostsMode || isBookmarksMode;
         // Show/hide posts-only options in Home tab
         postsOnlyOptions.classList.toggle('hidden', !isPostsMode);
         // Show/hide posts-only settings in Settings tab
         if (settingsPostsOnly) {
             settingsPostsOnly.classList.toggle('hidden', !isPostsMode);
         }
+        if (settingsBookmarksOnly) {
+            settingsBookmarksOnly.classList.toggle('hidden', !isBookmarksMode);
+        }
+        if (isBookmarksMode) {
+            if (!usernameInput.disabled) bookmarksUsernameBackup = usernameInput.value;
+            usernameInput.disabled = true;
+            usernameInput.value = '';
+            usernameField.classList.add('hidden');
+            bookmarksAccountField.classList.remove('hidden');
+            renderBookmarksAccount();
+        } else {
+            if (usernameInput.disabled) usernameInput.value = bookmarksUsernameBackup;
+            usernameInput.disabled = false;
+            usernameField.classList.remove('hidden');
+            bookmarksAccountField.classList.add('hidden');
+            usernameLabel.textContent =
+                currentTranslations.fieldUsername || 'Twitter Username';
+            usernamePrefix.classList.remove('hidden');
+        }
         const txtOption = outputFormat.querySelector('option[value="txt"]');
-        if (txtOption) txtOption.disabled = !isPostsMode;
-        if (!isPostsMode && outputFormat.value === 'txt') outputFormat.value = 'csv';
+        if (txtOption) txtOption.disabled = !isPostRows;
+        if (!isPostRows && outputFormat.value === 'txt') outputFormat.value = 'csv';
+    }
+
+    function renderBookmarksAccount() {
+        const account = detectedCurrentAccount || {};
+        const username = String(account.username || '').replace(/^@/, '');
+        bookmarksAccountName.textContent = account.name ||
+            currentTranslations.signedInXAccount || 'Signed-in X account';
+        bookmarksAccountHandle.textContent = username ? `@${username}` : '';
+        bookmarksAccountHandle.classList.toggle('hidden', !username);
+
+        const avatarUrl = String(account.avatarUrl || '');
+        if (avatarUrl) {
+            bookmarksAccountAvatar.src = avatarUrl;
+            bookmarksAccountAvatar.classList.remove('hidden');
+            bookmarksAccountAvatarFallback.classList.add('hidden');
+        } else {
+            bookmarksAccountAvatar.removeAttribute('src');
+            bookmarksAccountAvatar.classList.add('hidden');
+            bookmarksAccountAvatarFallback.classList.remove('hidden');
+        }
     }
 
     // Apply saved mode or default
@@ -340,8 +409,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         langCode.textContent = code.toUpperCase();
     }
 
-    let currentTranslations = {};
-
     function templateText(key, values = {}) {
         let text = t(key);
         for (const [name, value] of Object.entries(values)) {
@@ -418,6 +485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.documentElement.lang = code;
         formatReleaseDates(code);
         applyLanguageDirection(code); // RTL for Arabic, LTR otherwise
+        applyModeUI(exportMode.value);
         updateResumeQuantityLabel();
     }
 
@@ -509,11 +577,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const ABOUT_RETRY_WARNING_THRESHOLD = 60;
     let activeAboutRisk = null;
+    let aboutRiskCountdown = null;
+
+    function guardedButtonCountdown(button, readyLabel, statusElement) {
+        return window.XPorterAcknowledgementTimer.start(button, {
+            seconds: 5,
+            readyLabel,
+            waitingLabel: (action, seconds) => templateText(
+                'acknowledgementCountdown',
+                { action, seconds: formatNumber(seconds, currentLang) }
+            ),
+            onChange({ text }) {
+                if (statusElement) statusElement.textContent = text;
+            }
+        });
+    }
 
     function closeAboutRiskDialog(confirmed) {
         if (!activeAboutRisk) return;
         const action = activeAboutRisk;
         activeAboutRisk = null;
+        aboutRiskCountdown?.cancel();
+        aboutRiskCountdown = null;
         aboutRiskDialog.classList.add('hidden');
         popup.inert = false;
         if (confirmed) action.onConfirm();
@@ -533,6 +618,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         aboutRiskConfirm.textContent = t(isRetryRisk
             ? 'aboutRetryRiskConfirm'
             : 'aboutEnableRiskConfirm');
+        aboutRiskCountdown?.cancel();
+        aboutRiskCountdown = guardedButtonCountdown(
+            aboutRiskConfirm,
+            aboutRiskConfirm.textContent,
+            aboutRiskCountdownStatus
+        );
         activeAboutRisk = { trigger, onConfirm, onCancel };
         popup.inert = true;
         aboutRiskDialog.classList.remove('hidden');
@@ -660,8 +751,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastAcceptedAboutRetries = 5;
     if (currentSettings) {
         includeRetweets.checked = currentSettings.includeRetweets !== false;
-        includeReplies.checked = currentSettings.includeReplies === true;
+        profileFeed.value = currentSettings.profileFeed === 'posts' ? 'posts' : 'all';
         includeArticles.checked = currentSettings.includeArticles !== false;
+        includeBookmarkReplyContext.checked =
+            currentSettings.includeBookmarkReplyContext !== false;
+        includeBookmarkArticles.checked =
+            currentSettings.includeBookmarkArticles !== false;
+        embedPostPhotos.checked = currentSettings.embedPostPhotos === true;
+        embedBookmarkPhotos.checked = currentSettings.embedBookmarkPhotos === true;
         const savedLimit = currentSettings.quantityLimit ?? 500;
         const presetValues = ['0', '100', '500', '1000', '5000', '10000'];
         if (presetValues.includes(String(savedLimit))) {
@@ -763,8 +860,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const nextSettings = {
             includeRetweets: includeRetweets.checked,
-            includeReplies: includeReplies.checked,
+            profileFeed: profileFeed.value === 'posts' ? 'posts' : 'all',
             includeArticles: includeArticles.checked,
+            includeBookmarkReplyContext: includeBookmarkReplyContext.checked,
+            includeBookmarkArticles: includeBookmarkArticles.checked,
+            embedPostPhotos: embedPostPhotos.checked,
+            embedBookmarkPhotos: embedBookmarkPhotos.checked,
             quantityLimit: qLimit,
             requestDelay: 3000,
             exportSpeed: exportSpeed.value || 'standard',
@@ -856,7 +957,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveSettingsDebounced();
     });
 
-    [includeRetweets, includeReplies, includeArticles, quantityLimit, exportSpeed, customQuantity, autoExpireHours,
+    [includeRetweets, profileFeed, includeArticles,
+        includeBookmarkReplyContext, includeBookmarkArticles,
+        embedPostPhotos, embedBookmarkPhotos,
+        quantityLimit, exportSpeed, customQuantity, autoExpireHours,
         customDelaySec, customCooldownMin, customBatchSize, userExportSpeed,
         userCustomDelaySec, userCustomCooldownMin, userCustomBatchSize,
         aboutAccountSpeed, aboutAccountCustomBatchSize].forEach(el => {
@@ -935,12 +1039,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     }
-
+    applyModeUI(exportMode.value);
     function updateResumeQuantityLabel() {
         if (!resumeLabel) return;
         const count = parseInt(resumeQuantity.value, 10) || 0;
         const mode = lastExportState?.exportMode || exportMode.value;
-        const key = (mode === 'posts') ? 'morePosts' : 'moreUsers';
+        const key = (mode === 'posts' || mode === 'bookmarks')
+            ? 'morePosts'
+            : 'moreUsers';
         resumeLabel.textContent = pluralLabel(key, count, currentLang, currentTranslations);
     }
 
@@ -948,6 +1054,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function modeLabel(mode) {
         const key = {
             posts: 'modePosts',
+            bookmarks: 'modeBookmarks',
             followers: 'modeFollowers',
             following: 'modeFollowing',
             verified_followers: 'modeVerifiedFollowers'
@@ -958,10 +1065,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Start Export ====================
     startBtn.addEventListener('click', async () => {
         try {
+            const mode = exportMode.value;
             // extractUsernameFromInput returns '' for anything that is not a
             // valid username or X profile URL — never submit garbage.
-            const username = extractUsernameFromInput(usernameInput.value);
-            if (!username || !isValidUsername(username)) {
+            const username = mode === 'bookmarks'
+                ? ''
+                : extractUsernameFromInput(usernameInput.value);
+            if (mode !== 'bookmarks' && (!username || !isValidUsername(username))) {
                 usernameInput.focus();
                 usernameInput.style.borderColor = 'var(--danger)';
                 setTimeout(() => usernameInput.style.borderColor = '', 2000);
@@ -981,7 +1091,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const mode = exportMode.value;
             const params = {
                 type: 'START_EXPORT',
                 username: username,
@@ -1120,7 +1229,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (_) {
             usernameInput.value = '';
         }
-        usernameInput.focus();
+        applyModeUI(exportMode.value);
+        if (exportMode.value !== 'bookmarks') usernameInput.focus();
     });
 
     // ==================== Rate Prompt ====================
@@ -1158,7 +1268,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // "New Export" is the only way out and destroys the collected data.
         const finalError = (status === 'error' && !isRunning);
         const showTerminalActions = (status === 'complete' || status === 'stopped' || finalError) && itemCount > 0;
-        const showTxtCopy = showTerminalActions && mode === 'posts' && outputFormat.value === 'txt';
+        const showTxtCopy = showTerminalActions &&
+            (mode === 'posts' || mode === 'bookmarks') &&
+            outputFormat.value === 'txt';
         startBtn.classList.toggle(
             'hidden',
             isRunning || status === 'complete' || status === 'stopped' || finalError
@@ -1187,9 +1299,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportMode.disabled = isRunning || downloadInProgress;
         outputFormat.disabled = isRunning || downloadInProgress;
 
-        if (state.username) {
+        if (state.username && mode !== 'bookmarks') {
             usernameInput.value = state.username;
         }
+        applyModeUI(mode);
+
+        const subject = mode === 'bookmarks'
+            ? modeLabel('bookmarks')
+            : bidiIsolate('@' + (state.username || usernameInput.value));
 
         // Measured progress remains useful for paused/error states. While an
         // export is active, the bar instead communicates activity: blue while
@@ -1227,7 +1344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Status-specific display
         switch (status) {
             case 'resolving_user':
-                statusText.textContent = `${t('lookingUp')} ${bidiIsolate('@' + state.username)}`;
+                statusText.textContent = `${t('lookingUp')} ${subject}`;
                 setDotColor('green', true);
                 statusMessage.textContent = t('resolvingUser');
                 progressFill.classList.add('indeterminate');
@@ -1235,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
 
             case 'fetching':
-                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${bidiIsolate('@' + (state.username || usernameInput.value))}`;
+                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
                 setDotColor('green', true);
                 statusMessage.textContent = state.partialReason === 'replies_unavailable'
                     ? `${t('postsOnlyFallbackActive')} · ${t('batch')} ${state.batch || 1}`
@@ -1300,7 +1417,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
 
             case 'retrying':
-                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${bidiIsolate('@' + (state.username || usernameInput.value))}`;
+                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
                 setDotColor('yellow', true);
                 statusMessage.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
                 progressFill.classList.add('indeterminate');

@@ -28,7 +28,7 @@ function walk(dir) {
 
 const manifest = JSON.parse(read('manifest.json'));
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, '1.6.0');
+assert.equal(manifest.version, '1.6.1');
 assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
     'download keepalive relies on Chrome 110+ extension API calls resetting the MV3 idle timer');
 
@@ -111,18 +111,18 @@ const quantityPresetValues = [...quantitySelectHtml.matchAll(/<option value="([^
     .map((match) => match[1]);
 assert.deepEqual(
     quantityPresetValues,
-    ['0', '100', '500', '1000', '5000', '10000', 'custom'],
-    'quantity presets must match popup options'
+    ['0', '100', '500', '1000', 'custom'],
+    'quantity presets must match the experimental 1.5.9 runtime'
 );
 assert.match(
     quantitySelectHtml,
-    /<option value=["']0["'][^>]*data-i18n=["']unlimited["']>[^<]*Unlimited<\/option>/,
+    /<option value=["']0["'][^>]*data-i18n=["']unlimited["']>[^<]*Unlimited[^<]*<\/option>/,
     'quantity select must expose Unlimited'
 );
 assert.match(
     popupHtml,
-    /<option value=["']txt["'][^>]*data-i18n=["']formatTxtPostsOnly["'][^>]*>TXT \(Posts only\)<\/option>/,
-    'the post-row text format must use the formatTxtPostsOnly label'
+    /<option value=["']txt["'][^>]*data-i18n=["']formatTxt["'][^>]*>TXT<\/option>/,
+    'the restored post-row text format must use the 1.5.9 TXT label'
 );
 const exportModeHtml = /<select id=["']exportMode["'][^>]*>([\s\S]*?)<\/select>/
     .exec(popupHtml)?.[1] || '';
@@ -130,9 +130,19 @@ const exportModeValues = [...exportModeHtml.matchAll(/<option value=["']([^"']+)
     .map((match) => match[1]);
 assert.deepEqual(
     exportModeValues,
-    ['posts', 'followers', 'following', 'verified_followers'],
-    'modes must match Posts, Followers, Following, Verified Followers'
+    ['posts', 'followers', 'following', 'verified_followers', 'bookmarks'],
+    'modes must include the restored viewer-owned Bookmarks export'
 );
+const profileFeedHtml = /<select id=["']profileFeed["'][^>]*>([\s\S]*?)<\/select>/
+    .exec(popupHtml)?.[1] || '';
+const profileFeedValues = [...profileFeedHtml.matchAll(/<option value=["']([^"']+)["']/g)]
+    .map((match) => match[1]);
+assert.deepEqual(profileFeedValues, ['all', 'posts'],
+    'Posts settings must restore the 1.5.9 All and Posts feed choices');
+assert.doesNotMatch(popupHtml, /id=["']includeReplies["']/,
+    'the 1.5.9 profile feed selector must replace the old Include replies checkbox');
+assert(manifest.host_permissions.includes('https://pbs.twimg.com/*'),
+    'the exact local 1.5.9 runtime must restore its photo host permission');
 
 const popupRefs = [
     ...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi),
@@ -372,7 +382,11 @@ for (const file of localeFiles) {
     const locale = JSON.parse(read(`popup/locales/${file}`));
     assert.deepEqual(Object.keys(locale).sort(), englishKeys, `${file} must match en.json keys`);
     for (const key of [
-        'formatTxtPostsOnly',
+        'formatTxt',
+        'profileFeed',
+        'profileFeedAll',
+        'profileFeedPosts',
+        'modeBookmarks',
         'errRepliesUnavailable',
         'repliesUnavailableBody',
         'continuePostsOnly',

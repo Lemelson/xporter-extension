@@ -41,6 +41,62 @@ function sendUsername(username) {
     }
 }
 
+function extractCurrentAccount() {
+    const switcher = document.querySelector?.(
+        '[data-testid="SideNav_AccountSwitcher_Button"]'
+    );
+    const profileLink = document.querySelector?.(
+        'a[data-testid="AppTabBar_Profile_Link"][href^="/"]'
+    );
+    const lines = String(switcher?.innerText || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const handleLine = lines.find((line) => /^@[a-zA-Z0-9_]{1,15}$/.test(line));
+    const linkHandle = String(profileLink?.getAttribute?.('href') || '')
+        .match(/^\/([a-zA-Z0-9_]{1,15})(?:\/|$)/)?.[1] || '';
+    const username = String(handleLine || linkHandle).replace(/^@/, '');
+    if (!username || RESERVED_PATHS.has(username.toLowerCase())) return null;
+
+    const name = lines.find((line) =>
+        line !== handleLine &&
+        !/^@[a-zA-Z0-9_]{1,15}$/.test(line) &&
+        line.length <= 200
+    ) || '';
+    const rawAvatar = switcher?.querySelector?.('img')?.src || '';
+    let avatarUrl = '';
+    try {
+        const parsed = new URL(rawAvatar);
+        if (parsed.protocol === 'https:' &&
+            ['pbs.twimg.com', 'abs.twimg.com'].includes(parsed.hostname)) {
+            avatarUrl = parsed.href;
+        }
+    } catch (_) { /* avatar is optional */ }
+    return { name, username, avatarUrl };
+}
+
+let lastCurrentAccountKey = '';
+let currentAccountTimer = null;
+
+function detectCurrentAccount() {
+    currentAccountTimer = null;
+    const account = extractCurrentAccount();
+    if (!account) return;
+    const key = JSON.stringify(account);
+    if (key === lastCurrentAccountKey) return;
+    lastCurrentAccountKey = key;
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+    chrome.runtime.sendMessage({
+        type: 'SET_CURRENT_ACCOUNT',
+        account
+    }).catch(() => {});
+}
+
+function scheduleCurrentAccountDetection() {
+    if (currentAccountTimer !== null) return;
+    currentAccountTimer = setTimeout(detectCurrentAccount, 250);
+}
+
 // Detect on initial page load
 const initialUsername = extractUsername();
 if (initialUsername) {
@@ -55,6 +111,7 @@ let lastUrl = window.location.href;
 // observe document.documentElement instead (it exists at document_start),
 // and fall back to DOMContentLoaded just in case.
 const observer = new MutationObserver(() => {
+    scheduleCurrentAccountDetection();
     if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         const username = extractUsername();
@@ -69,6 +126,7 @@ function startUrlObserver() {
         childList: true,
         subtree: true
     });
+    scheduleCurrentAccountDetection();
     return true;
 }
 
@@ -93,7 +151,8 @@ window.addEventListener('popstate', () => {
 // Must mirror TRACKED in content/interceptor.js — anything else is dropped.
 const RELAY_TRACKED_OPERATIONS = new Set([
     'Followers', 'Following', 'BlueVerifiedFollowers',
-    'UserTweets', 'UserTweetsAndReplies', 'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'
+    'UserTweets', 'UserOriginalsTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds',
+    'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'
 ]);
 const RELAY_MAX_BODY_CHARS = 8 * 1024 * 1024; // must match interceptor.js
 const RELAY_MAX_SEEN_POSTS = 250;

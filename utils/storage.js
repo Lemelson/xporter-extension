@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
     EXPORT_STATE: 'xporter_export_state',
     SETTINGS: 'xporter_settings',
     USERNAME: 'xporter_detected_username',
+    CURRENT_ACCOUNT: 'xporter_current_account',
     TWEETS_PREFIX: 'xporter_tweets_batch_',
     EXPORT_HISTORY: 'xporter_export_history',
     ABOUT_ACCOUNT_CACHE: 'xporter_about_account_cache',
@@ -379,9 +380,16 @@ async function saveSettings(settings) {
         log.error('Settings read failed — aborting save to avoid wiping settings:', e.message);
         return false;
     }
+    const migratedProfileFeed = ['all', 'posts'].includes(current.profileFeed)
+        ? current.profileFeed
+        : Object.hasOwn(current, 'includeReplies')
+            ? (current.includeReplies === true ? 'all' : 'posts')
+            : undefined;
+    const { includeReplies: _legacyIncludeReplies, ...currentSettings } = current;
     return safeSet({
         [STORAGE_KEYS.SETTINGS]: {
-            ...current,
+            ...currentSettings,
+            ...(migratedProfileFeed ? { profileFeed: migratedProfileFeed } : {}),
             ...settings
         }
     });
@@ -393,10 +401,24 @@ async function saveSettings(settings) {
 async function loadSettings() {
     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
     const result = await safeGet(STORAGE_KEYS.SETTINGS);
+    const saved = result[STORAGE_KEYS.SETTINGS] || {};
+    const profileFeed = ['all', 'posts'].includes(saved.profileFeed)
+        ? saved.profileFeed
+        : Object.hasOwn(saved, 'includeReplies')
+            ? (saved.includeReplies === true ? 'all' : 'posts')
+            : 'all';
+    // `includeReplies` described the pre-redesign combined endpoint. Convert
+    // it once at the read boundary so runtime code has one unambiguous feed
+    // choice and old installs keep the behavior they explicitly selected.
+    const { includeReplies: _legacyIncludeReplies, ...savedSettings } = saved;
     return {
         includeRetweets: true,
-        includeReplies: false,
+        profileFeed: 'all',
         includeArticles: true,
+        includeBookmarkReplyContext: true,
+        includeBookmarkArticles: true,
+        embedPostPhotos: false,
+        embedBookmarkPhotos: false,
         includeAboutAccountDetails: false,
         aboutAccountSpeed: 'standard',
         aboutAccountCustomBatchSize: C.ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE?.[2] ?? 5,
@@ -419,7 +441,8 @@ async function loadSettings() {
         autoExpireHours: 4,
         ladybugEnabled: true,
         localizeExportHeaders: true,
-        ...(result[STORAGE_KEYS.SETTINGS] || {})
+        ...savedSettings,
+        profileFeed
     };
 }
 
@@ -440,6 +463,23 @@ async function loadDetectedUsername() {
     return result[STORAGE_KEYS.USERNAME] || '';
 }
 
+async function saveCurrentAccount(account) {
+    const username = String(account?.username || '').replace(/^@/, '');
+    if (!/^[a-zA-Z0-9_]{1,15}$/.test(username)) return false;
+    return safeSet({
+        [STORAGE_KEYS.CURRENT_ACCOUNT]: {
+            name: String(account?.name || '').slice(0, 200),
+            username,
+            avatarUrl: String(account?.avatarUrl || '').slice(0, 500)
+        }
+    });
+}
+
+async function loadCurrentAccount() {
+    const result = await safeGet(STORAGE_KEYS.CURRENT_ACCOUNT);
+    return result[STORAGE_KEYS.CURRENT_ACCOUNT] || null;
+}
+
 // ==================== Usage Stats (for uninstall feedback) ====================
 // Anonymous, non-personal counters. Used only to build the uninstall feedback
 // URL so churn can be understood. No X data, nothing identifying. Cleared on
@@ -454,7 +494,7 @@ function defaultUsage() {
         exportsOk: 0,
         exportsErr: 0,
         exportsStopped: 0,
-        byMode: { posts: 0, followers: 0, following: 0, verifiedFollowers: 0 },
+        byMode: { posts: 0, bookmarks: 0, followers: 0, following: 0, verifiedFollowers: 0 },
         byFormat: { csv: 0, json: 0, xlsx: 0 },
         dateRangeExports: 0,
         resumes: 0,
@@ -662,6 +702,7 @@ if (typeof globalThis !== 'undefined') {
         clearExportState,
         saveSettings, loadSettings,
         saveDetectedUsername, loadDetectedUsername,
+        saveCurrentAccount, loadCurrentAccount,
         saveExportHistory, loadExportHistory, loadExportHistoryEntry,
         pruneExpiredExportHistory,
         deleteExportHistoryEntry, clearExportHistory,

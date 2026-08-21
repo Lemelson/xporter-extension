@@ -12,7 +12,10 @@
         'UserByScreenName',
         'AboutAccountQuery',
         'UserTweets',
+        'UserOriginalsTimeline',
         'UserTweetsAndReplies',
+        'Bookmarks',
+        'TweetResultsByRestIds',
         'Following',
         'BlueVerifiedFollowers'
     ]);

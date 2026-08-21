@@ -1,8 +1,8 @@
 # CLAUDE.md — quick orientation
 
-**XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, followers, following, and verified followers to **CSV / JSON / XLSX**, plus an AI-friendly **posts-only TXT**, using X's internal GraphQL API through the user's own logged-in session.
+**XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, personal bookmarks, followers, following, and verified followers to **CSV / JSON / XLSX / TXT**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Version:** 1.4.11 (`manifest.json`)
+- **Version:** local experimental 1.6.1 (`manifest.json`), restoring the packaged 1.5.9 feature set; do not publish without a separate release decision.
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 

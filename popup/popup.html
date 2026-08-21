@@ -120,23 +120,44 @@
       <div class="field">
         <div class="field-label-row">
           <label class="field-label" for="exportMode" data-i18n="exportMode">Export Mode</label>
-          <span class="date-help" tabindex="0" aria-label="What each export mode collects." data-i18n-aria-label="exportModeHelp" data-i18n-tooltip="exportModeHelp">!</span>
+          <span class="date-help help-viewport" tabindex="0"
+            aria-label="What each export mode collects." data-i18n-aria-label="exportModeHelp"
+            data-i18n-tooltip="exportModeHelp">!</span>
         </div>
         <select id="exportMode" class="select">
           <option value="posts" data-i18n="modePosts">📝 Posts</option>
           <option value="followers" data-i18n="modeFollowers">👥 Followers</option>
           <option value="following" data-i18n="modeFollowing">➡️ Following</option>
           <option value="verified_followers" data-i18n="modeVerifiedFollowers">✓ Verified Followers</option>
+          <option value="bookmarks" data-i18n="modeBookmarks">🔖 Bookmarks</option>
         </select>
       </div>
 
       <!-- Username input -->
-      <div class="field">
-        <label class="field-label" for="usernameInput" data-i18n="fieldUsername">Twitter Username</label>
+      <div class="field" id="usernameField">
+        <label class="field-label" id="usernameLabel" for="usernameInput"
+          data-i18n="fieldUsername">Twitter Username</label>
         <div class="input-group">
-          <span class="input-prefix">@</span>
+          <span class="input-prefix" id="usernamePrefix">@</span>
           <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername" placeholder="elonmusk"
             autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="field hidden" id="bookmarksAccountField">
+        <span class="field-label" data-i18n="bookmarksAccount">Account</span>
+        <div class="bookmarks-account-card" id="bookmarksAccountCard" role="status">
+          <div class="bookmarks-account-avatar">
+            <img id="bookmarksAccountAvatar" alt="" class="hidden">
+            <span id="bookmarksAccountAvatarFallback" aria-hidden="true">👤</span>
+          </div>
+          <div class="bookmarks-account-copy">
+            <strong id="bookmarksAccountName" data-i18n="signedInXAccount">Signed-in X account</strong>
+            <span class="bookmarks-account-meta">
+              <span id="bookmarksAccountHandle"></span>
+              <span class="bookmarks-account-owner" data-i18n="yourAccount">Your account</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -172,7 +193,7 @@
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
           <option value="xlsx">Excel (XLSX)</option>
-          <option value="txt" data-i18n="formatTxtPostsOnly">TXT (Posts only)</option>
+          <option value="txt" data-i18n="formatTxt">TXT</option>
         </select>
       </div>
 
@@ -267,25 +288,26 @@
 
     <!-- SETTINGS TAB -->
     <div class="tab-content" id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings">
-      <div id="settingsPostsOnly">
+      <div class="mode-settings-group" id="settingsPostsOnly">
+        <div class="mode-settings-heading" data-i18n="postsSettingsHeading">Posts</div>
         <div class="field">
           <label class="toggle-label">
             <input type="checkbox" id="includeRetweets" class="toggle-input" checked>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
-            <span data-i18n="includeRetweets">Include retweets</span>
+            <span data-i18n="includeRetweets">Include reposts</span>
           </label>
         </div>
         <div class="field">
-          <div class="date-toggle-row">
-            <label class="toggle-label">
-              <input type="checkbox" id="includeReplies" class="toggle-input">
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-              <span data-i18n="includeReplies">Include replies</span>
-            </label>
-            <span class="date-help" tabindex="0"
-              aria-label="Adds posts from the profile's Replies tab. XPorter uses one combined timeline, not a second hidden pass. Unlimited exports can take longer because there are more posts to collect."
-              data-i18n-aria-label="includeRepliesHelp" data-i18n-tooltip="includeRepliesHelp">!</span>
+          <div class="field-label-row">
+            <label class="field-label" for="profileFeed" data-i18n="profileFeed">Profile feed</label>
+            <span class="date-help help-viewport help-below" tabindex="0"
+              aria-label="All matches X's All feed and is recommended: original posts, quotes, replies, and complete author threads. Posts uses X's Posts feed and excludes replies. Quotes are posts, not replies; reposts follow the separate switch."
+              data-i18n-aria-label="profileFeedHelp" data-i18n-tooltip="profileFeedHelp">!</span>
           </div>
+          <select id="profileFeed" class="select">
+            <option value="all" data-i18n="profileFeedAll" selected>All — posts, replies &amp; threads</option>
+            <option value="posts" data-i18n="profileFeedPosts">Posts — originals &amp; quotes</option>
+          </select>
         </div>
         <div class="field">
           <label class="toggle-label">
@@ -294,19 +316,70 @@
             <span data-i18n="includeArticles">Include articles</span>
           </label>
         </div>
+        <div class="field">
+          <div class="date-toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="embedPostPhotos" class="toggle-input">
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+              <span data-i18n="embedPostPhotos">Embed photos in XLSX</span>
+            </label>
+            <span class="date-help help-viewport help-below" tabindex="0"
+              aria-label="XLSX only. Downloads photos from X while the file is being saved and places them on a separate Media sheet. Several photos from a post, quote, or replied-to post are kept as separate rows. This can make saving much slower and the workbook much larger. Videos remain links."
+              data-i18n-aria-label="embedPhotosHelp" data-i18n-tooltip="embedPhotosHelp">!</span>
+          </div>
+        </div>
+      </div>
+      <div class="mode-settings-group hidden" id="settingsBookmarksOnly">
+        <div class="mode-settings-heading" data-i18n="bookmarksSettingsHeading">Bookmarks</div>
+        <div class="field">
+          <div class="date-toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="includeBookmarkReplyContext" class="toggle-input" checked>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+              <span data-i18n="includeBookmarkReplyContext">Include replied-to posts</span>
+            </label>
+            <span class="date-help help-viewport help-below" tabindex="0"
+              aria-label="For saved replies, fetches the post being answered and stores it inside the same bookmark record. Parent posts do not increase the bookmark count. XPorter batches IDs, but pages containing replies still need extra X requests. Deleted, private, or blocked posts may remain unavailable."
+              data-i18n-aria-label="includeBookmarkReplyContextHelp"
+              data-i18n-tooltip="includeBookmarkReplyContextHelp">!</span>
+          </div>
+        </div>
+        <div class="field">
+          <div class="date-toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="includeBookmarkArticles" class="toggle-input" checked>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+              <span data-i18n="includeBookmarkArticles">Include Article text</span>
+            </label>
+            <span class="date-help help-long" tabindex="0"
+              aria-label="Keeps the title, URL, and all Article text returned by X, including Articles inside quoted or replied-to posts. Some Articles expose only a preview; XPorter preserves exactly what X returns."
+              data-i18n-aria-label="includeBookmarkArticlesHelp"
+              data-i18n-tooltip="includeBookmarkArticlesHelp">!</span>
+          </div>
+        </div>
+        <div class="field">
+          <div class="date-toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="embedBookmarkPhotos" class="toggle-input">
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+              <span data-i18n="embedBookmarkPhotos">Embed photos in XLSX</span>
+            </label>
+            <span class="date-help help-long" tabindex="0"
+              aria-label="XLSX only. Downloads photos from X while the file is being saved and places them on a separate Media sheet. Several photos from a post, quote, or replied-to post are kept as separate rows. This can make saving much slower and the workbook much larger. Videos remain links."
+              data-i18n-aria-label="embedPhotosHelp" data-i18n-tooltip="embedPhotosHelp">!</span>
+          </div>
+        </div>
       </div>
       <div class="field">
         <div class="field-label-row">
           <label class="field-label" id="quantityLimitLabel" for="quantityLimit" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
-          <span class="date-help" tabindex="0" aria-label="How many posts (or users) to collect before the export stops. Example: 500 stops at 500 posts. Choose Unlimited to grab everything X will give you." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
+          <span class="date-help" tabindex="0" aria-label="How many posts (or users) to collect before the export stops. Example: 500 stops at 500 posts. For Posts, X usually exposes only about 3,200 of the most recent items, even when a profile shows more. XPorter cannot bypass this X availability limit. Followers and Following have different limits." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
         </div>
         <select id="quantityLimit" class="select">
-          <option value="0" data-i18n="unlimited">Unlimited</option>
+          <option value="0" data-i18n="unlimited">Unlimited (Posts: ≈3,200)</option>
           <option value="100">100 posts</option>
           <option value="500">500 posts</option>
           <option value="1000">1,000 posts</option>
-          <option value="5000">5,000 posts</option>
-          <option value="10000">10,000 posts</option>
           <option value="custom" data-i18n="custom">Custom</option>
         </select>
         <div class="custom-quantity hidden" id="customQuantityRow">
@@ -316,8 +389,8 @@
       </div>
       <div class="field">
         <div class="field-label-row">
-          <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="postsExportSpeed">Posts Export Speed</label>
-          <span class="date-help" tabindex="0" aria-label="Controls only Posts exports. The five presets wait about 2, 3, 4, 7, or 12 seconds between requests in the typical fallback path. Standard is the recommended 4-second balance. If X's live quota runs low, XPorter pauses until it resets instead of risking a failed export. Custom lets you type your own pause and batch break." data-i18n-aria-label="postsExportSpeedHelp" data-i18n-tooltip="postsExportSpeedHelp">!</span>
+          <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="postsExportSpeed">Posts &amp; Bookmarks Export Speed</label>
+          <span class="date-help" tabindex="0" aria-label="Controls Posts and Bookmarks exports. The five presets wait about 2, 3, 4, 7, or 12 seconds between requests in the typical fallback path. Standard is the recommended 4-second balance. If X's live quota runs low, XPorter pauses until it resets instead of risking a failed export. Custom lets you type your own pause and batch break." data-i18n-aria-label="postsExportSpeedHelp" data-i18n-tooltip="postsExportSpeedHelp">!</span>
         </div>
         <select id="exportSpeed" class="select">
           <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ~2 s between requests</option>
@@ -848,7 +921,7 @@
                   <path d="M12 7v5l3 2" />
                 </svg>
               </span>
-              <span class="detail-title update-title" data-i18n="update151Title">Rate-limit pauses are now clear</span>
+              <span class="detail-title update-title" data-i18n="update151Title">Bookmarks and cleaner exports</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
@@ -856,15 +929,16 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner update-body">
-                <p data-i18n="update151Body">X rate limits now show a real pause with a live retry countdown. The next
-                  network attempt stays labelled as a retry instead of looking like a stuck new batch, including
-                  after the popup is reopened.</p>
+                <p data-i18n="update151Body">Export personal Bookmarks to CSV, JSON, XLSX, or TXT with quoted posts,
+                  replied-to context, Articles, metrics, and optional embedded photos. Files now omit columns or
+                  fields that are empty throughout, while TXT labels make every metric's owner clear. Pacing,
+                  retries, resume handling, and popup help and layout are also more reliable.</p>
                 <div class="update-meta">
                   <span data-i18n="updateBuilt">Build</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <time data-release-date datetime="2026-08-16">August 16, 2026</time>
+                  <time data-release-date datetime="2026-08-17">August 17, 2026</time>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <span class="update-meta-version">v1.6.0</span>
+                  <span class="update-meta-version">v1.6.1</span>
                 </div>
               </div>
             </div>
@@ -880,7 +954,7 @@
                   <path d="M12 7v5l3 2" />
                 </svg>
               </span>
-              <span class="detail-title update-title" data-i18n="update150Title">Replies tab exports now work</span>
+              <span class="detail-title update-title" data-i18n="update150Title">Richer account data and safer replies</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
@@ -888,13 +962,14 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner update-body">
-                <p data-i18n="update150Body">Include replies now collects posts from the profile's Replies tab through
-                  one combined timeline. Conversation context from other accounts is filtered out, and pacing follows
-                  the correct X rate limit.</p>
+                <p data-i18n="update150Body">Added public “About this Account” fields for user lists, fuller profile
+                  context in post files, quoted-post and Article data, separate pacing for posts and user lists, and
+                  protected X request compatibility. Replies use a dedicated combined timeline with a safe fallback,
+                  while rate-limit pauses show a live retry countdown and resumable progress.</p>
                 <div class="update-meta">
                   <span data-i18n="updateReleased">Released</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <time data-release-date datetime="2026-07-30">July 30, 2026</time>
+                  <time data-release-date datetime="2026-07-29">July 29, 2026</time>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
                   <span class="update-meta-version">v1.5.8</span>
                 </div>
@@ -925,9 +1000,9 @@
                 <div class="update-meta">
                   <span data-i18n="updateReleased">Released</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <time data-release-date datetime="2026-07-26">July 26, 2026</time>
+                  <time data-release-date datetime="2026-07-17">July 17, 2026</time>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <span class="update-meta-version">v1.5.1</span>
+                  <span class="update-meta-version">v1.4.11</span>
                 </div>
               </div>
             </div>
@@ -964,7 +1039,7 @@
     <footer class="footer">
       <span id="extensionVersion">v0.0.0</span>
       <span class="footer-separator">·</span>
-      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Aug 16, 2026</span></span>
+      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Aug 17, 2026</span></span>
     </footer>
   </div>
 
@@ -977,8 +1052,9 @@
         faster. Enable it only when you specifically need the extra “About this Account” fields.</p>
       <div class="risk-dialog-actions">
         <button type="button" class="btn btn-secondary" id="aboutRiskCancel">Keep it off</button>
-        <button type="button" class="btn btn-warning" id="aboutRiskConfirm">Enable extra details</button>
+        <button type="button" class="btn btn-warning" id="aboutRiskConfirm" disabled>Enable extra details (5)</button>
       </div>
+      <span class="sr-only" id="aboutRiskCountdownStatus" role="status" aria-live="polite"></span>
     </div>
   </div>
 
@@ -990,6 +1066,7 @@
   <script src="rate-prompt.js"></script>
   <script src="history.js"></script>
   <script src="seen-posts.js"></script>
+  <script src="acknowledgement-timer.js"></script>
 
   <script src="popup.js"></script>
   <script src="ladybug.js"></script>
