@@ -119,6 +119,76 @@ assert.match(
     /<option value=["']0["'][^>]*data-i18n=["']unlimited["']>[^<]*Unlimited[^<]*<\/option>/,
     'quantity select must expose Unlimited'
 );
+for (const id of [
+    'customDelaySec',
+    'postSafetyBreakMin',
+    'userCustomDelaySec',
+    'userSafetyBreakMin'
+]) {
+    assert(
+        new RegExp(
+            `<input(?=[^>]*id="${id}")(?=[^>]*inputmode="decimal")[^>]*>`,
+            'i'
+        ).test(popupHtml),
+        `${id} must expose a locale-friendly decimal input`
+    );
+}
+for (const id of [
+    'postSafetyBreakEnabled',
+    'postSafetyBreakRows',
+    'postSafetyBreakEvery',
+    'userSafetyBreakEnabled',
+    'userSafetyBreakRows',
+    'userSafetyBreakEvery'
+]) {
+    assert.match(popupHtml, new RegExp(`id=["']${id}["']`),
+        `Settings must expose independent ${id}`);
+}
+const settingsGroups = Object.fromEntries(
+    [...popupHtml.matchAll(
+        /<section[^>]*data-settings-scope=["']([^"']+)["'][^>]*>([\s\S]*?)<\/section>/g
+    )].map((match) => [match[1], match[2]])
+);
+assert.match(settingsGroups.quantity || '', /id=["']quantityLimit["']/,
+    'quantity limit must be its own settings group');
+assert.match(settingsGroups.posts || '', /id=["']exportSpeed["']/,
+    'Posts & Bookmarks group must contain its speed');
+assert.match(settingsGroups.posts || '', /id=["']postSafetyBreakEnabled["']/,
+    'Posts & Bookmarks group must contain its Scheduled breaks');
+assert.doesNotMatch(settingsGroups.posts || '', /id=["']userExportSpeed["']/,
+    'Posts & Bookmarks group must not visually absorb User Lists controls');
+assert.match(settingsGroups.users || '', /id=["']userExportSpeed["']/,
+    'User Lists group must contain its speed');
+assert.match(settingsGroups.users || '', /id=["']userSafetyBreakEnabled["']/,
+    'User Lists group must contain its Scheduled breaks');
+const popupCss = read('popup/popup.css');
+const settingsGroupCss = /\.settings-control-group\s*\{([\s\S]*?)\}/
+    .exec(popupCss)?.[1] || '';
+assert.match(settingsGroupCss, /border-block-end:/,
+    'settings scopes must use straight separators');
+assert.doesNotMatch(settingsGroupCss, /border-radius|background:|box-shadow:/,
+    'settings scopes must not render as rounded cards');
+const safetyBreakCss = /\.safety-break-setting\s*\{([\s\S]*?)\}/
+    .exec(popupCss)?.[1] || '';
+assert.doesNotMatch(safetyBreakCss, /border-radius|background:|box-shadow:/,
+    'Scheduled breaks must not add a nested rounded card');
+for (const safetyHelp of [
+    /id=["']postSafetyBreakEnabled["'][\s\S]*?class=["']date-help help-local["']/,
+    /id=["']userSafetyBreakEnabled["'][\s\S]*?class=["']date-help help-local["']/
+]) {
+    assert.match(popupHtml, safetyHelp,
+        'Scheduled-break help must open from its own icon instead of the viewport top');
+}
+assert.doesNotMatch(popupHtml, /id=["'](?:customCooldownMin|customBatchSize|userCustomCooldownMin|userCustomBatchSize)["']/,
+    'Custom speed must control only the delay between requests');
+for (const id of [
+    'statusPhaseIcon',
+    'statusSubtitle',
+    'statusPhaseHelp'
+]) {
+    assert.match(popupHtml, new RegExp(`id=["']${id}["']`),
+        `export status must expose ${id} for distinct wait states`);
+}
 assert.match(
     popupHtml,
     /<option value=["']txt["'][^>]*data-i18n=["']formatTxt["'][^>]*>TXT<\/option>/,
@@ -133,14 +203,27 @@ assert.deepEqual(
     ['posts', 'followers', 'following', 'verified_followers', 'bookmarks'],
     'modes must include the restored viewer-owned Bookmarks export'
 );
-const profileFeedHtml = /<select id=["']profileFeed["'][^>]*>([\s\S]*?)<\/select>/
-    .exec(popupHtml)?.[1] || '';
-const profileFeedValues = [...profileFeedHtml.matchAll(/<option value=["']([^"']+)["']/g)]
-    .map((match) => match[1]);
-assert.deepEqual(profileFeedValues, ['all', 'posts'],
-    'Posts settings must restore the 1.5.9 All and Posts feed choices');
-assert.doesNotMatch(popupHtml, /id=["']includeReplies["']/,
-    'the 1.5.9 profile feed selector must replace the old Include replies checkbox');
+assert.doesNotMatch(popupHtml, /id=["']profileFeed["']/,
+    'the ambiguous profile-feed selector must not remain in the popup');
+for (const postTypeControl of [
+    'includeOriginalPosts',
+    'includeQuotes',
+    'includeReplies',
+    'includeRetweets',
+    'includeArticles'
+]) {
+    assert.match(
+        popupHtml,
+        new RegExp(`id=["']${postTypeControl}["']`),
+        `Home must expose an explicit ${postTypeControl} post-type choice`
+    );
+}
+const postSelectionIndex = popupHtml.indexOf('id="postSelectionPanel"');
+const outputFormatIndex = popupHtml.indexOf('id="outputFormat"');
+assert(postSelectionIndex >= 0 && postSelectionIndex < outputFormatIndex,
+    'post-type choices must appear on Home before Output Format');
+assert.doesNotMatch(popupHtml, /id=["']settingsPostsOnly["']/,
+    'post content choices must not remain hidden in Settings');
 assert(!manifest.host_permissions.includes('https://pbs.twimg.com/*'),
     'photo host access must never be a required permission — that is what disabled every 1.5.8 installation');
 assert.deepEqual(manifest.optional_host_permissions, ['https://pbs.twimg.com/*'],
@@ -218,6 +301,18 @@ const popupRuntime = popupScripts
     .filter(Boolean)
     .map(read)
     .join('\n');
+const photoPermissionRequest = popupRuntime.split('function requestPhotoEmbedPermission', 2)[1]
+    ?.split('async function handleEmbedPhotosChange', 1)[0] || '';
+assert.match(
+    photoPermissionRequest,
+    /chrome\.permissions\.request\(\{\s*origins:\s*\[PHOTO_EMBED_ORIGIN\]\s*\}\)/,
+    'photo permission request must be invoked synchronously from the checkbox user gesture'
+);
+assert.doesNotMatch(
+    photoPermissionRequest,
+    /permissions\.contains|await\s+/,
+    'no async permission preflight may consume the checkbox user gesture before permissions.request'
+);
 assert.match(
     read('popup/popup.js'),
     /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0/,
@@ -227,8 +322,42 @@ assert.match(read('popup/theme-init.js'), /theme === ['"]light['"]/,
     'the early theme bootstrap must only opt into light when explicitly saved');
 assert.match(read('utils/storage.js'), /theme:\s*['"]dark['"]/,
     'new settings must default to dark');
+for (const key of ['postSafetyBreakEnabled', 'userSafetyBreakEnabled']) {
+    assert.match(
+        read('utils/storage.js'),
+        new RegExp(`${key}:\\s*false`),
+        `${key} must be opt-in for missing settings`
+    );
+    assert.match(
+        workerSource,
+        new RegExp(`${key}:\\s*false`),
+        `${key} must be off for fresh installs`
+    );
+}
+assert.match(read('popup/popup.css'), /\.progress-fill\.rate-limit[\s\S]*repeating-linear-gradient/,
+    'X rate limits must have a distinct striped progress treatment');
+assert.match(read('popup/popup.css'), /\.progress-fill\.safety-break[\s\S]*repeating-linear-gradient/,
+    'scheduled breaks must have a distinct progress treatment');
+assert.match(read('popup/popup.js'), /state\.kind\s*===\s*['"]batch['"][\s\S]*setStatusPhase\(['"]safety-break['"]\)/,
+    'batch cooldowns must render as the user-configured Scheduled break, not as an X rate limit');
+assert.match(read('popup/popup.js'), /case\s+['"]rate_limited['"]:[\s\S]*setStatusPhase\(['"]rate-limit['"]\)/,
+    'real X rate limits must render their own status phase');
 assert.match(popupHtml, /id=["']includeAboutAccountDetails["']/,
     'Settings must expose the detailed About this Account opt-in');
+const aboutDetailsToggleMarkup = popupHtml.slice(
+    popupHtml.indexOf('id="includeAboutAccountDetails"'),
+    popupHtml.indexOf('id="aboutAccountOptions"')
+);
+assert.match(
+    aboutDetailsToggleMarkup,
+    /class=["'][^"']*\bhelp-local\b[^"']*\bhelp-tall\b[^"']*["']/,
+    'About-this-Account help must open below its own settings row'
+);
+assert.doesNotMatch(
+    aboutDetailsToggleMarkup,
+    /\bhelp-viewport\b/,
+    'About-this-Account help must not be relocated to the top of the popup'
+);
 assert.doesNotMatch(
     popupHtml,
     /id=["']includeAboutAccountDetails["'][^>]*\bchecked\b/,
@@ -385,9 +514,19 @@ for (const file of localeFiles) {
     assert.deepEqual(Object.keys(locale).sort(), englishKeys, `${file} must match en.json keys`);
     for (const key of [
         'formatTxt',
-        'profileFeed',
-        'profileFeedAll',
-        'profileFeedPosts',
+        'whatToExport',
+        'postTypeOriginals',
+        'postTypeOriginalsHelp',
+        'postTypeQuotes',
+        'postTypeQuotesHelp',
+        'postTypeReplies',
+        'postTypeRepliesHelp',
+        'postTypeReposts',
+        'postTypeRepostsHelp',
+        'postTypeArticles',
+        'postTypeArticlesHelp',
+        'postSelectionMultiFeed',
+        'postSelectionRequired',
         'modeBookmarks',
         'errRepliesUnavailable',
         'repliesUnavailableBody',
@@ -396,12 +535,68 @@ for (const file of localeFiles) {
         'postsOnlyFallbackActive',
         'postsOnlyFallbackComplete',
         'postsOnlyHistory',
-        'sourceExhausted'
+        'sourceExhausted',
+        'postSafetyBreaks',
+        'userSafetyBreaks',
+        'safetyBreakHelp',
+        'safetyBreakMinutes',
+        'safetyBreakEvery',
+        'safetyBreakRequests',
+        'statusRateLimitTitle',
+        'statusRateLimitSubtitle',
+        'statusRateLimitHelp',
+        'statusSafetyBreakTitle',
+        'statusSafetyBreakSubtitle',
+        'statusSafetyBreakHelp'
     ]) {
         assert.equal(typeof locale[key], 'string', `${file} must define ${key}`);
         assert(locale[key].trim().length > 0, `${file} must not leave ${key} empty`);
     }
+    assert.equal(
+        locale.postSafetyBreaks,
+        locale.userSafetyBreaks,
+        `${file} must use the same short Scheduled breaks label in both scoped sections`
+    );
+    for (const key of ['postsExportSpeedHelp', 'userListsExportSpeedHelp', 'safetyBreakHelp']) {
+        const boldMarkers = locale[key].match(/\*\*/g) || [];
+        assert.equal(
+            boldMarkers.length,
+            2,
+            `${file} ${key} must bold exactly one important phrase`
+        );
+        assert.match(
+            locale[key],
+            /^\*\*[^*]+\*\*/,
+            `${file} ${key} must lead with its one bold summary`
+        );
+    }
+    for (const key of ['errRateLimited', 'ovRateLimited', 'statusRateLimitWait']) {
+        assert.match(
+            locale[key],
+            /X/,
+            `${file} ${key} must identify an X rate limit, not a scheduled break`
+        );
+    }
+    if (file !== 'en.json') {
+        const localizedAboutSpeedCopy = [
+            locale.aboutSpeedFast,
+            locale.aboutSpeedCareful,
+            locale.aboutSpeedTurtle,
+            locale.aboutSpeedCustom,
+            locale.aboutAccountSpeedHelp
+        ].join(' ');
+        assert.doesNotMatch(
+            localizedAboutSpeedCopy,
+            /\b(?:Fast|Careful|Turtle|Custom)\b/,
+            `${file} About-this-Account speed copy must not leave English preset names`
+        );
+    }
 }
+assert.doesNotMatch(
+    JSON.parse(read('popup/locales/ru.json')).postsExportSpeedHelp,
+    /введёт свой лимит|всё равно может применить/i,
+    'Russian speed help must describe X rate limits naturally'
+);
 assert.match(english.aboutDesc, /TXT/, 'English About summary must advertise TXT');
 assert.match(english.detailFormatsBody, /TXT/, 'English format details must include TXT');
 

@@ -1,5 +1,5 @@
 // XPorter — Shared Utilities
-// Common helpers used by the popup and other extension UI contexts.
+// Common helpers used by the popup, service worker, and other extension contexts.
 
 // ==================== Messaging ====================
 
@@ -77,6 +77,7 @@ function formatError(error, t) {
         'USER_UNAVAILABLE': 'errUserUnavailable',
         'ACCOUNT_PRIVATE': 'errAccountPrivate',
         'INVALID_DATE_RANGE': 'errInvalidDateRange',
+        'NO_POST_TYPES_SELECTED': 'postSelectionRequired',
         'AUTH_ERROR': 'errAuthError',
         'RATE_LIMITED': 'errRateLimited',
         'STALE_QUERY_ID': 'errStaleQuery',
@@ -104,6 +105,7 @@ function formatError(error, t) {
         'USER_UNAVAILABLE': 'This account is unavailable',
         'ACCOUNT_PRIVATE': 'This account is private',
         'INVALID_DATE_RANGE': 'Date range is invalid — "From" must be earlier than "To"',
+        'NO_POST_TYPES_SELECTED': 'Choose at least one type of post to export',
         'AUTH_ERROR': 'Authentication failed — please refresh x.com and try again',
         'RATE_LIMITED': 'Routine pause — progress saved, please wait',
         'STALE_QUERY_ID': 'X API changed — retrying with fresh data...',
@@ -446,6 +448,17 @@ function formatCollectedCount(count, mode, langCode, translations) {
     return `${formatNumber(count, langCode)} ${collectedLabel(count, mode, langCode, translations)}`;
 }
 
+/**
+ * Parse a decimal typed with either a dot or a comma. Custom pacing fields are
+ * locale-facing text inputs because HTML number inputs reject one separator or
+ * the other depending on the browser locale.
+ */
+function parseLocalizedDecimal(value, fallback) {
+    const normalized = String(value ?? '').trim().replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 // ==================== Cooldown Countdown ====================
 
 /**
@@ -502,6 +515,8 @@ function startWaitProgress(element, untilTs, durationMs) {
     if (!element) return;
     const duration = Math.max(1, Number(durationMs) || 1);
     const deadline = Number(untilTs) || (Date.now() + duration);
+    if (element.__xporterWaitUntil === deadline) return;
+    element.__xporterWaitUntil = deadline;
     const remaining = Math.max(0, deadline - Date.now());
     const elapsedPct = Math.min(100, Math.max(0, (1 - remaining / duration) * 100));
 
@@ -515,6 +530,7 @@ function startWaitProgress(element, untilTs, durationMs) {
 
 function stopWaitProgress(element) {
     if (!element) return;
+    delete element.__xporterWaitUntil;
     element.style.removeProperty('transition');
 }
 

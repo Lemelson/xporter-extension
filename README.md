@@ -33,7 +33,9 @@ Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. The access is requested from the user's click on
 an "Embed photos in XLSX" toggle, so updating from 1.5.8 is never a privilege
 increase and cannot disable existing installations. Declining the request keeps
-every export fully functional with media URLs instead of embedded images.
+every export fully functional with media URLs instead of embedded images. The
+grant is checked again before download and any missing or unreadable permission
+fails closed to the same URL-only workbook.
 
 > [!WARNING]
 > **XPorter 1.5.9 was withdrawn and is not recommended.** Its update added a
@@ -113,7 +115,8 @@ X periodically rotates its GraphQL `queryId` values. XPorter handles this by:
 
 **Rate limiting:**
 - Five named speed presets target roughly 2 / 3 / 4 / 7 / 12 seconds between requests; Standard (~4 s) is the default
-- A Custom mode exposes the request delay, batch size, and longer batch cooldown
+- A Custom mode uses the exact request delay you enter; decimal seconds accept either `.` or `,`
+- Optional Scheduled breaks are configured independently for Posts & Bookmarks and for User Lists; fractional minutes accept either `.` or `,`
 - Valid `x-rate-limit-*` headers always take priority so XPorter stops at the live quota instead of overrunning it
 - Missing headers use conservative mode-specific fallback delays; 429s and network timeouts retry automatically
 - Stale GraphQL query IDs trigger live capture or endpoint re-discovery before the export fails
@@ -172,15 +175,18 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 
 | Setting | Default | Description |
 |---|---|---|
-| Include retweets | On | Export retweets alongside original posts |
-| Profile feed | All | Choose All (posts, replies, and threads) or Posts (originals and quotes) |
-| Include articles | On | Export X Articles alongside ordinary posts |
+| Original posts | On | Export standalone posts written by the profile |
+| Quotes | On | Export posts that add the author's comment above another post |
+| Replies | On | Export the author's replies, including replies to other accounts; mixed selections combine X's Posts/All and Replies feeds without duplicate rows |
+| Reposts | On | Export posts reshared without an added comment |
+| Articles | On | Export X long-form Articles and the text X returns |
 | Embed post photos | Off | Download X photos and embed them in a separate XLSX Media sheet |
 | Export mode | Posts | Data type to export: posts, personal bookmarks, followers, following, or verified followers |
 | Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for post-shaped exports |
-| Quantity limit | 500 | Maximum posts or users per export (0 = unlimited) |
+| Quantity limit | 500 | Maximum posts or users per export (0 = unlimited); changing it retargets an ordinary active export |
 | Export Speed | Standard | Turbo, Fast, Standard, Careful, Turtle, or Custom request pacing |
-| Custom pacing | 5 s / 20 / 3 min | Delay, requests per batch, and batch pause used only by Custom |
+| Custom pacing | 5 seconds | Exact delay between requests; seconds may be fractional with `.` or `,` |
+| Scheduled breaks | Off | Optional independent break after every N requests; separate controls for Posts & Bookmarks and User Lists |
 | Auto-clear old exports | On / 4 hours | Removes old downloadable payloads while keeping history metadata |
 | Localize column titles | On | Translate CSV/XLSX headers; JSON keys always remain English |
 

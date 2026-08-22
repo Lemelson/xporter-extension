@@ -40,41 +40,36 @@ const XPORTER_CONFIG = {
     //   raceReserve                — fixed-pace marker; advertised low budget
     //                                no longer creates a scheduled reset wait
     //   fallbackScale              — multiplier on FALLBACK_REQUEST_DELAYS
-    //   batchSize/cooldownDuration — headerless-fallback batch rhythm
     SPEED_PRESETS: {
         turbo: {
             adaptiveFloor: 1500, adaptivePad: 500, budgetFraction: 1,
-            raceReserve: 2, fallbackScale: 0.5,
-            batchSize: 30, cooldownDuration: 45000
+            raceReserve: 2, fallbackScale: 0.5
         },
         fast: {
             adaptiveFloor: 2500, adaptivePad: 500, budgetFraction: 1,
-            raceReserve: 3, fallbackScale: 0.75,
-            batchSize: 25, cooldownDuration: 60000
+            raceReserve: 3, fallbackScale: 0.75
         },
         standard: {
             adaptiveFloor: 3000, adaptivePad: 1000, budgetFraction: 1,
-            raceReserve: 5, fallbackScale: 1,
-            batchSize: 20, cooldownDuration: 180000
+            raceReserve: 5, fallbackScale: 1
         },
         careful: {
             adaptiveFloor: 5000, adaptivePad: 2000, budgetFraction: 1,
-            raceReserve: 8, fallbackScale: 1.5,
-            batchSize: 15, cooldownDuration: 300000
+            raceReserve: 8, fallbackScale: 1.5
         },
         turtle: {
             adaptiveFloor: 8000, adaptivePad: 4000, budgetFraction: 1,
-            raceReserve: 12, fallbackScale: 2.5,
-            batchSize: 10, cooldownDuration: 480000
+            raceReserve: 12, fallbackScale: 2.5
         }
         // 'custom' is not listed here — createRateLimiter() builds it from the
         // mode's own Custom fields, clamped to CUSTOM_SPEED_LIMITS below.
     },
-    // Clamp ranges (and defaults) for the Custom speed's user-typed values.
+    // Clamp ranges (and defaults) for the Custom speed and the independent
+    // optional scheduled-break controls.
     CUSTOM_SPEED_LIMITS: {
-        delaySec: [2, 120, 5],     // [min, max, default] s between requests
+        delaySec: [0.1, 120, 5],   // [min, max, default] s between requests
         batch: [5, 100, 20],       // requests per batch
-        cooldownMin: [1, 30, 3]    // minutes of pause after each batch
+        cooldownMin: [0.1, 30, 3]  // minutes of pause after each batch
     },
 
     // Bound each generated file so a multi-million-row export is never loaded

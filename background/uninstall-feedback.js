@@ -68,8 +68,11 @@
                 s_limit: settings.quantityLimit,
                 s_localize: settings.localizeExportHeaders ? 1 : 0,
                 s_speed: settings.exportSpeed === 'custom'
-                    ? `custom_${settings.customDelaySec || 0}_${settings.customCooldownMin || 0}_${settings.customBatchSize || 0}`
+                    ? `custom_${settings.customDelaySec || 0}`
                     : (settings.exportSpeed || 'standard'),
+                s_safety: settings.postSafetyBreakEnabled
+                    ? `${settings.postSafetyBreakMin || 0}_${settings.postSafetyBreakEvery || 0}`
+                    : 'off',
                 s_adaptive: settings.adaptivePacing !== false ? 1 : 0
             };
             if (usage.installedAtApprox) params.inst_approx = 1;

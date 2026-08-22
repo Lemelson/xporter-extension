@@ -31,9 +31,8 @@ class RateLimitManager {
             ? options.budgetFraction
             : 1;
         this.raceReserve = options.raceReserve || 0;
-        // Custom preset: the user explicitly asked for "pause N min every M
-        // requests", so honor the batch cooldown even while adaptive pacing
-        // is active (normally it only applies on the headerless fallback path).
+        // Optional Scheduled breaks are independent from the speed preset, so
+        // honor them even while adaptive pacing is active.
         this.alwaysBatchCooldown = !!options.alwaysBatchCooldown;
         this.adaptiveHeaderTtl = options.adaptiveHeaderTtl || C.ADAPTIVE_HEADER_TTL || 300000;
         this.fallbackMinDelay = options.fallbackMinDelay || this.requestDelay;
@@ -117,7 +116,10 @@ class RateLimitManager {
         // Absolute end-of-wait timestamp so the UI can render a live countdown
         // that stays correct even when the event itself arrives late.
         if (Number.isFinite(detail.duration)) event.until = Date.now() + detail.duration;
-        if (Number.isFinite(detail.retryIn)) event.until = Date.now() + detail.retryIn;
+        if (Number.isFinite(detail.retryIn)) {
+            event.until = Date.now() + detail.retryIn;
+            if (!Number.isFinite(event.duration)) event.duration = detail.retryIn;
+        }
         this.listeners.forEach(cb => {
             try { cb(event); } catch (e) { XLog.error('Status listener error:', e); }
         });
@@ -265,8 +267,7 @@ class RateLimitManager {
             const adaptive = this._computeAdaptiveDelay();
             if (adaptive) {
                 // Header-driven pacing IS the throttle, so we normally skip
-                // the blanket batch cooldown (custom preset opts back in via
-                // alwaysBatchCooldown).
+                // the blanket batch cooldown (Scheduled breaks opt back in).
                 if (this.alwaysBatchCooldown) {
                     await this._maybeBatchCooldown();
                     if (this._aborted) throw new Error('ABORTED');
@@ -284,8 +285,8 @@ class RateLimitManager {
                 await this._wait(adaptive.delay);
             } else {
                 // Fallback: no live budget — use the selected per-mode delay.
-                // A named speed must never invent a multi-minute batch pause;
-                // Custom keeps its explicitly configured batch cooldown.
+                // A speed must never invent a multi-minute batch pause;
+                // Scheduled breaks are the only opt-in source of one.
                 if (this.alwaysBatchCooldown) {
                     await this._maybeBatchCooldown();
                     if (this._aborted) throw new Error('ABORTED');

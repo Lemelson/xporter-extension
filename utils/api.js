@@ -44,6 +44,10 @@ const FALLBACK_ENDPOINTS = {
     queryId: 'jcbfqPu_2XMNOwVyGypRhw',
     operationName: 'UserOriginalsTimeline'
   },
+  UserRepliesTimeline: {
+    queryId: 'dRUXRSlEIPlVmPgOQ8Z43g',
+    operationName: 'UserRepliesTimeline'
+  },
   UserTweetsAndReplies: {
     queryId: 'qUpkZU6eN8MbtQb7rC_pYg',
     operationName: 'UserTweetsAndReplies'
@@ -73,6 +77,10 @@ const FALLBACK_ENDPOINTS = {
     operationName: 'BlueVerifiedFollowers'
   }
 };
+const SIGNED_REPLY_OPERATIONS = new Set([
+  'UserRepliesTimeline',
+  'UserTweetsAndReplies'
+]);
 
 // Cache for discovered query IDs
 let discoveredEndpoints = null;
@@ -124,7 +132,8 @@ async function _hydrateEndpoints() {
         .filter(key => ![
           'AboutAccountQuery',
           'TweetResultsByRestIds',
-          'UserOriginalsTimeline'
+          'UserOriginalsTimeline',
+          'UserRepliesTimeline'
         ].includes(key));
       const hasCurrentEndpointSet = cached?.endpoints &&
         requiredCachedOperations.every(key => cached.endpoints[key]?.queryId);
@@ -490,7 +499,7 @@ async function _discoverEndpointsInner(requiredOperation = null) {
     throw new Error('No JS bundles found');
   }
 
-  const targetOperations = ['UserByScreenName', 'AboutAccountQuery', 'UserTweets', 'UserOriginalsTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
+  const targetOperations = ['UserByScreenName', 'AboutAccountQuery', 'UserTweets', 'UserOriginalsTimeline', 'UserRepliesTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
   const found = {};
   let discoveredBearer = null;
 
@@ -581,6 +590,9 @@ async function _discoverEndpointsInner(requiredOperation = null) {
       UserOriginalsTimeline: found.UserOriginalsTimeline
         ? { queryId: found.UserOriginalsTimeline, operationName: 'UserOriginalsTimeline' }
         : FALLBACK_ENDPOINTS.UserOriginalsTimeline,
+      UserRepliesTimeline: found.UserRepliesTimeline
+        ? { queryId: found.UserRepliesTimeline, operationName: 'UserRepliesTimeline' }
+        : FALLBACK_ENDPOINTS.UserRepliesTimeline,
       UserTweetsAndReplies: found.UserTweetsAndReplies
         ? { queryId: found.UserTweetsAndReplies, operationName: 'UserTweetsAndReplies' }
         : FALLBACK_ENDPOINTS.UserTweetsAndReplies,
@@ -648,7 +660,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
   const effectiveFieldToggles = nativeTemplate ? nativeTemplate.fieldToggles : fieldToggles;
   const requestPath = `/i/api/graphql/${endpoint.queryId}/${endpoint.operationName}`;
   let transactionId = null;
-  if (endpoint.operationName === 'UserTweetsAndReplies' &&
+  if (SIGNED_REPLY_OPERATIONS.has(endpoint.operationName) &&
       typeof XPorterTransactionId !== 'undefined') {
     try {
       transactionId = await XPorterTransactionId.generate('GET', requestPath);
@@ -739,7 +751,7 @@ async function withStaleRetry(endpointKey, makeRequest) {
     } catch (error) {
       const canRefreshTransaction =
         error.message === 'STALE_QUERY_ID' &&
-        endpointKey === 'UserTweetsAndReplies' &&
+        SIGNED_REPLY_OPERATIONS.has(endpointKey) &&
         !transactionRefreshUsed &&
         typeof XPorterTransactionId !== 'undefined' &&
         typeof XPorterTransactionId.invalidate === 'function';
@@ -848,7 +860,9 @@ async function withStaleRetry(endpointKey, makeRequest) {
 
   XLog.error(`All queryIds exhausted for ${endpointKey}. Tried: ${[...triedIds].join(', ')}`);
   const error = new Error(
-    endpointKey === 'UserTweetsAndReplies' ? 'REPLIES_UNAVAILABLE' : 'STALE_QUERY_ID'
+    SIGNED_REPLY_OPERATIONS.has(endpointKey)
+      ? 'REPLIES_UNAVAILABLE'
+      : 'STALE_QUERY_ID'
   );
   error.staleCandidatesExhausted = true;
   throw error;
@@ -1060,12 +1074,14 @@ async function fetchUserTweets(userId, cursor = null, count = 20, profileFeed = 
   }
 
   // X's redesigned profile uses different one-pass operations for its first
-  // tab: All is UserTweets, while Posts is UserOriginalsTimeline. Boolean
-  // values remain a private compatibility seam for resumable exports created
-  // before this distinction existed.
+  // tabs: All is UserTweets, Posts is UserOriginalsTimeline, and Replies is
+  // UserRepliesTimeline. Boolean values remain a private compatibility seam
+  // for resumable exports created before this distinction existed.
   const endpointKey = profileFeed === 'posts'
     ? 'UserOriginalsTimeline'
-    : (profileFeed === true || profileFeed === 'legacy_with_replies')
+    : profileFeed === 'replies'
+      ? 'UserRepliesTimeline'
+      : (profileFeed === true || profileFeed === 'legacy_with_replies')
       ? 'UserTweetsAndReplies'
       : 'UserTweets';
   return withStaleRetry(endpointKey, async (endpoint) => {

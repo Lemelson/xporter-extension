@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const vm = require('node:vm');
+const { requireSofficeExecutable } = require('./tooling-policy.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -572,17 +573,28 @@ async function testRepliesRequestIncludesFreshTransactionHeader() {
         features: {},
         fieldToggles: {}
     });
+    await context.XPorterAPI.setLiveRequestTemplate({
+        operationName: 'UserRepliesTimeline',
+        queryId: 'transaction-current-replies-id',
+        features: {},
+        fieldToggles: {}
+    });
     context.XPorterAPI.setLiveQueryId('UserTweets', 'transaction-posts-id');
 
+    await context.XPorterAPI.fetchUserTweets('1', null, 20, 'replies');
     await context.XPorterAPI.fetchUserTweets('1', null, 20, true);
     await context.XPorterAPI.fetchUserTweets('1', null, 20, false);
 
     assert.deepEqual(generated, [{
         method: 'GET',
+        path: '/i/api/graphql/transaction-current-replies-id/UserRepliesTimeline'
+    }, {
+        method: 'GET',
         path: '/i/api/graphql/transaction-replies-id/UserTweetsAndReplies'
-    }], 'only Replies requests need the current X transaction challenge');
+    }], 'both current and legacy Replies requests need the X transaction challenge');
     assert.equal(requestOptions[0].headers['x-client-transaction-id'], 'transaction-1');
-    assert.equal(requestOptions[1].headers['x-client-transaction-id'], undefined,
+    assert.equal(requestOptions[1].headers['x-client-transaction-id'], 'transaction-2');
+    assert.equal(requestOptions[2].headers['x-client-transaction-id'], undefined,
         'the stable Posts endpoint must not pay the transaction initialization cost');
 }
 
@@ -840,9 +852,7 @@ async function testXlsxIsRealOoxmlZip() {
     try {
         fs.writeFileSync(workbookPath, bytes);
         execFileSync('unzip', ['-t', workbookPath], { stdio: 'pipe' });
-        const soffice = ['soffice', 'libreoffice'].find(bin => {
-            try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; }
-        });
+        const soffice = requireSofficeExecutable();
         if (soffice) {
             const profileUrl = `file://${path.join(tempDir, 'libreoffice-profile')}`;
             execFileSync(soffice, [
@@ -1140,6 +1150,15 @@ function testPostsTxtIsAiFriendly() {
         followingCount: 3252,
         subscriptionsCount: 2,
         createdAt: 'Sat Mar 01 00:00:00 +0000 2008'
+    }, {
+        postSelection: {
+            postSelectionVersion: 1,
+            includeOriginalPosts: true,
+            includeQuotes: false,
+            includeReplies: true,
+            includeRetweets: true,
+            includeArticles: true
+        }
     });
 
     assert.match(text, /^PROFILE\nName: Matt Paulson\nUsername: @MediaKing/m);
@@ -1155,6 +1174,11 @@ function testPostsTxtIsAiFriendly() {
     assert.match(text, /Followers: 76000/);
     assert.match(text, /Subscriptions: 2/);
     assert.match(text, /POSTS \(5\)/);
+    assert.match(
+        text,
+        /Included types: Original posts, Replies, Reposts, Articles/,
+        'AI-friendly TXT must state the exact content menu that produced the rows'
+    );
     assert.match(text,
         /1\. POST\nPost: "First line\nSecond line"\nPost metrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
     assert.match(text,
@@ -1884,14 +1908,18 @@ async function testProfileFeedSelectsMatchingTimeline() {
     vm.runInContext(source('utils/api.js'), context, { filename: 'utils/api.js' });
     context.XPorterAPI.setLiveQueryId('UserTweets', 'all-query-id');
     context.XPorterAPI.setLiveQueryId('UserOriginalsTimeline', 'posts-query-id');
+    context.XPorterAPI.setLiveQueryId('UserRepliesTimeline', 'replies-query-id');
 
     await context.XPorterAPI.fetchUserTweets('1', null, 20, 'all');
     await context.XPorterAPI.fetchUserTweets('1', null, 20, 'posts');
+    await context.XPorterAPI.fetchUserTweets('1', null, 20, 'replies');
 
     assert.match(requestUrls[0], /\/all-query-id\/UserTweets\?/,
         'All must use the redesigned profile All timeline');
     assert.match(requestUrls[1], /\/posts-query-id\/UserOriginalsTimeline\?/,
         'Posts must use the redesigned original-posts timeline');
+    assert.match(requestUrls[2], /\/replies-query-id\/UserRepliesTimeline\?/,
+        'Replies must use the current profile Replies timeline');
 }
 
 async function testActiveApiRequestCanBeAborted() {
@@ -1981,6 +2009,7 @@ async function testDownloadModulePreservesCurrentExportContract() {
     let xlsxProfile = null;
     let xlsxMediaAssets = null;
     let photoFetches = 0;
+    let photoPermissionState = 'granted';
     let keepAliveCallback = null;
     let keepAliveCleared = 0;
     let keepAliveTouches = 0;
@@ -2076,6 +2105,14 @@ async function testDownloadModulePreservesCurrentExportContract() {
         },
         XPorterFeedback: { refresh() { feedbackRefreshes += 1; } },
         chrome: {
+            permissions: {
+                async contains() {
+                    if (photoPermissionState === 'error') {
+                        throw new Error('permissions unavailable');
+                    }
+                    return photoPermissionState === 'granted';
+                }
+            },
             runtime: {
                 lastError: null,
                 sendMessage: async () => ({}),
@@ -2118,6 +2155,20 @@ async function testDownloadModulePreservesCurrentExportContract() {
         { name: 'Test User', screenName: 'test' },
         'post XLSX generation must receive the same profile snapshot as TXT'
     );
+    assert.equal(photoFetches, 1, 'granted photo access must embed the requested media');
+    assert.equal(xlsxMediaAssets?.length, 1);
+
+    photoPermissionState = 'denied';
+    await context.XPorterDownloads.downloadCurrent('xlsx');
+    assert.equal(photoFetches, 1,
+        'revoked photo access must keep the URL-only workbook without fetching media');
+    assert.equal(xlsxMediaAssets, null);
+
+    photoPermissionState = 'error';
+    await context.XPorterDownloads.downloadCurrent('xlsx');
+    assert.equal(photoFetches, 1,
+        'a permissions API failure must fail closed and keep the URL-only workbook');
+    assert.equal(xlsxMediaAssets, null);
     
 
     const detached = await context.XPorterDownloads.startCurrentDownload('csv');
@@ -2461,6 +2512,7 @@ function createWorkerHarness() {
             }
         }
     });
+    vm.runInContext(source('utils/shared.js'), context, { filename: 'utils/shared.js' });
     vm.runInContext(source('background/service-worker.js'), context, { filename: 'background/service-worker.js' });
     return {
         context,
@@ -2795,6 +2847,289 @@ async function testAllFeedKeepsOnlyProfilePostsAndContext() {
         vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'posts' })", harness.context),
         'UserOriginalsTimeline',
         'Posts must pace against its own redesigned endpoint budget'
+    );
+
+    const repliesHarness = createWorkerHarness();
+    let repliesFetchArgs = null;
+    repliesHarness.context.XPorterAPI.fetchUserTweets = async (...args) => {
+        repliesFetchArgs = args;
+        return {
+            tweets: parsedTimeline.tweets,
+            nextCursor: null
+        };
+    };
+    repliesHarness.context.__makeRateLimiter = harness.context.__makeRateLimiter;
+
+    await vm.runInContext(`
+        currentExport = {
+            running: true,
+            username: 'targetuser',
+            userId: '10',
+            exportMode: 'posts',
+            outputFormat: 'csv',
+            userInfo: { screenName: 'TargetUser', tweetCount: 3 },
+            settings: { includeRetweets: true, profileFeed: 'replies', includeArticles: true, quantityLimit: 500 },
+            tweetCount: 0,
+            totalBatches: 0,
+            tweetBuffer: [],
+            cursor: null
+        };
+        rateLimiter = __makeRateLimiter();
+        _fetchPostsLoop();
+    `, repliesHarness.context);
+
+    assert.equal(repliesFetchArgs[3], 'replies',
+        'the saved Replies feed must reach the current profile Replies API');
+    const savedReplies = repliesHarness.getSavedBatches().flat();
+    assert.deepEqual(
+        savedReplies.map(item => item.id),
+        ['200', '250'],
+        'Replies must keep only target-author replies and drop roots plus foreign context rows'
+    );
+    assert.equal(savedReplies[0].reply_to_post.id, '100',
+        'Replies must preserve the filtered foreign parent as nested context');
+    assert.equal(savedReplies[1].reply_to_post.id, '200',
+        'Replies must preserve a preceding author reply as nested thread context');
+    assert.equal(
+        vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'replies' })", repliesHarness.context),
+        'UserRepliesTimeline',
+        'Replies must pace against the endpoint actually in use'
+    );
+}
+
+async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
+    const helperHarness = createWorkerHarness();
+    const plan = (settings) => JSON.parse(JSON.stringify(
+        vm.runInContext(`postFeedPlanForSettings(${JSON.stringify(settings)})`, helperHarness.context)
+    ));
+
+    assert.deepEqual(plan({
+        postSelectionVersion: 1,
+        includeOriginalPosts: false,
+        includeQuotes: true,
+        includeReplies: false,
+        includeRetweets: false,
+        includeArticles: false
+    }), ['posts'], 'quotes-only must use the originals timeline and filter locally');
+    assert.deepEqual(plan({
+        postSelectionVersion: 1,
+        includeOriginalPosts: false,
+        includeQuotes: false,
+        includeReplies: true,
+        includeRetweets: false,
+        includeArticles: false
+    }), ['replies'], 'replies-only must use the current Replies timeline');
+    assert.deepEqual(plan({
+        postSelectionVersion: 1,
+        includeOriginalPosts: true,
+        includeQuotes: true,
+        includeReplies: true,
+        includeRetweets: false,
+        includeArticles: false
+    }), ['posts', 'replies'],
+    'originals/quotes plus replies must combine the two native X timelines');
+    assert.deepEqual(plan({
+        postSelectionVersion: 1,
+        includeOriginalPosts: true,
+        includeQuotes: false,
+        includeReplies: false,
+        includeRetweets: true,
+        includeArticles: false
+    }), ['all'], 'reposts require the All timeline');
+    assert.deepEqual(plan({
+        postSelectionVersion: 1,
+        includeOriginalPosts: false,
+        includeQuotes: false,
+        includeReplies: false,
+        includeRetweets: false,
+        includeArticles: false
+    }), [], 'an empty menu selection must never start a hidden default feed');
+
+    const selectionKeys = [
+        'includeOriginalPosts',
+        'includeQuotes',
+        'includeReplies',
+        'includeRetweets',
+        'includeArticles'
+    ];
+    for (let mask = 1; mask < (1 << selectionKeys.length); mask += 1) {
+        const settings = { postSelectionVersion: 1 };
+        selectionKeys.forEach((key, index) => {
+            settings[key] = Boolean(mask & (1 << index));
+        });
+        const expected = [];
+        const hasNonReplies = settings.includeOriginalPosts ||
+            settings.includeQuotes ||
+            settings.includeRetweets ||
+            settings.includeArticles;
+        if (hasNonReplies) {
+            expected.push(settings.includeRetweets ? 'all' : 'posts');
+        }
+        if (settings.includeReplies) expected.push('replies');
+        assert.deepEqual(
+            plan(settings),
+            expected,
+            `post selection combination ${mask.toString(2).padStart(selectionKeys.length, '0')} must use the exact feed plan`
+        );
+    }
+
+    const harness = createWorkerHarness();
+    const requestedFeeds = [];
+    const rowsByFeed = {
+        posts: [{
+            id: 'original',
+            type: 'tweet',
+            author_username: 'TargetUser'
+        }, {
+            id: 'quote',
+            type: 'quote',
+            author_username: 'TargetUser'
+        }, {
+            id: 'article',
+            type: 'article',
+            author_username: 'TargetUser'
+        }, {
+            id: 'opportunistic-reply',
+            type: 'reply',
+            author_username: 'TargetUser'
+        }],
+        replies: [{
+            id: 'reply',
+            type: 'reply',
+            author_username: 'TargetUser',
+            reply_to_id: 'foreign-parent'
+        }, {
+            id: 'foreign-parent',
+            type: 'tweet',
+            author_username: 'OtherUser'
+        }, {
+            id: 'reply',
+            type: 'reply',
+            author_username: 'TargetUser'
+        }]
+    };
+    harness.context.XPorterAPI.fetchUserTweets = async (_userId, _cursor, _count, feed) => {
+        requestedFeeds.push(feed);
+        return { tweets: rowsByFeed[feed], nextCursor: null };
+    };
+    harness.context.__makeRateLimiter = () => ({
+        totalRequests: 0,
+        batchSize: 20,
+        async executeWithRateLimit(request) {
+            this.totalRequests += 1;
+            return request();
+        },
+        reconfigure() {},
+        getState() { return {}; }
+    });
+
+    await vm.runInContext(`
+        currentExport = {
+            running: true,
+            username: 'targetuser',
+            userId: '10',
+            exportMode: 'posts',
+            outputFormat: 'txt',
+            userInfo: { screenName: 'TargetUser', tweetCount: 6 },
+            settings: {
+                postSelectionVersion: 1,
+                includeOriginalPosts: true,
+                includeQuotes: true,
+                includeReplies: true,
+                includeRetweets: false,
+                includeArticles: false,
+                quantityLimit: 3
+            },
+            tweetCount: 0,
+            totalBatches: 0,
+            tweetBuffer: [],
+            cursor: null,
+            postFeedIndex: 0
+        };
+        rateLimiter = __makeRateLimiter();
+        _fetchPostsLoop();
+    `, harness.context);
+
+    assert.deepEqual(requestedFeeds, ['posts', 'replies'],
+        'a mixed selection must fetch each required native feed exactly once');
+    assert.deepEqual(
+        harness.getSavedBatches().flat().map(item => item.id),
+        ['original', 'quote', 'reply'],
+        'a small global limit must reserve room for both feeds while exact filters remove foreign rows'
+    );
+    const saved = harness.getSavedState();
+    assert.equal(saved.postFeedIndex, 1,
+        'resume state must identify the feed whose cursor was last persisted');
+}
+
+async function testLiveQuantityChangeUpdatesMixedFeedBudget() {
+    const harness = createWorkerHarness();
+    const rowsByFeed = {
+        posts: ['p1', 'p2', 'p3', 'p4'].map(id => ({
+            id,
+            type: 'tweet',
+            author_username: 'TargetUser'
+        })),
+        replies: ['r1', 'r2', 'r3', 'r4'].map(id => ({
+            id,
+            type: 'reply',
+            author_username: 'TargetUser'
+        }))
+    };
+    let raised = false;
+    harness.context.XPorterAPI.fetchUserTweets = async (_userId, _cursor, _count, feed) => {
+        if (feed === 'posts' && !raised) {
+            raised = true;
+            await harness.context.handleMessage({
+                type: 'SAVE_SETTINGS',
+                settings: { quantityLimit: 8 }
+            }, {});
+        }
+        return { tweets: rowsByFeed[feed], nextCursor: null };
+    };
+    harness.context.__makeRateLimiter = () => ({
+        totalRequests: 0,
+        batchSize: 20,
+        async executeWithRateLimit(request) {
+            this.totalRequests += 1;
+            return request();
+        },
+        reconfigure() {},
+        getState() { return {}; }
+    });
+
+    await vm.runInContext(`
+        currentExport = {
+            running: true,
+            username: 'targetuser',
+            userId: '10',
+            exportMode: 'posts',
+            outputFormat: 'txt',
+            userInfo: { screenName: 'TargetUser', tweetCount: 8 },
+            settings: {
+                postSelectionVersion: 1,
+                includeOriginalPosts: true,
+                includeQuotes: false,
+                includeReplies: true,
+                includeRetweets: false,
+                includeArticles: false,
+                quantityLimit: 4
+            },
+            tweetCount: 0,
+            totalBatches: 0,
+            tweetBuffer: [],
+            cursor: null,
+            postFeedIndex: 0,
+            limitOverride: 0
+        };
+        rateLimiter = __makeRateLimiter();
+        _fetchPostsLoop();
+    `, harness.context);
+
+    assert.deepEqual(
+        harness.getSavedBatches().flat().map(item => item.id),
+        ['p1', 'p2', 'p3', 'p4', 'r1', 'r2', 'r3', 'r4'],
+        'raising the live target must recalculate the current feed share instead of keeping its old smaller budget'
     );
 }
 
@@ -3510,33 +3845,66 @@ async function testProfileFeedDefaultsAndMigratesLegacyReplySetting() {
     };
 
     const fresh = await createSettingsHarness({}).context.XPorterStorage.loadSettings();
-    assert.equal(fresh.profileFeed, 'all',
-        'fresh installs must export the redesigned All feed by default');
+    assert.deepEqual(
+        {
+            originals: fresh.includeOriginalPosts,
+            quotes: fresh.includeQuotes,
+            replies: fresh.includeReplies,
+            reposts: fresh.includeRetweets,
+            articles: fresh.includeArticles
+        },
+        { originals: true, quotes: true, replies: true, reposts: true, articles: true },
+        'fresh installs must start with every explicit post type selected'
+    );
+    assert.equal(Object.hasOwn(fresh, 'profileFeed'), false,
+        'runtime settings must not expose the obsolete profile-feed model');
 
     const formerPostsOnly =
         await createSettingsHarness({ includeReplies: false }).context.XPorterStorage.loadSettings();
-    assert.equal(formerPostsOnly.profileFeed, 'posts',
-        'an existing reply-off choice must migrate to the Posts feed');
+    assert.equal(formerPostsOnly.includeOriginalPosts, true);
+    assert.equal(formerPostsOnly.includeQuotes, true);
+    assert.equal(formerPostsOnly.includeReplies, false,
+        'an existing reply-off choice must migrate without enabling replies');
 
     const formerCombined =
         await createSettingsHarness({ includeReplies: true }).context.XPorterStorage.loadSettings();
-    assert.equal(formerCombined.profileFeed, 'all',
-        'an existing reply-on choice must migrate to the All feed');
+    assert.equal(formerCombined.includeOriginalPosts, true);
+    assert.equal(formerCombined.includeReplies, true,
+        'an existing reply-on choice must migrate to originals plus replies');
 
     const explicit =
         await createSettingsHarness({ profileFeed: 'posts', includeReplies: true })
             .context.XPorterStorage.loadSettings();
-    assert.equal(explicit.profileFeed, 'posts',
-        'the explicit redesigned feed must win over the legacy toggle');
-    assert.equal(Object.hasOwn(explicit, 'includeReplies'), false,
-        'runtime settings must not keep two contradictory feed controls');
+    assert.equal(explicit.includeOriginalPosts, true);
+    assert.equal(explicit.includeQuotes, true);
+    assert.equal(explicit.includeReplies, false,
+        'the newer Posts feed choice must win over the older reply toggle');
+
+    const explicitReplies =
+        await createSettingsHarness({ profileFeed: 'replies' })
+            .context.XPorterStorage.loadSettings();
+    assert.equal(explicitReplies.includeOriginalPosts, false);
+    assert.equal(explicitReplies.includeQuotes, false);
+    assert.equal(explicitReplies.includeReplies, true);
+    assert.equal(explicitReplies.includeRetweets, false);
+    assert.equal(explicitReplies.includeArticles, false,
+        'the former Replies feed must migrate to a true replies-only selection');
 
     const savedMigration = createSettingsHarness({ includeReplies: false, language: 'ru' });
     await savedMigration.context.XPorterStorage.saveSettings({ theme: 'light' });
     assert.deepEqual(
         JSON.parse(JSON.stringify(savedMigration.storage.xporter_settings)),
-        { language: 'ru', profileFeed: 'posts', theme: 'light' },
-        'the next settings write must persist the legacy choice and remove the obsolete key'
+        {
+            language: 'ru',
+            postSelectionVersion: 1,
+            includeOriginalPosts: true,
+            includeQuotes: true,
+            includeReplies: false,
+            includeRetweets: true,
+            includeArticles: true,
+            theme: 'light'
+        },
+        'the next settings write must persist explicit choices and remove obsolete keys'
     );
 }
 
@@ -3842,9 +4210,12 @@ function testCursorDedupMemoryIsBounded() {
 
 async function testAboutRateLimitWaitSurvivesPopupReopen() {
     const harness = createWorkerHarness();
-    const status = await vm.runInContext(`
-        (() => {
-            const until = Date.now() + 60000;
+    const statuses = await vm.runInContext(`
+        (async () => {
+            const originalNow = Date.now;
+            let now = 1000;
+            Date.now = () => now;
+            const until = 61000;
             currentExport = {
                 running: true,
                 username: 'rate-limited-user',
@@ -3868,16 +4239,27 @@ async function testAboutRateLimitWaitSurvivesPopupReopen() {
                 kind: 'window',
                 attempt: 1
             };
-            return getExportStatus();
+            const first = await getExportStatus();
+            now = 3000;
+            const second = await getExportStatus();
+            Date.now = originalNow;
+            return [first, second];
         })()
     `, harness.context);
+    const [status, polledStatus] = statuses;
 
     assert.equal(status.running, true);
     assert.equal(status.status, 'rate_limited',
         'reopening the popup during an About wait must restore the rate-limit pause');
     assert.equal(status.tweetCount, 40);
     assert(status.retryIn > 0 && status.retryIn <= 60000);
-    assert(status.until > Date.now());
+    assert.equal(status.duration, 60000,
+        'status polling must preserve the original wait duration so the progress bar never restarts');
+    assert.equal(status.until, 61000);
+    assert.equal(polledStatus.retryIn, 58000);
+    assert.equal(polledStatus.duration, 60000,
+        'a later poll may shrink retryIn but must keep the original duration');
+    assert.equal(polledStatus.until, 61000);
 }
 
 async function testExportSnapshotSurvivesWorkerRestart() {
@@ -3934,7 +4316,13 @@ async function testSavedPacingChangesApplyToARunningExportOnly() {
     const reconfigured = [];
     harness.context.__makeLiveLimiter = label => ({
         reconfigure(options) {
-            reconfigured.push({ label, adaptiveFloor: options.adaptiveFloor });
+            reconfigured.push({
+                label,
+                adaptiveFloor: options.adaptiveFloor,
+                safetyBreak: options.alwaysBatchCooldown === true,
+                batchSize: options.batchSize,
+                cooldownDuration: options.cooldownDuration
+            });
         },
         getState() { return {}; }
     });
@@ -3943,9 +4331,12 @@ async function testSavedPacingChangesApplyToARunningExportOnly() {
         currentExport = {
             running: true,
             exportMode: 'following',
+            limitOverride: 0,
+            tweetCount: 500,
             settings: {
                 includeAboutAccountDetails: true,
                 includeRetweets: false,
+                quantityLimit: 500,
                 exportSpeed: 'turtle',
                 userExportSpeed: 'turtle',
                 aboutAccountSpeed: 'turtle'
@@ -3957,9 +4348,13 @@ async function testSavedPacingChangesApplyToARunningExportOnly() {
             type: 'SAVE_SETTINGS',
             settings: {
                 includeRetweets: true,
+                quantityLimit: 1000,
                 exportSpeed: 'turbo',
                 userExportSpeed: 'turbo',
-                aboutAccountSpeed: 'standard'
+                aboutAccountSpeed: 'standard',
+                userSafetyBreakEnabled: true,
+                userSafetyBreakEvery: 25,
+                userSafetyBreakMin: '1,5'
             }
         }, {});
     `, harness.context);
@@ -3969,16 +4364,43 @@ async function testSavedPacingChangesApplyToARunningExportOnly() {
         'the next Followers/Following request must use the newly saved speed');
     assert.equal(activeSettings.aboutAccountSpeed, 'standard',
         'the next About batch must use the newly saved concurrency');
+    assert.equal(activeSettings.userSafetyBreakEnabled, true,
+        'scheduled breaks must apply live without restarting the user-list export');
+    assert.equal(activeSettings.quantityLimit, 1000,
+        'changing the configured quantity must immediately retarget an ordinary running export');
+    assert.equal(vm.runInContext('quantityLimitReached()', harness.context), false,
+        'raising a live target must allow the active export to continue');
     assert.equal(activeSettings.includeRetweets, false,
         'data-shape filters must stay frozen for the active export');
     assert.deepEqual(
         reconfigured,
         [
-            { label: 'list', adaptiveFloor: 2000 },
-            { label: 'about', adaptiveFloor: 2000 }
+            {
+                label: 'list',
+                adaptiveFloor: 2000,
+                safetyBreak: true,
+                batchSize: 25,
+                cooldownDuration: 90000
+            },
+            {
+                label: 'about',
+                adaptiveFloor: 2000,
+                safetyBreak: true,
+                batchSize: 25,
+                cooldownDuration: 90000
+            }
         ],
         'both active user-list limiters must receive the new pacing without being replaced'
     );
+
+    await vm.runInContext(`
+        handleMessage({
+            type: 'SAVE_SETTINGS',
+            settings: { quantityLimit: 300 }
+        }, {});
+    `, harness.context);
+    assert.equal(vm.runInContext('quantityLimitReached()', harness.context), true,
+        'lowering a live target below the collected count must stop at the next limit check');
 
     await vm.runInContext(`
         currentExport = {
@@ -4005,7 +4427,37 @@ async function testSavedPacingChangesApplyToARunningExportOnly() {
         'the next Posts request must use the newly saved speed');
     assert.equal(postSettings.includeReplies, false,
         'changing settings mid-export must not change the active Posts data shape');
-    assert.deepEqual(reconfigured.at(-1), { label: 'posts', adaptiveFloor: 2000 });
+    assert.deepEqual(reconfigured.at(-1), {
+        label: 'posts',
+        adaptiveFloor: 2000,
+        safetyBreak: false,
+        batchSize: undefined,
+        cooldownDuration: undefined
+    });
+
+    await vm.runInContext(`
+        currentExport = {
+            running: true,
+            exportMode: 'posts',
+            limitOverride: 750,
+            settings: {
+                quantityLimit: 750,
+                exportSpeed: 'standard'
+            }
+        };
+        rateLimiter = __makeLiveLimiter('override');
+        handleMessage({
+            type: 'SAVE_SETTINGS',
+            settings: {
+                quantityLimit: 3200
+            }
+        }, {});
+    `, harness.context);
+    assert.equal(
+        vm.runInContext('currentExport.settings.quantityLimit', harness.context),
+        750,
+        'an explicit per-run +N target must not be overwritten by later global quantity changes'
+    );
 }
 
 function testPostsAndUserListsUseIndependentSpeedSettings() {
@@ -4016,9 +4468,9 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
         turtle: { adaptiveFloor: 12000 }
     };
     harness.context.XPORTER_CONFIG.CUSTOM_SPEED_LIMITS = {
-        delaySec: [2, 120, 5],
+        delaySec: [0.1, 120, 5],
         batch: [5, 100, 20],
-        cooldownMin: [1, 30, 3]
+        cooldownMin: [0.1, 30, 3]
     };
     const resolved = vm.runInContext(`({
         posts: createRateLimiter({
@@ -4060,10 +4512,56 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
             userCustomDelaySec: 17,
             userCustomBatchSize: 40,
             userCustomCooldownMin: 6
-        }, 'followers')
+        }, 'followers'),
+        decimalCommaCustom: resolveSpeedPreset({
+            exportSpeed: 'custom',
+            customDelaySec: '0,5',
+            customBatchSize: 7,
+            customCooldownMin: '0,25'
+        }, 'posts'),
+        customWithoutAdaptive: (() => {
+            const options = buildRateLimiterOptions({
+                exportSpeed: 'custom',
+                customDelaySec: '0,5',
+                customBatchSize: 7,
+                customCooldownMin: '0,25',
+                adaptivePacing: false,
+                requestDelay: 3000
+            }, 'posts');
+            return [options.fallbackMinDelay, options.fallbackMaxDelay];
+        })(),
+        postSafetyDisabled: buildRateLimiterOptions({
+            exportSpeed: 'turbo',
+            postSafetyBreakEnabled: false,
+            postSafetyBreakMin: '2,5',
+            postSafetyBreakEvery: 11
+        }, 'posts'),
+        postSafetyEnabled: buildRateLimiterOptions({
+            exportSpeed: 'turbo',
+            postSafetyBreakEnabled: true,
+            postSafetyBreakMin: '2,5',
+            postSafetyBreakEvery: 11
+        }, 'bookmarks'),
+        userSafetyEnabled: buildRateLimiterOptions({
+            userExportSpeed: 'fast',
+            userSafetyBreakEnabled: true,
+            userSafetyBreakMin: '7,5',
+            userSafetyBreakEvery: 33
+        }, 'following')
     })`, harness.context);
 
-    assert.deepEqual(JSON.parse(JSON.stringify(resolved)), {
+    const plain = JSON.parse(JSON.stringify(resolved));
+    assert.deepEqual({
+        posts: plain.posts,
+        followers: plain.followers,
+        following: plain.following,
+        verifiedFollowers: plain.verifiedFollowers,
+        aboutAccount: plain.aboutAccount,
+        postCustom: plain.postCustom,
+        userCustom: plain.userCustom,
+        decimalCommaCustom: plain.decimalCommaCustom,
+        customWithoutAdaptive: plain.customWithoutAdaptive
+    }, {
         posts: 2000,
         followers: 12000,
         following: 2000,
@@ -4071,25 +4569,37 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
         aboutAccount: 2000,
         postCustom: {
             adaptiveFloor: 3000,
-            adaptivePad: 1000,
+            adaptivePad: 0,
             budgetFraction: 1,
             raceReserve: 2,
-            batchSize: 10,
-            cooldownDuration: 120000,
-            alwaysBatchCooldown: true,
-            customFallbackDelays: [3000, 5000]
+            customFallbackDelays: [3000, 3000]
         },
         userCustom: {
             adaptiveFloor: 17000,
-            adaptivePad: 1000,
+            adaptivePad: 0,
             budgetFraction: 1,
             raceReserve: 2,
-            batchSize: 40,
-            cooldownDuration: 360000,
-            alwaysBatchCooldown: true,
-            customFallbackDelays: [17000, 19000]
-        }
+            customFallbackDelays: [17000, 17000]
+        },
+        decimalCommaCustom: {
+            adaptiveFloor: 500,
+            adaptivePad: 0,
+            budgetFraction: 1,
+            raceReserve: 2,
+            customFallbackDelays: [500, 500]
+        },
+        customWithoutAdaptive: [500, 500]
     }, 'post exports and every user-list mode must resolve their own saved speed preset');
+    assert.equal(plain.postSafetyDisabled.alwaysBatchCooldown, false,
+        'scheduled breaks must be opt-in even when legacy batch values exist in a speed preset');
+    assert.equal(plain.postSafetyEnabled.alwaysBatchCooldown, true);
+    assert.equal(plain.postSafetyEnabled.batchSize, 11);
+    assert.equal(plain.postSafetyEnabled.cooldownDuration, 150000,
+        'posts/bookmarks scheduled breaks must accept fractional minutes with a comma');
+    assert.equal(plain.userSafetyEnabled.alwaysBatchCooldown, true);
+    assert.equal(plain.userSafetyEnabled.batchSize, 33);
+    assert.equal(plain.userSafetyEnabled.cooldownDuration, 450000,
+        'user-list scheduled breaks must be independent from posts/bookmarks');
 }
 
 function testAboutAccountRetriesAreConfigurable() {
@@ -4725,6 +5235,8 @@ const tests = [
     ['anonymous uninstall module', testUninstallFeedbackModuleKeepsAnonymousContract],
     ['explicit zero-row Replies fallback', testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot],
     ['All feed profile filtering and context', testAllFeedKeepsOnlyProfilePostsAndContext],
+    ['explicit post-type combinations', testExplicitPostTypeSelectionPlansAndCombinesFeeds],
+    ['live mixed-feed quantity retargeting', testLiveQuantityChangeUpdatesMixedFeedBudget],
     ['Bookmarks mode and reply context', testBookmarksModeSkipsUsernameResolutionAndKeepsEverySavedAuthor],
     ['search capture arms before navigation', testSearchCaptureIsArmedBeforeNavigation],
     ['unexpected empty user list is not success', testUnexpectedEmptyUserListDoesNotComplete],

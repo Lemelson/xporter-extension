@@ -156,6 +156,17 @@ async function run() {
         uiContext,
         { filename: 'utils/shared.js' }
     );
+    const localizedDecimals = vm.runInContext(`([
+        parseLocalizedDecimal('0.5', 5),
+        parseLocalizedDecimal('0,5', 5),
+        parseLocalizedDecimal(' 1,25 ', 5),
+        parseLocalizedDecimal('not-a-number', 5)
+    ])`, uiContext);
+    assert.deepEqual(
+        Array.from(localizedDecimals),
+        [0.5, 0.5, 1.25, 5],
+        'Custom pacing must accept decimal dots and commas without truncating'
+    );
     const waitProgress = vm.runInContext(`(() => {
         Date.now = () => 1000;
         const classes = new Set(['indeterminate']);
@@ -179,6 +190,34 @@ async function run() {
     assert.equal(waitProgress.indeterminate, false);
     assert.equal(waitProgress.transition, 'width 3000ms linear');
     assert.equal(waitProgress.width, '100%');
+
+    const repeatedWaitProgress = vm.runInContext(`(() => {
+        let now = 1000;
+        Date.now = () => now;
+        const widthWrites = [];
+        const style = {
+            transition: '',
+            set width(value) { widthWrites.push(value); },
+            get width() { return widthWrites.at(-1) || ''; },
+            removeProperty(name) { delete this[name]; }
+        };
+        const element = {
+            classList: { remove() {} },
+            style,
+            offsetWidth: 100
+        };
+        startWaitProgress(element, 61000, 60000);
+        now = 3000;
+        startWaitProgress(element, 61000, 58000);
+        stopWaitProgress(element);
+        startWaitProgress(element, 61000, 58000);
+        return widthWrites;
+    })()`, uiContext);
+    assert.deepEqual(
+        Array.from(repeatedWaitProgress),
+        ['0%', '100%', '0%', '100%'],
+        'polling must not restart the same wait, but Stop must clear the guard for a new wait'
+    );
 
     // Budget above the reserve → hold the promised floor pace instead of
     // spreading over the whole window…
@@ -205,10 +244,10 @@ async function run() {
         'a low advertised reserve must not schedule a multi-minute hold'
     );
 
-    // Custom preset: alwaysBatchCooldown must inject the batch pause even
-    // while adaptive pacing is active (normally adaptive skips it).
+    // Independent Scheduled breaks must inject the batch pause even while
+    // adaptive pacing is active (normally adaptive skips it).
     const customWaits = [];
-    const custom = new RateLimitManager({
+    const scheduledBreak = new RateLimitManager({
         adaptiveFloor: 2000,
         adaptivePad: 0,
         raceReserve: 2,
@@ -217,10 +256,10 @@ async function run() {
         alwaysBatchCooldown: true,
         rateLimitProvider: () => budget({ remaining: 100, resetInMs: 600000 })
     });
-    custom.restoreState({ requestCount: 20, totalRequests: 20, lastRequestAt: Date.now() });
-    custom._wait = async (ms) => customWaits.push(ms);
-    await custom.executeWithRateLimit(async () => 'ok');
-    assert.equal(customWaits.length, 2, 'custom must wait for batch cooldown AND the adaptive delay');
+    scheduledBreak.restoreState({ requestCount: 20, totalRequests: 20, lastRequestAt: Date.now() });
+    scheduledBreak._wait = async (ms) => customWaits.push(ms);
+    await scheduledBreak.executeWithRateLimit(async () => 'ok');
+    assert.equal(customWaits.length, 2, 'Scheduled breaks must wait for the batch pause AND the adaptive delay');
     assert(customWaits[0] > 170000, 'first wait must be the (nearly full) batch cooldown');
     assert.equal(customWaits[1], 2000, 'second wait must be the adaptive burst delay (floor + pad)');
 

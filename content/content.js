@@ -151,7 +151,7 @@ window.addEventListener('popstate', () => {
 // Must mirror TRACKED in content/interceptor.js — anything else is dropped.
 const RELAY_TRACKED_OPERATIONS = new Set([
     'Followers', 'Following', 'BlueVerifiedFollowers',
-    'UserTweets', 'UserOriginalsTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds',
+    'UserTweets', 'UserOriginalsTimeline', 'UserRepliesTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds',
     'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'
 ]);
 const RELAY_MAX_BODY_CHARS = 8 * 1024 * 1024; // must match interceptor.js

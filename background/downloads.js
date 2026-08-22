@@ -21,7 +21,7 @@
             }
             return await chrome.permissions.contains({ origins: [PHOTO_HOST_ORIGIN] });
         } catch (_) {
-            return true;
+            return false;
         }
     }
 
@@ -280,6 +280,7 @@
                 mode: state.exportMode || 'posts',
                 format: plan.format,
                 profile: state.userInfo || null,
+                postSelection: state.settings || null,
                 includeAboutAccountDetails:
                     state.settings?.includeAboutAccountDetails === true,
                 dateFrom: state.dateFrom,
@@ -347,7 +348,8 @@
             return {
                 success: true,
                 text: XPorterCSV.generatePostsText(items, state.userInfo || {}, {
-                    mode: state.exportMode
+                    mode: state.exportMode,
+                    postSelection: state.settings || null
                 }),
                 count: items.length
             };
@@ -370,6 +372,7 @@
                 name: entry.displayName || '',
                 screenName: entry.username || ''
             },
+            postSelection: entry.postSelection || null,
             includeAboutAccountDetails:
                 entry.includeAboutAccountDetails === true,
             dateFrom: entry.dateFrom,
@@ -399,7 +402,10 @@
         };
 
         if (format === 'txt' && isPostRows) {
-            content = XPorterCSV.generatePostsText(allItems, options.profile || {}, { mode });
+            content = XPorterCSV.generatePostsText(allItems, options.profile || {}, {
+                mode,
+                postSelection: options.postSelection || null
+            });
             mimeType = 'text/plain;charset=utf-8;';
             extension = 'txt';
         } else if (format === 'json') {
@@ -417,6 +423,7 @@
             content = XPorterCSV.generateXLSX(allItems, isUsers, {
                 ...headerOpts,
                 mode,
+                postSelection: options.postSelection || null,
                 ...(mediaAssets.length > 0 ? { mediaAssets } : {}),
                 ...(!isUsers ? { profile: options.profile || {} } : {})
             });

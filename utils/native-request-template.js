@@ -13,6 +13,7 @@
         'AboutAccountQuery',
         'UserTweets',
         'UserOriginalsTimeline',
+        'UserRepliesTimeline',
         'UserTweetsAndReplies',
         'Bookmarks',
         'TweetResultsByRestIds',

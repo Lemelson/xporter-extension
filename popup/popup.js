@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('bookmarksAccountAvatarFallback');
     const exportMode = document.getElementById('exportMode');
     const outputFormat = document.getElementById('outputFormat');
+    const outputFormatHint = document.getElementById('outputFormatHint');
     const postsOnlyOptions = document.getElementById('postsOnlyOptions');
     const dateCheck = document.getElementById('dateCheck');
     const dateFields = document.getElementById('dateFields');
@@ -36,6 +37,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newExportBtn = document.getElementById('newExportBtn');
     const exportStatus = document.getElementById('exportStatus');
     const statusText = document.getElementById('statusText');
+    const statusPhaseIcon = document.getElementById('statusPhaseIcon');
+    const statusSubtitle = document.getElementById('statusSubtitle');
+    const statusPhaseHelp = document.getElementById('statusPhaseHelp');
     const statusDetail = document.getElementById('statusDetail');
     const statusIndicator = document.getElementById('statusIndicator');
     const statusMessage = document.getElementById('statusMessage');
@@ -47,9 +51,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const tabContents = document.querySelectorAll('.tab-content');
 
     // Settings elements
+    const includeOriginalPosts = document.getElementById('includeOriginalPosts');
+    const includeQuotes = document.getElementById('includeQuotes');
+    const includeReplies = document.getElementById('includeReplies');
     const includeRetweets = document.getElementById('includeRetweets');
-    const profileFeed = document.getElementById('profileFeed');
     const includeArticles = document.getElementById('includeArticles');
+    const postSelectionPanel = document.getElementById('postSelectionPanel');
+    const postSelectionCount = document.getElementById('postSelectionCount');
+    const postSelectionNote = document.getElementById('postSelectionNote');
+    const postSelectionError = document.getElementById('postSelectionError');
+    const postOutputOptions = document.getElementById('postOutputOptions');
     const includeBookmarkReplyContext =
         document.getElementById('includeBookmarkReplyContext');
     const includeBookmarkArticles = document.getElementById('includeBookmarkArticles');
@@ -59,13 +70,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exportSpeed = document.getElementById('exportSpeed');
     const customSpeedRows = document.getElementById('customSpeedRows');
     const customDelaySec = document.getElementById('customDelaySec');
-    const customCooldownMin = document.getElementById('customCooldownMin');
-    const customBatchSize = document.getElementById('customBatchSize');
+    const postSafetyBreakEnabled = document.getElementById('postSafetyBreakEnabled');
+    const postSafetyBreakRows = document.getElementById('postSafetyBreakRows');
+    const postSafetyBreakMin = document.getElementById('postSafetyBreakMin');
+    const postSafetyBreakEvery = document.getElementById('postSafetyBreakEvery');
     const userExportSpeed = document.getElementById('userExportSpeed');
     const userCustomSpeedRows = document.getElementById('userCustomSpeedRows');
     const userCustomDelaySec = document.getElementById('userCustomDelaySec');
-    const userCustomCooldownMin = document.getElementById('userCustomCooldownMin');
-    const userCustomBatchSize = document.getElementById('userCustomBatchSize');
+    const userSafetyBreakEnabled = document.getElementById('userSafetyBreakEnabled');
+    const userSafetyBreakRows = document.getElementById('userSafetyBreakRows');
+    const userSafetyBreakMin = document.getElementById('userSafetyBreakMin');
+    const userSafetyBreakEvery = document.getElementById('userSafetyBreakEvery');
     const includeAboutAccountDetails = document.getElementById('includeAboutAccountDetails');
     const aboutAccountOptions = document.getElementById('aboutAccountOptions');
     const aboutAccountSpeed = document.getElementById('aboutAccountSpeed');
@@ -124,7 +139,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Settings tab — posts-only elements
-    const settingsPostsOnly = document.getElementById('settingsPostsOnly');
     const settingsBookmarksOnly = document.getElementById('settingsBookmarksOnly');
 
     // Language selector elements
@@ -189,6 +203,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
         statusMessage.textContent = `${t(cooldownLabelKey)} ${countdown}`;
     });
+
+    function clearStatusPhase() {
+        exportStatus.classList.remove('phase-rate-limit', 'phase-safety-break');
+        statusPhaseIcon.classList.add('hidden');
+        statusPhaseIcon.replaceChildren();
+        statusSubtitle.classList.add('hidden');
+        statusSubtitle.textContent = '';
+        statusPhaseHelp.classList.add('hidden');
+    }
+
+    function setStatusPhase(kind) {
+        const isRateLimit = kind === 'rate-limit';
+        const titleKey = isRateLimit ? 'statusRateLimitTitle' : 'statusSafetyBreakTitle';
+        const subtitleKey = isRateLimit
+            ? 'statusRateLimitSubtitle'
+            : 'statusSafetyBreakSubtitle';
+        const helpKey = isRateLimit ? 'statusRateLimitHelp' : 'statusSafetyBreakHelp';
+        exportStatus.classList.add(
+            isRateLimit ? 'phase-rate-limit' : 'phase-safety-break'
+        );
+        statusPhaseIcon.innerHTML = isRateLimit ? ICONS.rateLimit : ICONS.safetyBreak;
+        statusPhaseIcon.classList.remove('hidden');
+        statusText.textContent = t(titleKey);
+        statusSubtitle.textContent = t(subtitleKey);
+        statusSubtitle.classList.remove('hidden');
+        const helpText = currentTranslations[helpKey] || helpKey;
+        statusPhaseHelp.setAttribute('aria-label', stripHelpMarkup(helpText));
+        const helpPop = statusPhaseHelp.querySelector(':scope > .help-pop');
+        if (helpPop) helpPop.innerHTML = renderHelpMarkup(helpText);
+        statusPhaseHelp.classList.remove('hidden');
+    }
 
     function handleStatusUpdate(state) {
         if (state.running && Date.now() < ignoreRunningUntil) return;
@@ -275,16 +320,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ==================== Export Mode Switching ====================
+    const postTypeControls = [
+        includeOriginalPosts,
+        includeQuotes,
+        includeReplies,
+        includeRetweets,
+        includeArticles
+    ];
+
+    function syncPostSelectionUI() {
+        const selectedCount = postTypeControls.filter(control => control.checked).length;
+        postSelectionCount.textContent = `${selectedCount}/${postTypeControls.length}`;
+        postSelectionPanel.classList.toggle('is-empty', selectedCount === 0);
+        postSelectionError.classList.toggle('hidden', selectedCount !== 0);
+        const hasOtherTypes = postTypeControls.some(
+            control => control !== includeReplies && control.checked
+        );
+        postSelectionNote.classList.toggle(
+            'hidden',
+            !includeReplies.checked || !hasOtherTypes
+        );
+        return selectedCount;
+    }
+
     function applyModeUI(mode) {
         const isPostsMode = (mode === 'posts');
         const isBookmarksMode = (mode === 'bookmarks');
         const isPostRows = isPostsMode || isBookmarksMode;
         // Show/hide posts-only options in Home tab
         postsOnlyOptions.classList.toggle('hidden', !isPostsMode);
-        // Show/hide posts-only settings in Settings tab
-        if (settingsPostsOnly) {
-            settingsPostsOnly.classList.toggle('hidden', !isPostsMode);
-        }
         if (settingsBookmarksOnly) {
             settingsBookmarksOnly.classList.toggle('hidden', !isBookmarksMode);
         }
@@ -307,6 +371,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const txtOption = outputFormat.querySelector('option[value="txt"]');
         if (txtOption) txtOption.disabled = !isPostRows;
         if (!isPostRows && outputFormat.value === 'txt') outputFormat.value = 'csv';
+        postOutputOptions.classList.toggle(
+            'hidden',
+            !isPostsMode || outputFormat.value !== 'xlsx'
+        );
+        outputFormatHint.classList.toggle(
+            'hidden',
+            !isPostRows || outputFormat.value !== 'txt'
+        );
+        syncPostSelectionUI();
     }
 
     function renderBookmarksAccount() {
@@ -368,6 +441,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     applyModeUI(exportMode.value);
     outputFormat.addEventListener('change', async () => {
+        applyModeUI(exportMode.value);
         const previousFormat = currentSettings.outputFormat || 'csv';
         const result = await persistSettingsPatch(currentSettings, { outputFormat: outputFormat.value });
         if (result?.success !== true) {
@@ -750,9 +824,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Load Settings ====================
     let lastAcceptedAboutRetries = 5;
     if (currentSettings) {
-        includeRetweets.checked = currentSettings.includeRetweets !== false;
-        profileFeed.value = currentSettings.profileFeed === 'posts' ? 'posts' : 'all';
-        includeArticles.checked = currentSettings.includeArticles !== false;
+        includeOriginalPosts.checked = currentSettings.includeOriginalPosts !== false;
+        includeQuotes.checked = currentSettings.includeQuotes !== false;
+        includeReplies.checked = currentSettings.includeReplies === true;
+        includeRetweets.checked = currentSettings.includeRetweets === true;
+        includeArticles.checked = currentSettings.includeArticles === true;
+        syncPostSelectionUI();
         includeBookmarkReplyContext.checked =
             currentSettings.includeBookmarkReplyContext !== false;
         includeBookmarkArticles.checked =
@@ -772,16 +849,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? currentSettings.exportSpeed
             : 'standard';
         customDelaySec.value = currentSettings.customDelaySec || 5;
-        customCooldownMin.value = currentSettings.customCooldownMin || 3;
-        customBatchSize.value = currentSettings.customBatchSize || 20;
         customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
+        postSafetyBreakEnabled.checked = currentSettings.postSafetyBreakEnabled === true;
+        postSafetyBreakMin.value = currentSettings.postSafetyBreakMin ?? 3;
+        postSafetyBreakEvery.value = currentSettings.postSafetyBreakEvery ?? 20;
         userExportSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom'].includes(currentSettings.userExportSpeed)
             ? currentSettings.userExportSpeed
             : 'standard';
         userCustomDelaySec.value = currentSettings.userCustomDelaySec || 5;
-        userCustomCooldownMin.value = currentSettings.userCustomCooldownMin || 3;
-        userCustomBatchSize.value = currentSettings.userCustomBatchSize || 20;
         userCustomSpeedRows.classList.toggle('hidden', userExportSpeed.value !== 'custom');
+        userSafetyBreakEnabled.checked = currentSettings.userSafetyBreakEnabled === true;
+        userSafetyBreakMin.value = currentSettings.userSafetyBreakMin ?? 3;
+        userSafetyBreakEvery.value = currentSettings.userSafetyBreakEvery ?? 20;
+        syncSafetyBreakVisibility();
         includeAboutAccountDetails.checked =
             currentSettings.includeAboutAccountDetails === true;
         aboutAccountSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom']
@@ -837,6 +917,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         return Math.max(Number.isFinite(min) ? min : value, Math.min(Number.isFinite(max) ? max : value, value));
     }
 
+    function clampDecimalInput(el, fallback) {
+        const parsed = parseLocalizedDecimal(el.value, fallback);
+        const min = parseLocalizedDecimal(el.dataset.min, parsed);
+        const max = parseLocalizedDecimal(el.dataset.max, parsed);
+        return Math.max(min, Math.min(max, parsed));
+    }
+
     function syncAboutAccountSpeedVisibility() {
         aboutAccountOptions.classList.toggle(
             'hidden',
@@ -845,6 +932,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         aboutAccountCustomRows.classList.toggle(
             'hidden',
             !includeAboutAccountDetails.checked || aboutAccountSpeed.value !== 'custom'
+        );
+    }
+
+    function syncSafetyBreakVisibility() {
+        postSafetyBreakRows.classList.toggle('hidden', !postSafetyBreakEnabled.checked);
+        userSafetyBreakRows.classList.toggle('hidden', !userSafetyBreakEnabled.checked);
+        postSafetyBreakEnabled.setAttribute(
+            'aria-expanded',
+            String(postSafetyBreakEnabled.checked)
+        );
+        userSafetyBreakEnabled.setAttribute(
+            'aria-expanded',
+            String(userSafetyBreakEnabled.checked)
         );
     }
 
@@ -859,8 +959,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             qLimit = parseInt(quantityLimit.value, 10) || 0;
         }
         const nextSettings = {
+            postSelectionVersion: 1,
+            includeOriginalPosts: includeOriginalPosts.checked,
+            includeQuotes: includeQuotes.checked,
+            includeReplies: includeReplies.checked,
             includeRetweets: includeRetweets.checked,
-            profileFeed: profileFeed.value === 'posts' ? 'posts' : 'all',
             includeArticles: includeArticles.checked,
             includeBookmarkReplyContext: includeBookmarkReplyContext.checked,
             includeBookmarkArticles: includeBookmarkArticles.checked,
@@ -869,13 +972,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             quantityLimit: qLimit,
             requestDelay: 3000,
             exportSpeed: exportSpeed.value || 'standard',
-            customDelaySec: clampToInput(customDelaySec, 5),
-            customCooldownMin: clampToInput(customCooldownMin, 3),
-            customBatchSize: clampToInput(customBatchSize, 20),
+            customDelaySec: clampDecimalInput(customDelaySec, 5),
+            postSafetyBreakEnabled: postSafetyBreakEnabled.checked,
+            postSafetyBreakMin: clampDecimalInput(postSafetyBreakMin, 3),
+            postSafetyBreakEvery: clampToInput(postSafetyBreakEvery, 20),
             userExportSpeed: userExportSpeed.value || 'standard',
-            userCustomDelaySec: clampToInput(userCustomDelaySec, 5),
-            userCustomCooldownMin: clampToInput(userCustomCooldownMin, 3),
-            userCustomBatchSize: clampToInput(userCustomBatchSize, 20),
+            userCustomDelaySec: clampDecimalInput(userCustomDelaySec, 5),
+            userSafetyBreakEnabled: userSafetyBreakEnabled.checked,
+            userSafetyBreakMin: clampDecimalInput(userSafetyBreakMin, 3),
+            userSafetyBreakEvery: clampToInput(userSafetyBreakEvery, 20),
             includeAboutAccountDetails: includeAboutAccountDetails.checked,
             aboutAccountSpeed: aboutAccountSpeed.value || 'standard',
             aboutAccountCustomBatchSize: clampToInput(aboutAccountCustomBatchSize, 5),
@@ -912,6 +1017,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     userExportSpeed.addEventListener('change', () => {
         userCustomSpeedRows.classList.toggle('hidden', userExportSpeed.value !== 'custom');
+    });
+    [postSafetyBreakEnabled, userSafetyBreakEnabled].forEach((control) => {
+        control.addEventListener('change', syncSafetyBreakVisibility);
     });
     includeAboutAccountDetails.addEventListener('change', () => {
         if (!includeAboutAccountDetails.checked) {
@@ -963,37 +1071,62 @@ document.addEventListener('DOMContentLoaded', async () => {
     // requested here, from the checkbox's own user gesture; declining keeps
     // ordinary URL-only exports fully functional.
     const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
-    async function ensurePhotoEmbedPermission(checkbox) {
-        if (!checkbox.checked) return true;
-        if (typeof chrome === 'undefined' || !chrome.permissions?.request) return true;
+    function requestPhotoEmbedPermission(checkbox) {
+        if (!checkbox.checked) return Promise.resolve(true);
+        if (typeof chrome === 'undefined' || !chrome.permissions?.request) {
+            return Promise.resolve(true);
+        }
         try {
-            const alreadyGranted = await chrome.permissions.contains({
-                origins: [PHOTO_EMBED_ORIGIN]
-            });
-            if (alreadyGranted) return true;
-            return await chrome.permissions.request({ origins: [PHOTO_EMBED_ORIGIN] });
+            return chrome.permissions.request({ origins: [PHOTO_EMBED_ORIGIN] });
         } catch (_) {
-            return false;
+            return Promise.resolve(false);
         }
     }
     async function handleEmbedPhotosChange(checkbox) {
-        if (!await ensurePhotoEmbedPermission(checkbox)) {
+        // Invoke request() before the first await. An async contains() preflight
+        // consumes Chromium's transient user activation and can make the
+        // permission prompt fail even though this handler came from a click.
+        const permissionRequest = requestPhotoEmbedPermission(checkbox);
+        let granted = false;
+        try {
+            granted = await permissionRequest;
+        } catch (_) { /* fail closed below */ }
+        if (!granted) {
             checkbox.checked = false;
         }
         saveSettingsDebounced();
     }
 
-    [includeRetweets, profileFeed, includeArticles,
+    async function syncEmbedPhotoPermissionState() {
+        if (typeof chrome === 'undefined' || !chrome.permissions?.contains) return;
+        let granted = false;
+        try {
+            granted = await chrome.permissions.contains({
+                origins: [PHOTO_EMBED_ORIGIN]
+            });
+        } catch (_) { /* fail closed below */ }
+        if (granted || (!embedPostPhotos.checked && !embedBookmarkPhotos.checked)) return;
+        embedPostPhotos.checked = false;
+        embedBookmarkPhotos.checked = false;
+        saveSettingsDebounced();
+    }
+
+    [includeOriginalPosts, includeQuotes, includeReplies, includeRetweets, includeArticles,
         includeBookmarkReplyContext, includeBookmarkArticles,
         quantityLimit, exportSpeed, customQuantity, autoExpireHours,
-        customDelaySec, customCooldownMin, customBatchSize, userExportSpeed,
-        userCustomDelaySec, userCustomCooldownMin, userCustomBatchSize,
+        customDelaySec, postSafetyBreakEnabled, postSafetyBreakMin, postSafetyBreakEvery,
+        userExportSpeed, userCustomDelaySec, userSafetyBreakEnabled,
+        userSafetyBreakMin, userSafetyBreakEvery,
         aboutAccountSpeed, aboutAccountCustomBatchSize].forEach(el => {
         el.addEventListener('change', saveSettingsDebounced);
     });
     embedPostPhotos.addEventListener('change', () => handleEmbedPhotosChange(embedPostPhotos));
     embedBookmarkPhotos.addEventListener('change', () => handleEmbedPhotosChange(embedBookmarkPhotos));
+    void syncEmbedPhotoPermissionState();
     customQuantity.addEventListener('input', saveSettingsDebounced);
+    postTypeControls.forEach(control => {
+        control.addEventListener('change', syncPostSelectionUI);
+    });
     resumeQuantity.addEventListener('input', updateResumeQuantityLabel);
 
     // ==================== Date Range Toggle ====================
@@ -1093,6 +1226,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     startBtn.addEventListener('click', async () => {
         try {
             const mode = exportMode.value;
+            if (mode === 'posts' && syncPostSelectionUI() === 0) {
+                postSelectionPanel.scrollIntoView({ block: 'nearest' });
+                showToast(t('postSelectionRequired'), 'error');
+                return;
+            }
             // extractUsernameFromInput returns '' for anything that is not a
             // valid username or X profile URL — never submit garbage.
             const username = mode === 'bookmarks'
@@ -1358,8 +1496,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // Cooldown tint is per-state; clear it before each render, re-add below.
-        progressFill.classList.remove('cooldown');
+        // Wait styling is per-state; clear it before each render, re-add below.
+        progressFill.classList.remove('cooldown', 'rate-limit', 'safety-break');
+        clearStatusPhase();
 
         // Ordinary pacing and a real X rate-limit pause both own the live
         // countdown. Every other state stops it immediately.
@@ -1390,25 +1529,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             case 'cooldown':
                 setDotColor('yellow', true);
-                // Pick the localized label for what this wait actually is —
-                // "Cooldown" alone made normal pacing look like a penalty.
-                cooldownLabelKey = state.kind === 'pacing' ? 'statusPacing'
-                    : state.kind === 'window' ? 'statusRateLimitWait'
-                        : 'cooldown';
+                if (state.kind === 'batch') {
+                    setStatusPhase('safety-break');
+                    cooldownLabelKey = 'statusResumesIn';
+                    progressFill.classList.add('safety-break');
+                } else if (state.kind === 'window') {
+                    setStatusPhase('rate-limit');
+                    cooldownLabelKey = 'retryIn';
+                    progressFill.classList.add('rate-limit');
+                } else {
+                    statusText.textContent =
+                        `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
+                    cooldownLabelKey = 'statusPacing';
+                    progressFill.classList.add('cooldown');
+                }
                 // Live countdown to the SW's absolute deadline (duration is
                 // the fallback for events that predate `until`).
                 cooldownTicker.start(state.until, state.duration || 180000);
-                progressFill.classList.add('cooldown');
                 startWaitProgress(progressFill, state.until, state.duration || 180000);
                 break;
 
             case 'rate_limited':
-                statusText.textContent = formatError('RATE_LIMITED', t);
+                setStatusPhase('rate-limit');
                 setDotColor('yellow', true);
                 cooldownLabelKey = 'retryIn';
-                cooldownTicker.start(state.until, state.retryIn || 60000);
-                progressFill.classList.add('cooldown');
-                startWaitProgress(progressFill, state.until, state.retryIn || 60000);
+                cooldownTicker.start(state.until, state.duration || state.retryIn || 60000);
+                progressFill.classList.add('rate-limit');
+                startWaitProgress(
+                    progressFill,
+                    state.until,
+                    state.duration || state.retryIn || 60000
+                );
                 break;
 
             case 'error':

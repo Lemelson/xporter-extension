@@ -147,7 +147,14 @@ function generatePostsText(items, profile = {}, opts = {}) {
         }
         lines.push('');
     }
-    lines.push(`${isBookmarks ? 'BOOKMARKS' : 'POSTS'} (${items.length})`, '');
+    lines.push(`${isBookmarks ? 'BOOKMARKS' : 'POSTS'} (${items.length})`);
+    if (!isBookmarks) {
+        const includedTypes = selectedPostTypeLabels(opts.postSelection);
+        if (includedTypes.length > 0) {
+            lines.push(`Included types: ${includedTypes.join(', ')}`);
+        }
+    }
+    lines.push('');
 
     // Use one visible sequence so the final number always matches POSTS (N).
     // Reply relationships stay explicit through a direct parent reference and
@@ -220,6 +227,17 @@ function generatePostsText(items, profile = {}, opts = {}) {
     items.forEach((item, index) => emitItem(item, index + 1));
 
     return lines.join('\n').trimEnd() + '\n';
+}
+
+function selectedPostTypeLabels(settings = {}) {
+    if (settings.postSelectionVersion !== 1) return [];
+    const labels = [];
+    if (settings.includeOriginalPosts === true) labels.push('Original posts');
+    if (settings.includeQuotes === true) labels.push('Quotes');
+    if (settings.includeReplies === true) labels.push('Replies');
+    if (settings.includeRetweets === true) labels.push('Reposts');
+    if (settings.includeArticles === true) labels.push('Articles');
+    return labels;
 }
 
 function profileMetadataRows(profile = {}) {
@@ -484,6 +502,10 @@ function generateXLSX(items, isUsers = false, opts = {}) {
     if (profileRows.length > 0) {
         appendRow(['PROFILE'], rowNumber++, null, 1);
         for (const row of profileRows) appendRow(row, rowNumber++, null, [2, 4]);
+        const includedTypes = selectedPostTypeLabels(opts.postSelection);
+        if (includedTypes.length > 0) {
+            appendRow(['Included post types', includedTypes.join(', ')], rowNumber++, null, [2, 4]);
+        }
         appendRow([], rowNumber++);
         appendRow([`POSTS (${items.length})`], rowNumber++, null, 1);
         appendRow([], rowNumber++);

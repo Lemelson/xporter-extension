@@ -380,19 +380,47 @@ async function saveSettings(settings) {
         log.error('Settings read failed — aborting save to avoid wiping settings:', e.message);
         return false;
     }
-    const migratedProfileFeed = ['all', 'posts'].includes(current.profileFeed)
-        ? current.profileFeed
-        : Object.hasOwn(current, 'includeReplies')
-            ? (current.includeReplies === true ? 'all' : 'posts')
-            : undefined;
-    const { includeReplies: _legacyIncludeReplies, ...currentSettings } = current;
+    const migratedPostSelection = normalizePostSelection(current);
+    const {
+        includeReplies: _legacyIncludeReplies,
+        profileFeed: _legacyProfileFeed,
+        ...currentSettings
+    } = current;
     return safeSet({
         [STORAGE_KEYS.SETTINGS]: {
             ...currentSettings,
-            ...(migratedProfileFeed ? { profileFeed: migratedProfileFeed } : {}),
+            ...migratedPostSelection,
             ...settings
         }
     });
+}
+
+function normalizePostSelection(saved = {}) {
+    if (saved.postSelectionVersion === 1) {
+        return {
+            postSelectionVersion: 1,
+            includeOriginalPosts: saved.includeOriginalPosts !== false,
+            includeQuotes: saved.includeQuotes !== false,
+            includeReplies: saved.includeReplies === true,
+            includeRetweets: saved.includeRetweets === true,
+            includeArticles: saved.includeArticles === true
+        };
+    }
+
+    const legacyFeed = ['all', 'posts', 'replies'].includes(saved.profileFeed)
+        ? saved.profileFeed
+        : Object.hasOwn(saved, 'includeReplies')
+            ? (saved.includeReplies === true ? 'all' : 'posts')
+            : 'all';
+    const repliesOnly = legacyFeed === 'replies';
+    return {
+        postSelectionVersion: 1,
+        includeOriginalPosts: !repliesOnly,
+        includeQuotes: !repliesOnly,
+        includeReplies: legacyFeed === 'all' || repliesOnly,
+        includeRetweets: !repliesOnly && saved.includeRetweets !== false,
+        includeArticles: !repliesOnly && saved.includeArticles !== false
+    };
 }
 
 /**
@@ -402,18 +430,21 @@ async function loadSettings() {
     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
     const result = await safeGet(STORAGE_KEYS.SETTINGS);
     const saved = result[STORAGE_KEYS.SETTINGS] || {};
-    const profileFeed = ['all', 'posts'].includes(saved.profileFeed)
-        ? saved.profileFeed
-        : Object.hasOwn(saved, 'includeReplies')
-            ? (saved.includeReplies === true ? 'all' : 'posts')
-            : 'all';
-    // `includeReplies` described the pre-redesign combined endpoint. Convert
-    // it once at the read boundary so runtime code has one unambiguous feed
-    // choice and old installs keep the behavior they explicitly selected.
-    const { includeReplies: _legacyIncludeReplies, ...savedSettings } = saved;
+    const postSelection = normalizePostSelection(saved);
+    // Convert the two previous post-filter models at the read boundary. New
+    // runtime code sees five explicit content choices and never has to infer
+    // what "All" or "Posts" meant.
+    const {
+        includeReplies: _legacyIncludeReplies,
+        profileFeed: _legacyProfileFeed,
+        ...savedSettings
+    } = saved;
     return {
+        postSelectionVersion: 1,
+        includeOriginalPosts: true,
+        includeQuotes: true,
+        includeReplies: true,
         includeRetweets: true,
-        profileFeed: 'all',
         includeArticles: true,
         includeBookmarkReplyContext: true,
         includeBookmarkArticles: true,
@@ -427,12 +458,14 @@ async function loadSettings() {
         requestDelay: C.REQUEST_DELAY || 3000,
         exportSpeed: 'standard',
         customDelaySec: C.CUSTOM_SPEED_LIMITS?.delaySec?.[2] ?? 5,
-        customBatchSize: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
-        customCooldownMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
+        postSafetyBreakEnabled: false,
+        postSafetyBreakEvery: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
+        postSafetyBreakMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
         userExportSpeed: 'standard',
         userCustomDelaySec: C.CUSTOM_SPEED_LIMITS?.delaySec?.[2] ?? 5,
-        userCustomBatchSize: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
-        userCustomCooldownMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
+        userSafetyBreakEnabled: false,
+        userSafetyBreakEvery: C.CUSTOM_SPEED_LIMITS?.batch?.[2] ?? 20,
+        userSafetyBreakMin: C.CUSTOM_SPEED_LIMITS?.cooldownMin?.[2] ?? 3,
         batchSize: C.BATCH_SIZE || 20,
         cooldownDuration: C.COOLDOWN_DURATION || 180000,
         adaptivePacing: (C.ADAPTIVE_PACING !== false),
@@ -442,7 +475,7 @@ async function loadSettings() {
         ladybugEnabled: true,
         localizeExportHeaders: true,
         ...savedSettings,
-        profileFeed
+        ...postSelection
     };
 }
 
@@ -671,7 +704,8 @@ function recordExportStopped() {
 // inside a message, so anything unknown is collapsed to UNKNOWN.
 const KNOWN_ERROR_CODES = new Set([
     'NOT_LOGGED_IN', 'USER_NOT_FOUND', 'USER_SUSPENDED', 'USER_UNAVAILABLE',
-    'ACCOUNT_PRIVATE', 'INVALID_DATE_RANGE', 'RATE_LIMITED', 'STALE_QUERY_ID',
+    'ACCOUNT_PRIVATE', 'INVALID_DATE_RANGE', 'NO_POST_TYPES_SELECTED',
+    'RATE_LIMITED', 'STALE_QUERY_ID',
     'REPLIES_UNAVAILABLE',
     'AUTH_ERROR', 'ENDPOINT_DISCOVERY_FAILED', 'MAX_RETRIES_EXCEEDED',
     'ABORTED', 'STORAGE_FULL', 'SEARCH_CAPTURE_TIMEOUT', 'DOWNLOAD_FAILED',
