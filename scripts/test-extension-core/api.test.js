@@ -952,6 +952,14 @@ async function testFollowingUsesRestEndpointAndNormalizesUsers() {
                     name: 'Followed User',
                     screen_name: 'followed',
                     description: 'Line one\nLine two',
+                    url: 'https://t.co/profile',
+                    entities: {
+                        url: {
+                            urls: [{
+                                expanded_url: 'https://example.com/profile'
+                            }]
+                        }
+                    },
                     followers_count: 12,
                     friends_count: 34,
                     statuses_count: 56,
@@ -980,8 +988,8 @@ async function testFollowingUsesRestEndpointAndNormalizesUsers() {
 
     assert.equal(
         requestUrl,
-        'https://x.com/i/api/1.1/friends/list.json?user_id=1890388644273258496&count=100&skip_status=true&include_user_entities=false&cursor=123',
-        'Following must use the REST friends list instead of the currently empty GraphQL timeline'
+        'https://x.com/i/api/1.1/friends/list.json?user_id=1890388644273258496&count=100&skip_status=true&include_user_entities=true&cursor=123',
+        'Following must use the REST friends list and request expanded profile URLs'
     );
     assert.equal(requestOptions.credentials, 'include');
     assert.equal(requestOptions.headers['x-csrf-token'], 'csrf');
@@ -992,7 +1000,7 @@ async function testFollowingUsesRestEndpointAndNormalizesUsers() {
         username: 'followed',
         bio: 'Line one Line two',
         location: '',
-        url: '',
+        url: 'https://example.com/profile',
         followers_count: 12,
         following_count: 34,
         tweet_count: 56,
@@ -1337,6 +1345,104 @@ function testTimelineV2UserListsAreParsed() {
     assert.equal(reply.conversation_id, '111');
 }
 
+function testNestedTimelineV2UserListsAreParsed() {
+    const context = vm.createContext({
+        console,
+        setTimeout,
+        clearTimeout,
+        XPORTER_CONFIG: {},
+        XLog: { log() {}, warn() {}, error() {}, info() {} },
+        USER_FEATURES: {},
+        USER_FIELD_TOGGLES: {},
+        TWEETS_FEATURES: {},
+        FOLLOWERS_FEATURES: {},
+        FOLLOWERS_FIELD_TOGGLES: {}
+    });
+    vm.runInContext(source('utils/api-parsers.js'), context, { filename: 'utils/api-parsers.js' });
+    context.__payload = {
+        data: {
+            user: {
+                result: {
+                    timeline_v2: {
+                        timeline: {
+                            instructions: [{
+                                type: 'TimelineAddEntries',
+                                entries: [{
+                                    entryId: 'user-1',
+                                    content: {
+                                        itemContent: {
+                                            user_results: {
+                                                result: {
+                                                    rest_id: '1',
+                                                    core: { name: 'First', screen_name: 'first' },
+                                                    legacy: {}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }]
+                            }, {
+                                type: 'TimelineAddToModule',
+                                moduleItems: [{
+                                    entryId: 'user-2',
+                                    item: {
+                                        itemContent: {
+                                            user_results: {
+                                                result: {
+                                                    rest_id: '2',
+                                                    is_blue_verified: false,
+                                                    core: { name: 'Second', screen_name: 'second' },
+                                                    legacy: {
+                                                        verified: true,
+                                                        url: 'https://t.co/short',
+                                                        entities: {
+                                                            url: {
+                                                                urls: [{
+                                                                    expanded_url: 'https://example.com/second'
+                                                                }]
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }]
+                            }, {
+                                type: 'TimelineReplaceEntry',
+                                entry: {
+                                    entryId: 'cursor-bottom-2',
+                                    content: {
+                                        __typename: 'TimelineTimelineCursor',
+                                        cursorType: 'Bottom',
+                                        value: 'next-nested-page'
+                                    }
+                                }
+                            }]
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    const result = vm.runInContext('XPorterApiParsers.parseFollowersResponse(__payload)', context);
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(result.users.map(user => user.id))),
+        ['1', '2'],
+        'TimelineAddToModule user rows must not disappear'
+    );
+    assert.equal(
+        result.nextCursor,
+        'next-nested-page',
+        'TimelineReplaceEntry must advance user-list pagination'
+    );
+    assert.equal(result.users[1].verified, true,
+        'legacy verified accounts must remain verified in the export');
+    assert.equal(result.users[1].url, 'https://example.com/second',
+        'profile URLs must use the expanded user entity');
+}
+
 const tests = [
     { name: "Bookmarks viewer timeline", run: testBookmarksEndpointUsesViewerTimelineWithoutUsername, order: 0 },
     { name: "SearchTimeline error relay", run: testSearchErrorsAreRelayed, order: 1 },
@@ -1359,7 +1465,8 @@ const tests = [
     { name: "active request cancellation", run: testActiveApiRequestCanBeAborted, order: 29 },
     { name: "active response-body cancellation", run: testActiveResponseBodyCanBeAborted, order: 30 },
     { name: "deep timeline module parser", run: testTimelineModuleItemsAreParsed, order: 68 },
-    { name: "timeline_v2 user-list parser", run: testTimelineV2UserListsAreParsed, order: 69 }
+    { name: "timeline_v2 user-list parser", run: testTimelineV2UserListsAreParsed, order: 69 },
+    { name: "nested timeline_v2 user-list parser", run: testNestedTimelineV2UserListsAreParsed, order: 74 }
 ];
 
 module.exports = {

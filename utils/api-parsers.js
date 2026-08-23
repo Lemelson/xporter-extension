@@ -8,23 +8,28 @@
     const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
     const instructions = timeline?.instructions || [];
     const users = [];
+    const seenIds = new Set();
     let nextCursor = null;
+    const sinks = {
+      addUser(user) {
+        if (!user?.id || seenIds.has(user.id)) return;
+        seenIds.add(user.id);
+        users.push(user);
+      },
+      setNextCursor(value) { if (value) nextCursor = value; }
+    };
 
     for (const instruction of instructions) {
+      if (instruction.entry) {
+        extractUserTimelineEntry(instruction.entry, sinks);
+      }
       const entries = instruction.entries || [];
-      if (instruction.type !== 'TimelineAddEntries' && entries.length === 0) continue;
       for (const entry of entries) {
-        const entryId = entry.entryId || '';
-        if (entryId.startsWith('user-')) {
-          const userResult = entry.content?.itemContent?.user_results?.result;
-          if (userResult && userResult.__typename !== 'UserUnavailable') {
-            const parsed = parseUserObject(userResult);
-            if (parsed) users.push(parsed);
-          }
-        }
-        if (entryId.startsWith('cursor-bottom-')) {
-          nextCursor = entry.content?.value || null;
-        }
+        extractUserTimelineEntry(entry, sinks);
+      }
+      const moduleItems = instruction.moduleItems || [];
+      for (const moduleItem of moduleItems) {
+        walkUserTimelineNode(moduleItem, sinks);
       }
     }
 
@@ -42,6 +47,7 @@
     const screenName = core.screen_name || legacy.screen_name || '';
     const createdAt = core.created_at || legacy.created_at || '';
     const rawImageUrl = result.avatar?.image_url || legacy.profile_image_url_https || '';
+    const expandedUrl = legacy.entities?.url?.urls?.[0]?.expanded_url || legacy.url || '';
 
     return {
       id: result.rest_id,
@@ -49,17 +55,46 @@
       username: screenName,
       bio: (legacy.description || '').replace(/\n/g, ' '),
       location: core.location || legacy.location || '',
-      url: legacy.url || '',
+      url: expandedUrl,
       followers_count: legacy.followers_count || 0,
       following_count: legacy.friends_count || 0,
       tweet_count: legacy.statuses_count || 0,
       listed_count: legacy.listed_count || 0,
-      verified: result.is_blue_verified || false,
+      verified: result.is_blue_verified || legacy.verified || false,
       protected: legacy.protected || false,
       created_at: createdAt,
       profile_image_url: rawImageUrl.replace('_normal', '_400x400'),
       profile_url: `https://x.com/${screenName}`
     };
+  }
+
+  function extractUserTimelineEntry(entry, sinks) {
+    if (!entry) return;
+    const entryId = entry.entryId || '';
+    if (entryId.startsWith('cursor-bottom-')) {
+      sinks.setNextCursor(entry.content?.value || null);
+    }
+    walkUserTimelineNode(entry.content, sinks);
+  }
+
+  function walkUserTimelineNode(node, sinks) {
+    if (!node) return;
+    if (Array.isArray(node)) {
+      for (const item of node) walkUserTimelineNode(item, sinks);
+      return;
+    }
+    if (typeof node !== 'object') return;
+
+    const userResult = node.user_results?.result || node.itemContent?.user_results?.result;
+    if (userResult && userResult.__typename !== 'UserUnavailable') {
+      const parsed = parseUserObject(userResult);
+      if (parsed) sinks.addUser(parsed);
+    }
+    if ((node.__typename === 'TimelineTimelineCursor' || node.cursorType) &&
+        node.cursorType === 'Bottom') {
+      sinks.setNextCursor(node.value || null);
+    }
+    for (const value of Object.values(node)) walkUserTimelineNode(value, sinks);
   }
 
   function parseAboutAccountResponse(data) {

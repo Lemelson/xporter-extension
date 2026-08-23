@@ -1037,7 +1037,7 @@ async function fetchFollowing(userId, cursor = null, count = 100) {
 async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) {
   const auth = await getAuthTokens();
 
-  let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=false`;
+  let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=true`;
   if (cursor && cursor !== '0' && cursor !== '-1') {
     url += `&cursor=${cursor}`;
   }
@@ -1082,7 +1082,7 @@ async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) 
     username: u.screen_name || '',
     bio: (u.description || '').replace(/\n/g, ' '),
     location: u.location || '',
-    url: u.url || '',
+    url: u.entities?.url?.urls?.find(item => item?.expanded_url)?.expanded_url || u.url || '',
     followers_count: u.followers_count || 0,
     following_count: u.friends_count || 0,
     tweet_count: u.statuses_count || 0,
