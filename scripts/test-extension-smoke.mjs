@@ -4,7 +4,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import toolingPolicy from './tooling-policy.js';
 
+const { assertBrowserSmokeCanLaunch } = toolingPolicy;
+try {
+  assertBrowserSmokeCanLaunch();
+} catch (error) {
+  console.error(`${error.code || 'BROWSER_SMOKE_BLOCKED'}: ${error.message}`);
+  process.exit(1);
+}
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const EXTENSION_ROOT = path.resolve(process.cwd());
@@ -48,7 +56,7 @@ async function main() {
     assert.equal(await popup.locator('#exportMode').inputValue(), 'posts');
     assert.equal(await popup.locator('#outputFormat').inputValue(), 'csv');
     const txtOption = popup.locator('#outputFormat option[value="txt"]');
-    assert.equal(await txtOption.textContent(), 'TXT (Posts only)');
+    assert.equal(await txtOption.textContent(), 'TXT');
     assert.equal(await txtOption.isDisabled(), false, 'posts-only TXT must be available for posts');
     await popup.locator('#exportMode').selectOption('followers');
     assert.equal(await txtOption.isDisabled(), true, 'posts-only TXT must be disabled for user-list exports');
@@ -155,7 +163,10 @@ async function main() {
     });
     await popup.locator('#copyBtn').click();
     await popup.waitForFunction(() => globalThis.__xporterCopiedText.includes('PROFILE'));
-    assert.match(await popup.evaluate(() => globalThis.__xporterCopiedText), /Post: \(A compact test post\)/);
+    assert.match(
+      await popup.evaluate(() => globalThis.__xporterCopiedText),
+      /Post: "A compact test post"/
+    );
 
     await popup.locator('[data-tab="settings"]').click();
     await popup.locator('#tab-settings').waitFor({ state: 'visible' });

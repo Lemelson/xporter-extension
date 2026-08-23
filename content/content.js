@@ -148,14 +148,7 @@ window.addEventListener('popstate', () => {
 // extension always has up-to-date queryIds without fragile JS-bundle scanning.
 // This listener must attach at document_start so early captures are not lost.
 
-// Must mirror TRACKED in content/interceptor.js — anything else is dropped.
-const RELAY_TRACKED_OPERATIONS = new Set([
-    'Followers', 'Following', 'BlueVerifiedFollowers',
-    'UserTweets', 'UserOriginalsTimeline', 'UserRepliesTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds',
-    'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'
-]);
-const RELAY_MAX_BODY_CHARS = 8 * 1024 * 1024; // must match interceptor.js
-const RELAY_MAX_SEEN_POSTS = 250;
+const CAPTURE_CONTRACT = globalThis.XPorterCaptureContract;
 const RELAY_POST_ID_PATTERN = /^\d{5,30}$/;
 const RELAY_POST_OPERATION_PATTERN = /(Timeline|Tweets|TweetDetail|Bookmarks|Likes|Community|ListLatest|UserMedia)/i;
 
@@ -168,7 +161,7 @@ function sanitizeSeenPost(post) {
     };
     return {
         id: String(post.id),
-        text: text(post.text, 25000),
+        text: text(post.text, CAPTURE_CONTRACT.MAX_POST_TEXT_CHARS),
         tweet_url: text(post.tweet_url, 300),
         language: text(post.language, 16),
         created_at: text(post.created_at, 80),
@@ -209,9 +202,10 @@ window.addEventListener('message', (event) => {
     }
     if (event.data?.type === '__XPORTER_GRAPHQL_RESPONSE__') {
         const { operationName, bodyText } = event.data;
-        if (typeof operationName !== 'string' || !RELAY_TRACKED_OPERATIONS.has(operationName)) return;
+        if (!CAPTURE_CONTRACT.isTrackedOperation(operationName)) return;
         // Cap relayed body size — oversized payloads are dropped, not truncated.
-        if (typeof bodyText !== 'string' || bodyText.length > RELAY_MAX_BODY_CHARS) return;
+        if (typeof bodyText !== 'string' ||
+            bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) return;
         const status = Number(event.data.status);
         if (!Number.isInteger(status) || status < 100 || status > 599) return;
         if (typeof event.data.url !== 'string' || !event.data.url.includes('/i/api/graphql/')) return;
@@ -229,12 +223,13 @@ window.addEventListener('message', (event) => {
         if (typeof operationName !== 'string' ||
             !/^[A-Za-z0-9_]{1,80}$/.test(operationName) ||
             !RELAY_POST_OPERATION_PATTERN.test(operationName)) return;
-        if (!Array.isArray(posts) || posts.length === 0 || posts.length > RELAY_MAX_SEEN_POSTS) return;
+        if (!Array.isArray(posts) || posts.length === 0 ||
+            posts.length > CAPTURE_CONTRACT.MAX_POSTS_PER_MESSAGE) return;
         if (!posts.every(post => (
             post && typeof post === 'object' &&
             RELAY_POST_ID_PATTERN.test(String(post.id || '')) &&
             typeof post.text === 'string' &&
-            post.text.length <= 25000
+            post.text.length <= CAPTURE_CONTRACT.MAX_POST_TEXT_CHARS
         ))) return;
         if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
         chrome.runtime.sendMessage({

@@ -10,6 +10,7 @@ importScripts(
     '../utils/native-request-template.js',
     '../utils/transaction-id.js',
     '../utils/api.js',
+    './export-policy.js',
     '../utils/rateLimit.js',
     '../utils/columns-i18n.js',
     '../utils/csv.js',
@@ -38,180 +39,46 @@ let exportLoopPromise = null;
 let lastTransientStatus = null;
 let manualWaitUntil = null;
 
-const RATE_LIMIT_KEYS_BY_MODE = {
-    posts: 'UserTweets',
-    bookmarks: 'Bookmarks',
-    bookmark_context: 'TweetResultsByRestIds',
-    followers: 'Followers',
-    following: 'Following',
-    verified_followers: 'BlueVerifiedFollowers'
-};
-
-function profileFeedForSettings(settings = {}) {
-    if (['all', 'posts', 'replies', 'legacy_with_replies', 'legacy_posts']
-        .includes(settings.profileFeed)) {
-        return settings.profileFeed;
-    }
-    if (Object.hasOwn(settings, 'includeReplies')) {
-        return settings.includeReplies === true
-            ? 'legacy_with_replies'
-            : 'legacy_posts';
-    }
-    return 'all';
+// The three limiters belong to one export lifecycle even though they pace
+// different X endpoints. Keep lifecycle operations on this canonical list so
+// Stop, status, live settings, and terminal cleanup cannot omit one.
+function exportRateLimiterResources() {
+    return [
+        { limiter: rateLimiter, mode: currentExport?.exportMode },
+        { limiter: bookmarkContextRateLimiter, mode: 'bookmark_context' },
+        { limiter: aboutRateLimiter, mode: 'about_account' }
+    ].filter(resource => resource.limiter);
 }
 
-function profileFeedAllowsTweet(settings, tweet) {
-    const feed = profileFeedForSettings(settings);
-    if (feed === 'replies') return tweet?.type === 'reply';
-    if (feed === 'posts' || feed === 'legacy_posts') return tweet?.type !== 'reply';
-    return true;
+function clearExportRateLimiters() {
+    rateLimiter = null;
+    bookmarkContextRateLimiter = null;
+    aboutRateLimiter = null;
 }
 
-function hasExplicitPostSelection(settings = {}) {
-    return settings.postSelectionVersion === 1 ||
-        Object.hasOwn(settings, 'includeOriginalPosts') ||
-        Object.hasOwn(settings, 'includeQuotes');
-}
-
-function postFeedPlanForSettings(settings = {}) {
-    if (!hasExplicitPostSelection(settings)) {
-        return [profileFeedForSettings(settings)];
-    }
-
-    const plan = [];
-    const needsNonReplyFeed = settings.includeOriginalPosts === true ||
-        settings.includeQuotes === true ||
-        settings.includeRetweets === true ||
-        settings.includeArticles === true;
-    if (needsNonReplyFeed) {
-        plan.push(settings.includeRetweets === true ? 'all' : 'posts');
-    }
-    if (settings.includeReplies === true) plan.push('replies');
-    return plan;
-}
-
-function postSelectionAllowsTweet(settings = {}, tweet = {}) {
-    if (!hasExplicitPostSelection(settings)) {
-        if (settings.includeRetweets === false && tweet.type === 'retweet') return false;
-        if (!profileFeedAllowsTweet(settings, tweet)) return false;
-        return settings.includeArticles !== false || tweet.type !== 'article';
-    }
-
-    if (tweet.type === 'retweet') return settings.includeRetweets === true;
-    if (tweet.type === 'article') return settings.includeArticles === true;
-    if (tweet.type === 'reply') return settings.includeReplies === true;
-    if (tweet.type === 'quote') return settings.includeQuotes === true;
-    return tweet.type === 'tweet' && settings.includeOriginalPosts === true;
-}
-
-function rateLimitKeyForMode(mode, settings) {
-    if (mode === 'about_account') return 'AboutAccountQuery';
-    if (mode === 'posts') {
-        const feed = profileFeedForSettings(settings);
-        if (feed === 'posts') return 'UserOriginalsTimeline';
-        if (feed === 'replies') return 'UserRepliesTimeline';
-        if (feed === 'legacy_with_replies') return 'UserTweetsAndReplies';
-    }
-    return RATE_LIMIT_KEYS_BY_MODE[mode];
-}
+// Keep the historical helper names in this worker's lexical scope so existing
+// orchestration and VM tests use the extracted policy without call-site churn.
+const {
+    profileFeedForSettings,
+    profileFeedAllowsTweet,
+    hasExplicitPostSelection,
+    postFeedPlanForSettings,
+    postSelectionAllowsTweet,
+    rateLimitKeyForMode,
+    clampCustomSpeed,
+    resolveAboutAccountMaxRetries,
+    resolveSpeedPreset,
+    resolveSafetyBreak,
+    buildRateLimiterOptions,
+    resolveAboutAccountBatchSize,
+    buildResumeSettings,
+    PACING_SETTING_KEYS
+} = XPorterExportPolicy;
 
 // Synchronous latch closing the async window between the `running` check and
 // `currentExport` assignment in start/resume (two rapid START_EXPORT messages
 // could otherwise both pass the guard and spawn two competing loops).
 let exportStarting = false;
-
-// Clamp a user-typed custom-speed value to its [min, max, default] range.
-function clampCustomSpeed(value, range) {
-    const [min, max, def] = range || [];
-    let v = parseLocalizedDecimal(value, def);
-    if (Number.isFinite(min)) v = Math.max(min, v);
-    if (Number.isFinite(max)) v = Math.min(max, v);
-    return v;
-}
-
-function resolveAboutAccountMaxRetries(settings = {}) {
-    const [min, max, fallback] =
-        XPORTER_CONFIG.ABOUT_ACCOUNT_RETRY_RANGE || [1, 1440, 5];
-    const requested = Number.parseInt(settings.aboutAccountMaxRetries, 10);
-    const value = Number.isFinite(requested) ? requested : fallback;
-    return Math.max(min, Math.min(max, value));
-}
-
-// Build the effective pacing preset for the export mode. Posts and user-list
-// exports have independent saved controls because their X endpoints have very
-// different budgets and safe fallback delays.
-function resolveSpeedPreset(settings, mode = 'posts') {
-    const presets = XPORTER_CONFIG.SPEED_PRESETS || {};
-    const isUserList = mode !== 'posts' && mode !== 'bookmarks' && mode !== 'bookmark_context';
-    const speed = settings[isUserList ? 'userExportSpeed' : 'exportSpeed'] || 'standard';
-    const customDelayKey = isUserList ? 'userCustomDelaySec' : 'customDelaySec';
-    if (speed === 'custom') {
-        const L = XPORTER_CONFIG.CUSTOM_SPEED_LIMITS || {};
-        const delayMs = clampCustomSpeed(settings[customDelayKey], L.delaySec) * 1000;
-        return {
-            adaptiveFloor: delayMs,
-            adaptivePad: 0,
-            budgetFraction: 1,
-            // The user picked an explicit pace. Keep it even when X's
-            // advertised budget runs low; only a real failure may pause.
-            raceReserve: 2,
-            // Custom means the number the user typed, without preset jitter.
-            customFallbackDelays: [delayMs, delayMs]
-        };
-    }
-    return presets[speed] || presets.standard || {};
-}
-
-function resolveSafetyBreak(settings, mode = 'posts') {
-    const isUserList = mode !== 'posts' && mode !== 'bookmarks' && mode !== 'bookmark_context';
-    const prefix = isUserList ? 'user' : 'post';
-    if (settings[`${prefix}SafetyBreakEnabled`] !== true) {
-        return { alwaysBatchCooldown: false };
-    }
-    const L = XPORTER_CONFIG.CUSTOM_SPEED_LIMITS || {};
-    return {
-        alwaysBatchCooldown: true,
-        batchSize: clampCustomSpeed(settings[`${prefix}SafetyBreakEvery`], L.batch),
-        cooldownDuration:
-            clampCustomSpeed(settings[`${prefix}SafetyBreakMin`], L.cooldownMin) * 60000
-    };
-}
-
-function buildRateLimiterOptions(settings, mode) {
-    const adaptivePacing = settings.adaptivePacing !== false;
-    // Everything else (floors, pads, fallback delays, batch rhythm) is derived
-    // from the mode-specific user-facing speed control.
-    const preset = resolveSpeedPreset(settings, mode);
-    const safetyBreak = resolveSafetyBreak(settings, mode);
-    const configuredFallback = preset.customFallbackDelays ||
-        (adaptivePacing ? XPORTER_CONFIG.FALLBACK_REQUEST_DELAYS?.[mode] : null);
-    const scale = preset.fallbackScale || 1;
-    const fallbackMinDelay = Math.round((configuredFallback?.[0] || settings.requestDelay) * scale);
-    const fallbackMaxDelay = Math.round((configuredFallback?.[1] || fallbackMinDelay / scale) * scale);
-    const endpointKey = rateLimitKeyForMode(mode, settings);
-
-    return {
-        requestDelay: settings.requestDelay,
-        batchSize: safetyBreak.batchSize || settings.batchSize,
-        cooldownDuration: safetyBreak.cooldownDuration || settings.cooldownDuration,
-        adaptiveFloor: preset.adaptiveFloor,
-        adaptivePad: preset.adaptivePad,
-        budgetFraction: preset.budgetFraction,
-        raceReserve: preset.raceReserve,
-        alwaysBatchCooldown: safetyBreak.alwaysBatchCooldown,
-        adaptivePacing,
-        maxRetries: mode === 'about_account'
-            ? resolveAboutAccountMaxRetries(settings)
-            : undefined,
-        fallbackMinDelay,
-        fallbackMaxDelay,
-        rateLimitProvider: () => (
-            endpointKey && typeof XPorterAPI?.getRateLimit === 'function'
-                ? XPorterAPI.getRateLimit(endpointKey)
-                : null
-        )
-    };
-}
 
 function createRateLimiter(settings, mode) {
     return new RateLimitManager(buildRateLimiterOptions(settings, mode));
@@ -366,6 +233,7 @@ async function handleMessage(message, sender) {
             if (!await XPorterStorage.clearExportState()) {
                 return { error: 'STORAGE_FULL' };
             }
+            clearExportRateLimiters();
             currentExport = null;
             setBadge('');
             return { success: true };
@@ -490,9 +358,8 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
 
     // Initialize rate limiter with current settings. The provider lets it pace
     // adaptively from X's live x-rate-limit-* budget (fixed delay is fallback).
+    clearExportRateLimiters();
     rateLimiter = createRateLimiter(settings, mode);
-    bookmarkContextRateLimiter = null;
-    aboutRateLimiter = null;
     aboutAccountCache = null;
     lastTransientStatus = null;
     _overlayI18n = null; // re-read the UI language for this export's overlay
@@ -504,6 +371,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
 
     // Clear previous export data
     if (!await XPorterStorage.clearExportState()) {
+        clearExportRateLimiters();
         return { error: 'STORAGE_FULL' };
     }
 
@@ -539,7 +407,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
         await saveCurrentState();
     } catch (error) {
         currentExport = null;
-        rateLimiter = null;
+        clearExportRateLimiters();
         return { error: error.message };
     }
 
@@ -1787,24 +1655,6 @@ function aboutDetailsForUser(about = {}) {
     };
 }
 
-function resolveAboutAccountBatchSize(settings = {}) {
-    const presets = XPORTER_CONFIG.ABOUT_ACCOUNT_BATCH_SIZES || {
-        turtle: 1,
-        careful: 3,
-        standard: 5,
-        fast: 10,
-        turbo: 20
-    };
-    const speed = settings.aboutAccountSpeed || 'standard';
-    if (speed !== 'custom') return presets[speed] || presets.standard || 5;
-
-    const [min, max, fallback] =
-        XPORTER_CONFIG.ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE || [1, 50, 5];
-    const requested = Number.parseInt(settings.aboutAccountCustomBatchSize, 10);
-    const value = Number.isFinite(requested) ? requested : fallback;
-    return Math.max(min, Math.min(max, value));
-}
-
 async function enrichUsersWithAboutDetails(users, onBatch = null) {
     const enriched = [];
 
@@ -1867,11 +1717,8 @@ async function stopExport() {
     if (currentExport?.running) {
         currentExport.running = false;
     }
-    if (rateLimiter) {
-        rateLimiter.abort();
-    }
-    if (aboutRateLimiter) {
-        aboutRateLimiter.abort();
+    for (const { limiter } of exportRateLimiterResources()) {
+        limiter.abort();
     }
     XPorterAPI.abortActiveRequests?.();
     await closeSearchCaptureTab();
@@ -1918,16 +1765,6 @@ async function resumePostsOnly() {
     }
 }
 
-// Settings that only control request pacing, never the shape of the data.
-const PACING_SETTING_KEYS = [
-    'exportSpeed', 'customDelaySec',
-    'postSafetyBreakEnabled', 'postSafetyBreakEvery', 'postSafetyBreakMin',
-    'userExportSpeed', 'userCustomDelaySec',
-    'userSafetyBreakEnabled', 'userSafetyBreakEvery', 'userSafetyBreakMin',
-    'aboutAccountSpeed', 'aboutAccountCustomBatchSize', 'aboutAccountMaxRetries',
-    'adaptivePacing', 'requestDelay', 'batchSize', 'cooldownDuration'
-];
-
 function applyLivePacingSettings(settingsPatch = {}) {
     if (!currentExport?.running || !currentExport.settings) return false;
 
@@ -1960,41 +1797,13 @@ function applyLivePacingSettings(settingsPatch = {}) {
     // the limiter here would lose counters or turn a harmless settings change
     // into a failed export.
     if (pacingChanged) {
-        rateLimiter?.reconfigure?.(
-            buildRateLimiterOptions(currentExport.settings, currentExport.exportMode)
-        );
-        aboutRateLimiter?.reconfigure?.(
-            buildRateLimiterOptions(currentExport.settings, 'about_account')
-        );
+        for (const { limiter, mode } of exportRateLimiterResources()) {
+            limiter.reconfigure?.(
+                buildRateLimiterOptions(currentExport.settings, mode)
+            );
+        }
     }
     return true;
-}
-
-// Resume with the same FILTERS that produced the saved rows (the export
-// snapshot; changing includeRetweets mid-export would make one half of the
-// file contradict the other), but with the user's CURRENT pacing: switching
-// to a slower speed is the natural escape hatch after rate limits, and a
-// snapshot that silently ignored it would trap the export at the old pace.
-// Merging on top of stored defaults keeps states from before snapshots
-// were persisted working.
-function buildResumeSettings(storedSettings, snapshot) {
-    const settings = { ...storedSettings, ...(snapshot || {}) };
-    if (snapshot &&
-        snapshot.postSelectionVersion !== 1 &&
-        !snapshot.profileFeed &&
-        Object.hasOwn(snapshot, 'includeReplies')) {
-        // A saved cursor belongs to the exact endpoint that produced it. Keep
-        // pre-redesign exports on their legacy operation until that export is
-        // completed instead of reusing the cursor against a different feed.
-        settings.profileFeed = snapshot.includeReplies === true
-            ? 'legacy_with_replies'
-            : 'legacy_posts';
-        delete settings.includeReplies;
-    }
-    for (const key of PACING_SETTING_KEYS) {
-        if (storedSettings[key] !== undefined) settings[key] = storedSettings[key];
-    }
-    return settings;
 }
 
 async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}) {
@@ -2026,8 +1835,8 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
         settings.quantityLimit = limitOverride;
     }
 
+    clearExportRateLimiters();
     rateLimiter = createRateLimiter(settings, savedState.exportMode || 'posts');
-    aboutRateLimiter = null;
     aboutAccountCache = null;
     lastTransientStatus = null;
     // Restore request counters so the batch/cooldown rhythm and the "batch N"
@@ -2076,7 +1885,7 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
         await saveCurrentState();
     } catch (error) {
         currentExport = null;
-        rateLimiter = null;
+        clearExportRateLimiters();
         return { error: error.message };
     }
 
@@ -2109,8 +1918,8 @@ async function getExportStatus() {
 
     if (currentExport) {
         const waitUntil = Math.max(
-            rateLimiter?.waitUntil || 0,
-            aboutRateLimiter?.waitUntil || 0,
+            ...exportRateLimiterResources()
+                .map(({ limiter }) => limiter.waitUntil || 0),
             manualWaitUntil || 0
         ) || null;
         const transientStatus = lastTransientStatus?.status;
@@ -2349,7 +2158,8 @@ function launchExportLoop(logPrefix) {
             // The user already pressed Stop — a late failure from the aborted
             // in-flight request must land as the 'stopped' they asked for,
             // not overwrite it with a scary terminal error.
-            if ((rateLimiter?._aborted || aboutRateLimiter?._aborted) &&
+            if (exportRateLimiterResources()
+                .some(({ limiter }) => limiter._aborted) &&
                 currentExport.running === false) {
                 currentExport.status = 'stopped';
                 await saveCurrentState({ bestEffort: true });
@@ -2373,7 +2183,10 @@ function launchExportLoop(logPrefix) {
             XPorterStorage.recordExportError(currentExport.error).then(XPorterFeedback.refresh).catch(() => {});
         })
         .finally(() => {
-            if (exportLoopPromise === tracked) exportLoopPromise = null;
+            if (exportLoopPromise === tracked) {
+                exportLoopPromise = null;
+                clearExportRateLimiters();
+            }
         });
     exportLoopPromise = tracked;
 }

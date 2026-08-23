@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the local experimental **v1.6.1** runtime (2026-08-17), which restores the packaged v1.5.9 feature set for local testing.
+> Last verified against the local experimental **v1.6.1** runtime (2026-08-23), which restores the packaged v1.5.9 feature set for local testing.
 
 ---
 
@@ -55,8 +55,8 @@
 All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage`:
 - **popup/export → service-worker**: commands (`START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `DOWNLOAD_EXPORT`, `SAVE_SETTINGS`, …)
 - **service-worker → popup/export**: live status (`EXPORT_STATUS_UPDATE` broadcast)
-- **content.js → service-worker**: username detection (`SET_USERNAME`), captured queryIds, and compact seen-post batches
-- **interceptor.js → content.js**: validated `window.postMessage` events for queryIds, date-range payloads, and passively seen posts (page MAIN world → content-script isolated world)
+- **content.js → service-worker**: username/current-account detection, captured request templates, date-range payloads, and compact seen-post batches
+- **interceptor.js → content.js**: `window.postMessage` events constrained by the immutable `XPorterCaptureContract`; the isolated relay and worker/API still revalidate at their own trust boundaries
 
 ### Export Flow (High-Level)
 1. User enters username + options in the popup
@@ -65,8 +65,8 @@ All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage
 4. Fetches data in batches via the appropriate endpoint, parsing each page
 5. Items are buffered in memory and flushed to `chrome.storage.local` in batches of 50
    - Cursor exports retain only a bounded recent-ID overlap window in memory; saved batches remain the durable source of truth
-6. `RateLimitManager` manages spacing, batch cooldowns, and retries
-7. On completion the user clicks Download → small exports become one file; large exports are read from storage incrementally and downloaded as numbered parts through `chrome.downloads`
+6. The worker manages primary, bookmark-context, and About-account `RateLimitManager` instances as one cancellable/reconfigurable export lifecycle
+7. On Download, `downloads.js` freezes one transaction (state, plan, settings, timestamp, photo permission, bounded photo cache); small exports become one file and large exports stream numbered parts without rereading mutable settings
 8. **Posts + date range** takes a different path — see §5.
 
 ---
@@ -80,14 +80,12 @@ xporter/
 ├── CLAUDE.md                    # Short orientation / file map (auto-read by Claude Code)
 ├── README.md                    # User-facing documentation
 ├── LICENSE                      # Custom license
-├── index.html                  # GitHub Pages landing page (marketing, not part of the extension)
-├── privacy-policy.html          # Hosted privacy policy
-├── icon128.png                  # Loose copy of the store icon (also in icons/ and docs/)
 │
 ├── background/
-│   ├── service-worker.js        # 🔑 CORE: export engine, message router, state machine,
-│   │                            #         date-range search-capture orchestration
-│   ├── downloads.js             # CSV/JSON/XLSX + seen-post download handoff
+│   ├── service-worker.js        # ~2,300-line coordinator: messages, export lifecycle,
+│   │                            # persistence, search capture, status/badges
+│   ├── export-policy.js         # Pure immutable selection/pacing/resume decisions
+│   ├── downloads.js             # Transactional CSV/JSON/XLSX/TXT + seen-post handoff
 │   └── uninstall-feedback.js    # Anonymous uninstall URL construction + refresh throttle
 │
 ├── content/
@@ -98,7 +96,7 @@ xporter/
 │   │                            #   Manifest-registered at document_start (isolated world).
 │   └── interceptor.js           # Manifest-registered at document_start in the page MAIN
 │                                #   world (Chrome 111+); wraps fetch/XHR to capture live
-│                                #   GraphQL queryIds + timeline payloads
+│                                #   GraphQL request templates + timeline payloads
 │
 ├── popup/                       # Compact popup UI (~350px)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
@@ -119,22 +117,29 @@ xporter/
 │   ├── api.js                   # 🔑 X GraphQL client, auth, queryId discovery, cancellation
 │   ├── api-parsers.js           # Pure X response normalization (users/posts/cursors)
 │   ├── api-features.js          # GraphQL feature-flag constant objects (split from api.js)
+│   ├── capture-contract.js       # Immutable cross-world operations and payload bounds
+│   ├── native-request-template.js # Sanitized captured request-template validation
+│   ├── transaction-id.js        # X client transaction header generation
 │   ├── rateLimit.js             # RateLimitManager (spacing, batch cooldown, retry, abort)
 │   ├── csv.js                   # CSV / XLSX output generation (JSON is built in the SW)
-│   ├── storage.js               # chrome.storage.local wrapper (quota-aware) + settings
+│   ├── columns-i18n.js          # Localized CSV/XLSX headers
+│   ├── storage.js               # Storage + queued settings/usage mutations
 │   ├── post-database.js         # IndexedDB seen-post store (dedupe by ID; 50k cap)
+│   ├── usage-tracker.js         # Popup open/active-time signals
 │   └── shared.js                # 🔑 Shared popup/UI helpers (see §4.6)
 │
 ├── _locales/                    # Chrome STORE metadata i18n (manifest __MSG_extName__ etc.)
 │   └── en/, ru/, … (messages.json per language)  ← NOT the same as popup/locales/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
-│   ├── package.sh                             # allowlist-based CWS zip builder (use this!)
-│   ├── discover_endpoints.js                  # find current queryIds from a console
-│   ├── debug-date-range-playwright.mjs        # Playwright repro for date-range
-│   └── debug-extension-date-range-playwright.mjs
+│   ├── test-all.js              # Canonical ordered 11-suite deterministic gate
+│   ├── test-extension-core.js   # 74-test aggregator; suites in test-extension-core/
+│   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
+│   │                            # bookmark lifecycle/API cancellation/capture/export policy
+│   ├── package.sh               # Atomic allowlist CWS ZIP builder (runs test-all)
+│   └── debug-*.mjs              # Authenticated/browser diagnostic scripts
 │
-├── docs/                        # GitHub Pages copy (icon, index, privacy)
+├── docs/                        # Sole GitHub Pages source: site, privacy, feedback, assets
 ├── icons/                       # icon16/48/128.png
 └── .github/workflows/           # CI (e.g. Pages deploy)
 ```
@@ -162,7 +167,7 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 | `SPEED_PRESETS` / `CUSTOM_SPEED_LIMITS` | turbo…turtle / clamp ranges | Export Speed presets: adaptive floor/pad, `budgetFraction`, `raceReserve`, fallback scale + batch rhythm; clamp ranges for the Custom tier (§4.4) |
 | `ENDPOINT_CACHE_TTL` | `86400000` | 24-h queryId cache (stale ids self-heal via `withStaleRetry`; a failed pass caches fallbacks for only 10 min) |
 | `API_FETCH_TIMEOUT` | `30000` | deadline per GraphQL/REST fetch (`fetchTimed`) |
-| `DISCOVERY_FETCH_TIMEOUT` / `DISCOVERY_TOTAL_TIMEOUT` | `15000` / `25000` | per-fetch / whole-pass discovery deadlines (single-flight; timed-out pass keeps scanning in background to refresh the cache) |
+| `DISCOVERY_FETCH_TIMEOUT` / `DISCOVERY_TOTAL_TIMEOUT` | `15000` / `25000` | per-fetch / whole-pass discovery deadlines; the shared generation aborts underlying fetches on total timeout and cannot commit afterward |
 | `TWEETS_PER_BATCH` | `50` | items per storage batch |
 | `FALLBACK_BEARER_TOKEN` | `AAAA…` | static public bearer |
 
@@ -171,23 +176,23 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 ### 4.2. `utils/api.js` + `utils/api-parsers.js` + `utils/api-features.js` — X GraphQL Integration
 The most complex, most fragile area.
 
-- **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 24 h (persisted; failed passes cache `FALLBACK_ENDPOINTS` for 10 min only). One scan at a time (single-flight), whole pass capped at `DISCOVERY_TOTAL_TIMEOUT`. `FALLBACK_ENDPOINTS` go stale when X ships new bundles — update periodically. On 401/403 a discovered bearer is reverted to the built-in public token (`noteAuthFailure`).
-- **Live queryId capture**: `content/interceptor.js` also captures real queryIds (and `SearchTimeline` bodies) from X's own traffic and forwards them to the SW, which is more reliable than scraping bundles.
+- **Endpoint discovery** (`discoverEndpoints`): fetch `x.com` HTML → find `client-web*.js` bundles → regex for `queryId:"…",operationName:"…"` → cache 24 h (persisted; failed passes cache `FALLBACK_ENDPOINTS` for 10 min only). Concurrent callers share one generation; the total deadline aborts its underlying fetches, and generation checks prevent a timed-out scan from committing stale results. `FALLBACK_ENDPOINTS` go stale when X ships new bundles — update periodically. On 401/403 a discovered bearer is reverted to the built-in public token (`noteAuthFailure`).
+- **Live request capture**: `content/interceptor.js` captures sanitized operation/queryId/features/field-toggle templates (plus `SearchTimeline` bodies) from X's own traffic. `utils/capture-contract.js` supplies the immutable operation/size limits in both worlds; isolated content and the worker/API apply their own sender and payload validation.
 - **Feature flags** (`api-features.js`): `USER_FEATURES`, `TWEETS_FEATURES` (large!), `FOLLOWERS_FEATURES`. Missing/renamed flags → `400 Bad Request`. To fix: copy the live `features` object from a real x.com GraphQL request in DevTools.
 - **`withStaleRetry(key, fn)`**: catches `STALE_QUERY_ID`, forces re-discovery, retries once. Self-healing against X changes.
 - **Auth**: reads cookies directly — `ct0` → `x-csrf-token`, `auth_token` → session. Requests go to `https://x.com/i/api/graphql/…` and use `encodeURIComponent` (NOT `URLSearchParams` — X rejects `+` for spaces).
-- **Target ops**: `UserByScreenName`; post-type plans use `UserOriginalsTimeline` for originals/quotes/articles, `UserTweets` when reposts are selected, and `UserRepliesTimeline` for replies (mixed selections run sequential passes); user lists `Followers`, `Following`, `BlueVerifiedFollowers`; `SearchTimeline` for date range.
+- **Target ops**: identity/enrichment `UserByScreenName`, `AboutAccountQuery`; posts `UserOriginalsTimeline`, `UserTweets`, `UserRepliesTimeline` (plus legacy `UserTweetsAndReplies` recovery); personal `Bookmarks` with `TweetResultsByRestIds` context; user lists `Followers`, `Following`, `BlueVerifiedFollowers`; `SearchTimeline` for date range.
 - **Parser seam**: `api-parsers.js` owns response-shape traversal and normalized rows; `api.js` owns network/auth/queryId behavior only.
 - **Cancellation**: `XPorterAPI.abortActiveRequests()` aborts an in-flight fetch when the user presses Stop; fetch and response-body reads share the same deadline.
 
-### 4.3. `background/service-worker.js` — Export Engine
-Central orchestrator + message router. Loads utils via `importScripts` (§11). Key state:
+### 4.3. `background/service-worker.js` — Export Coordinator
+The roughly 2,300-line worker is the central message router and mutable lifecycle coordinator. Pure export selection, rate-limit option derivation, and resume-setting merge rules live in `background/export-policy.js`; downloads and persistence remain behind their own modules. Key state:
 
 ```javascript
 currentExport = {
   running, username,
-  exportMode: 'posts'|'followers'|'following'|'verified_followers',
-  outputFormat: 'csv'|'json'|'xlsx',
+  exportMode: 'posts'|'bookmarks'|'followers'|'following'|'verified_followers',
+  outputFormat: 'csv'|'json'|'xlsx'|'txt',
   dateFrom, dateTo,        // posts only → triggers the search-capture path (§5)
   settings, tweetCount,    // "tweetCount"/"tweetBuffer" = item count/buffer (historical names)
   totalBatches, tweetBuffer, userId, cursor,
@@ -195,12 +200,21 @@ currentExport = {
 }
 ```
 
-**Message types** (`onMessage` cases): `SET_USERNAME`, `GET_USERNAME`, `START_EXPORT`, `STOP_EXPORT`, `RESUME_EXPORT` (optional `extraItems` — "+N more" becomes a per-export `limitOverride` baked into the settings snapshot and persisted with the export state; the stored `quantityLimit` setting is NEVER modified by a resume. A resume keeps the snapshot's data FILTERS but takes PACING keys from the current stored settings — `buildResumeSettings` in the SW — so slowing the Export Speed down actually applies to the resumed run), `GET_STATUS`, `GET_DOWNLOAD_PLAN`, `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`/`DOWNLOAD_HISTORY_ENTRY`, `GET_EXPORT_TEXT` (returns the already-collected posts-only TXT to the popup for a user-triggered clipboard copy), `SAVE_SETTINGS`/`GET_SETTINGS`, `CLEAR_EXPORT`, `GET_EXPORT_HISTORY`/`DELETE_HISTORY_ENTRY`/`CLEAR_HISTORY`, `DISCOVERED_QUERYID`/`PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`/`DOWNLOAD_FEED_DB`/`CLEAR_FEED_DB`. `SAVE_SETTINGS` applies pacing plus `quantityLimit` to an ordinary active export; an explicit per-run `limitOverride` from "+N more" takes precedence. Worker-to-popup broadcasts include `EXPORT_STATUS_UPDATE` and multipart `DOWNLOAD_PROGRESS`/`DOWNLOAD_COMPLETE`/`DOWNLOAD_ERROR`.
+**Message types** (`onMessage` cases):
+- identity/settings: `SET_USERNAME`, `GET_USERNAME`, `SET_CURRENT_ACCOUNT`, `GET_CURRENT_ACCOUNT`, `SAVE_SETTINGS`, `GET_SETTINGS`;
+- lifecycle/status: `START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `RESUME_EXPORT`, `RESUME_POSTS_ONLY`, `CLEAR_EXPORT`;
+- current/history downloads: `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`, `GET_DOWNLOAD_PLAN`, `GET_EXPORT_TEXT`, `DOWNLOAD_HISTORY_ENTRY`, `GET_EXPORT_HISTORY`, `DELETE_HISTORY_ENTRY`, `CLEAR_HISTORY`;
+- page capture/local dataset: `DISCOVERED_REQUEST_TEMPLATE`, `PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`, `DOWNLOAD_FEED_DB`, `CLEAR_FEED_DB`;
+- anonymous usage: `XP_SESSION_OPEN`, `XP_ACTIVE_TICK`.
 
-**Lifecycle**: Chrome can kill the SW mid-export. State is saved to storage after each batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds default settings.
+`RESUME_EXPORT.extraItems` becomes a persisted per-run `limitOverride`; it never rewrites the stored `quantityLimit`. Resume keeps snapshot filters but takes current pacing keys through `XPorterExportPolicy.buildResumeSettings`. Worker broadcasts include `EXPORT_STATUS_UPDATE` and multipart `DOWNLOAD_PROGRESS`/`DOWNLOAD_COMPLETE`/`DOWNLOAD_ERROR`.
+
+**Lifecycle**: Chrome can kill the worker mid-export, so state is saved after each page/batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds defaults. One export may own three limiter slots—primary feed, bookmark reply-context, and About-account enrichment. Stop, live pacing changes, terminal/error cleanup, and fresh-run initialization operate through the canonical limiter-resource list so secondary work cannot survive the export.
 
 ### 4.4. `utils/rateLimit.js` — `RateLimitManager`
 Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
+
+`background/export-policy.js` is the pure facade for feed selection, pacing keys/options, About concurrency/retries, and resume merging. The worker owns limiter instances and reconfigures all active instances in place so live settings apply on the next request without discarding counters.
 
 **Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for the active profile-feed operation (`UserTweets`, `UserOriginalsTimeline`, or `UserRepliesTimeline`) and for `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing at their advertised delay; advertised headers are advisory, and only an actual 429 enters the one-minute retry wait. Missing/stale headers use mode-specific fallback delays. Optional Scheduled breaks independently opt a mode into a longer batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders ordinary pacing with an amber bar, Scheduled breaks with a teal pause icon/bar, and X rate limits with a shield plus monochrome diagonal bar. A stable original duration plus absolute `until` keeps wait progress monotonic across the popup's 2-second status polls. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
 
@@ -209,7 +223,9 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 **Scheduled breaks.** `postSafetyBreakEnabled` and `userSafetyBreakEnabled` are off by default and independent from speed. When enabled, the corresponding `*SafetyBreakMin` (fractional dot/comma accepted) and integer `*SafetyBreakEvery` values set `alwaysBatchCooldown`, `cooldownDuration`, and `batchSize` for the active limiter. Posts and Bookmarks share one control; Followers, Following, Verified Followers, and About Account use the user-list control. Live settings changes reconfigure the existing limiter for the next request without replacing it or losing counters.
 
 ### 4.5. `utils/storage.js` — Chrome Storage + Settings
-`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys: `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_tweets_batch_N`. `loadSettings()` returns defaults merged with saved values; `saveSettings()` also merges partial updates so hidden/runtime settings are not dropped by UI patches:
+`chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys include `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_current_account`, `xporter_tweets_batch_N`, `xporter_export_history`, `xporter_about_account_cache`, and `xporter_usage`.
+
+`loadSettings()` merges defaults with saved values. `saveSettings()` serializes every partial read→merge→write through a recoverable promise queue; a read failure aborts the patch rather than merging into `{}` and wiping unrelated settings. Anonymous usage mutations use a separate recoverable queue so concurrent popup ticks/export events cannot lose increments.
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -241,9 +257,15 @@ Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 - RTL + number-formatting helpers
 
 ### 4.7. `content/content.js` + `content/interceptor.js`
-- **content.js** (isolated world, `document_start`): username detection from the URL (filters reserved paths, handles SPA nav via `MutationObserver`/`popstate`), validates + relays `__XPORTER_QUERYID__` messages to the SW (operation whitelist + queryId regex — the channel is page-spoofable), and drives the date-range search-capture tab.
-- **interceptor.js** (page MAIN world via manifest `"world": "MAIN"`, `document_start`, Chrome 111+ — no `web_accessible_resources`, no script-tag injection): wraps `fetch`/`XHR` to read GraphQL queryIds + `SearchTimeline` response bodies (≤8 MB), posting them back via `window.postMessage` with `location.origin` as target.
-- Validation is layered: content.js → SW (`VALID_LIVE_OPERATIONS` + regex) → `api.js setLiveQueryId` (last gate before URL interpolation).
+- **`utils/capture-contract.js`** loads first in both manifest worlds and exposes frozen tracked-operation and payload-size limits. It contains no credentials or mutable authority.
+- **content.js** (isolated world, `document_start`): detects profile/current-account identity, reconstructs and validates captured request templates, relays bounded date-range/feed payloads, and drives the search-capture tab.
+- **interceptor.js** (MAIN world, `document_start`, Chrome 111+): wraps `fetch`/`XHR` to capture sanitized GraphQL templates plus bounded timeline bodies, posting only to `location.origin`.
+- Validation is layered: MAIN-world capture → isolated relay → worker sender/template validation → `api.js` validation before authenticated request construction.
+
+### 4.8. `background/downloads.js` — Immutable Download Transactions
+`createCurrentDownloadTransaction()` reads export state/settings once, builds the multipart plan once, freezes the settings snapshot, fixes one export timestamp, checks optional photo permission once, and creates one byte-bounded LRU photo cache. Every part consumes that transaction, so changing settings during a download cannot change later filenames, formats, permission behavior, or row planning.
+
+Photo embedding is bounded: at most four concurrent fetch workers, 15 MB per image, credentials omitted, and an abort timeout at least as strict as `API_FETCH_TIMEOUT`. In-flight and retained media URLs share one promise; settled entries are evicted by the 64 MiB / 256-entry default budget, so a much later duplicate may be fetched again instead of growing heap with the whole export. `startCurrentDownload()` owns one detached `activeDownload` plus keepalive and clears both in `finally`, including photo timeouts and other failures.
 
 ---
 
@@ -342,16 +364,18 @@ On `status:'error'` the popup still offers **Download** (when items were collect
 9. **Help-tooltip markup** — keep the `**bold**` spans when editing/translating; aria-labels are auto-stripped.
 10. **FOUC** — `theme-init.js` must stay first in `popup.html`.
 11. **CSS variables** — never hardcode colours.
-12. **`scripts/` and `index.html`/`docs/` are not part of the runtime extension** — dev/marketing only.
+12. **`docs/` is the only Pages source** — root site HTML/icons were removed. `scripts/` and `docs/` are not packaged with the extension.
+13. **Do not bypass mutation queues** — settings patches and usage counters have separate serialized mutation paths in `storage.js`.
+14. **Do not reconstruct current-download state per part** — preserve the immutable transaction, bounded photo cache, in-flight de-duplication, and timeout cleanup.
 
 ---
 
 ## 9. Development Guidelines
 
 ### Add an export mode
-1. Add endpoint to `FALLBACK_ENDPOINTS` + `discoverEndpoints()` in `api.js` (and `interceptor.js` `TRACKED` if capturing live).
+1. Add endpoint to `FALLBACK_ENDPOINTS` + `discoverEndpoints()` in `api.js`; if it is captured live, add it once to `utils/capture-contract.js`.
 2. Add fetch fn (follow `fetchFollowers`) + parser (`parseFollowersResponse`).
-3. Export via `globalThis.XPorterAPI`; dispatch in the SW fetch loop.
+3. Export via `globalThis.XPorterAPI`; put pure selection/pacing rules in `background/export-policy.js` and orchestration in the worker.
 4. Add the UI option in `popup.html`; add CSV headers; add i18n keys to all 14 locales.
 
 ### Add a setting
@@ -367,7 +391,9 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. The static-contract suite checks runtime JavaScript syntax, manifest/import/popup assets, DOM IDs, both 14-locale sets, popup i18n references, and the popup/content/worker message protocol without opening a browser. For a real unpacked-browser check, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 74-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+
+For a real unpacked-browser check, run `node scripts/test-extension-smoke.mjs` outside `CODEX_SANDBOX` with Playwright available. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports; CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 
 **Static-only audit boundary.** A clean local suite proves internal contracts, parsers against fixtures, persistence/rate-limit state, and generated files. It does **not** prove that X's current queryIds, GraphQL feature flags, cookie behavior, or live payload shapes still match the code. Record that distinction explicitly whenever browser/live-X validation is intentionally skipped.
 
@@ -391,10 +417,12 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 ## 11. Script Loading Order
 
 **Service worker** (`importScripts`, order matters):
-`config.js` → `api-features.js` → `api-parsers.js` → `api.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
+`config.js` → `shared.js` → `api-features.js` → `api-parsers.js` → `native-request-template.js` → `transaction-id.js` → `api.js` → `background/export-policy.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
 
 **Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
 `theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `popup.js` → `ladybug.js`.
+
+**Manifest content worlds** (`document_start`): `capture-contract.js` → `native-request-template.js` → `feed-parser.js` → `interceptor.js` in MAIN; `capture-contract.js` → `native-request-template.js` → `content.js` in the isolated world.
 
 ---
 
@@ -403,11 +431,13 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 | Global | Source | Notes |
 |---|---|---|
 | `XPORTER_CONFIG`, `XLog` | `config.js` | constants + logger |
+| `XPorterExportPolicy` | `background/export-policy.js` | frozen pure selection, pacing, About, and resume policy |
 | `XPorterAPI` | `api.js` | `.getUserByScreenName`, `.fetchUserTweets`, `.fetchFollowers/Following/VerifiedFollowers`, `.discoverEndpoints`, search-capture parsers |
 | `XPorterApiParsers` | `api-parsers.js` | Pure user/tweet/timeline normalization |
+| `XPorterNativeTemplate` | `native-request-template.js` | sanitized request-template validation |
 | `RateLimitManager` | `rateLimit.js` | class |
 | `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateXLSX`, `.generateExportFilename` |
-| `XPorterStorage` | `storage.js` | export state, batches, settings, username |
+| `XPorterStorage` | `storage.js` | export state, batches, history, queued settings/usage mutations, identity, About cache |
 | `XPorterFeedback` | `uninstall-feedback.js` | `.refresh`, `.maybeRefresh` |
 | `XPorterDownloads` | `downloads.js` | current download planning/start, incremental multipart generation, history/seen-post downloads |
 

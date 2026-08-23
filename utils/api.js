@@ -311,15 +311,33 @@ async function fetchTimed(url, options = {}, timeoutMs) {
   const ms = timeoutMs || _C.API_FETCH_TIMEOUT || 30000;
   const controller = new AbortController();
   const request = { aborted: false, timedOut: false, hasResponse: false };
+  const externalSignal = options.signal || null;
+  const fetchOptions = { ...options };
+  delete fetchOptions.signal;
+  const abortFromExternal = () => {
+    request.aborted = true;
+    controller.abort();
+  };
   const timer = setTimeout(() => {
     request.timedOut = true;
     controller.abort();
   }, ms);
+  if (externalSignal?.aborted) {
+    abortFromExternal();
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternal, { once: true });
+  }
   activeRequests.set(controller, request);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
     request.hasResponse = true;
-    responseRequests.set(response, { controller, timer, request });
+    responseRequests.set(response, {
+      controller,
+      timer,
+      request,
+      externalSignal,
+      abortFromExternal
+    });
     return response;
   } catch (err) {
     if (request.aborted) {
@@ -334,6 +352,7 @@ async function fetchTimed(url, options = {}, timeoutMs) {
     if (!request.hasResponse) {
       clearTimeout(timer);
       activeRequests.delete(controller);
+      externalSignal?.removeEventListener('abort', abortFromExternal);
     }
   }
 }
@@ -343,6 +362,7 @@ function releaseResponse(response) {
   if (!lifecycle) return;
   clearTimeout(lifecycle.timer);
   activeRequests.delete(lifecycle.controller);
+  lifecycle.externalSignal?.removeEventListener('abort', lifecycle.abortFromExternal);
   responseRequests.delete(response);
 }
 
@@ -441,26 +461,19 @@ async function discoverEndpoints(forceRefresh = false, requiredOperation = null)
 
   XLog.log('Discovering GraphQL endpoints...');
 
-  // Cap the whole pass: scanning several multi-MB bundles on a slow
-  // connection can take minutes while the user stares at "Resolving user…".
-  // On timeout we fall back to the known queryIds; the still-running scan is
-  // left to finish and refresh the cache for the next call. Single-flight:
-  // concurrent callers (e.g. withStaleRetry forcing a refresh while a
-  // timed-out pass is still scanning) share one scan instead of stacking
-  // multi-MB downloads onto an already slow connection.
-  let timeoutId = null;
+  // Cap and cancel the whole pass: scanning several multi-MB bundles on a slow
+  // connection must not continue after the caller has already fallen back.
+  // Concurrent callers share this generation, including its deadline.
   try {
-    const totalMs = _C.DISCOVERY_TOTAL_TIMEOUT || 25000;
     if (!_discoveryInFlight) {
-      _discoveryInFlight = _discoverEndpointsInner(requiredOperation).finally(() => { _discoveryInFlight = null; });
-      _discoveryInFlight.catch(() => { /* stays handled even if every waiter times out first */ });
+      const flight = _runDiscoveryGeneration(requiredOperation);
+      const tracked = flight.finally(() => {
+        if (_discoveryInFlight === tracked) _discoveryInFlight = null;
+      });
+      _discoveryInFlight = tracked;
+      tracked.catch(() => { /* every caller may time out or disappear */ });
     }
-    const result = await Promise.race([
-      _discoveryInFlight,
-      new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('DISCOVERY_TIMEOUT')), totalMs);
-      })
-    ]);
+    const result = await _discoveryInFlight;
     if (requiredOperation && !discoveredOperations.has(requiredOperation)) {
       throw new Error(`Missing required queryId: ${requiredOperation}`);
     }
@@ -472,16 +485,64 @@ async function discoverEndpoints(forceRefresh = false, requiredOperation = null)
     endpointsCacheTtl = FALLBACK_CACHE_TTL;
     discoveredOperations = new Set();
     return discoveredEndpoints;
+  }
+}
+
+let _discoveryGeneration = 0;
+
+async function _runDiscoveryGeneration(requiredOperation) {
+  const generation = ++_discoveryGeneration;
+  const controller = new AbortController();
+  const totalMs = _C.DISCOVERY_TOTAL_TIMEOUT || 25000;
+  let timeoutId = null;
+  const scan = _discoverEndpointsInner(
+    requiredOperation,
+    controller.signal,
+    generation
+  );
+  scan.catch(() => { /* a timed-out generation may settle after its caller */ });
+
+  try {
+    const result = await Promise.race([
+      scan,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('DISCOVERY_TIMEOUT')), totalMs);
+      })
+    ]);
+    clearTimeout(timeoutId);
+    timeoutId = null;
+    if (controller.signal.aborted || generation !== _discoveryGeneration) {
+      throw new Error('DISCOVERY_ABORTED');
+    }
+
+    // Commit only after this generation wins its total-deadline race. The
+    // single-flight promise remains active through persistence, so no newer
+    // generation can start and race this snapshot into storage.
+    discoveredEndpoints = result.endpoints;
+    discoveredOperations = result.operations;
+    endpointsCacheTime = Date.now();
+    endpointsCacheTtl = ENDPOINTS_CACHE_TTL;
+    if (result.bearer) activeBearerToken = result.bearer;
+    XLog.log('Endpoints discovered successfully');
+    await _persistEndpoints();
+    return discoveredEndpoints;
+  } catch (error) {
+    if (error.message === 'DISCOVERY_TIMEOUT') {
+      controller.abort();
+      if (generation === _discoveryGeneration) _discoveryGeneration++;
+    }
+    throw error;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
-async function _discoverEndpointsInner(requiredOperation = null) {
+async function _discoverEndpointsInner(requiredOperation = null, signal = null, generation = 0) {
   // Fetch X's main page to find JS bundle URLs
   const mainPageResponse = await fetchTimed('https://x.com', {
     credentials: 'include',
-    headers: { 'User-Agent': navigator.userAgent }
+    headers: { 'User-Agent': navigator.userAgent },
+    signal
   }, _C.DISCOVERY_FETCH_TIMEOUT || 15000);
   const mainPageHtml = await readTextTimed(mainPageResponse);
 
@@ -504,10 +565,17 @@ async function _discoverEndpointsInner(requiredOperation = null) {
   let discoveredBearer = null;
 
   for (const url of scriptUrls) {
+    if (signal?.aborted || generation !== _discoveryGeneration) {
+      throw new Error('DISCOVERY_ABORTED');
+    }
     if (targetOperations.every(op => found[op]) && discoveredBearer) break;
 
     try {
-      const jsResponse = await fetchTimed(url, {}, _C.DISCOVERY_FETCH_TIMEOUT || 15000);
+      const jsResponse = await fetchTimed(
+        url,
+        { signal },
+        _C.DISCOVERY_FETCH_TIMEOUT || 15000
+      );
       const jsText = await readTextTimed(jsResponse);
 
       // Search for bearer token (pattern: "AAAAAAA..." — 100+ chars, URL-safe base64)
@@ -562,13 +630,16 @@ async function _discoverEndpointsInner(requiredOperation = null) {
         }
       }
     } catch (e) {
+      if (signal?.aborted || e.message === 'ABORTED' ||
+          generation !== _discoveryGeneration) {
+        throw new Error('DISCOVERY_ABORTED');
+      }
       XLog.warn(`Error scanning bundle ${url}:`, e.message);
     }
   }
 
-  // Update bearer token if dynamically extracted
-  if (discoveredBearer) {
-    activeBearerToken = discoveredBearer;
+  if (signal?.aborted || generation !== _discoveryGeneration) {
+    throw new Error('DISCOVERY_ABORTED');
   }
 
   if (found.UserByScreenName && found.UserTweets &&
@@ -581,7 +652,7 @@ async function _discoverEndpointsInner(requiredOperation = null) {
         XLog.warn(`✗ ${op}: NOT found in bundles, using fallback = ${FALLBACK_ENDPOINTS[op]?.queryId || 'none'}`);
       }
     }
-    discoveredEndpoints = {
+    const endpoints = {
       UserByScreenName: { queryId: found.UserByScreenName, operationName: 'UserByScreenName' },
       AboutAccountQuery: found.AboutAccountQuery
         ? { queryId: found.AboutAccountQuery, operationName: 'AboutAccountQuery' }
@@ -615,12 +686,11 @@ async function _discoverEndpointsInner(requiredOperation = null) {
         ? { queryId: found.BlueVerifiedFollowers, operationName: 'BlueVerifiedFollowers' }
         : FALLBACK_ENDPOINTS.BlueVerifiedFollowers
     };
-    discoveredOperations = new Set(Object.keys(found));
-    endpointsCacheTime = Date.now();
-    endpointsCacheTtl = ENDPOINTS_CACHE_TTL; // real data → full lifetime again
-    XLog.log('Endpoints discovered successfully');
-    await _persistEndpoints();
-    return discoveredEndpoints;
+    return {
+      endpoints,
+      operations: new Set(Object.keys(found)),
+      bearer: discoveredBearer
+    };
   }
 
   throw new Error(`Missing queryIds: ${targetOperations.filter(op => !found[op]).join(', ')}`);

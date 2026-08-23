@@ -6,6 +6,18 @@
     let activeDownload = null;
     const MAX_EMBEDDED_PHOTO_BYTES = 15 * 1024 * 1024;
     const EMBEDDED_PHOTO_CONCURRENCY = 4;
+    const PHOTO_FETCH_TIMEOUT_MS = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.API_FETCH_TIMEOUT) || 30000
+    );
+    const PHOTO_ASSET_CACHE_MAX_BYTES = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_CACHE_MAX_BYTES) || (64 * 1024 * 1024)
+    );
+    const PHOTO_ASSET_CACHE_MAX_ENTRIES = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_CACHE_MAX_ENTRIES) || 256
+    );
     const PHOTO_HOST_ORIGIN = 'https://pbs.twimg.com/*';
 
     // Photo embedding is an optional capability: pbs.twimg.com lives in
@@ -137,11 +149,18 @@
     }
 
     async function fetchPhotoAsset(target) {
+        const controller = typeof AbortController === 'function'
+            ? new AbortController()
+            : null;
+        const timeout = controller && typeof setTimeout === 'function'
+            ? setTimeout(() => controller.abort(), PHOTO_FETCH_TIMEOUT_MS)
+            : null;
         try {
             const response = await fetch(target.sourceUrl, {
                 method: 'GET',
                 credentials: 'omit',
-                cache: 'force-cache'
+                cache: 'force-cache',
+                ...(controller ? { signal: controller.signal } : {})
             });
             if (!response.ok) return null;
             const type = imageType(response, target.sourceUrl);
@@ -159,10 +178,54 @@
         } catch (error) {
             XLog.warn?.(`Could not embed photo ${target.sourceUrl}:`, error.message);
             return null;
+        } finally {
+            if (timeout !== null && typeof clearTimeout === 'function') {
+                clearTimeout(timeout);
+            }
         }
     }
 
-    async function fetchPhotoAssets(items) {
+    function createPhotoAssetCache() {
+        return {
+            entries: new Map(),
+            settledBytes: 0
+        };
+    }
+
+    function removePhotoAssetCacheEntry(assetCache, sourceUrl, entry) {
+        if (assetCache.entries.get(sourceUrl) !== entry) return;
+        assetCache.entries.delete(sourceUrl);
+        if (entry.settled) {
+            assetCache.settledBytes = Math.max(
+                0,
+                assetCache.settledBytes - entry.byteLength
+            );
+        }
+    }
+
+    function evictSettledPhotoAssets(assetCache) {
+        while (
+            assetCache.settledBytes > PHOTO_ASSET_CACHE_MAX_BYTES ||
+            assetCache.entries.size > PHOTO_ASSET_CACHE_MAX_ENTRIES
+        ) {
+            let candidate = null;
+            for (const pair of assetCache.entries) {
+                if (pair[1].settled) {
+                    candidate = pair;
+                    break;
+                }
+            }
+            if (!candidate) return;
+            removePhotoAssetCacheEntry(assetCache, candidate[0], candidate[1]);
+        }
+    }
+
+    function clearPhotoAssetCache(assetCache) {
+        assetCache?.entries?.clear();
+        if (assetCache) assetCache.settledBytes = 0;
+    }
+
+    async function fetchPhotoAssets(items, assetCache = createPhotoAssetCache()) {
         const targets = collectPhotoTargets(items);
         if (targets.length === 0) return [];
         const results = new Array(targets.length);
@@ -170,7 +233,47 @@
         const worker = async () => {
             while (nextIndex < targets.length) {
                 const index = nextIndex++;
-                results[index] = await fetchPhotoAsset(targets[index]);
+                const target = targets[index];
+                let entry = assetCache.entries.get(target.sourceUrl);
+                if (entry) {
+                    // Map insertion order is the LRU order.
+                    assetCache.entries.delete(target.sourceUrl);
+                    assetCache.entries.set(target.sourceUrl, entry);
+                } else {
+                    entry = {
+                        promise: null,
+                        settled: false,
+                        byteLength: 0
+                    };
+                    entry.promise = fetchPhotoAsset(target).then(
+                        asset => {
+                            if (!asset) {
+                                removePhotoAssetCacheEntry(
+                                    assetCache,
+                                    target.sourceUrl,
+                                    entry
+                                );
+                                return null;
+                            }
+                            entry.settled = true;
+                            entry.byteLength = asset.bytes.byteLength;
+                            assetCache.settledBytes += entry.byteLength;
+                            evictSettledPhotoAssets(assetCache);
+                            return asset;
+                        },
+                        error => {
+                            removePhotoAssetCacheEntry(
+                                assetCache,
+                                target.sourceUrl,
+                                entry
+                            );
+                            throw error;
+                        }
+                    );
+                    assetCache.entries.set(target.sourceUrl, entry);
+                }
+                const asset = await entry.promise;
+                results[index] = asset ? { ...asset, ...target } : null;
             }
         };
         await Promise.all(
@@ -218,8 +321,18 @@
     }
 
     async function getCurrentPlan(format) {
-        const state = await XPorterStorage.loadExportState();
-        return buildPlan(state, format);
+        const [state, settings] = await Promise.all([
+            XPorterStorage.loadExportState(),
+            XPorterStorage.loadSettings()
+        ]);
+        return buildPlan({
+            ...state,
+            settings: {
+                ...(state?.settings || {}),
+                embedPostPhotos: settings.embedPostPhotos === true,
+                embedBookmarkPhotos: settings.embedBookmarkPhotos === true
+            }
+        }, format);
     }
 
     async function* loadCurrentParts(state, partSize) {
@@ -256,16 +369,50 @@
             .catch(() => {});
     }
 
-    async function downloadCurrent(format) {
-        const state = await XPorterStorage.loadExportState();
-        const plan = buildPlan(state, format);
+    async function createCurrentDownloadTransaction(format) {
+        const [state, downloadSettings] = await Promise.all([
+            XPorterStorage.loadExportState(),
+            XPorterStorage.loadSettings()
+        ]);
+        const plan = buildPlan({
+            ...state,
+            settings: {
+                ...(state?.settings || {}),
+                embedPostPhotos: downloadSettings.embedPostPhotos === true,
+                embedBookmarkPhotos: downloadSettings.embedBookmarkPhotos === true
+            }
+        }, format);
+        const mode = state?.exportMode || 'posts';
+        const embedPhotos = plan.format === 'xlsx' && (
+            (mode === 'posts' && downloadSettings.embedPostPhotos === true) ||
+            (mode === 'bookmarks' && downloadSettings.embedBookmarkPhotos === true)
+        );
+        const photoHostAccess = embedPhotos ? await hasPhotoHostAccess() : false;
+        return {
+            state,
+            plan,
+            downloadSettings: Object.freeze({ ...downloadSettings }),
+            exportedAt: new Date(),
+            photoHostAccess,
+            photoAssetCache: createPhotoAssetCache()
+        };
+    }
+
+    async function executeCurrentDownload(transaction) {
+        const {
+            state,
+            plan,
+            downloadSettings,
+            exportedAt,
+            photoHostAccess,
+            photoAssetCache
+        } = transaction;
         if (!state || plan.count === 0 || !state.totalBatches) return { error: 'NO_DATA' };
 
         let partNumber = 0;
         let downloadedCount = 0;
         let lastResult = null;
         const filenames = [];
-        const exportedAt = new Date();
         for await (const items of loadCurrentParts(state, plan.partSize)) {
             partNumber++;
             reportDownload({
@@ -288,7 +435,10 @@
                 exportedAt,
                 partNumber,
                 partCount: plan.partCount,
-                saveAs: !plan.multipart
+                saveAs: !plan.multipart,
+                downloadSettings,
+                photoHostAccess,
+                photoAssetCache
             });
             if (lastResult?.success !== true) return lastResult;
             downloadedCount += items.length;
@@ -311,13 +461,23 @@
         return { success: true, count: plan.count, partCount: partNumber, filenames };
     }
 
+    async function downloadCurrent(format) {
+        const transaction = await createCurrentDownloadTransaction(format);
+        try {
+            return await executeCurrentDownload(transaction);
+        } finally {
+            clearPhotoAssetCache(transaction.photoAssetCache);
+        }
+    }
+
     async function startCurrentDownload(format) {
         if (activeDownload) return { error: 'DOWNLOAD_IN_PROGRESS' };
-        const plan = await getCurrentPlan(format);
+        const transaction = await createCurrentDownloadTransaction(format);
+        const { plan } = transaction;
         if (plan.count === 0) return { error: 'NO_DATA' };
 
         const stopKeepAlive = keepWorkerAliveDuringDownload();
-        activeDownload = downloadCurrent(plan.format)
+        activeDownload = executeCurrentDownload(transaction)
             .then(result => {
                 if (result?.success !== true) {
                     reportDownload({ type: 'DOWNLOAD_ERROR', error: result?.error || 'DOWNLOAD_FAILED' });
@@ -330,6 +490,7 @@
                 return { error: error.message || 'DOWNLOAD_FAILED' };
             })
             .finally(() => {
+                clearPhotoAssetCache(transaction.photoAssetCache);
                 stopKeepAlive();
                 activeDownload = null;
             });
@@ -393,7 +554,7 @@
         let mimeType;
         let extension;
 
-        const settings = await XPorterStorage.loadSettings();
+        const settings = options.downloadSettings || await XPorterStorage.loadSettings();
         const headerOpts = {
             localize: settings.localizeExportHeaders === true,
             lang: settings.language || 'en',
@@ -417,8 +578,11 @@
                 (mode === 'posts' && settings.embedPostPhotos === true) ||
                 (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
             );
-            const mediaAssets = (embedPhotos && await hasPhotoHostAccess())
-                ? await fetchPhotoAssets(allItems)
+            const photoHostAccess = options.photoHostAccess !== undefined
+                ? options.photoHostAccess
+                : await hasPhotoHostAccess();
+            const mediaAssets = (embedPhotos && photoHostAccess)
+                ? await fetchPhotoAssets(allItems, options.photoAssetCache)
                 : [];
             content = XPorterCSV.generateXLSX(allItems, isUsers, {
                 ...headerOpts,

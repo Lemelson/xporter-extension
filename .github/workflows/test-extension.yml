@@ -25,14 +25,5 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Static contracts
-        run: node scripts/test-static-contracts.js
-
-      - name: Extension core
-        run: node scripts/test-extension-core.js
-
-      - name: Rate limiting
-        run: node scripts/test-rate-limit.js
-
-      - name: Feed capture
-        run: node scripts/test-feed-capture.js
+      - name: Deterministic gate
+        run: node scripts/test-all.js

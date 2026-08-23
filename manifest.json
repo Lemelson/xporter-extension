@@ -37,6 +37,7 @@
         "https://twitter.com/*"
       ],
       "js": [
+        "utils/capture-contract.js",
         "utils/native-request-template.js",
         "content/feed-parser.js",
         "content/interceptor.js"
@@ -50,6 +51,7 @@
         "https://twitter.com/*"
       ],
       "js": [
+        "utils/capture-contract.js",
         "utils/native-request-template.js",
         "content/content.js"
       ],

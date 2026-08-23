@@ -365,10 +365,23 @@ async function clearExportHistory() {
 
 // ==================== Settings ====================
 
+// Partial settings updates are read→merge→write transactions. Serialize only
+// this mutation path so two concurrent popup/worker patches cannot both read
+// the same snapshot and overwrite each other. Keep the queue recoverable: a
+// rejected transaction must not prevent later settings writes from running.
+let _settingsMutationQueue = Promise.resolve();
+
 /**
  * Save settings
  */
-async function saveSettings(settings) {
+function saveSettings(settings) {
+    const mutate = () => saveSettingsPatch(settings);
+    const run = _settingsMutationQueue.then(mutate, mutate);
+    _settingsMutationQueue = run.catch(() => {});
+    return run;
+}
+
+async function saveSettingsPatch(settings) {
     // Read directly (not via safeGet): a transient read failure must abort the
     // save — merging the patch into {} would silently wipe every other setting.
     let current;

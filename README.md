@@ -187,6 +187,9 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 | Export Speed | Standard | Turbo, Fast, Standard, Careful, Turtle, or Custom request pacing |
 | Custom pacing | 5 seconds | Exact delay between requests; seconds may be fractional with `.` or `,` |
 | Scheduled breaks | Off | Optional independent break after every N requests; separate controls for Posts & Bookmarks and User Lists |
+| Include “About this Account” details | Off | Add public account location, Premium date, connection source, affiliated account, and username-change history to user-list exports; requires up to one extra X request per user |
+| About Details Speed | Standard / 5 at once | Control how many “About this Account” requests run concurrently; higher values are faster but more likely to hit X rate limits or a temporary restriction; Custom accepts 1–50 |
+| About rate-limit retries | 5 / one minute apart | Retry rejected “About this Account” requests; a successful request resets the counter, and the configurable range is 1–1,440 retries |
 | Auto-clear old exports | On / 4 hours | Removes old downloadable payloads while keeping history metadata |
 | Localize column titles | On | Translate CSV/XLSX headers; JSON keys always remain English |
 
@@ -262,11 +265,34 @@ xporter/
 - No third-party analytics, advertising, or tracking SDKs
 - No extension-owned backend; normal export traffic goes only to X.com
 - Authentication uses your existing X session cookies — XPorter never stores or transmits credentials
-- **One exception:** when you uninstall XPorter, an anonymous usage summary (no X data, no usernames, nothing that identifies you) is sent once to help improve the extension — see the [privacy policy](privacy-policy.html) for exactly what it contains
+- **One exception:** when you uninstall XPorter, an anonymous usage summary (no X data, no usernames, nothing that identifies you) is sent once to help improve the extension — see the [live privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html) for exactly what it contains
 
 ## Contributing
 
 Contributions are welcome. Please open an [issue](https://github.com/Lemelson/xporter-extension/issues) for bugs or feature requests, or submit a pull request directly.
+
+### Development and verification
+
+The extension has no build step or npm dependency installation. After changing runtime code or documentation, run the canonical deterministic gate from the repository root:
+
+```bash
+node scripts/test-all.js
+git diff --check
+```
+
+For focused iteration, the individual `scripts/test-*.js` files remain directly runnable; `test-all.js` is the required complete gate and the source of truth for their order.
+
+For a real unpacked-Chromium check, run `node scripts/test-extension-smoke.mjs` from a normal Terminal session or an approved unsandboxed environment. Do not launch it inside `CODEX_SANDBOX`: macOS can abort GUI-backed Chromium during LaunchServices registration, and the script intentionally fails fast there.
+
+Build a Chrome Web Store archive only with:
+
+```bash
+scripts/package.sh
+```
+
+The packager reads the version from `manifest.json`, runs the deterministic gates, and writes an allowlist-only ZIP beside the repository.
+
+Passing local tests proves repository contracts such as syntax, parsers, persistence, pacing, localization structure, and file generation. It does not prove that X's current private endpoints, query IDs, cookies, feature flags, or live response shapes still work. That requires a separate authenticated live-X verification and should be reported independently from deterministic results.
 
 ## Contact
 

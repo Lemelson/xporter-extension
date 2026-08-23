@@ -3,8 +3,8 @@
 # package.sh — build a clean Chrome Web Store zip for XPorter.
 #
 # Allowlist-based: only files that ship in the extension are added, so dev
-# artifacts (.git*, docs/, scripts/, index.html, *.md, privacy-policy.html,
-# .DS_Store, .nojekyll, root icon128.png, .github/, ...) can never leak in.
+# artifacts (.git*, the docs/ Pages source, scripts/, *.md, .DS_Store,
+# .nojekyll, .github/, ...) can never leak in.
 #
 # Usage:  scripts/package.sh
 # Output: ../xporter-v<version>.zip (next to the extension root; overwritten)
@@ -17,6 +17,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 command -v zip >/dev/null 2>&1 || { echo "ERROR: 'zip' not found in PATH" >&2; exit 1; }
+command -v unzip >/dev/null 2>&1 || { echo "ERROR: 'unzip' not found in PATH" >&2; exit 1; }
+command -v zipinfo >/dev/null 2>&1 || { echo "ERROR: 'zipinfo' not found in PATH" >&2; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "ERROR: 'node' not found in PATH" >&2; exit 1; }
 
 # A Chrome Web Store archive must never be created from code that fails the
@@ -24,10 +26,7 @@ command -v node >/dev/null 2>&1 || { echo "ERROR: 'node' not found in PATH" >&2;
 # allowlist packager makes the checks mandatory instead of relying on a release
 # checklist that can be forgotten.
 echo "Running release checks..."
-node scripts/test-static-contracts.js
-node scripts/test-extension-core.js
-node scripts/test-rate-limit.js
-node scripts/test-feed-capture.js
+node scripts/test-all.js
 
 # Read version from manifest.json (no jq dependency).
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json | head -n 1)"
@@ -56,8 +55,31 @@ while IFS= read -r -d '' f; do
   FILES+=("${f#./}")
 done < <(find "${INCLUDE_DIRS[@]}" -type f ! -name '.*' ! -name '*.md' -print0 | sort -z)
 
-rm -f "$OUT"
-zip -X -q "$OUT" "${FILES[@]}"
+OUT_DIR="$(dirname "$OUT")"
+OUT_NAME="$(basename "$OUT")"
+TEMP_BASE="$(mktemp "${OUT_DIR}/.${OUT_NAME}.tmp.XXXXXX")"
+TEMP_OUT="${TEMP_BASE}.zip"
+rm -f "$TEMP_BASE"
+cleanup() {
+  rm -f "$TEMP_BASE" "$TEMP_OUT"
+}
+trap cleanup EXIT
+
+zip -X -q "$TEMP_OUT" "${FILES[@]}"
+unzip -tq "$TEMP_OUT" >/dev/null
+
+EXPECTED_ENTRIES="$(printf '%s\n' "${FILES[@]}")"
+ACTUAL_ENTRIES="$(zipinfo -1 "$TEMP_OUT")"
+if [[ "$ACTUAL_ENTRIES" != "$EXPECTED_ENTRIES" ]]; then
+  echo "ERROR: package contents do not match the runtime allowlist" >&2
+  exit 1
+fi
+
+# The temporary archive lives beside the destination, so rename is atomic.
+# A failed build or validation therefore leaves the previous good artifact
+# untouched.
+mv -f "$TEMP_OUT" "$OUT"
+trap - EXIT
 
 COUNT="$(zipinfo -1 "$OUT" | wc -l | tr -d ' ')"
 echo "Packaged XPorter v${VERSION}"

@@ -8,9 +8,7 @@
   if (window.__XPORTER_INTERCEPTOR_INSTALLED__) return;
   window.__XPORTER_INTERCEPTOR_INSTALLED__ = true;
 
-  const TRACKED = ['Followers', 'Following', 'BlueVerifiedFollowers', 'UserTweets', 'UserOriginalsTimeline', 'UserRepliesTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'UserByScreenName', 'AboutAccountQuery', 'SearchTimeline'];
-  const MAX_BODY_CHARS = 8 * 1024 * 1024; // must match content.js relay cap
-  const MAX_FEED_BODY_CHARS = 2 * 1024 * 1024;
+  const CAPTURE_CONTRACT = globalThis.XPorterCaptureContract;
   const _origFetch = window.fetch;
   const _origXHROpen = XMLHttpRequest.prototype.open;
 
@@ -24,7 +22,8 @@
 
   function postGraphqlResponse(operationName, url, status, bodyText) {
     // Cap relayed body size — drop oversized payloads entirely.
-    if (typeof bodyText !== 'string' || bodyText.length > MAX_BODY_CHARS) return;
+    if (typeof bodyText !== 'string' ||
+        bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) return;
     window.postMessage({
       type: '__XPORTER_GRAPHQL_RESPONSE__',
       operationName,
@@ -86,9 +85,10 @@
       // retry. Feed collection remains success-only.
       if ((capturesExport || (capturesFeed && successful)) && response) {
         response.clone().text().then((bodyText) => {
-          if (bodyText.length > MAX_BODY_CHARS) return;
+          if (bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) return;
           if (capturesExport) postGraphqlResponse(operationName, requestUrl, response.status, bodyText);
-          if (capturesFeed && successful && bodyText.length <= MAX_FEED_BODY_CHARS) {
+          if (capturesFeed && successful &&
+              bodyText.length <= CAPTURE_CONTRACT.MAX_FEED_BODY_CHARS) {
             // Yield once so X can render the response before passive parsing.
             setTimeout(() => postSeenPosts(operationName, bodyText), 0);
           }
@@ -117,7 +117,7 @@
         const capturesFeed = window.XPorterFeedParser?.supportsOperation(operation.operationName);
         const nativeTemplate =
           globalThis.XPorterNativeTemplate?.parseRequestUrl(requestUrl, method) || null;
-        if (TRACKED.includes(operation.operationName)) {
+        if (CAPTURE_CONTRACT.isTrackedOperation(operation.operationName)) {
           this.__xporterOperationName = operation.operationName;
           this.__xporterRequestUrl = requestUrl;
           this.__xporterNativeTemplate = nativeTemplate;
@@ -133,7 +133,8 @@
               if (successful && nativeTemplate) postNativeTemplate(nativeTemplate);
               if (capturesExport || (capturesFeed && successful)) {
                 const bodyText = (this.responseType === '' || this.responseType === 'text') ? this.responseText : '';
-                if (bodyText.length <= MAX_BODY_CHARS && (capturesExport || bodyText)) {
+                if (bodyText.length <= CAPTURE_CONTRACT.MAX_BODY_CHARS &&
+                    (capturesExport || bodyText)) {
                   if (capturesExport) {
                     postGraphqlResponse(
                       operation.operationName,
@@ -142,7 +143,8 @@
                       bodyText
                     );
                   }
-                  if (capturesFeed && successful && bodyText.length <= MAX_FEED_BODY_CHARS) {
+                  if (capturesFeed && successful &&
+                      bodyText.length <= CAPTURE_CONTRACT.MAX_FEED_BODY_CHARS) {
                     setTimeout(() => postSeenPosts(operation.operationName, bodyText), 0);
                   }
                 }

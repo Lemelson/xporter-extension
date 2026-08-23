@@ -28,41 +28,72 @@ function walk(dir) {
 
 const manifest = JSON.parse(read('manifest.json'));
 assert.equal(manifest.manifest_version, 3);
-assert.equal(manifest.version, '1.6.1');
+assert.match(
+    manifest.version,
+    /^\d+\.\d+\.\d+$/,
+    'manifest version must use Chrome Web Store major.minor.patch syntax'
+);
 assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
     'download keepalive relies on Chrome 110+ extension API calls resetting the MV3 idle timer');
+
+const requiredDeterministicSuites = [
+    'scripts/test-static-contracts.js',
+    'scripts/test-extension-core.js',
+    'scripts/test-rate-limit.js',
+    'scripts/test-feed-capture.js',
+    'scripts/test-tooling-policy.js',
+    'scripts/test-storage-concurrency.js',
+    'scripts/test-download-transaction.js',
+    'scripts/test-bookmark-context-lifecycle.js',
+    'scripts/test-api-discovery-cancellation.js',
+    'scripts/test-capture-contract.js',
+    'scripts/test-export-policy.js'
+];
+assertFile('scripts/test-all.js', 'canonical deterministic gate');
+const testAllSource = read('scripts/test-all.js');
+const suiteListSource = /const SUITES\s*=\s*\[([\s\S]*?)\];/.exec(testAllSource)?.[1] || '';
+const aggregatedSuites = [...suiteListSource.matchAll(/['"](scripts\/test-[^'"]+\.(?:js|mjs))['"]/g)]
+    .map(match => match[1]);
+assert.deepEqual(
+    aggregatedSuites,
+    requiredDeterministicSuites,
+    'test-all.js must run every deterministic suite once, in canonical order'
+);
+assert.match(testAllSource, /for\s*\(\s*const\s+suite\s+of\s+SUITES\s*\)/,
+    'test-all.js must execute its explicit suite list sequentially');
+assert.match(testAllSource, /spawnSync\([\s\S]*?stdio:\s*['"]inherit['"]/,
+    'test-all.js must inherit each suite output');
+assert.match(testAllSource, /result\.status\s*!==\s*0[\s\S]*?process\.exit\(/,
+    'test-all.js must fail fast with the first nonzero suite status');
 
 const packageScript = read('scripts/package.sh');
 assert.match(packageScript, /\nset -euo pipefail\n/,
     'package.sh must abort immediately when any release check fails');
-const packageWriteIndex = packageScript.indexOf('rm -f "$OUT"');
-for (const requiredReleaseCheck of [
-    'node scripts/test-static-contracts.js',
-    'node scripts/test-extension-core.js',
-    'node scripts/test-rate-limit.js',
-    'node scripts/test-feed-capture.js'
-]) {
-    assert(
-        packageScript.includes(requiredReleaseCheck),
-        `package.sh must block production packaging on: ${requiredReleaseCheck}`
-    );
-    assert(
-        packageScript.indexOf(requiredReleaseCheck) < packageWriteIndex,
-        `${requiredReleaseCheck} must run before package.sh creates or replaces the ZIP`
+const packageWriteIndex = packageScript.indexOf('mv -f "$TEMP_OUT" "$OUT"');
+assert(packageWriteIndex >= 0,
+    'package.sh must replace the destination only after building and validating a temporary ZIP');
+const canonicalGateCommand = 'node scripts/test-all.js';
+assert(packageScript.includes(canonicalGateCommand),
+    `package.sh must block production packaging on: ${canonicalGateCommand}`);
+assert(packageScript.indexOf(canonicalGateCommand) < packageWriteIndex,
+    `${canonicalGateCommand} must run before package.sh creates or replaces the ZIP`);
+for (const suite of requiredDeterministicSuites) {
+    assert.doesNotMatch(
+        packageScript,
+        new RegExp(`node\\s+${suite.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+        `package.sh must delegate ${suite} through test-all.js`
     );
 }
 
 if (exists('.github/workflows/test-extension.yml')) {
     const runtimeWorkflow = read('.github/workflows/test-extension.yml');
-    for (const requiredCiCheck of [
-        'node scripts/test-static-contracts.js',
-        'node scripts/test-extension-core.js',
-        'node scripts/test-rate-limit.js',
-        'node scripts/test-feed-capture.js'
-    ]) {
-        assert(
-            runtimeWorkflow.includes(requiredCiCheck),
-            `extension runtime CI must run: ${requiredCiCheck}`
+    assert(runtimeWorkflow.includes(canonicalGateCommand),
+        `extension runtime CI must run: ${canonicalGateCommand}`);
+    for (const suite of requiredDeterministicSuites) {
+        assert.doesNotMatch(
+            runtimeWorkflow,
+            new RegExp(`node\\s+${suite.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+            `extension runtime CI must delegate ${suite} through test-all.js`
         );
     }
 }
