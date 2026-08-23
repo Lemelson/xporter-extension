@@ -257,18 +257,33 @@
           AI-ready: clear post types, reply and quote context, metrics, dates, and URLs — without raw ID columns.
         </p>
       </div>
-      <div class="field hidden" id="postOutputOptions">
-        <div class="date-toggle-row">
-          <label class="toggle-label">
-            <input type="checkbox" id="embedPostPhotos" class="toggle-input">
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-            <span data-i18n="embedPostPhotos">Embed photos in XLSX</span>
-          </label>
-          <span class="date-help help-viewport help-below" tabindex="0"
-            aria-label="XLSX only. Downloads photos from X while the file is being saved and places them on a separate Media sheet. Several photos from a post, quote, or replied-to post are kept as separate rows. This can make saving much slower and the workbook much larger. Videos remain links."
-            data-i18n-aria-label="embedPhotosHelp" data-i18n-tooltip="embedPhotosHelp">!</span>
+      <section class="xlsx-photo-options hidden" id="xlsxPhotoOptions" role="radiogroup"
+        aria-labelledby="xlsxPhotosTitle" aria-describedby="xlsxPhotosHelp">
+        <div class="post-selection-heading">
+          <div>
+            <h2 id="xlsxPhotosTitle" data-i18n="xlsxPhotosTitle">Photos in Excel</h2>
+            <p id="xlsxPhotosHelp" data-i18n="xlsxPhotosHelp">Choose how photos are included in this workbook.</p>
+          </div>
         </div>
-      </div>
+        <div class="post-selection-list">
+          <label class="post-choice xlsx-photo-choice">
+            <input type="radio" id="xlsxPhotoLinks" name="xlsxPhotoMode" value="links" checked>
+            <span class="post-choice-check" aria-hidden="true"></span>
+            <span class="post-choice-copy">
+              <strong data-i18n="xlsxPhotoLinks">Keep photo links</strong>
+              <span data-i18n="xlsxPhotoLinksHelp">Fastest and smallest. Photos stay available by URL.</span>
+            </span>
+          </label>
+          <label class="post-choice xlsx-photo-choice">
+            <input type="radio" id="xlsxPhotoEmbed" name="xlsxPhotoMode" value="embed">
+            <span class="post-choice-check" aria-hidden="true"></span>
+            <span class="post-choice-copy">
+              <strong data-i18n="xlsxPhotoEmbed">Embed photo previews</strong>
+              <span data-i18n="xlsxPhotoEmbedHelp">Adds optimized previews to a separate Media sheet.</span>
+            </span>
+          </label>
+        </div>
+      </section>
 
       <!-- Export status + contextual square action (Stop while running, Download when stopped/complete) -->
       <div class="export-status hidden" id="exportStatus">
@@ -395,18 +410,6 @@
               aria-label="Keeps the title, URL, and all Article text returned by X, including Articles inside quoted or replied-to posts. Some Articles expose only a preview; XPorter preserves exactly what X returns."
               data-i18n-aria-label="includeBookmarkArticlesHelp"
               data-i18n-tooltip="includeBookmarkArticlesHelp">!</span>
-          </div>
-        </div>
-        <div class="field">
-          <div class="date-toggle-row">
-            <label class="toggle-label">
-              <input type="checkbox" id="embedBookmarkPhotos" class="toggle-input">
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-              <span data-i18n="embedBookmarkPhotos">Embed photos in XLSX</span>
-            </label>
-            <span class="date-help help-long" tabindex="0"
-              aria-label="XLSX only. Downloads photos from X while the file is being saved and places them on a separate Media sheet. Several photos from a post, quote, or replied-to post are kept as separate rows. This can make saving much slower and the workbook much larger. Videos remain links."
-              data-i18n-aria-label="embedPhotosHelp" data-i18n-tooltip="embedPhotosHelp">!</span>
           </div>
         </div>
       </div>
@@ -1137,6 +1140,33 @@
         <button type="button" class="btn btn-warning" id="aboutRiskConfirm" disabled>Enable extra details (5)</button>
       </div>
       <span class="sr-only" id="aboutRiskCountdownStatus" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <div id="photoPermissionDialog" class="risk-dialog-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="photoPermissionTitle" aria-describedby="photoPermissionBody">
+    <div class="risk-dialog-card photo-permission-card">
+      <div class="photo-permission-heading">
+        <div class="photo-permission-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+          </svg>
+        </div>
+        <h2 class="risk-dialog-title" id="photoPermissionTitle">Before allowing photo access</h2>
+      </div>
+      <div class="risk-dialog-body photo-permission-body" id="photoPermissionBody">
+        This optional access is used only to embed photos in XLSX.
+      </div>
+      <div class="risk-dialog-actions">
+        <button type="button" class="btn btn-secondary" id="photoPermissionCancel">Not now</button>
+        <button type="button" class="btn btn-primary" id="photoPermissionConfirm" disabled>
+          Wait 3 sec.
+        </button>
+      </div>
+      <span class="sr-only" id="photoPermissionCountdownStatus" role="status" aria-live="polite"></span>
     </div>
   </div>
 

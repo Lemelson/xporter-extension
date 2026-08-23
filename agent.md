@@ -131,6 +131,8 @@ xporter/
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── package.sh                             # allowlist-based CWS zip builder (use this!)
 │   ├── discover_endpoints.js                  # find current queryIds from a console
+│   ├── test-popup-footer-layout.mjs            # popup footer/no-trailing-scroll regression
+│   ├── test-photo-permission-rationale.mjs     # guarded 14-locale XLSX photo-permission flow
 │   ├── debug-date-range-playwright.mjs        # Playwright repro for date-range
 │   └── debug-extension-date-range-playwright.mjs
 │
@@ -214,6 +216,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 | Setting | Default | Notes |
 |---|---|---|
 | `includeOriginalPosts` / `includeQuotes` / `includeReplies` / `includeRetweets` / `includeArticles` | all `true` | Exact primary-row types selected on Home. A mixed Replies + non-reply export persists a two-pass feed plan, removes duplicate primary rows, and preserves foreign parents only as nested reply context. |
+| `embedPostPhotos` / `embedBookmarkPhotos` | both `false` | The Home XLSX-only radio group stores independent Posts/Bookmarks choices: false keeps URLs only; true downloads bounded previews into the Media sheet. |
 | `quantityLimit` | `500` | 0 = unlimited; live for an ordinary active export, but never overwrites a `+N more` per-run target |
 | `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
 | `customDelaySec` / `userCustomDelaySec` | `5` / `5` | exact Custom delay for Posts/Bookmarks and User Lists; decimal dot or comma accepted |
@@ -266,7 +269,7 @@ X has no clean date-filter on the timeline GraphQL, so XPorter:
 ### Schemas
 - **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
 - **Users CSV**: `id, name, username, bio, location, url, followers_count, following_count, tweet_count, listed_count, verified, protected, created_at, profile_image_url, profile_url`.
-- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for posts only (public profile context followed by compact per-post metrics, full text, and canonical URL). Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially instead of loading every saved row into memory; the popup shows the planned file count and live part progress. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
+- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for posts only (public profile context followed by compact per-post metrics, full text, and canonical URL). Posts/Bookmarks + XLSX exposes two photo modes on Home: URL-only (fastest/smallest) or optimized `name=small` previews on a separate Media sheet while retaining source URLs. Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially instead of loading every saved row into memory; the popup shows the planned file count plus `photos` and `building_xlsx` download stages. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
 
 ---
 
@@ -367,7 +370,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. The static-contract suite checks runtime JavaScript syntax, manifest/import/popup assets, DOM IDs, both 14-locale sets, popup i18n references, and the popup/content/worker message protocol without opening a browser. For a real unpacked-browser check, run `scripts/test-extension-smoke.mjs` with Playwright available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
+Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.js`, `node scripts/test-rate-limit.js`, and `node scripts/test-feed-capture.js`. The static-contract suite checks runtime JavaScript syntax, manifest/import/popup assets, DOM IDs, both 14-locale sets, popup i18n references, and the popup/content/worker message protocol without opening a browser. For real unpacked-browser checks, run `scripts/test-extension-smoke.mjs`; `scripts/test-popup-footer-layout.mjs` guards against invisible popovers adding a trailing strip below the footer, while `scripts/test-photo-permission-rationale.mjs` verifies the guarded one-time photo explanation at the real popup width in all 14 locales. Playwright must be available (or set `PLAYWRIGHT_MODULE` to its `index.mjs`). The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports (>1000 → storage batching); CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 
 **Static-only audit boundary.** A clean local suite proves internal contracts, parsers against fixtures, persistence/rate-limit state, and generated files. It does **not** prove that X's current queryIds, GraphQL feature flags, cookie behavior, or live payload shapes still match the code. Record that distinction explicitly whenever browser/live-X validation is intentionally skipped.
 
@@ -382,7 +385,7 @@ Run `node scripts/test-static-contracts.js`, `node scripts/test-extension-core.j
 | `downloads` | save files |
 | `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
 | `host_permissions` | `https://x.com/*`, `https://twitter.com/*` |
-| `optional_host_permissions` | `https://pbs.twimg.com/*` — requested synchronously via `chrome.permissions.request()` from the "Embed photos in XLSX" toggle click; no async preflight may consume that user gesture. Declining keeps URL-only exports fully functional. Never a required permission: a required increase is what disabled every 1.5.8 installation during the withdrawn 1.5.9 update. Before embedding images, `downloads.js` re-checks the grant with `chrome.permissions.contains()` and fails closed to plain media URLs when it is missing or the check errors. |
+| `optional_host_permissions` | `https://pbs.twimg.com/*` — selecting "Embed photo previews" for the first time shows a mandatory localized explanation with a three-second guard. Its Continue click calls `chrome.permissions.request()` synchronously before persisting `xporter_photo_permission_intro_seen`; later attempts request directly. No async preflight may consume that user gesture. Declining keeps URL-only exports fully functional. Never a required permission: a required increase is what disabled every 1.5.8 installation during the withdrawn 1.5.9 update. Before embedding previews, `downloads.js` re-checks the grant with `chrome.permissions.contains()` and fails closed to plain media URLs when it is missing or the check errors. |
 
 Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
 

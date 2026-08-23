@@ -80,6 +80,9 @@ const XPORTER_CONFIG = {
         users: { csv: 100000, json: 50000, xlsx: 25000 }
     },
     EMBEDDED_PHOTO_XLSX_PART_LIMIT: 250,
+    EMBEDDED_PHOTO_XLSX_TARGET_LIMIT: 1000,
+    EMBEDDED_PHOTO_PREVIEW_MAX_BYTES: 3 * 1024 * 1024,
+    EMBEDDED_PHOTO_XLSX_PART_MAX_BYTES: 40 * 1024 * 1024,
     STORAGE_BATCH_READ_SIZE: 100,
     RECENT_EXPORT_ID_LIMIT: 1000,
     // History duplicates row payloads. Large completed exports keep metadata

@@ -1817,6 +1817,10 @@ body.light .post-choice:hover {
   transform: translateY(-1px) rotate(-45deg);
 }
 
+body.light .post-choice input:checked + .post-choice-check::after {
+  border-color: #ffffff;
+}
+
 [dir="rtl"] .post-choice input:checked + .post-choice-check::after {
   transform: translateY(-1px) rotate(-45deg);
 }
@@ -1869,6 +1873,43 @@ body.light .post-selection-error {
   color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.xlsx-photo-options {
+  margin-block: 3px 12px;
+  padding-block-start: 11px;
+  border-block-start: 1px solid var(--border);
+}
+
+.xlsx-photo-options .post-selection-heading {
+  margin-block-end: 7px;
+  padding-inline: 1px;
+}
+
+.xlsx-photo-choice {
+  min-height: 44px;
+}
+
+.xlsx-photo-choice .post-choice-check {
+  border-radius: 50%;
+}
+
+.xlsx-photo-choice input:checked + .post-choice-check::after,
+body.light .xlsx-photo-choice input:checked + .post-choice-check::after {
+  inline-size: 6px;
+  block-size: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: #08223a;
+  transform: none;
+}
+
+body.light .xlsx-photo-choice input:checked + .post-choice-check::after {
+  background: #ffffff;
+}
+
+[dir="rtl"] .xlsx-photo-choice input:checked + .post-choice-check::after {
+  transform: none;
 }
 
 /* Quantity, Posts/Bookmarks, and User Lists are separate linear sections.
@@ -1982,6 +2023,46 @@ body.light .risk-dialog-card {
   line-height: 1;
 }
 
+.photo-permission-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.photo-permission-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-block-end: 14px;
+}
+
+.photo-permission-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(255, 209, 102, 0.42);
+  border-radius: 13px;
+  background: rgba(255, 209, 102, 0.12);
+  color: var(--warning);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+body.light .photo-permission-icon {
+  border-color: rgba(180, 83, 9, 0.30);
+  background: rgba(245, 158, 11, 0.10);
+}
+
+.photo-permission-heading .risk-dialog-title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .risk-dialog-title {
   margin: 0 0 10px;
   font-size: 18px;
@@ -1994,6 +2075,51 @@ body.light .risk-dialog-card {
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-line;
+}
+
+.photo-permission-body strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.photo-permission-card .photo-permission-heading,
+.photo-permission-card .risk-dialog-actions {
+  flex-shrink: 0;
+}
+
+.photo-permission-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
+.photo-permission-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.photo-permission-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.photo-permission-body::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--text-muted);
+}
+
+.photo-permission-card .risk-dialog-actions {
+  flex-direction: row;
+}
+
+.photo-permission-card .risk-dialog-actions .btn {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  min-height: 48px;
+  padding-inline: 8px;
+  white-space: normal;
 }
 
 .risk-dialog-actions {
@@ -2126,6 +2252,7 @@ body.light .risk-dialog-card {
 }
 
 .help-pop {
+  display: none;
   position: absolute;
   left: 0;
   top: calc(100% + 8px);
@@ -2199,8 +2326,17 @@ body.light .risk-dialog-card {
 
 .date-help:hover .help-pop,
 .date-help:focus-visible .help-pop {
+  display: block;
   opacity: 1;
   transform: translateY(0);
+  animation: helpPopIn 0.15s ease;
+}
+
+@keyframes helpPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 body.light .help-pop {
@@ -2263,6 +2399,10 @@ body.light .help-pop {
   margin-inline-start: 33px;
   padding-inline-start: 12px;
   border-inline-start: 2px solid rgba(88, 224, 210, 0.46);
+}
+
+body.light .safety-break-rows {
+  border-inline-start-color: rgba(10, 111, 219, 0.72);
 }
 
 .safety-break-rows .cooldown-row {

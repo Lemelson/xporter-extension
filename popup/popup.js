@@ -60,12 +60,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const postSelectionCount = document.getElementById('postSelectionCount');
     const postSelectionNote = document.getElementById('postSelectionNote');
     const postSelectionError = document.getElementById('postSelectionError');
-    const postOutputOptions = document.getElementById('postOutputOptions');
+    const xlsxPhotoOptions = document.getElementById('xlsxPhotoOptions');
+    const xlsxPhotoLinks = document.getElementById('xlsxPhotoLinks');
+    const xlsxPhotoEmbed = document.getElementById('xlsxPhotoEmbed');
     const includeBookmarkReplyContext =
         document.getElementById('includeBookmarkReplyContext');
     const includeBookmarkArticles = document.getElementById('includeBookmarkArticles');
-    const embedPostPhotos = document.getElementById('embedPostPhotos');
-    const embedBookmarkPhotos = document.getElementById('embedBookmarkPhotos');
     const quantityLimit = document.getElementById('quantityLimit');
     const exportSpeed = document.getElementById('exportSpeed');
     const customSpeedRows = document.getElementById('customSpeedRows');
@@ -93,6 +93,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const aboutRiskCancel = document.getElementById('aboutRiskCancel');
     const aboutRiskConfirm = document.getElementById('aboutRiskConfirm');
     const aboutRiskCountdownStatus = document.getElementById('aboutRiskCountdownStatus');
+    const photoPermissionDialog = document.getElementById('photoPermissionDialog');
+    const photoPermissionTitle = document.getElementById('photoPermissionTitle');
+    const photoPermissionBody = document.getElementById('photoPermissionBody');
+    const photoPermissionCancel = document.getElementById('photoPermissionCancel');
+    const photoPermissionConfirm = document.getElementById('photoPermissionConfirm');
+    const photoPermissionCountdownStatus =
+        document.getElementById('photoPermissionCountdownStatus');
     const customQuantityRow = document.getElementById('customQuantityRow');
     const customQuantity = document.getElementById('customQuantity');
     const autoExpireEnabled = document.getElementById('autoExpireEnabled');
@@ -100,10 +107,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const autoExpireRow = document.getElementById('autoExpireRow');
     const ladybugEnabled = document.getElementById('ladybugEnabled');
     const localizeExportHeaders = document.getElementById('localizeExportHeaders');
+    const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
+    const PHOTO_PERMISSION_INTRO_KEY = 'xporter_photo_permission_intro_seen';
+    const PHOTO_PERMISSION_INTRO_SECONDS = 3;
 
     // Long localized help must use the visible popup area below the tabs.
     // Recalculate on every open because Chromium can scroll the popup between
-    // interactions, which changes whether the header and tabs are still visible.
+    // interactions, which changes whether the header, tabs, and footer are visible.
     function positionViewportHelp(trigger) {
         const tooltip = trigger.querySelector(':scope > .help-pop');
         if (!tooltip) return;
@@ -117,18 +127,39 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? footerRect.top - 8
             : window.innerHeight - 8;
         const triggerRect = trigger.getBoundingClientRect();
-        const tooltipTop = trigger.classList.contains('help-below')
-            ? Math.max(safeTop + 4, triggerRect.bottom + 8)
-            : safeTop + 4;
-        const maxHeight = Math.max(48, safeBottom - tooltipTop);
         // The active tab briefly animates with transform, so a fixed child can
         // unexpectedly become relative to that tab. Position explicitly from
         // the tooltip's actual offset parent to keep viewport geometry stable.
         const parentRect = tooltip.offsetParent?.getBoundingClientRect() ||
             trigger.parentElement.getBoundingClientRect();
-        trigger.style.setProperty('--help-pop-safe-top', `${tooltipTop - parentRect.top}px`);
         trigger.style.setProperty('--help-pop-left', `${16 - parentRect.left}px`);
         trigger.style.setProperty('--help-pop-width', `${window.innerWidth - 32}px`);
+        const safeAreaTop = safeTop + 4;
+        let tooltipTop = safeAreaTop;
+        let maxHeight = Math.max(0, safeBottom - safeAreaTop);
+
+        if (trigger.classList.contains('help-below')) {
+            const belowTop = Math.max(safeAreaTop, triggerRect.bottom + 8);
+            const availableBelow = Math.max(0, safeBottom - belowTop);
+            const aboveBottom = triggerRect.top - 8;
+            const availableAbove = Math.max(0, aboveBottom - safeAreaTop);
+            const borderHeight = parseFloat(getComputedStyle(tooltip).borderTopWidth) +
+                parseFloat(getComputedStyle(tooltip).borderBottomWidth);
+            const naturalHeight = tooltip.scrollHeight + borderHeight;
+
+            if (naturalHeight <= availableBelow) {
+                tooltipTop = belowTop;
+                maxHeight = availableBelow;
+            } else {
+                maxHeight = availableAbove;
+                tooltipTop = Math.max(
+                    safeAreaTop,
+                    aboveBottom - Math.min(naturalHeight, availableAbove)
+                );
+            }
+        }
+
+        trigger.style.setProperty('--help-pop-safe-top', `${tooltipTop - parentRect.top}px`);
         trigger.style.setProperty('--help-pop-max-height', `${maxHeight}px`);
     }
 
@@ -251,12 +282,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (message.type === 'DOWNLOAD_PROGRESS') {
             setDownloadBusy(true);
-            downloadBtn.querySelector('[data-i18n="download"]').textContent =
-                `${message.partNumber} / ${message.partCount}`;
-            statusMessage.textContent = templateText(
-                'downloadingPart',
-                { current: message.partNumber, total: message.partCount }
-            );
+            const downloadLabel = downloadBtn.querySelector('[data-i18n="download"]');
+            if (message.stage === 'photos') {
+                const current = formatNumber(message.photoCurrent || 0, currentLang);
+                const total = formatNumber(message.photoTotal || 0, currentLang);
+                downloadLabel.textContent = `${current} / ${total}`;
+                statusMessage.textContent = templateText(
+                    'downloadStagePhotos',
+                    { current, total }
+                );
+            } else if (message.stage === 'building_xlsx') {
+                downloadLabel.textContent = t('preparing');
+                statusMessage.textContent = t('downloadStageBuildingXlsx');
+            } else {
+                downloadLabel.textContent =
+                    `${message.partNumber} / ${message.partCount}`;
+                statusMessage.textContent = templateText(
+                    'downloadingPart',
+                    { current: message.partNumber, total: message.partCount }
+                );
+            }
         } else if (message.type === 'DOWNLOAD_COMPLETE') {
             setDownloadBusy(false);
             if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
@@ -293,15 +338,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Parallel Init ====================
     // Fire all independent async requests at once instead of sequentially
-    const [settingsResult, authResult, status, activeTabs, currentAccountResult] = await Promise.all([
+    const [settingsResult, authResult, status, activeTabs, currentAccountResult,
+        photoPermissionIntroState] = await Promise.all([
         sendMessage({ type: 'GET_SETTINGS' }),
         checkAuth().catch(() => null),
         sendMessage({ type: 'GET_STATUS' }),
         chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []),
-        sendMessage({ type: 'GET_CURRENT_ACCOUNT' }).catch(() => null)
+        sendMessage({ type: 'GET_CURRENT_ACCOUNT' }).catch(() => null),
+        chrome.storage.local.get(PHOTO_PERMISSION_INTRO_KEY).catch(() => ({}))
     ]);
 
     const currentSettings = settingsResult?.settings || {};
+    let photoPermissionIntroSeen =
+        photoPermissionIntroState?.[PHOTO_PERMISSION_INTRO_KEY] === true;
     detectedCurrentAccount = currentAccountResult?.account || null;
 
     // ==================== Theme & Design ====================
@@ -343,6 +392,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         return selectedCount;
     }
 
+    function modeEmbedsXlsxPhotos(mode = exportMode.value) {
+        if (mode === 'posts') return currentSettings.embedPostPhotos === true;
+        if (mode === 'bookmarks') return currentSettings.embedBookmarkPhotos === true;
+        return false;
+    }
+
+    function syncXlsxPhotoChoice(mode = exportMode.value) {
+        const embeds = modeEmbedsXlsxPhotos(mode);
+        xlsxPhotoEmbed.checked = embeds;
+        xlsxPhotoLinks.checked = !embeds;
+    }
+
+    async function persistXlsxPhotoChoice(embeds, mode = exportMode.value) {
+        const key = mode === 'bookmarks' ? 'embedBookmarkPhotos' : 'embedPostPhotos';
+        const result = await persistSettingsPatch(currentSettings, { [key]: embeds });
+        if (result?.success !== true) {
+            syncXlsxPhotoChoice(mode);
+            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+        }
+        return result;
+    }
+
     function applyModeUI(mode) {
         const isPostsMode = (mode === 'posts');
         const isBookmarksMode = (mode === 'bookmarks');
@@ -371,10 +442,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const txtOption = outputFormat.querySelector('option[value="txt"]');
         if (txtOption) txtOption.disabled = !isPostRows;
         if (!isPostRows && outputFormat.value === 'txt') outputFormat.value = 'csv';
-        postOutputOptions.classList.toggle(
+        xlsxPhotoOptions.classList.toggle(
             'hidden',
-            !isPostsMode || outputFormat.value !== 'xlsx'
+            !isPostRows || outputFormat.value !== 'xlsx'
         );
+        syncXlsxPhotoChoice(mode);
         outputFormatHint.classList.toggle(
             'hidden',
             !isPostRows || outputFormat.value !== 'txt'
@@ -653,14 +725,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     let activeAboutRisk = null;
     let aboutRiskCountdown = null;
 
-    function guardedButtonCountdown(button, readyLabel, statusElement) {
+    function guardedButtonCountdown(
+        button,
+        readyLabel,
+        statusElement,
+        seconds = 5,
+        waitingLabel = null
+    ) {
         return window.XPorterAcknowledgementTimer.start(button, {
-            seconds: 5,
+            seconds,
             readyLabel,
-            waitingLabel: (action, seconds) => templateText(
+            waitingLabel: waitingLabel || ((action, remainingSeconds) => templateText(
                 'acknowledgementCountdown',
-                { action, seconds: formatNumber(seconds, currentLang) }
-            ),
+                {
+                    action,
+                    seconds: formatNumber(remainingSeconds, currentLang)
+                }
+            )),
             onChange({ text }) {
                 if (statusElement) statusElement.textContent = text;
             }
@@ -715,6 +796,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (event.key !== 'Tab') return;
         const first = aboutRiskCancel;
         const last = aboutRiskConfirm;
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+
+    let activePhotoPermissionCheckbox = null;
+    let photoPermissionCountdown = null;
+    let photoPermissionSelectionVersion = 0;
+
+    function finishPhotoPermissionDialog(continueToChrome) {
+        if (!activePhotoPermissionCheckbox) return;
+        const checkbox = activePhotoPermissionCheckbox;
+        activePhotoPermissionCheckbox = null;
+        photoPermissionCountdown?.cancel();
+        photoPermissionCountdown = null;
+        photoPermissionDialog.classList.add('hidden');
+        popup.inert = false;
+
+        if (continueToChrome) {
+            // Keep the permission request inside this confirmation click. Any
+            // await or permission preflight before request() loses Chromium's
+            // transient user activation and suppresses the native prompt.
+            void requestAndSavePhotoEmbedPermission(checkbox, true);
+        } else {
+            checkbox.checked = false;
+            xlsxPhotoLinks.checked = true;
+        }
+        requestAnimationFrame(() => checkbox.focus());
+    }
+
+    function openPhotoPermissionDialog(checkbox) {
+        activePhotoPermissionCheckbox = checkbox;
+        photoPermissionTitle.textContent = t('photoPermissionTitle');
+        photoPermissionBody.innerHTML = renderHelpMarkup(t('photoPermissionBody'));
+        photoPermissionCancel.textContent = t('photoPermissionCancel');
+        photoPermissionConfirm.textContent = t('photoPermissionContinue');
+        photoPermissionCountdown?.cancel();
+        photoPermissionCountdown = guardedButtonCountdown(
+            photoPermissionConfirm,
+            photoPermissionConfirm.textContent,
+            photoPermissionCountdownStatus,
+            PHOTO_PERMISSION_INTRO_SECONDS,
+            (_action, remainingSeconds) => templateText(
+                'photoPermissionWaiting',
+                { seconds: formatNumber(remainingSeconds, currentLang) }
+            )
+        );
+        popup.inert = true;
+        photoPermissionDialog.classList.remove('hidden');
+        requestAnimationFrame(() => photoPermissionCancel.focus());
+    }
+
+    photoPermissionCancel.addEventListener('click', () => finishPhotoPermissionDialog(false));
+    photoPermissionConfirm.addEventListener('click', () => finishPhotoPermissionDialog(true));
+    photoPermissionDialog.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            finishPhotoPermissionDialog(false);
+            return;
+        }
+        if (event.key !== 'Tab') return;
+        const first = photoPermissionCancel;
+        const last = photoPermissionConfirm;
         if (event.shiftKey && document.activeElement === first) {
             event.preventDefault();
             last.focus();
@@ -834,8 +982,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSettings.includeBookmarkReplyContext !== false;
         includeBookmarkArticles.checked =
             currentSettings.includeBookmarkArticles !== false;
-        embedPostPhotos.checked = currentSettings.embedPostPhotos === true;
-        embedBookmarkPhotos.checked = currentSettings.embedBookmarkPhotos === true;
+        syncXlsxPhotoChoice();
         const savedLimit = currentSettings.quantityLimit ?? 500;
         const presetValues = ['0', '100', '500', '1000', '5000', '10000'];
         if (presetValues.includes(String(savedLimit))) {
@@ -967,8 +1114,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             includeArticles: includeArticles.checked,
             includeBookmarkReplyContext: includeBookmarkReplyContext.checked,
             includeBookmarkArticles: includeBookmarkArticles.checked,
-            embedPostPhotos: embedPostPhotos.checked,
-            embedBookmarkPhotos: embedBookmarkPhotos.checked,
+            embedPostPhotos: exportMode.value === 'posts'
+                ? xlsxPhotoEmbed.checked
+                : currentSettings.embedPostPhotos === true,
+            embedBookmarkPhotos: exportMode.value === 'bookmarks'
+                ? xlsxPhotoEmbed.checked
+                : currentSettings.embedBookmarkPhotos === true,
             quantityLimit: qLimit,
             requestDelay: 3000,
             exportSpeed: exportSpeed.value || 'standard',
@@ -1066,11 +1217,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Photo embedding needs https://pbs.twimg.com/* access. That origin lives
-    // in optional_host_permissions (never required), so extension updates can
-    // not disable existing installations — the 1.5.9 incident. The grant is
-    // requested here, from the checkbox's own user gesture; declining keeps
-    // ordinary URL-only exports fully functional.
-    const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
+    // in optional_host_permissions (never required), so extension updates
+    // cannot disable existing installations — the 1.5.9 incident. The first
+    // enable attempt explains the scope; its guarded Continue click is then
+    // the direct user gesture that opens Chromium's native permission prompt.
     function requestPhotoEmbedPermission(checkbox) {
         if (!checkbox.checked) return Promise.resolve(true);
         if (typeof chrome === 'undefined' || !chrome.permissions?.request) {
@@ -1082,33 +1232,63 @@ document.addEventListener('DOMContentLoaded', async () => {
             return Promise.resolve(false);
         }
     }
-    async function handleEmbedPhotosChange(checkbox) {
+
+    async function requestAndSavePhotoEmbedPermission(checkbox, rememberIntro = false) {
         // Invoke request() before the first await. An async contains() preflight
         // consumes Chromium's transient user activation and can make the
-        // permission prompt fail even though this handler came from a click.
+        // native permission prompt fail even though this came from a click.
         const permissionRequest = requestPhotoEmbedPermission(checkbox);
+        if (rememberIntro) {
+            photoPermissionIntroSeen = true;
+            try {
+                const write = chrome.storage.local.set({
+                    [PHOTO_PERMISSION_INTRO_KEY]: true
+                });
+                if (write?.catch) void write.catch(() => {});
+            } catch (_) { /* the in-memory acknowledgement still avoids a loop */ }
+        }
         let granted = false;
         try {
             granted = await permissionRequest;
         } catch (_) { /* fail closed below */ }
         if (!granted) {
             checkbox.checked = false;
+            xlsxPhotoLinks.checked = true;
         }
-        saveSettingsDebounced();
+        await persistXlsxPhotoChoice(granted);
+    }
+
+    function handleEmbedPhotosChange(checkbox) {
+        if (!checkbox.checked) {
+            return;
+        }
+        photoPermissionSelectionVersion += 1;
+        if (!photoPermissionIntroSeen) {
+            openPhotoPermissionDialog(checkbox);
+            return;
+        }
+        void requestAndSavePhotoEmbedPermission(checkbox);
     }
 
     async function syncEmbedPhotoPermissionState() {
         if (typeof chrome === 'undefined' || !chrome.permissions?.contains) return;
+        const selectionVersion = photoPermissionSelectionVersion;
         let granted = false;
         try {
             granted = await chrome.permissions.contains({
                 origins: [PHOTO_EMBED_ORIGIN]
             });
         } catch (_) { /* fail closed below */ }
-        if (granted || (!embedPostPhotos.checked && !embedBookmarkPhotos.checked)) return;
-        embedPostPhotos.checked = false;
-        embedBookmarkPhotos.checked = false;
-        saveSettingsDebounced();
+        if (selectionVersion !== photoPermissionSelectionVersion) return;
+        if (granted ||
+            (currentSettings.embedPostPhotos !== true &&
+                currentSettings.embedBookmarkPhotos !== true)) return;
+        xlsxPhotoLinks.checked = true;
+        xlsxPhotoEmbed.checked = false;
+        await persistSettingsPatch(currentSettings, {
+            embedPostPhotos: false,
+            embedBookmarkPhotos: false
+        });
     }
 
     [includeOriginalPosts, includeQuotes, includeReplies, includeRetweets, includeArticles,
@@ -1120,9 +1300,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         aboutAccountSpeed, aboutAccountCustomBatchSize].forEach(el => {
         el.addEventListener('change', saveSettingsDebounced);
     });
-    embedPostPhotos.addEventListener('change', () => handleEmbedPhotosChange(embedPostPhotos));
-    embedBookmarkPhotos.addEventListener('change', () => handleEmbedPhotosChange(embedBookmarkPhotos));
-    void syncEmbedPhotoPermissionState();
+    xlsxPhotoLinks.addEventListener('change', () => {
+        if (xlsxPhotoLinks.checked) {
+            photoPermissionSelectionVersion += 1;
+            void persistXlsxPhotoChoice(false);
+        }
+    });
+    xlsxPhotoEmbed.addEventListener('change', () => {
+        if (xlsxPhotoEmbed.checked) handleEmbedPhotosChange(xlsxPhotoEmbed);
+    });
+    await syncEmbedPhotoPermissionState();
     customQuantity.addEventListener('input', saveSettingsDebounced);
     postTypeControls.forEach(control => {
         control.addEventListener('change', syncPostSelectionUI);

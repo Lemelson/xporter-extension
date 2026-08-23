@@ -4,8 +4,13 @@
 
 (function () {
     let activeDownload = null;
-    const MAX_EMBEDDED_PHOTO_BYTES = 15 * 1024 * 1024;
-    const EMBEDDED_PHOTO_CONCURRENCY = 4;
+    const MAX_EMBEDDED_PHOTO_BYTES =
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_PREVIEW_MAX_BYTES) || 3 * 1024 * 1024;
+    const MAX_EMBEDDED_PHOTO_PART_BYTES =
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_PART_MAX_BYTES) || 40 * 1024 * 1024;
+    const MAX_EMBEDDED_PHOTO_TARGETS =
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_TARGET_LIMIT) || 1000;
+    const EMBEDDED_PHOTO_CONCURRENCY = 8;
     const PHOTO_HOST_ORIGIN = 'https://pbs.twimg.com/*';
 
     // Photo embedding is an optional capability: pbs.twimg.com lives in
@@ -47,6 +52,7 @@
         const add = (exportedPostId, post, relation) => {
             if (!post || typeof post !== 'object') return;
             for (const rawUrl of String(post.media_urls || '').split(/,\s*/)) {
+                if (targets.length >= MAX_EMBEDDED_PHOTO_TARGETS) return;
                 const sourceUrl = rawUrl.trim();
                 if (!sourceUrl) continue;
                 let parsed;
@@ -136,9 +142,56 @@
         return { width: 160, height: 96 };
     }
 
+    function previewPhotoUrl(sourceUrl) {
+        try {
+            const url = new URL(sourceUrl);
+            if (url.protocol !== 'https:' || url.hostname !== 'pbs.twimg.com') return null;
+            url.searchParams.set('name', 'small');
+            return url.toString();
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function readBoundedPhotoBytes(response) {
+        const reader = response.body?.getReader?.();
+        if (!reader) {
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            return bytes.length <= MAX_EMBEDDED_PHOTO_BYTES ? bytes : null;
+        }
+
+        const chunks = [];
+        let total = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+                total += chunk.length;
+                if (total > MAX_EMBEDDED_PHOTO_BYTES) {
+                    await reader.cancel();
+                    return null;
+                }
+                chunks.push(chunk);
+            }
+        } finally {
+            reader.releaseLock?.();
+        }
+        if (total === 0) return null;
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return bytes;
+    }
+
     async function fetchPhotoAsset(target) {
         try {
-            const response = await fetch(target.sourceUrl, {
+            const fetchUrl = previewPhotoUrl(target.sourceUrl);
+            if (!fetchUrl) return null;
+            const response = await fetch(fetchUrl, {
                 method: 'GET',
                 credentials: 'omit',
                 cache: 'force-cache'
@@ -148,8 +201,8 @@
             if (!type) return null;
             const declaredSize = Number(response.headers?.get?.('content-length')) || 0;
             if (declaredSize > MAX_EMBEDDED_PHOTO_BYTES) return null;
-            const bytes = new Uint8Array(await response.arrayBuffer());
-            if (bytes.length === 0 || bytes.length > MAX_EMBEDDED_PHOTO_BYTES) return null;
+            const bytes = await readBoundedPhotoBytes(response);
+            if (!bytes) return null;
             return {
                 ...target,
                 ...type,
@@ -162,15 +215,27 @@
         }
     }
 
-    async function fetchPhotoAssets(items) {
+    async function fetchPhotoAssets(items, onProgress = null) {
         const targets = collectPhotoTargets(items);
         if (targets.length === 0) return [];
+        let completed = 0;
+        let retainedBytes = 0;
+        onProgress?.({ current: completed, total: targets.length });
         const results = new Array(targets.length);
         let nextIndex = 0;
         const worker = async () => {
             while (nextIndex < targets.length) {
                 const index = nextIndex++;
-                results[index] = await fetchPhotoAsset(targets[index]);
+                const asset = await fetchPhotoAsset(targets[index]);
+                if (asset &&
+                    retainedBytes + asset.bytes.length <= MAX_EMBEDDED_PHOTO_PART_BYTES) {
+                    retainedBytes += asset.bytes.length;
+                    results[index] = asset;
+                } else {
+                    results[index] = null;
+                }
+                completed += 1;
+                onProgress?.({ current: completed, total: targets.length });
             }
         };
         await Promise.all(
@@ -198,13 +263,13 @@
         return Math.min(ordinaryLimit, photoLimit);
     }
 
-    function buildPlan(state, requestedFormat) {
+    function buildPlan(state, requestedFormat, downloadSettings = state?.settings || {}) {
         const format = requestedFormat || state?.outputFormat || 'csv';
         const count = Math.max(0, Number(state?.tweetCount) || 0);
         const partSize = getPartLimit(
             format,
             state?.exportMode || 'posts',
-            state?.settings || {}
+            downloadSettings
         );
         const partCount = Math.max(1, Math.ceil(count / partSize));
         return {
@@ -219,7 +284,8 @@
 
     async function getCurrentPlan(format) {
         const state = await XPorterStorage.loadExportState();
-        return buildPlan(state, format);
+        const settings = await XPorterStorage.loadSettings();
+        return buildPlan(state, format, settings);
     }
 
     async function* loadCurrentParts(state, partSize) {
@@ -256,9 +322,10 @@
             .catch(() => {});
     }
 
-    async function downloadCurrent(format) {
-        const state = await XPorterStorage.loadExportState();
-        const plan = buildPlan(state, format);
+    async function downloadCurrent(format, snapshot = null) {
+        const state = snapshot?.state || await XPorterStorage.loadExportState();
+        const settings = snapshot?.settings || await XPorterStorage.loadSettings();
+        const plan = snapshot?.plan || buildPlan(state, format, settings);
         if (!state || plan.count === 0 || !state.totalBatches) return { error: 'NO_DATA' };
 
         let partNumber = 0;
@@ -288,7 +355,8 @@
                 exportedAt,
                 partNumber,
                 partCount: plan.partCount,
-                saveAs: !plan.multipart
+                saveAs: !plan.multipart,
+                settings
             });
             if (lastResult?.success !== true) return lastResult;
             downloadedCount += items.length;
@@ -313,11 +381,13 @@
 
     async function startCurrentDownload(format) {
         if (activeDownload) return { error: 'DOWNLOAD_IN_PROGRESS' };
-        const plan = await getCurrentPlan(format);
+        const state = await XPorterStorage.loadExportState();
+        const settings = await XPorterStorage.loadSettings();
+        const plan = buildPlan(state, format, settings);
         if (plan.count === 0) return { error: 'NO_DATA' };
 
         const stopKeepAlive = keepWorkerAliveDuringDownload();
-        activeDownload = downloadCurrent(plan.format)
+        activeDownload = downloadCurrent(plan.format, { state, settings, plan })
             .then(result => {
                 if (result?.success !== true) {
                     reportDownload({ type: 'DOWNLOAD_ERROR', error: result?.error || 'DOWNLOAD_FAILED' });
@@ -393,7 +463,7 @@
         let mimeType;
         let extension;
 
-        const settings = await XPorterStorage.loadSettings();
+        const settings = options.settings || await XPorterStorage.loadSettings();
         const headerOpts = {
             localize: settings.localizeExportHeaders === true,
             lang: settings.language || 'en',
@@ -417,9 +487,24 @@
                 (mode === 'posts' && settings.embedPostPhotos === true) ||
                 (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
             );
+            const progressBase = {
+                type: 'DOWNLOAD_PROGRESS',
+                partNumber: options.partNumber || 1,
+                partCount: options.partCount || 1,
+                count: allItems.length,
+                format
+            };
             const mediaAssets = (embedPhotos && await hasPhotoHostAccess())
-                ? await fetchPhotoAssets(allItems)
+                ? await fetchPhotoAssets(allItems, ({ current, total }) => {
+                    reportDownload({
+                        ...progressBase,
+                        stage: 'photos',
+                        photoCurrent: current,
+                        photoTotal: total
+                    });
+                })
                 : [];
+            reportDownload({ ...progressBase, stage: 'building_xlsx' });
             content = XPorterCSV.generateXLSX(allItems, isUsers, {
                 ...headerOpts,
                 mode,

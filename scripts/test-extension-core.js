@@ -2009,7 +2009,12 @@ async function testDownloadModulePreservesCurrentExportContract() {
     let xlsxProfile = null;
     let xlsxMediaAssets = null;
     let photoFetches = 0;
+    const photoFetchUrls = [];
+    const progressEvents = [];
     let photoPermissionState = 'granted';
+    let photoEmbeddingEnabled = true;
+    let photoPermissionChecks = 0;
+    let settingsLoads = 0;
     let keepAliveCallback = null;
     let keepAliveCleared = 0;
     let keepAliveTouches = 0;
@@ -2031,7 +2036,7 @@ async function testDownloadModulePreservesCurrentExportContract() {
         FileReader: FakeFileReader,
         fetch: async (url) => {
             photoFetches += 1;
-            assert.equal(String(url), 'https://pbs.twimg.com/media/download-test.png');
+            photoFetchUrls.push(String(url));
             return new Response(new Uint8Array([
                 137, 80, 78, 71, 13, 10, 26, 10,
                 0, 0, 0, 13, 73, 72, 68, 82,
@@ -2055,6 +2060,8 @@ async function testDownloadModulePreservesCurrentExportContract() {
                 posts: { csv: 10, json: 10, xlsx: 10, txt: 10 },
                 users: { csv: 10, json: 10, xlsx: 10 }
             },
+            EMBEDDED_PHOTO_PREVIEW_MAX_BYTES: 100,
+            EMBEDDED_PHOTO_XLSX_PART_MAX_BYTES: 30,
             STORAGE_BATCH_READ_SIZE: 100
         },
         XPorterStorage: {
@@ -2063,7 +2070,10 @@ async function testDownloadModulePreservesCurrentExportContract() {
                     id: '12345',
                     text: 'hello',
                     media_type: 'photo',
-                    media_urls: 'https://pbs.twimg.com/media/download-test.png'
+                    media_urls: [
+                        'https://pbs.twimg.com/media/download-test.png',
+                        'https://pbs.twimg.com/media/download-test-2.png'
+                    ].join(', ')
                 }]];
             },
             async loadAllTweets() { throw new Error('current downloads must not load the whole export'); },
@@ -2075,11 +2085,12 @@ async function testDownloadModulePreservesCurrentExportContract() {
                 };
             },
             async loadSettings() {
+                settingsLoads += 1;
                 return {
                     localizeExportHeaders: false,
                     language: 'en',
-                    embedPostPhotos: true,
-                    embedBookmarkPhotos: true
+                    embedPostPhotos: photoEmbeddingEnabled,
+                    embedBookmarkPhotos: photoEmbeddingEnabled
                 };
             },
             async recordDownload() { downloadRecorded += 1; }
@@ -2107,6 +2118,7 @@ async function testDownloadModulePreservesCurrentExportContract() {
         chrome: {
             permissions: {
                 async contains() {
+                    photoPermissionChecks += 1;
                     if (photoPermissionState === 'error') {
                         throw new Error('permissions unavailable');
                     }
@@ -2115,7 +2127,10 @@ async function testDownloadModulePreservesCurrentExportContract() {
             },
             runtime: {
                 lastError: null,
-                sendMessage: async () => ({}),
+                sendMessage: async (message) => {
+                    progressEvents.push(JSON.parse(JSON.stringify(message)));
+                    return {};
+                },
                 getPlatformInfo(callback) {
                     keepAliveTouches += 1;
                     callback?.({ os: 'mac' });
@@ -2155,22 +2170,59 @@ async function testDownloadModulePreservesCurrentExportContract() {
         { name: 'Test User', screenName: 'test' },
         'post XLSX generation must receive the same profile snapshot as TXT'
     );
-    assert.equal(photoFetches, 1, 'granted photo access must embed the requested media');
+    assert.equal(photoFetches, 2, 'granted photo access must fetch each requested preview');
+    assert.deepEqual(
+        photoFetchUrls,
+        [
+            'https://pbs.twimg.com/media/download-test.png?name=small',
+            'https://pbs.twimg.com/media/download-test-2.png?name=small'
+        ],
+        'embedded Excel previews must request the bounded X thumbnail, not the original photo'
+    );
     assert.equal(xlsxMediaAssets?.length, 1);
+    assert(
+        xlsxMediaAssets[0].bytes.length <= 30,
+        'the retained preview package must stay within its aggregate byte budget'
+    );
+    assert.deepEqual(
+        progressEvents
+            .filter(event => event.type === 'DOWNLOAD_PROGRESS' && event.stage === 'photos')
+            .map(event => [event.photoCurrent, event.photoTotal]),
+        [[0, 2], [1, 2], [2, 2]],
+        'photo progress must start at zero and advance once for every settled photo'
+    );
+    assert(
+        progressEvents.some(event =>
+            event.type === 'DOWNLOAD_PROGRESS' &&
+            event.stage === 'building_xlsx'
+        ),
+        'the download protocol must report XLSX assembly after the photo stage'
+    );
 
+    photoEmbeddingEnabled = false;
+    const permissionChecksBeforeLinks = photoPermissionChecks;
+    await context.XPorterDownloads.downloadCurrent('xlsx');
+    assert.equal(photoFetches, 2,
+        'the links-only Excel mode must never fetch photo bytes');
+    assert.equal(photoPermissionChecks, permissionChecksBeforeLinks,
+        'the links-only Excel mode must not ask for optional photo access');
+    assert.equal(xlsxMediaAssets, null);
+
+    photoEmbeddingEnabled = true;
     photoPermissionState = 'denied';
     await context.XPorterDownloads.downloadCurrent('xlsx');
-    assert.equal(photoFetches, 1,
+    assert.equal(photoFetches, 2,
         'revoked photo access must keep the URL-only workbook without fetching media');
     assert.equal(xlsxMediaAssets, null);
 
     photoPermissionState = 'error';
     await context.XPorterDownloads.downloadCurrent('xlsx');
-    assert.equal(photoFetches, 1,
+    assert.equal(photoFetches, 2,
         'a permissions API failure must fail closed and keep the URL-only workbook');
     assert.equal(xlsxMediaAssets, null);
     
 
+    const settingsLoadsBeforeDetached = settingsLoads;
     const detached = await context.XPorterDownloads.startCurrentDownload('csv');
     assert.equal(detached.started, true);
     assert.equal(typeof keepAliveCallback, 'function',
@@ -2178,6 +2230,11 @@ async function testDownloadModulePreservesCurrentExportContract() {
     keepAliveCallback();
     assert.equal(keepAliveTouches, 1);
     await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+        settingsLoads,
+        settingsLoadsBeforeDetached + 1,
+        'a detached download must use one settings snapshot for its plan and actual files'
+    );
     assert.equal(keepAliveCleared, 1, 'download keepalive must stop after completion');
 
     
