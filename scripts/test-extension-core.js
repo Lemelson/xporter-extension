@@ -5043,6 +5043,135 @@ function testTimelineV2UserListsAreParsed() {
     assert.equal(reply.conversation_id, '111');
 }
 
+function testNestedTimelineV2UserListsAreParsed() {
+    const context = vm.createContext({
+        console,
+        setTimeout,
+        clearTimeout,
+        XPORTER_CONFIG: {},
+        XLog: { log() {}, warn() {}, error() {}, info() {} },
+        USER_FEATURES: {},
+        USER_FIELD_TOGGLES: {},
+        TWEETS_FEATURES: {},
+        FOLLOWERS_FEATURES: {},
+        FOLLOWERS_FIELD_TOGGLES: {}
+    });
+    vm.runInContext(source('utils/api-parsers.js'), context, { filename: 'utils/api-parsers.js' });
+    context.__payload = {
+        data: {
+            user: {
+                result: {
+                    timeline_v2: {
+                        timeline: {
+                            instructions: [{
+                                type: 'TimelineAddEntries',
+                                entries: [{
+                                    entryId: 'user-1',
+                                    content: {
+                                        itemContent: {
+                                            user_results: {
+                                                result: {
+                                                    rest_id: '1',
+                                                    core: { name: 'First', screen_name: 'first' },
+                                                    legacy: {}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }]
+                            }, {
+                                type: 'TimelineAddToModule',
+                                moduleItems: [{
+                                    entryId: 'user-2',
+                                    item: {
+                                        itemContent: {
+                                            user_results: {
+                                                result: {
+                                                    rest_id: '2',
+                                                    is_blue_verified: false,
+                                                    core: { name: 'Second', screen_name: 'second' },
+                                                    legacy: {
+                                                        verified: true,
+                                                        url: 'https://t.co/short',
+                                                        entities: {
+                                                            url: {
+                                                                urls: [{
+                                                                    expanded_url: 'https://example.com/second'
+                                                                }]
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }]
+                            }, {
+                                type: 'TimelineReplaceEntry',
+                                entry: {
+                                    entryId: 'cursor-bottom-2',
+                                    content: {
+                                        __typename: 'TimelineTimelineCursor',
+                                        cursorType: 'Bottom',
+                                        value: 'next-nested-page'
+                                    }
+                                }
+                            }]
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    const result = vm.runInContext('XPorterApiParsers.parseFollowersResponse(__payload)', context);
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(result.users.map(user => user.id))),
+        ['1', '2'],
+        'TimelineAddToModule user rows must not disappear'
+    );
+    assert.equal(
+        result.nextCursor,
+        'next-nested-page',
+        'TimelineReplaceEntry must advance user-list pagination'
+    );
+    assert.equal(result.users[1].verified, true,
+        'legacy verified accounts must remain verified in the export');
+    assert.equal(result.users[1].url, 'https://example.com/second',
+        'profile URLs must use the expanded user entity');
+}
+
+async function testStopAbortsBookmarkContextLimiter() {
+    const harness = createWorkerHarness();
+    harness.context.__aborts = {
+        primary: 0,
+        bookmarkContext: 0,
+        about: 0,
+        requests: 0
+    };
+    harness.context.__aborter = (key) => ({
+        abort() { harness.context.__aborts[key] += 1; }
+    });
+    harness.context.XPorterAPI.abortActiveRequests = () => {
+        harness.context.__aborts.requests += 1;
+    };
+    vm.runInContext(`
+        currentExport = { running: true };
+        rateLimiter = __aborter('primary');
+        bookmarkContextRateLimiter = __aborter('bookmarkContext');
+        aboutRateLimiter = __aborter('about');
+        exportLoopPromise = null;
+    `, harness.context);
+
+    const result = await vm.runInContext('stopExport()', harness.context);
+    assert.equal(result.success, true);
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(harness.context.__aborts)),
+        { primary: 1, bookmarkContext: 1, about: 1, requests: 1 },
+        'Stop must abort every limiter and active request path'
+    );
+}
+
 function testThemeInitializationCanRevertToDark() {
     const classes = new Set(['light']);
     const context = vm.createContext({
@@ -5267,6 +5396,8 @@ const tests = [
     ['repeated user-list cursor terminates', testRepeatedUserListCursorTerminatesWithoutHanging],
     ['deep timeline module parser', testTimelineModuleItemsAreParsed],
     ['timeline_v2 user-list parser', testTimelineV2UserListsAreParsed],
+    ['nested timeline_v2 user-list parser', testNestedTimelineV2UserListsAreParsed],
+    ['Stop aborts Bookmarks reply-context limiter', testStopAbortsBookmarkContextLimiter],
     ['theme restore', testThemeInitializationCanRevertToDark],
     ['profile feed defaults and migration', testProfileFeedDefaultsAndMigratesLegacyReplySetting]
 ];

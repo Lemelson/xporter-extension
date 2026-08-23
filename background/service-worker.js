@@ -1870,6 +1870,9 @@ async function stopExport() {
     if (rateLimiter) {
         rateLimiter.abort();
     }
+    if (bookmarkContextRateLimiter) {
+        bookmarkContextRateLimiter.abort();
+    }
     if (aboutRateLimiter) {
         aboutRateLimiter.abort();
     }
