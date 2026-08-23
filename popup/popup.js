@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastDownloadPlan = null;
     let downloadPlanRequest = 0;
     let downloadInProgress = false;
+    let pendingXlsxPhotoChoice = Promise.resolve({ success: true });
     let resumeAddsItems = false;
     let bookmarksUsernameBackup = '';
     let detectedCurrentAccount = null;
@@ -417,6 +418,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         return result;
     }
 
+    function trackXlsxPhotoChoice(promise) {
+        const tracked = Promise.resolve(promise).catch((error) => {
+            showToast(formatError(error?.message || 'STORAGE_FULL', t), 'error');
+            return { error: error?.message || 'STORAGE_FULL' };
+        });
+        pendingXlsxPhotoChoice = tracked;
+        return tracked;
+    }
+
     function applyModeUI(mode) {
         const isPostsMode = (mode === 'posts');
         const isBookmarksMode = (mode === 'bookmarks');
@@ -569,6 +579,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function setDownloadBusy(busy) {
         downloadInProgress = busy;
         downloadBtn.disabled = busy;
+        xlsxPhotoLinks.disabled = busy;
+        xlsxPhotoEmbed.disabled = busy;
         outputFormat.disabled = busy || !!lastExportState?.running;
         exportMode.disabled = busy || !!lastExportState?.running;
         newExportBtn.disabled = busy;
@@ -825,7 +837,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Keep the permission request inside this confirmation click. Any
             // await or permission preflight before request() loses Chromium's
             // transient user activation and suppresses the native prompt.
-            void requestAndSavePhotoEmbedPermission(checkbox, true);
+            trackXlsxPhotoChoice(
+                requestAndSavePhotoEmbedPermission(checkbox, true)
+            );
         } else {
             checkbox.checked = false;
             xlsxPhotoLinks.checked = true;
@@ -1240,6 +1254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Invoke request() before the first await. An async contains() preflight
         // consumes Chromium's transient user activation and can make the
         // native permission prompt fail even though this came from a click.
+        const selectionVersion = photoPermissionSelectionVersion;
         const permissionRequest = requestPhotoEmbedPermission(checkbox);
         if (rememberIntro) {
             photoPermissionIntroSeen = true;
@@ -1254,11 +1269,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             granted = await permissionRequest;
         } catch (_) { /* fail closed below */ }
+        if (selectionVersion !== photoPermissionSelectionVersion) {
+            return { error: 'SELECTION_SUPERSEDED' };
+        }
         if (!granted) {
             checkbox.checked = false;
             xlsxPhotoLinks.checked = true;
         }
-        await persistXlsxPhotoChoice(granted);
+        return await persistXlsxPhotoChoice(granted);
     }
 
     function handleEmbedPhotosChange(checkbox) {
@@ -1270,7 +1288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             openPhotoPermissionDialog(checkbox);
             return;
         }
-        void requestAndSavePhotoEmbedPermission(checkbox);
+        trackXlsxPhotoChoice(requestAndSavePhotoEmbedPermission(checkbox));
     }
 
     async function syncEmbedPhotoPermissionState() {
@@ -1306,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     xlsxPhotoLinks.addEventListener('change', () => {
         if (xlsxPhotoLinks.checked) {
             photoPermissionSelectionVersion += 1;
-            void persistXlsxPhotoChoice(false);
+            trackXlsxPhotoChoice(persistXlsxPhotoChoice(false));
         }
     });
     xlsxPhotoEmbed.addEventListener('change', () => {
@@ -1490,6 +1508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     downloadBtn.addEventListener('click', async () => {
         setDownloadBusy(true);
         downloadBtn.querySelector('[data-i18n="download"]').textContent = t('preparing');
+        await pendingXlsxPhotoChoice;
         const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: outputFormat.value });
         if (result?.success === true) {
             renderDownloadPlan(result);

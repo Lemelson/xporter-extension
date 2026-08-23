@@ -28,7 +28,7 @@
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Public site | `docs/` only (`index.html`, `privacy-policy.html`, `feedback.html`, `assets/`); root site copies were removed |
-| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 75-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the gate then atomically replaces an allowlist ZIP |
+| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 77-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the gate then atomically replaces an allowlist ZIP |
 
 ## Gotchas that bite
 

@@ -392,6 +392,24 @@ assert.match(
     /await\s+refreshDownloadPlan\(lastExportState\)/,
     'changing XLSX photo mode must immediately refresh the visible multipart plan'
 );
+const downloadBusyContract = popupRuntime
+    .split('function setDownloadBusy', 2)[1]
+    ?.split('function renderDownloadPlan', 1)[0] || '';
+for (const control of ['xlsxPhotoLinks', 'xlsxPhotoEmbed']) {
+    assert.match(
+        downloadBusyContract,
+        new RegExp(`${control}\\.disabled\\s*=\\s*busy`),
+        `an active download must lock ${control}`
+    );
+}
+const downloadClickContract = popupRuntime
+    .split("downloadBtn.addEventListener('click'", 2)[1]
+    ?.split("copyBtn.addEventListener('click'", 1)[0] || '';
+assert.match(
+    downloadClickContract,
+    /await\s+pendingXlsxPhotoChoice/,
+    'Download must wait for the most recent XLSX photo choice to finish saving'
+);
 assert.match(
     read('popup/popup.js'),
     /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0/,

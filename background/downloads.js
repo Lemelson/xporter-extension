@@ -4,6 +4,9 @@
 
 (function () {
     let activeDownload = null;
+    let activeDownloadPlan = null;
+    let activeTransactionPromise = null;
+    let activeTextRead = null;
     let downloadStarting = false;
     const MAX_EMBEDDED_PHOTO_BYTES = Math.max(
         1,
@@ -118,6 +121,7 @@
             return { contentType: 'image/jpeg', extension: 'jpg' };
         }
         if (header === 'image/gif') return { contentType: header, extension: 'gif' };
+        if (header && header !== 'application/octet-stream') return null;
 
         const format = String(sourceUrl).match(/[?&]format=(png|jpe?g|gif)(?:&|$)/i)?.[1]
             || String(sourceUrl).match(/\.(png|jpe?g|gif)(?:\?|$)/i)?.[1]
@@ -211,6 +215,26 @@
         return bytes;
     }
 
+    async function cancelPhotoResponse(response, controller) {
+        try {
+            if (typeof response?.body?.cancel === 'function') {
+                await response.body.cancel();
+            } else {
+                const reader = response?.body?.getReader?.();
+                if (reader) {
+                    try {
+                        await reader.cancel();
+                    } finally {
+                        reader.releaseLock?.();
+                    }
+                }
+            }
+        } catch (_) { /* cancellation is best-effort */ }
+        try {
+            controller?.abort();
+        } catch (_) { /* already aborted */ }
+    }
+
     async function fetchPhotoAsset(target) {
         const controller = typeof AbortController === 'function'
             ? new AbortController()
@@ -227,11 +251,20 @@
                 cache: 'force-cache',
                 ...(controller ? { signal: controller.signal } : {})
             });
-            if (!response.ok) return null;
+            if (!response.ok) {
+                await cancelPhotoResponse(response, controller);
+                return null;
+            }
             const type = imageType(response, target.sourceUrl);
-            if (!type) return null;
+            if (!type) {
+                await cancelPhotoResponse(response, controller);
+                return null;
+            }
             const declaredSize = Number(response.headers?.get?.('content-length')) || 0;
-            if (declaredSize > MAX_EMBEDDED_PHOTO_BYTES) return null;
+            if (declaredSize > MAX_EMBEDDED_PHOTO_BYTES) {
+                await cancelPhotoResponse(response, controller);
+                return null;
+            }
             const bytes = await readBoundedPhotoBytes(response);
             if (!bytes) return null;
             return {
@@ -401,6 +434,19 @@
     }
 
     async function getCurrentPlan(format) {
+        const transactionPromise = activeTransactionPromise;
+        if (transactionPromise) {
+            try {
+                const transaction = await transactionPromise;
+                return { ...transaction.plan, active: true };
+            } catch (_) {
+                // The failed start clears its latch in `startCurrentDownload`;
+                // fall through to the current saved state for a useful plan.
+            }
+        }
+        if (activeDownloadPlan) {
+            return { ...activeDownloadPlan, active: true };
+        }
         const [state, settings] = await Promise.all([
             XPorterStorage.loadExportState(),
             XPorterStorage.loadSettings()
@@ -551,12 +597,16 @@
     }
 
     async function startCurrentDownload(format) {
-        if (downloadStarting || activeDownload) return { error: 'DOWNLOAD_IN_PROGRESS' };
+        if (isCurrentDataReadActive()) return { error: 'DOWNLOAD_IN_PROGRESS' };
         downloadStarting = true;
+        let transactionPromise = null;
         try {
-            const transaction = await createCurrentDownloadTransaction(format);
+            transactionPromise = createCurrentDownloadTransaction(format);
+            activeTransactionPromise = transactionPromise;
+            const transaction = await transactionPromise;
             const { plan } = transaction;
             if (plan.count === 0) return { error: 'NO_DATA' };
+            activeDownloadPlan = Object.freeze({ ...plan });
 
             const stopKeepAlive = keepWorkerAliveDuringDownload();
             let run;
@@ -581,16 +631,30 @@
                 .finally(() => {
                     clearPhotoAssetCache(transaction.photoAssetCache);
                     stopKeepAlive();
-                    if (activeDownload === run) activeDownload = null;
+                    if (activeDownload === run) {
+                        activeDownload = null;
+                        activeDownloadPlan = null;
+                    }
                 });
             activeDownload = run;
             return { success: true, started: true, ...plan, active: true };
         } finally {
+            if (activeTransactionPromise === transactionPromise) {
+                activeTransactionPromise = null;
+            }
             downloadStarting = false;
         }
     }
 
-    async function getCurrentPostsText() {
+    function isCurrentDownloadActive() {
+        return downloadStarting || !!activeDownload;
+    }
+
+    function isCurrentDataReadActive() {
+        return isCurrentDownloadActive() || !!activeTextRead;
+    }
+
+    async function readCurrentPostsText() {
         const state = await XPorterStorage.loadExportState();
         if (state?.exportMode !== 'posts' && state?.exportMode !== 'bookmarks') {
             return { error: 'NO_DATA' };
@@ -608,6 +672,18 @@
             };
         }
         return { error: 'NO_DATA' };
+    }
+
+    function getCurrentPostsText() {
+        if (isCurrentDataReadActive()) {
+            return Promise.resolve({ error: 'DOWNLOAD_IN_PROGRESS' });
+        }
+        let run;
+        run = readCurrentPostsText().finally(() => {
+            if (activeTextRead === run) activeTextRead = null;
+        });
+        activeTextRead = run;
+        return run;
     }
 
     async function downloadHistory(id, format) {
@@ -797,6 +873,8 @@
     }
 
     globalThis.XPorterDownloads = {
+        isCurrentDataReadActive,
+        isCurrentDownloadActive,
         getCurrentPlan,
         startCurrentDownload,
         downloadCurrent,

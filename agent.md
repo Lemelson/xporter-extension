@@ -133,7 +133,7 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── test-all.js              # Canonical ordered 11-suite deterministic gate
-│   ├── test-extension-core.js   # 75-test aggregator; suites in test-extension-core/
+│   ├── test-extension-core.js   # 77-test aggregator; suites in test-extension-core/
 │   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
 │   │                            # bookmark lifecycle/API cancellation/capture/export policy
 │   ├── test-extension-smoke.mjs               # unpacked extension runtime smoke
@@ -400,7 +400,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 75-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 77-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
 
 Outside `CODEX_SANDBOX`, run `node scripts/test-extension-smoke.mjs` plus the footer, tooltip, XLSX-photo-options, and photo-permission browser checks. Every Playwright entrypoint invokes `tooling-policy.js` before loading Playwright. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports; CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 

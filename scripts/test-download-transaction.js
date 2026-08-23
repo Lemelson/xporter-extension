@@ -30,6 +30,7 @@ function createHarness(options = {}) {
     const progressEvents = [];
     let permissionChecks = 0;
     let keepAliveClears = 0;
+    const pendingDownloadCallbacks = [];
     const sourceBatches = options.sourceBatches || [
         [{ id: '1' }],
         [{ id: '2' }]
@@ -76,7 +77,12 @@ function createHarness(options = {}) {
         XLog: { error() {}, warn() {} },
         XPORTER_CONFIG: {
             DOWNLOAD_PART_LIMITS: {
-                posts: { csv: 1, json: 1, xlsx: 1, txt: 1 },
+                posts: {
+                    csv: 1,
+                    json: 1,
+                    xlsx: options.postXlsxPartLimit || 1,
+                    txt: 1
+                },
                 users: { csv: 1, json: 1, xlsx: 1 }
             },
             STORAGE_BATCH_READ_SIZE: 2,
@@ -84,7 +90,8 @@ function createHarness(options = {}) {
             EMBEDDED_PHOTO_CACHE_MAX_BYTES: options.photoCacheMaxBytes,
             EMBEDDED_PHOTO_PREVIEW_MAX_BYTES: options.photoMaxBytes,
             EMBEDDED_PHOTO_XLSX_PART_MAX_BYTES: options.photoPartMaxBytes,
-            EMBEDDED_PHOTO_XLSX_TARGET_LIMIT: options.photoTargetLimit
+            EMBEDDED_PHOTO_XLSX_TARGET_LIMIT: options.photoTargetLimit,
+            EMBEDDED_PHOTO_XLSX_PART_LIMIT: options.photoPartLimit
         },
         XPorterStorage: {
             async loadExportState() {
@@ -105,6 +112,9 @@ function createHarness(options = {}) {
                 };
             },
             async loadTweetBatches(start, count) {
+                if (typeof options.loadTweetBatches === 'function') {
+                    return options.loadTweetBatches({ start, count, sourceBatches });
+                }
                 return sourceBatches.slice(start, start + count);
             },
             async loadSettings() {
@@ -166,6 +176,10 @@ function createHarness(options = {}) {
             downloads: {
                 download(_downloadOptions, callback) {
                     downloadId += 1;
+                    if (options.holdDownloads) {
+                        pendingDownloadCallbacks.push(() => callback(downloadId));
+                        return;
+                    }
                     callback(downloadId);
                 }
             }
@@ -186,7 +200,10 @@ function createHarness(options = {}) {
         photoFetchUrls,
         progressEvents,
         permissionChecks: () => permissionChecks,
-        keepAliveClears: () => keepAliveClears
+        keepAliveClears: () => keepAliveClears,
+        releaseDownloads() {
+            for (const callback of pendingDownloadCallbacks.splice(0)) callback();
+        }
     };
 }
 
@@ -442,6 +459,167 @@ async function testPhotoPartBudgetDropsExcessAssets() {
         'one workbook part must retain only photos that fit its aggregate byte budget');
 }
 
+async function testHeaderRejectedPhotoResponsesAreCancelled() {
+    const cases = [
+        {
+            name: 'non-success status',
+            response: {
+                ok: false,
+                headers: { get() { return null; } }
+            }
+        },
+        {
+            name: 'unsupported content type',
+            response: {
+                ok: true,
+                headers: {
+                    get(name) {
+                        return name.toLowerCase() === 'content-type'
+                            ? 'text/html'
+                            : null;
+                    }
+                }
+            }
+        },
+        {
+            name: 'oversized declared body',
+            response: {
+                ok: true,
+                headers: {
+                    get(name) {
+                        if (name.toLowerCase() === 'content-type') return 'image/png';
+                        if (name.toLowerCase() === 'content-length') return '11';
+                        return null;
+                    }
+                }
+            }
+        }
+    ];
+
+    for (const testCase of cases) {
+        let cancelCalls = 0;
+        const response = {
+            ...testCase.response,
+            body: {
+                async cancel() {
+                    cancelCalls += 1;
+                }
+            }
+        };
+        const harness = createHarness({
+            sourceBatches: [[{
+                id: '1',
+                media_urls: 'https://pbs.twimg.com/media/rejected.png'
+            }]],
+            settings: {
+                localizeExportHeaders: false,
+                language: 'en',
+                embedPostPhotos: true,
+                embedBookmarkPhotos: false
+            },
+            photoMaxBytes: 10,
+            async fetch() {
+                return response;
+            }
+        });
+
+        const result = await harness.downloads.downloadCurrent('xlsx');
+
+        assert.equal(result.success, true, testCase.name);
+        assert.equal(cancelCalls, 1,
+            `${testCase.name} must cancel its response body immediately`);
+        assert.deepEqual(harness.generatedMediaAssets.map(assets => assets.length), [0]);
+    }
+}
+
+async function testActiveDownloadKeepsItsFrozenPlan() {
+    const sourceBatches = [[{ id: '1' }]];
+    const harness = createHarness({
+        sourceBatches,
+        holdDownloads: true,
+        fakeKeepAlive: true,
+        postXlsxPartLimit: 1000,
+        photoPartLimit: 250,
+        async loadExportState() {
+            return {
+                username: 'snapshot',
+                exportMode: 'posts',
+                outputFormat: 'xlsx',
+                tweetCount: 500,
+                totalBatches: sourceBatches.length,
+                settings: {}
+            };
+        },
+        settingsForRead(readNumber) {
+            return {
+                localizeExportHeaders: false,
+                language: 'en',
+                embedPostPhotos: readNumber > 1,
+                embedBookmarkPhotos: false
+            };
+        }
+    });
+
+    const started = await harness.downloads.startCurrentDownload('xlsx');
+    assert.deepEqual(
+        {
+            partSize: started.partSize,
+            partCount: started.partCount,
+            active: started.active
+        },
+        { partSize: 1000, partCount: 1, active: true }
+    );
+    assert.equal(harness.downloads.isCurrentDownloadActive(), true);
+
+    const visiblePlan = await harness.downloads.getCurrentPlan('xlsx');
+    assert.deepEqual(
+        {
+            partSize: visiblePlan.partSize,
+            partCount: visiblePlan.partCount,
+            active: visiblePlan.active
+        },
+        { partSize: 1000, partCount: 1, active: true },
+        'mutable settings must not replace the plan frozen for the active download'
+    );
+    assert.equal(harness.settingsReads(), 1,
+        'reading the active plan must not reload mutable settings');
+
+    harness.releaseDownloads();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(harness.downloads.isCurrentDownloadActive(), false);
+}
+
+async function testTextCopyUsesTheCurrentDataReadLease() {
+    let releaseBatches;
+    const batchGate = new Promise(resolve => {
+        releaseBatches = resolve;
+    });
+    const harness = createHarness({
+        sourceBatches: [[{ id: '1' }]],
+        async loadTweetBatches({ start, count, sourceBatches }) {
+            await batchGate;
+            return sourceBatches.slice(start, start + count);
+        }
+    });
+
+    const textRead = harness.downloads.getCurrentPostsText();
+    assert.equal(harness.downloads.isCurrentDataReadActive(), true,
+        'Copy must reserve the dataset before its first asynchronous read');
+
+    const competingDownload = await harness.downloads.startCurrentDownload('csv');
+    assert.deepEqual(
+        competingDownload,
+        { error: 'DOWNLOAD_IN_PROGRESS' },
+        'a file download must not read the same mutable batches beside Copy'
+    );
+
+    releaseBatches();
+    const result = await textRead;
+    assert.equal(result.success, true);
+    assert.equal(harness.downloads.isCurrentDataReadActive(), false,
+        'Copy must release the dataset after producing its text');
+}
+
 async function testConcurrentStartsReserveDownloadBeforeSnapshotRead() {
     let releaseState;
     const stateGate = new Promise(resolve => {
@@ -490,6 +668,9 @@ async function main() {
     await testHungPhotoFetchTimesOutAndReleasesDownload();
     await testChunkedPhotoStopsAtByteLimit();
     await testPhotoPartBudgetDropsExcessAssets();
+    await testHeaderRejectedPhotoResponsesAreCancelled();
+    await testActiveDownloadKeepsItsFrozenPlan();
+    await testTextCopyUsesTheCurrentDataReadLease();
     await testConcurrentStartsReserveDownloadBeforeSnapshotRead();
     console.log('Download transaction tests passed.');
 }

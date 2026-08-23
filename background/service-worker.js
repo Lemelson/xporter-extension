@@ -79,6 +79,21 @@ const {
 // `currentExport` assignment in start/resume (two rapid START_EXPORT messages
 // could otherwise both pass the guard and spawn two competing loops).
 let exportStarting = false;
+let exportDataMutationStarting = false;
+
+function downloadOwnsExportData() {
+    if (typeof XPorterDownloads.isCurrentDataReadActive === 'function') {
+        return XPorterDownloads.isCurrentDataReadActive();
+    }
+    return XPorterDownloads.isCurrentDownloadActive?.() === true;
+}
+
+function exportOwnsDownloadData() {
+    return exportDataMutationStarting ||
+        exportStarting ||
+        !!exportLoopPromise ||
+        currentExport?.running === true;
+}
 
 function createRateLimiter(settings, mode) {
     return new RateLimitManager(buildRateLimiterOptions(settings, mode));
@@ -192,12 +207,14 @@ async function handleMessage(message, sender) {
 
         case 'DOWNLOAD_CSV':
         case 'DOWNLOAD_EXPORT':
+            if (exportOwnsDownloadData()) return { error: 'ALREADY_RUNNING' };
             return await XPorterDownloads.startCurrentDownload(message.outputFormat);
 
         case 'GET_DOWNLOAD_PLAN':
             return await XPorterDownloads.getCurrentPlan(message.outputFormat);
 
         case 'GET_EXPORT_TEXT':
+            if (exportOwnsDownloadData()) return { error: 'ALREADY_RUNNING' };
             return await XPorterDownloads.getCurrentPostsText();
 
         case 'DOWNLOAD_HISTORY_ENTRY':
@@ -227,16 +244,22 @@ async function handleMessage(message, sender) {
             return { settings };
 
         case 'CLEAR_EXPORT':
-            if (exportLoopPromise) {
-                return { error: 'ALREADY_RUNNING' };
+            if (exportOwnsDownloadData()) return { error: 'ALREADY_RUNNING' };
+            exportDataMutationStarting = true;
+            try {
+                if (downloadOwnsExportData()) {
+                    return { error: 'DOWNLOAD_IN_PROGRESS' };
+                }
+                if (!await XPorterStorage.clearExportState()) {
+                    return { error: 'STORAGE_FULL' };
+                }
+                clearExportRateLimiters();
+                currentExport = null;
+                setBadge('');
+                return { success: true };
+            } finally {
+                exportDataMutationStarting = false;
             }
-            if (!await XPorterStorage.clearExportState()) {
-                return { error: 'STORAGE_FULL' };
-            }
-            clearExportRateLimiters();
-            currentExport = null;
-            setBadge('');
-            return { success: true };
 
         case 'DISCOVERED_REQUEST_TEMPLATE': {
             if (!isXPageSender(sender)) return { error: 'INVALID_SENDER' };
@@ -332,6 +355,8 @@ async function startExport({ username, dateFrom, dateTo, exportMode, outputForma
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
         return { error: 'ALREADY_RUNNING' };
     }
+    if (exportDataMutationStarting) return { error: 'ALREADY_RUNNING' };
+    if (downloadOwnsExportData()) return { error: 'DOWNLOAD_IN_PROGRESS' };
     exportStarting = true;
 
     try {
@@ -1733,6 +1758,8 @@ async function resumeExport(extraItems) {
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
         return { error: 'ALREADY_RUNNING' };
     }
+    if (exportDataMutationStarting) return { error: 'ALREADY_RUNNING' };
+    if (downloadOwnsExportData()) return { error: 'DOWNLOAD_IN_PROGRESS' };
     exportStarting = true;
     try {
         return await _resumeExportInner(extraItems);
@@ -1757,6 +1784,8 @@ async function resumePostsOnly() {
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
         return { error: 'ALREADY_RUNNING' };
     }
+    if (exportDataMutationStarting) return { error: 'ALREADY_RUNNING' };
+    if (downloadOwnsExportData()) return { error: 'DOWNLOAD_IN_PROGRESS' };
     exportStarting = true;
     try {
         return await _resumeExportInner(undefined, { postsOnlyFallback: true });
@@ -2044,8 +2073,17 @@ async function applyAutoExpiration() {
     const maxAge = Math.max(1, Number(settings.autoExpireHours) || 4) * 60 * 60 * 1000;
     const state = currentExport?.running ? null : await XPorterStorage.loadExportState();
     if (state?.updatedAt && Date.now() - state.updatedAt > maxAge) {
-        await XPorterStorage.clearExportState();
-        if (currentExport && !currentExport.running) currentExport = null;
+        if (!exportDataMutationStarting && !exportStarting && !exportLoopPromise) {
+            exportDataMutationStarting = true;
+            try {
+                if (!downloadOwnsExportData()) {
+                    await XPorterStorage.clearExportState();
+                    if (currentExport && !currentExport.running) currentExport = null;
+                }
+            } finally {
+                exportDataMutationStarting = false;
+            }
+        }
     }
     await XPorterStorage.pruneExpiredExportHistory(settings);
     return settings;

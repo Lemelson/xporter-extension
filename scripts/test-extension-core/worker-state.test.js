@@ -12,6 +12,9 @@ function createWorkerHarness() {
     let loadAllCalls = 0;
     let savedHistory = null;
     let aboutAccountCache = {};
+    let downloadActive = false;
+    let downloadStarts = 0;
+    let textReads = 0;
     const savedBatches = [];
     const settings = {
         quantityLimit: 500,
@@ -40,6 +43,17 @@ function createWorkerHarness() {
         XPorterColumns: {},
         XPorterFeedback: { refresh() {}, maybeRefresh() {} },
         XPorterDownloads: {
+            isCurrentDataReadActive() { return downloadActive; },
+            isCurrentDownloadActive() { return downloadActive; },
+            async startCurrentDownload() {
+                downloadStarts += 1;
+                return { success: true };
+            },
+            async getCurrentPlan() { return { count: 0, partCount: 1 }; },
+            async getCurrentPostsText() {
+                textReads += 1;
+                return { error: 'NO_DATA' };
+            },
             async downloadCurrent() { return { success: true }; },
             async downloadHistory() { return { success: true }; },
             async downloadSeenPosts() { return { success: true }; }
@@ -131,8 +145,116 @@ function createWorkerHarness() {
         getSavedHistory() { return savedHistory; },
         setAboutAccountCache(cache) { aboutAccountCache = JSON.parse(JSON.stringify(cache)); },
         getAboutAccountCache() { return aboutAccountCache; },
-        getSavedBatches() { return savedBatches; }
+        getSavedBatches() { return savedBatches; },
+        setDownloadActive(value) { downloadActive = value; },
+        downloadStarts() { return downloadStarts; },
+        textReads() { return textReads; }
     };
+}
+
+async function testExportDataMutationsRespectDownloadLease() {
+    const harness = createWorkerHarness();
+    harness.setSavedState({
+        running: false,
+        status: 'complete',
+        updatedAt: 1,
+        exportMode: 'posts',
+        tweetCount: 1,
+        totalBatches: 1
+    });
+    harness.setDownloadActive(true);
+
+    for (const message of [
+        { type: 'CLEAR_EXPORT' },
+        {
+            type: 'START_EXPORT',
+            username: 'target',
+            exportMode: 'posts',
+            outputFormat: 'csv'
+        },
+        { type: 'RESUME_EXPORT', extraItems: 1 },
+        { type: 'RESUME_POSTS_ONLY' }
+    ]) {
+        const result = await harness.context.handleMessage(message, {});
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(result)),
+            { error: 'DOWNLOAD_IN_PROGRESS' },
+            `${message.type} must not mutate batches while a download owns them`
+        );
+    }
+    assert.equal(harness.wasCleared(), false,
+        'a live download lease must protect every saved batch');
+
+    await vm.runInContext('applyAutoExpiration()', harness.context);
+    assert.equal(harness.wasCleared(), false,
+        'automatic expiration must defer while a download owns the dataset');
+
+    harness.setDownloadActive(false);
+    vm.runInContext('exportStarting = true', harness.context);
+    const blockedDownload = await harness.context.handleMessage({
+        type: 'DOWNLOAD_EXPORT',
+        outputFormat: 'csv'
+    }, {});
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(blockedDownload)),
+        { error: 'ALREADY_RUNNING' },
+        'a download must not start while an export mutation owns the dataset'
+    );
+    assert.equal(harness.downloadStarts(), 0);
+
+    const blockedCopy = await harness.context.handleMessage({
+        type: 'GET_EXPORT_TEXT'
+    }, {});
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(blockedCopy)),
+        { error: 'ALREADY_RUNNING' },
+        'Copy must not start while an export mutation owns the dataset'
+    );
+    assert.equal(harness.textReads(), 0);
+}
+
+async function testClearCannotRaceStartingOrResumingExport() {
+    for (const message of [
+        {
+            type: 'START_EXPORT',
+            username: 'target',
+            exportMode: 'posts',
+            outputFormat: 'csv'
+        },
+        { type: 'RESUME_EXPORT', extraItems: 1 },
+        { type: 'RESUME_POSTS_ONLY' }
+    ]) {
+        const harness = createWorkerHarness();
+        let releaseOperation;
+        harness.context.__operationGate = new Promise(resolve => {
+            releaseOperation = resolve;
+        });
+        const innerFunction = message.type === 'START_EXPORT'
+            ? '_startExportInner'
+            : '_resumeExportInner';
+        vm.runInContext(`
+            ${innerFunction} = async function () {
+                await __operationGate;
+                return { success: true };
+            };
+        `, harness.context);
+
+        const operation = harness.context.handleMessage(message, {});
+        await new Promise(resolve => setImmediate(resolve));
+        const clearResult = await harness.context.handleMessage({
+            type: 'CLEAR_EXPORT'
+        }, {});
+
+        assert.deepEqual(
+            JSON.parse(JSON.stringify(clearResult)),
+            { error: 'ALREADY_RUNNING' },
+            `Clear must not overtake ${message.type}'s synchronous latch`
+        );
+        assert.equal(harness.wasCleared(), false);
+
+        releaseOperation();
+        assert.equal((await operation).success, true);
+    }
 }
 
 async function testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot() {
@@ -2484,6 +2606,8 @@ async function testProfileFeedDefaultsAndMigratesLegacyReplySetting() {
 }
 
 const tests = [
+    { name: "download lease protects export batches", run: testExportDataMutationsRespectDownloadLease, order: 75 },
+    { name: "Clear cannot race Start or Resume", run: testClearCannotRaceStartingOrResumingExport, order: 76 },
     { name: "explicit zero-row Replies fallback", run: testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot, order: 35 },
     { name: "All feed profile filtering and context", run: testAllFeedKeepsOnlyProfilePostsAndContext, order: 36 },
     { name: "explicit post-type combinations", run: testExplicitPostTypeSelectionPlansAndCombinesFeeds, order: 37 },

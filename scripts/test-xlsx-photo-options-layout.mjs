@@ -39,13 +39,7 @@ async function main() {
     }
 
     const extensionId = new URL(serviceWorker.url()).host;
-    const popup = await context.newPage();
-    await popup.setViewportSize({ width: 350, height: 600 });
-    await popup.goto(`chrome-extension://${extensionId}/popup/popup.html`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000
-    });
-    await popup.evaluate(async () => {
+    await serviceWorker.evaluate(async () => {
       const stored = await chrome.storage.local.get('xporter_settings');
       await chrome.storage.local.set({
         xporter_settings: {
@@ -54,6 +48,12 @@ async function main() {
           outputFormat: 'xlsx'
         }
       });
+    });
+    const popup = await context.newPage();
+    await popup.setViewportSize({ width: 350, height: 600 });
+    await popup.goto(`chrome-extension://${extensionId}/popup/popup.html`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000
     });
 
     for (const language of LOCALES) {
