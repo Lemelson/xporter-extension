@@ -4,8 +4,23 @@
 
 (function () {
     let activeDownload = null;
-    const MAX_EMBEDDED_PHOTO_BYTES = 15 * 1024 * 1024;
-    const EMBEDDED_PHOTO_CONCURRENCY = 4;
+    let downloadStarting = false;
+    const MAX_EMBEDDED_PHOTO_BYTES = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_PREVIEW_MAX_BYTES) || (3 * 1024 * 1024)
+    );
+    const MAX_EMBEDDED_PHOTO_PART_BYTES = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_PART_MAX_BYTES) || (40 * 1024 * 1024)
+    );
+    const MAX_EMBEDDED_PHOTO_TARGETS = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_TARGET_LIMIT) || 1000
+    );
+    const EMBEDDED_PHOTO_CONCURRENCY = Math.max(
+        1,
+        Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_CONCURRENCY) || 8
+    );
     const PHOTO_FETCH_TIMEOUT_MS = Math.max(
         1,
         Number(XPORTER_CONFIG?.API_FETCH_TIMEOUT) || 30000
@@ -59,6 +74,7 @@
         const add = (exportedPostId, post, relation) => {
             if (!post || typeof post !== 'object') return;
             for (const rawUrl of String(post.media_urls || '').split(/,\s*/)) {
+                if (targets.length >= MAX_EMBEDDED_PHOTO_TARGETS) return;
                 const sourceUrl = rawUrl.trim();
                 if (!sourceUrl) continue;
                 let parsed;
@@ -148,6 +164,53 @@
         return { width: 160, height: 96 };
     }
 
+    function previewPhotoUrl(sourceUrl) {
+        try {
+            const url = new URL(sourceUrl);
+            if (url.protocol !== 'https:' || url.hostname !== 'pbs.twimg.com') return null;
+            url.searchParams.set('name', 'small');
+            return url.toString();
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function readBoundedPhotoBytes(response) {
+        const reader = response.body?.getReader?.();
+        if (!reader) {
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            return bytes.length > 0 && bytes.length <= MAX_EMBEDDED_PHOTO_BYTES
+                ? bytes
+                : null;
+        }
+
+        const chunks = [];
+        let total = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+                total += chunk.length;
+                if (total > MAX_EMBEDDED_PHOTO_BYTES) {
+                    await reader.cancel();
+                    return null;
+                }
+                chunks.push(chunk);
+            }
+        } finally {
+            reader.releaseLock?.();
+        }
+        if (total === 0) return null;
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.length;
+        }
+        return bytes;
+    }
+
     async function fetchPhotoAsset(target) {
         const controller = typeof AbortController === 'function'
             ? new AbortController()
@@ -156,7 +219,9 @@
             ? setTimeout(() => controller.abort(), PHOTO_FETCH_TIMEOUT_MS)
             : null;
         try {
-            const response = await fetch(target.sourceUrl, {
+            const fetchUrl = previewPhotoUrl(target.sourceUrl);
+            if (!fetchUrl) return null;
+            const response = await fetch(fetchUrl, {
                 method: 'GET',
                 credentials: 'omit',
                 cache: 'force-cache',
@@ -167,8 +232,8 @@
             if (!type) return null;
             const declaredSize = Number(response.headers?.get?.('content-length')) || 0;
             if (declaredSize > MAX_EMBEDDED_PHOTO_BYTES) return null;
-            const bytes = new Uint8Array(await response.arrayBuffer());
-            if (bytes.length === 0 || bytes.length > MAX_EMBEDDED_PHOTO_BYTES) return null;
+            const bytes = await readBoundedPhotoBytes(response);
+            if (!bytes) return null;
             return {
                 ...target,
                 ...type,
@@ -225,11 +290,18 @@
         if (assetCache) assetCache.settledBytes = 0;
     }
 
-    async function fetchPhotoAssets(items, assetCache = createPhotoAssetCache()) {
+    async function fetchPhotoAssets(
+        items,
+        assetCache = createPhotoAssetCache(),
+        onProgress = null
+    ) {
         const targets = collectPhotoTargets(items);
         if (targets.length === 0) return [];
         const results = new Array(targets.length);
         let nextIndex = 0;
+        let completed = 0;
+        let retainedBytes = 0;
+        onProgress?.({ current: completed, total: targets.length });
         const worker = async () => {
             while (nextIndex < targets.length) {
                 const index = nextIndex++;
@@ -273,7 +345,15 @@
                     assetCache.entries.set(target.sourceUrl, entry);
                 }
                 const asset = await entry.promise;
-                results[index] = asset ? { ...asset, ...target } : null;
+                if (asset &&
+                    retainedBytes + asset.bytes.byteLength <= MAX_EMBEDDED_PHOTO_PART_BYTES) {
+                    retainedBytes += asset.bytes.byteLength;
+                    results[index] = { ...asset, ...target };
+                } else {
+                    results[index] = null;
+                }
+                completed += 1;
+                onProgress?.({ current: completed, total: targets.length });
             }
         };
         await Promise.all(
@@ -316,7 +396,7 @@
             partSize,
             partCount,
             multipart: partCount > 1,
-            active: !!activeDownload
+            active: downloadStarting || !!activeDownload
         };
     }
 
@@ -471,31 +551,43 @@
     }
 
     async function startCurrentDownload(format) {
-        if (activeDownload) return { error: 'DOWNLOAD_IN_PROGRESS' };
-        const transaction = await createCurrentDownloadTransaction(format);
-        const { plan } = transaction;
-        if (plan.count === 0) return { error: 'NO_DATA' };
+        if (downloadStarting || activeDownload) return { error: 'DOWNLOAD_IN_PROGRESS' };
+        downloadStarting = true;
+        try {
+            const transaction = await createCurrentDownloadTransaction(format);
+            const { plan } = transaction;
+            if (plan.count === 0) return { error: 'NO_DATA' };
 
-        const stopKeepAlive = keepWorkerAliveDuringDownload();
-        activeDownload = executeCurrentDownload(transaction)
-            .then(result => {
-                if (result?.success !== true) {
-                    reportDownload({ type: 'DOWNLOAD_ERROR', error: result?.error || 'DOWNLOAD_FAILED' });
-                }
-                return result;
-            })
-            .catch(error => {
-                XLog.error('Download failed:', error.message);
-                reportDownload({ type: 'DOWNLOAD_ERROR', error: error.message || 'DOWNLOAD_FAILED' });
-                return { error: error.message || 'DOWNLOAD_FAILED' };
-            })
-            .finally(() => {
-                clearPhotoAssetCache(transaction.photoAssetCache);
-                stopKeepAlive();
-                activeDownload = null;
-            });
-
-        return { success: true, started: true, ...plan, active: true };
+            const stopKeepAlive = keepWorkerAliveDuringDownload();
+            let run;
+            run = executeCurrentDownload(transaction)
+                .then(result => {
+                    if (result?.success !== true) {
+                        reportDownload({
+                            type: 'DOWNLOAD_ERROR',
+                            error: result?.error || 'DOWNLOAD_FAILED'
+                        });
+                    }
+                    return result;
+                })
+                .catch(error => {
+                    XLog.error('Download failed:', error.message);
+                    reportDownload({
+                        type: 'DOWNLOAD_ERROR',
+                        error: error.message || 'DOWNLOAD_FAILED'
+                    });
+                    return { error: error.message || 'DOWNLOAD_FAILED' };
+                })
+                .finally(() => {
+                    clearPhotoAssetCache(transaction.photoAssetCache);
+                    stopKeepAlive();
+                    if (activeDownload === run) activeDownload = null;
+                });
+            activeDownload = run;
+            return { success: true, started: true, ...plan, active: true };
+        } finally {
+            downloadStarting = false;
+        }
     }
 
     async function getCurrentPostsText() {
@@ -578,12 +670,33 @@
                 (mode === 'posts' && settings.embedPostPhotos === true) ||
                 (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
             );
-            const photoHostAccess = options.photoHostAccess !== undefined
-                ? options.photoHostAccess
-                : await hasPhotoHostAccess();
+            const progressBase = {
+                type: 'DOWNLOAD_PROGRESS',
+                partNumber: options.partNumber || 1,
+                partCount: options.partCount || 1,
+                count: allItems.length,
+                format
+            };
+            const photoHostAccess = embedPhotos
+                ? (options.photoHostAccess !== undefined
+                    ? options.photoHostAccess
+                    : await hasPhotoHostAccess())
+                : false;
             const mediaAssets = (embedPhotos && photoHostAccess)
-                ? await fetchPhotoAssets(allItems, options.photoAssetCache)
+                ? await fetchPhotoAssets(
+                    allItems,
+                    options.photoAssetCache,
+                    ({ current, total }) => {
+                        reportDownload({
+                            ...progressBase,
+                            stage: 'photos',
+                            photoCurrent: current,
+                            photoTotal: total
+                        });
+                    }
+                )
                 : [];
+            reportDownload({ ...progressBase, stage: 'building_xlsx' });
             content = XPorterCSV.generateXLSX(allItems, isUsers, {
                 ...headerOpts,
                 mode,

@@ -68,6 +68,39 @@ test('browser smoke entrypoint rejects the Codex sandbox before loading Playwrig
     );
 });
 
+test('every Playwright entrypoint rejects the Codex sandbox before loading Playwright', () => {
+    const forbiddenModule = 'xporter-playwright-must-not-load-in-sandbox';
+    const browserEntrypoints = fs.readdirSync(__dirname)
+        .filter(name => /\.(?:js|mjs|cjs)$/.test(name))
+        .filter(name => {
+            const absolute = path.join(__dirname, name);
+            if (absolute === __filename) return false;
+            const source = fs.readFileSync(absolute, 'utf8');
+            return source.includes("'playwright'") || source.includes('"playwright"');
+        })
+        .sort();
+
+    assert(browserEntrypoints.length > 0, 'at least one Playwright entrypoint must be discovered');
+    for (const name of browserEntrypoints) {
+        const result = spawnSync(process.execPath, [path.join(__dirname, name)], {
+            cwd: path.join(__dirname, '..'),
+            encoding: 'utf8',
+            env: {
+                ...process.env,
+                CODEX_SANDBOX: 'seatbelt',
+                PLAYWRIGHT_MODULE: forbiddenModule,
+                TMPDIR: os.tmpdir()
+            }
+        });
+        const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+        assert.notEqual(result.status, 0, `${name} must refuse a sandboxed browser launch`);
+        assert.match(output, /CODEX_SANDBOX_BROWSER_BLOCKED/,
+            `${name} must fail through the shared browser policy`);
+        assert.doesNotMatch(output, new RegExp(forbiddenModule),
+            `${name} must reject the sandbox before Playwright module resolution`);
+    }
+});
+
 test('sandboxed soffice resolution prefers the bundled Codex headless runtime', () => {
     const runtime = '/Users/test/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice';
     const executable = resolveSofficeExecutable({

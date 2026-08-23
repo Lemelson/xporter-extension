@@ -17,18 +17,18 @@
 | Storage, settings + defaults | `utils/storage.js`; partial settings writes and usage-counter mutations each use recoverable promise queues |
 | Passive seen-post database | `utils/post-database.js` (IndexedDB; one row per post ID, 50k-row cap) |
 | Tunable constants + logger (`XLog`) | `utils/config.js` |
-| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css`; history and seen-post UI live in `popup/history.js` / `popup/seen-posts.js` |
+| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css`; history and seen-post UI live in `popup/history.js` / `popup/seen-posts.js`; Posts/Bookmarks + XLSX exposes one Links/embedded-previews choice, and the one-time photo-permission explanation persists as `xporter_photo_permission_intro_seen` |
 | Popup UI helpers | `utils/shared.js` (incl. `sendMessage` w/ error sentinels, `formatError`, `isValidUsername`, `bidiIsolate`, `localizeQuantityOptions`, `createCooldownTicker`) |
 | In-app UI strings (14 languages) | `popup/locales/*.json` (`en.json` = fallback) |
 | Localized CSV/XLSX column headers | `utils/columns-i18n.js` (`XPorterColumns`; data keys + JSON stay English; gated by the `localizeExportHeaders` setting, default on) |
 | Store name/description i18n | `_locales/*/messages.json` (≠ `popup/locales/`) |
 | Ladybug Easter egg (About tab) | `popup/ladybug.js` |
 | "Rate XPorter" prompt | `popup/rate-prompt.{js,css}` (self-contained; state in `chrome.storage.local` key `xporter_rate_prompt`; deep-links to the CWS reviews page) |
-| Downloads + uninstall feedback | `background/downloads.js` freezes one current-download transaction (state, plan, settings, permission, timestamp, bounded photo cache), splits parts incrementally, and bounds photo fetches by timeout/size; `background/uninstall-feedback.js` builds the uninstall URL. Disclosures live in `docs/privacy-policy.html`. |
+| Downloads + uninstall feedback | `background/downloads.js` atomically reserves one current download, freezes its state/plan/settings/permission/timestamp, splits parts incrementally, and fetches bounded `name=small` previews through a timeout plus LRU cache; `background/uninstall-feedback.js` builds the uninstall URL. Disclosures live in `docs/privacy-policy.html`. |
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Public site | `docs/` only (`index.html`, `privacy-policy.html`, `feedback.html`, `assets/`); root site copies were removed |
-| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 74-test core is split under `scripts/test-extension-core/`; `scripts/package.sh` runs the gate then atomically replaces an allowlist ZIP |
+| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 75-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the gate then atomically replaces an allowlist ZIP |
 
 ## Gotchas that bite
 
@@ -40,15 +40,15 @@
 6. **X API is fragile:** 400s usually = a changed GraphQL **feature flag** (`utils/api-features.js`); queryIds drift (auto-discovered + live-captured, with `FALLBACK_ENDPOINTS` to refresh). Use `encodeURIComponent`, never `URLSearchParams`.
 7. **Service worker can be killed mid-export** — persist after every page. Stop, terminal cleanup, and a fresh run must abort/clear all three active limiter slots, not only the primary limiter.
 8. **Queued storage mutations:** never bypass `XPorterStorage.saveSettings()` or the queued usage mutators with a new load→modify→save path; concurrent handlers would lose updates.
-9. **Current downloads are transactions:** do not reload mutable state/settings or re-check photo permission between parts. Reuse the frozen transaction and its byte-bounded LRU photo cache; in-flight URLs share a promise, settled entries may be evicted, and photo fetches must retain their abort timeout.
+9. **Current downloads are transactions:** reserve the starting lock before the first async snapshot read; do not reload mutable state/settings or re-check photo permission between parts. Reuse the frozen transaction and its byte-bounded LRU photo cache; in-flight URLs share a promise, settled entries may be evicted, and preview fetch/body reads must retain their abort and byte bounds.
 10. **Date-range posts** use a separate path: open an X **search tab** and scroll it; the user must keep it open. See `agent.md` §5.
 11. **`tweetCount`/`tweetBuffer`** mean item count/buffer even for user exports (historical naming).
 12. **CSS:** never hardcode colours — everything is CSS custom properties with `dark`/`light` (`.light` on `<body>`).
 13. **Rate-limit budgets are endpoint-specific:** use `XPorterAPI.getRateLimit(operationName)` and never reuse one operation's headers for another. Header-less responses must take the mode-specific fallback path.
 14. **Deterministic proof has a boundary:** `test-all.js` proves repository contracts, not current authenticated X behavior. Query IDs, feature flags, cookies, and live response shapes require separate authenticated live-X verification.
-15. **Large downloads are multipart:** never call `loadAllTweets()` for the current export download path. `downloads.js` reads bounded batch ranges and uses `DOWNLOAD_PART_LIMITS`; XLSX/JSON/CSV/TXT parts must remain below their configured row ceilings.
+15. **Large downloads are multipart:** never call `loadAllTweets()` for the current export download path. `downloads.js` reads bounded batch ranges and uses `DOWNLOAD_PART_LIMITS`; XLSX/JSON/CSV/TXT parts must remain below their configured row ceilings. Embedded-photo XLSX parts use bounded previews and report `photos` plus `building_xlsx` stages.
 16. **Post types are explicit and feed plans are resumable:** originals/quotes/articles use `UserOriginalsTimeline`; selecting reposts upgrades that pass to `UserTweets`; replies use `UserRepliesTimeline`. Mixed selections run the needed passes sequentially, persist `postFeedPlan`/`postFeedIndex`, de-duplicate primary rows, and keep foreign parent rows only as nested context. Never reuse a cursor across feeds.
 17. **Cursor de-duplication is bounded:** ordinary posts/user-list exports keep only `RECENT_EXPORT_ID_LIMIT` IDs in memory. Do not restore an unbounded per-run `Set`; date-range search is the separate path that needs full saved-ID de-duplication on resume.
 
 ## When you change things
-Keep **`agent.md`** and this file in sync (new files, messages, storage keys, settings, export modes, and load order). Run `node scripts/test-all.js` plus `git diff --check`; use `node scripts/test-extension-smoke.mjs` only outside `CODEX_SANDBOX`, and record authenticated live-X proof separately. Bump `version` in `manifest.json` only for releases. Build the CWS ZIP with `scripts/package.sh`.
+Keep **`agent.md`** and this file in sync (new files, messages, storage keys, settings, export modes, and load order). Run `node scripts/test-all.js` plus `git diff --check`; outside `CODEX_SANDBOX`, run the unpacked smoke and the popup footer, tooltip, XLSX-photo-layout, and permission-rationale browser checks. Record authenticated live-X proof separately. Bump `version` in `manifest.json` only for releases. Build the CWS ZIP with `scripts/package.sh`.

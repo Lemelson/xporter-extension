@@ -203,7 +203,7 @@ async function testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot() {
         'Posts-only fallback must switch only the current export snapshot to UserTweets');
     assert.equal(saved.settings.includeReplies, undefined,
         'the legacy Include replies flag must be migrated out of the export snapshot');
-    
+
     assert.equal(saved.settings.includeRetweets, false);
     assert.equal(saved.settings.includeArticles, true);
     assert.equal(saved.settings.quantityLimit, 500,

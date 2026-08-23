@@ -295,7 +295,7 @@ async function testNativeRequestTemplateCaptureIsAtomicAndPrivate() {
     assert.equal(xhrTemplate?.template?.queryId, 'native-xhr-id',
         'successful native XHR requests must publish the same sanitized template');
 
-    
+
 }
 
 async function testTweetResultsEndpointFetchesReplyParentsInOneBatch() {

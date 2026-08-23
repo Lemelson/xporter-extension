@@ -24,18 +24,16 @@
 
 ## Release status
 
-The local worktree is an experimental `1.6.1` build that restores the complete
-packaged `1.5.9` feature set for local verification. The published `1.6.0`
-release remains on the stable `1.5.8` code line. Do not publish or upload this
-local experiment without a separate release decision.
+This repository still reports version `1.6.1`. The current code combines the
+1.6.1 release baseline with additional local reliability and interface work.
+It is not a new Chrome Web Store release: do not upload it without a separate
+version and release decision.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
-`optional_host_permissions`. The access is requested from the user's click on
-an "Embed photos in XLSX" toggle, so updating from 1.5.8 is never a privilege
-increase and cannot disable existing installations. Declining the request keeps
-every export fully functional with media URLs instead of embedded images. The
-grant is checked again before download and any missing or unreadable permission
-fails closed to the same URL-only workbook.
+`optional_host_permissions`. When you first select **Embed photo previews**,
+XPorter explains why the access is needed before Chrome asks for permission.
+Declining keeps every export working with photo links. Each download checks the
+grant once and falls back to the same links-only workbook when access is missing.
 
 > [!WARNING]
 > **XPorter 1.5.9 was withdrawn and is not recommended.** Its update added a
@@ -56,6 +54,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Passive seen-post dataset** — stores one local row per non-reply post already loaded while you browse X, with first/latest metrics and no extra API requests
 - **Multiple export modes** — posts, personal bookmarks, followers, following, and verified followers
 - **CSV, JSON, XLSX, and TXT output** — download the AI-friendly TXT or copy it straight to your clipboard
+- **Two XLSX photo modes** — keep links for the smallest file, or add bounded previews to a separate Media sheet
 - **Date range filtering** — export posts from a specific time window
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
@@ -100,7 +99,7 @@ Content Script ── detects username from active tab
 2. **Popup** collects the target username and export settings
 3. **Service worker** resolves the username to a user ID via `UserByScreenName`, then fetches the selected data type in paginated batches
 4. Items are saved incrementally to Chrome local storage (batches of 50)
-5. On completion (or manual download), items are compiled locally into CSV, JSON, XLSX, or posts-only TXT; large exports automatically download as safe, numbered parts
+5. On completion (or manual download), items are compiled locally into CSV, JSON, XLSX, or posts-only TXT; large exports download as safe, numbered parts, and XLSX previews show separate photo and workbook-building progress
 
 While you browse X, the page hook also extracts non-reply posts from timeline responses X has already loaded. They are deduplicated by post ID in a local IndexedDB database; repeat sightings update metrics and exposure count instead of adding rows. The Settings tab can export this dataset as CSV/JSON or clear it. Collection is capped at the 50,000 most recently seen unique posts.
 
@@ -180,7 +179,7 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 | Replies | On | Export the author's replies, including replies to other accounts; mixed selections combine X's Posts/All and Replies feeds without duplicate rows |
 | Reposts | On | Export posts reshared without an added comment |
 | Articles | On | Export X long-form Articles and the text X returns |
-| Embed post photos | Off | Download X photos and embed them in a separate XLSX Media sheet |
+| Photos in Excel — Posts / Bookmarks | Keep links / Keep links | Store each mode independently: keep source URLs only, or add bounded previews to a separate Media sheet |
 | Export mode | Posts | Data type to export: posts, personal bookmarks, followers, following, or verified followers |
 | Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for post-shaped exports |
 | Quantity limit | 500 | Maximum posts or users per export (0 = unlimited); changing it retargets an ordinary active export |

@@ -3,6 +3,15 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import toolingPolicy from './tooling-policy.js';
+
+const { assertBrowserSmokeCanLaunch } = toolingPolicy;
+try {
+  assertBrowserSmokeCanLaunch();
+} catch (error) {
+  console.error(`${error.code || 'BROWSER_SMOKE_BLOCKED'}: ${error.message}`);
+  process.exit(1);
+}
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const USERNAME = process.argv[2] || 'Hongnumongol99';

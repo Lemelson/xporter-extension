@@ -58,11 +58,17 @@ async function main() {
     const txtOption = popup.locator('#outputFormat option[value="txt"]');
     assert.equal(await txtOption.textContent(), 'TXT');
     assert.equal(await txtOption.isDisabled(), false, 'posts-only TXT must be available for posts');
+    await popup.locator('#outputFormat').selectOption('xlsx');
+    assert.equal(await popup.locator('#xlsxPhotoOptions').isVisible(), true);
+    assert.equal(await popup.locator('#xlsxPhotoLinks').isChecked(), true);
     await popup.locator('#exportMode').selectOption('followers');
     assert.equal(await txtOption.isDisabled(), true, 'posts-only TXT must be disabled for user-list exports');
-    assert.equal(await popup.locator('#outputFormat').inputValue(), 'csv');
+    assert.equal(await popup.locator('#xlsxPhotoOptions').isVisible(), false);
+    await popup.locator('#exportMode').selectOption('bookmarks');
+    assert.equal(await popup.locator('#xlsxPhotoOptions').isVisible(), true);
     await popup.locator('#exportMode').selectOption('posts');
     assert.equal(await txtOption.isDisabled(), false);
+    await popup.locator('#outputFormat').selectOption('csv');
     // The public mirror — the `Lemelson/xporter` dev repo is private and 404s
     // for users, so a link pointing there is a regression this guards against.
     assert.equal(

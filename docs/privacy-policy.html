@@ -151,10 +151,10 @@
       <li><strong>X public client assets</strong> — a public JavaScript asset may be downloaded from X's
         <code>abs.twimg.com</code> CDN and parsed as text to derive a request header required by some X feeds. XPorter
         does not execute that remote code and sends the CDN no cookies, auth headers, usernames, or export data.</li>
-      <li><strong>X media files</strong> — when you explicitly enable photo embedding and save an XLSX file, XPorter
-        downloads the selected posts' public images from <code>pbs.twimg.com</code> without credentials and embeds them
-        locally in a Media sheet. This is off by default. Images are not sent to XPorter or any third-party server; if a
-        download fails, the original media URL remains in the export.</li>
+      <li><strong>X media files</strong> — when you explicitly select embedded photo previews and save an XLSX file,
+        XPorter downloads optimized previews from <code>pbs.twimg.com</code> without credentials and adds them locally to
+        a Media sheet. This is off by default. Images are not sent to XPorter or any third-party server; the original
+        media URL remains in the export even when a preview cannot be downloaded.</li>
       <li><strong>Posts already loaded while you browse X.com</strong> — non-reply posts and their public metrics are
         deduplicated by post ID and stored locally in IndexedDB. No additional request is made and page URLs are not
         stored.</li>

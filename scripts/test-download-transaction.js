@@ -23,8 +23,11 @@ function createHarness(options = {}) {
     const generatedLanguages = [];
     const generatedMediaAssets = [];
     let settingsReads = 0;
+    let stateReads = 0;
     let downloadId = 0;
     let photoFetches = 0;
+    const photoFetchUrls = [];
+    const progressEvents = [];
     let permissionChecks = 0;
     let keepAliveClears = 0;
     const sourceBatches = options.sourceBatches || [
@@ -58,8 +61,9 @@ function createHarness(options = {}) {
                 keepAliveClears += 1;
             })
             : clearInterval,
-        fetch: options.fetch || (async () => {
+        fetch: options.fetch || (async (url) => {
             photoFetches += 1;
+            photoFetchUrls.push(String(url));
             return new Response(new Uint8Array([
                 137, 80, 78, 71, 13, 10, 26, 10,
                 0, 0, 0, 13, 73, 72, 68, 82,
@@ -77,10 +81,20 @@ function createHarness(options = {}) {
             },
             STORAGE_BATCH_READ_SIZE: 2,
             API_FETCH_TIMEOUT: options.photoFetchTimeoutMs,
-            EMBEDDED_PHOTO_CACHE_MAX_BYTES: options.photoCacheMaxBytes
+            EMBEDDED_PHOTO_CACHE_MAX_BYTES: options.photoCacheMaxBytes,
+            EMBEDDED_PHOTO_PREVIEW_MAX_BYTES: options.photoMaxBytes,
+            EMBEDDED_PHOTO_XLSX_PART_MAX_BYTES: options.photoPartMaxBytes,
+            EMBEDDED_PHOTO_XLSX_TARGET_LIMIT: options.photoTargetLimit
         },
         XPorterStorage: {
             async loadExportState() {
+                stateReads += 1;
+                if (typeof options.loadExportState === 'function') {
+                    return options.loadExportState({
+                        readNumber: stateReads,
+                        sourceBatches
+                    });
+                }
                 return {
                     username: 'snapshot',
                     exportMode: 'posts',
@@ -141,7 +155,8 @@ function createHarness(options = {}) {
             },
             runtime: {
                 lastError: null,
-                sendMessage() {
+                sendMessage(message) {
+                    progressEvents.push(JSON.parse(JSON.stringify(message)));
                     return Promise.resolve({});
                 },
                 getPlatformInfo(callback) {
@@ -166,7 +181,10 @@ function createHarness(options = {}) {
         generatedLanguages,
         generatedMediaAssets,
         settingsReads: () => settingsReads,
+        stateReads: () => stateReads,
         photoFetches: () => photoFetches,
+        photoFetchUrls,
+        progressEvents,
         permissionChecks: () => permissionChecks,
         keepAliveClears: () => keepAliveClears
     };
@@ -213,12 +231,29 @@ async function testDuplicatePhotoUrlIsFetchedOncePerDownload() {
     assert.equal(result.success, true);
     assert.equal(harness.photoFetches(), 1,
         'the same photo URL must be fetched once for the whole download');
+    assert.deepEqual(
+        harness.photoFetchUrls,
+        ['https://pbs.twimg.com/media/reused.png?name=small'],
+        'XLSX must fetch a bounded preview instead of the original photo'
+    );
     assert.equal(harness.permissionChecks(), 1,
         'photo permission must be frozen once for the whole download');
     assert.deepEqual(
         harness.generatedMediaAssets.map(assets => assets.length),
         [1, 1],
         'each part must retain its own media relationship'
+    );
+    assert(
+        harness.progressEvents.some(event =>
+            event.type === 'DOWNLOAD_PROGRESS' && event.stage === 'photos'
+        ),
+        'photo work must report its own progress stage'
+    );
+    assert(
+        harness.progressEvents.some(event =>
+            event.type === 'DOWNLOAD_PROGRESS' && event.stage === 'building_xlsx'
+        ),
+        'workbook assembly must be distinguishable from photo fetching'
     );
 }
 
@@ -325,12 +360,137 @@ async function testHungPhotoFetchTimesOutAndReleasesDownload() {
         'detached download cleanup must clear its keepalive after a photo timeout');
 }
 
+async function testChunkedPhotoStopsAtByteLimit() {
+    let readerCancelled = false;
+    let readCount = 0;
+    const harness = createHarness({
+        sourceBatches: [[{
+            id: '1',
+            media_urls: 'https://pbs.twimg.com/media/chunked.png'
+        }]],
+        settings: {
+            localizeExportHeaders: false,
+            language: 'en',
+            embedPostPhotos: true,
+            embedBookmarkPhotos: false
+        },
+        photoMaxBytes: 10,
+        async fetch() {
+            return {
+                ok: true,
+                headers: {
+                    get(name) {
+                        return name.toLowerCase() === 'content-type' ? 'image/png' : null;
+                    }
+                },
+                body: {
+                    getReader() {
+                        return {
+                            async read() {
+                                readCount += 1;
+                                if (readCount <= 2) {
+                                    return { done: false, value: new Uint8Array(8) };
+                                }
+                                return { done: true };
+                            },
+                            async cancel() {
+                                readerCancelled = true;
+                            },
+                            releaseLock() {}
+                        };
+                    }
+                },
+                async arrayBuffer() {
+                    return new Uint8Array(16).buffer;
+                }
+            };
+        }
+    });
+
+    const result = await harness.downloads.downloadCurrent('xlsx');
+
+    assert.equal(result.success, true);
+    assert.equal(readerCancelled, true,
+        'a chunked response over the byte limit must be cancelled before full buffering');
+    assert.deepEqual(harness.generatedMediaAssets.map(assets => assets.length), [0],
+        'an oversized preview must fall back to its URL');
+}
+
+async function testPhotoPartBudgetDropsExcessAssets() {
+    const harness = createHarness({
+        sourceBatches: [[{
+            id: '1',
+            media_urls: [
+                'https://pbs.twimg.com/media/one.png',
+                'https://pbs.twimg.com/media/two.png'
+            ].join(', ')
+        }]],
+        settings: {
+            localizeExportHeaders: false,
+            language: 'en',
+            embedPostPhotos: true,
+            embedBookmarkPhotos: false
+        },
+        photoMaxBytes: 100,
+        photoPartMaxBytes: 30
+    });
+
+    const result = await harness.downloads.downloadCurrent('xlsx');
+
+    assert.equal(result.success, true);
+    assert.deepEqual(harness.generatedMediaAssets.map(assets => assets.length), [1],
+        'one workbook part must retain only photos that fit its aggregate byte budget');
+}
+
+async function testConcurrentStartsReserveDownloadBeforeSnapshotRead() {
+    let releaseState;
+    const stateGate = new Promise(resolve => {
+        releaseState = resolve;
+    });
+    const harness = createHarness({
+        fakeKeepAlive: true,
+        async loadExportState({ sourceBatches }) {
+            await stateGate;
+            return {
+                username: 'snapshot',
+                exportMode: 'posts',
+                outputFormat: 'csv',
+                tweetCount: sourceBatches.flat().length,
+                totalBatches: sourceBatches.length,
+                settings: {
+                    localizeExportHeaders: false,
+                    language: 'en',
+                    embedPostPhotos: false,
+                    embedBookmarkPhotos: false
+                }
+            };
+        }
+    });
+
+    const firstStart = harness.downloads.startCurrentDownload('csv');
+    const secondStart = harness.downloads.startCurrentDownload('csv');
+    await new Promise(resolve => setImmediate(resolve));
+    releaseState();
+
+    const [first, second] = await Promise.all([firstStart, secondStart]);
+    assert.equal(first.success, true);
+    assert.deepEqual(second, { error: 'DOWNLOAD_IN_PROGRESS' },
+        'the second caller must be rejected before it can build a competing snapshot');
+    assert.equal(harness.stateReads(), 1,
+        'only the lock owner may read export state for a detached download');
+
+    await new Promise(resolve => setImmediate(resolve));
+}
+
 async function main() {
     await testMultipartDownloadUsesOneSettingsSnapshot();
     await testDuplicatePhotoUrlIsFetchedOncePerDownload();
     await testSettledPhotoCacheIsBoundedAcrossParts();
     await testFailedPhotoFetchIsNotCached();
     await testHungPhotoFetchTimesOutAndReleasesDownload();
+    await testChunkedPhotoStopsAtByteLimit();
+    await testPhotoPartBudgetDropsExcessAssets();
+    await testConcurrentStartsReserveDownloadBeforeSnapshotRead();
     console.log('Download transaction tests passed.');
 }
 

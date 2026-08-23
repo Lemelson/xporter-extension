@@ -65,6 +65,15 @@ assert.match(testAllSource, /spawnSync\([\s\S]*?stdio:\s*['"]inherit['"]/,
     'test-all.js must inherit each suite output');
 assert.match(testAllSource, /result\.status\s*!==\s*0[\s\S]*?process\.exit\(/,
     'test-all.js must fail fast with the first nonzero suite status');
+for (const browserCheck of [
+    'scripts/test-extension-smoke.mjs',
+    'scripts/test-popup-footer-layout.mjs',
+    'scripts/test-popup-tooltip-layout.mjs',
+    'scripts/test-xlsx-photo-options-layout.mjs',
+    'scripts/test-photo-permission-rationale.mjs'
+]) {
+    assertFile(browserCheck, 'documented browser check');
+}
 
 const packageScript = read('scripts/package.sh');
 assert.match(packageScript, /\nset -euo pipefail\n/,
@@ -253,6 +262,23 @@ const postSelectionIndex = popupHtml.indexOf('id="postSelectionPanel"');
 const outputFormatIndex = popupHtml.indexOf('id="outputFormat"');
 assert(postSelectionIndex >= 0 && postSelectionIndex < outputFormatIndex,
     'post-type choices must appear on Home before Output Format');
+for (const id of ['xlsxPhotoOptions', 'xlsxPhotoLinks', 'xlsxPhotoEmbed']) {
+    assert.match(
+        popupHtml,
+        new RegExp(`id=["']${id}["']`),
+        `XLSX photo choices must expose ${id}`
+    );
+}
+assert.match(
+    popupHtml,
+    /id=["']xlsxPhotoOptions["'][^>]*\brole=["']radiogroup["']/,
+    'XLSX photo choices must be one accessible mutually exclusive group'
+);
+assert.doesNotMatch(
+    popupHtml,
+    /id=["'](?:embedPostPhotos|embedBookmarkPhotos)["']/,
+    'the old duplicate photo toggles must not remain in the popup'
+);
 assert.doesNotMatch(popupHtml, /id=["']settingsPostsOnly["']/,
     'post content choices must not remain hidden in Settings');
 assert(!manifest.host_permissions.includes('https://pbs.twimg.com/*'),
@@ -333,7 +359,7 @@ const popupRuntime = popupScripts
     .map(read)
     .join('\n');
 const photoPermissionRequest = popupRuntime.split('function requestPhotoEmbedPermission', 2)[1]
-    ?.split('async function handleEmbedPhotosChange', 1)[0] || '';
+    ?.split('async function requestAndSavePhotoEmbedPermission', 1)[0] || '';
 assert.match(
     photoPermissionRequest,
     /chrome\.permissions\.request\(\{\s*origins:\s*\[PHOTO_EMBED_ORIGIN\]\s*\}\)/,
@@ -343,6 +369,28 @@ assert.doesNotMatch(
     photoPermissionRequest,
     /permissions\.contains|await\s+/,
     'no async permission preflight may consume the checkbox user gesture before permissions.request'
+);
+const photoPermissionConfirmation = popupRuntime
+    .split('async function requestAndSavePhotoEmbedPermission', 2)[1]
+    ?.split('function handleEmbedPhotosChange', 1)[0] || '';
+assert(
+    photoPermissionConfirmation.indexOf('requestPhotoEmbedPermission(checkbox)') >= 0 &&
+    photoPermissionConfirmation.indexOf('requestPhotoEmbedPermission(checkbox)') <
+    photoPermissionConfirmation.indexOf('chrome.storage.local.set'),
+    'Continue must open Chrome permission before persisting the one-time acknowledgement'
+);
+assert.match(
+    popupRuntime,
+    /if\s*\(!photoPermissionIntroSeen\)\s*\{\s*openPhotoPermissionDialog\(checkbox\)/,
+    'the first photo-enable attempt must show the explanation before requesting permission'
+);
+const photoChoicePersistence = popupRuntime
+    .split('async function persistXlsxPhotoChoice', 2)[1]
+    ?.split('function applyModeUI', 1)[0] || '';
+assert.match(
+    photoChoicePersistence,
+    /await\s+refreshDownloadPlan\(lastExportState\)/,
+    'changing XLSX photo mode must immediately refresh the visible multipart plan'
 );
 assert.match(
     read('popup/popup.js'),
@@ -470,6 +518,15 @@ assert.match(popupHtml, /id=["']aboutRiskCancel["']/,
 assert.match(popupHtml, /id=["']aboutRiskConfirm["']/,
     'the About risk dialog must require an explicit consequence-labelled confirmation');
 assert.match(
+    popupHtml,
+    /id=["']photoPermissionDialog["'][^>]*\brole=["']dialog["'][^>]*\baria-modal=["']true["']/,
+    'photo embedding must explain its optional host access in an accessible dialog'
+);
+assert.match(popupHtml, /id=["']photoPermissionCancel["']/,
+    'the photo permission dialog must let users keep embedding off');
+assert.match(popupHtml, /id=["']photoPermissionConfirm["'][^>]*\bdisabled\b/,
+    'the photo permission dialog confirmation must start disabled');
+assert.match(
     read('popup/popup.js'),
     /ABOUT_RETRY_WARNING_THRESHOLD\s*=\s*60/,
     'more than one hour of About retries must require explicit confirmation'
@@ -545,6 +602,19 @@ for (const file of localeFiles) {
     assert.deepEqual(Object.keys(locale).sort(), englishKeys, `${file} must match en.json keys`);
     for (const key of [
         'formatTxt',
+        'xlsxPhotosTitle',
+        'xlsxPhotosHelp',
+        'xlsxPhotoLinks',
+        'xlsxPhotoLinksHelp',
+        'xlsxPhotoEmbed',
+        'xlsxPhotoEmbedHelp',
+        'downloadStagePhotos',
+        'downloadStageBuildingXlsx',
+        'photoPermissionTitle',
+        'photoPermissionBody',
+        'photoPermissionCancel',
+        'photoPermissionContinue',
+        'photoPermissionWaiting',
         'whatToExport',
         'postTypeOriginals',
         'postTypeOriginalsHelp',
@@ -583,6 +653,26 @@ for (const file of localeFiles) {
         assert.equal(typeof locale[key], 'string', `${file} must define ${key}`);
         assert(locale[key].trim().length > 0, `${file} must not leave ${key} empty`);
     }
+    assert.match(
+        locale.photoPermissionBody,
+        /^\*\*[^*]+\*\*/,
+        `${file} photo permission explanation must lead with a bold summary`
+    );
+    assert.match(
+        locale.photoPermissionBody,
+        /pbs\.twimg\.com/,
+        `${file} photo permission explanation must name the exact image host`
+    );
+    assert.match(
+        locale.photoPermissionWaiting,
+        /\{seconds\}/,
+        `${file} photo permission countdown must interpolate the remaining seconds`
+    );
+    assert.match(
+        locale.downloadStagePhotos,
+        /\{current\}[\s\S]*\{total\}/,
+        `${file} photo progress must interpolate both counters`
+    );
     assert.equal(
         locale.postSafetyBreaks,
         locale.userSafetyBreaks,
@@ -630,6 +720,16 @@ assert.doesNotMatch(
 );
 assert.match(english.aboutDesc, /TXT/, 'English About summary must advertise TXT');
 assert.match(english.detailFormatsBody, /TXT/, 'English format details must include TXT');
+assert.match(
+    read('popup/popup.js'),
+    /PHOTO_PERMISSION_INTRO_SECONDS\s*=\s*3/,
+    'the mandatory photo-permission explanation must guard Continue for three seconds'
+);
+assert.match(
+    read('popup/popup.js'),
+    /PHOTO_PERMISSION_INTRO_KEY\s*=\s*['"]xporter_photo_permission_intro_seen['"]/,
+    'the completed photo-permission explanation must persist exactly once'
+);
 
 const i18nRefs = [...popupHtml.matchAll(/data-i18n(?:-[a-z-]+)?=["']([^"']+)["']/g)]
     .map((match) => match[1]);

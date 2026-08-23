@@ -133,9 +133,14 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── test-all.js              # Canonical ordered 11-suite deterministic gate
-│   ├── test-extension-core.js   # 74-test aggregator; suites in test-extension-core/
+│   ├── test-extension-core.js   # 75-test aggregator; suites in test-extension-core/
 │   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
 │   │                            # bookmark lifecycle/API cancellation/capture/export policy
+│   ├── test-extension-smoke.mjs               # unpacked extension runtime smoke
+│   ├── test-popup-footer-layout.mjs            # no trailing strip below footer
+│   ├── test-popup-tooltip-layout.mjs           # viewport-side selection for long help
+│   ├── test-xlsx-photo-options-layout.mjs      # 14-locale photo-choice layout
+│   ├── test-photo-permission-rationale.mjs     # guarded 14-locale permission flow
 │   ├── package.sh               # Atomic allowlist CWS ZIP builder (runs test-all)
 │   └── debug-*.mjs              # Authenticated/browser diagnostic scripts
 │
@@ -169,6 +174,9 @@ All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 | `API_FETCH_TIMEOUT` | `30000` | deadline per GraphQL/REST fetch (`fetchTimed`) |
 | `DISCOVERY_FETCH_TIMEOUT` / `DISCOVERY_TOTAL_TIMEOUT` | `15000` / `25000` | per-fetch / whole-pass discovery deadlines; the shared generation aborts underlying fetches on total timeout and cannot commit afterward |
 | `TWEETS_PER_BATCH` | `50` | items per storage batch |
+| `EMBEDDED_PHOTO_PREVIEW_MAX_BYTES` / `_XLSX_PART_MAX_BYTES` | `3 MiB` / `40 MiB` | hard per-preview stream cap and aggregate retained-photo cap per workbook part |
+| `EMBEDDED_PHOTO_XLSX_TARGET_LIMIT` / `_CONCURRENCY` | `1000` / `8` | maximum photo candidates and parallel preview workers per part |
+| `EMBEDDED_PHOTO_CACHE_MAX_BYTES` / `_MAX_ENTRIES` | `64 MiB` / `256` | settled LRU cache bounds shared across one multipart download |
 | `FALLBACK_BEARER_TOKEN` | `AAAA…` | static public bearer |
 
 **`XLog`** — use `XLog.log/warn/error/info()` instead of `console.*` in SW code.
@@ -230,6 +238,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 | Setting | Default | Notes |
 |---|---|---|
 | `includeOriginalPosts` / `includeQuotes` / `includeReplies` / `includeRetweets` / `includeArticles` | all `true` | Exact primary-row types selected on Home. A mixed Replies + non-reply export persists a two-pass feed plan, removes duplicate primary rows, and preserves foreign parents only as nested reply context. |
+| `embedPostPhotos` / `embedBookmarkPhotos` | both `false` | The Home XLSX-only radio group stores independent Posts/Bookmarks choices: false keeps URLs only; true downloads bounded previews into the Media sheet. |
 | `quantityLimit` | `500` | 0 = unlimited; live for an ordinary active export, but never overwrites a `+N more` per-run target |
 | `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
 | `customDelaySec` / `userCustomDelaySec` | `5` / `5` | exact Custom delay for Posts/Bookmarks and User Lists; decimal dot or comma accepted |
@@ -265,7 +274,7 @@ Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 ### 4.8. `background/downloads.js` — Immutable Download Transactions
 `createCurrentDownloadTransaction()` reads export state/settings once, builds the multipart plan once, freezes the settings snapshot, fixes one export timestamp, checks optional photo permission once, and creates one byte-bounded LRU photo cache. Every part consumes that transaction, so changing settings during a download cannot change later filenames, formats, permission behavior, or row planning.
 
-Photo embedding is bounded: at most four concurrent fetch workers, 15 MB per image, credentials omitted, and an abort timeout at least as strict as `API_FETCH_TIMEOUT`. In-flight and retained media URLs share one promise; settled entries are evicted by the 64 MiB / 256-entry default budget, so a much later duplicate may be fetched again instead of growing heap with the whole export. `startCurrentDownload()` owns one detached `activeDownload` plus keepalive and clears both in `finally`, including photo timeouts and other failures.
+Photo embedding is bounded: at most eight concurrent workers request `name=small` previews, stream at most 3 MiB per preview, retain at most 40 MiB and 1,000 candidates per workbook part, omit credentials, and keep an abort timeout across both fetch and body read. In-flight and retained media URLs share one promise; settled entries are evicted by the 64 MiB / 256-entry default budget. `startCurrentDownload()` reserves a synchronous starting lock before reading its snapshot, then owns one detached promise plus keepalive and clears them by identity in `finally`.
 
 ---
 
@@ -288,7 +297,7 @@ X has no clean date-filter on the timeline GraphQL, so XPorter:
 ### Schemas
 - **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
 - **Users CSV**: `id, name, username, bio, location, url, followers_count, following_count, tweet_count, listed_count, verified, protected, created_at, profile_image_url, profile_url`.
-- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for posts only (public profile context followed by compact per-post metrics, full text, and canonical URL). Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially instead of loading every saved row into memory; the popup shows the planned file count and live part progress. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
+- **Formats**: CSV (BOM-prefixed UTF-8), JSON (pretty), XLSX (dependency-free OOXML ZIP), and TXT for posts only (public profile context followed by compact per-post metrics, full text, and canonical URL). Posts/Bookmarks + XLSX exposes URL-only or optimized `name=small` previews on a separate Media sheet while retaining source URLs. Large exports use `DOWNLOAD_PART_LIMITS` and `loadTweetBatches()` to create numbered files sequentially; the popup shows the planned file count plus `photos` and `building_xlsx` stages. A completed TXT export shows equal Download/Copy action tiles only while the text fits one part; larger TXT exports must be downloaded.
 
 ---
 
@@ -391,9 +400,9 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 74-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 75-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
 
-For a real unpacked-browser check, run `node scripts/test-extension-smoke.mjs` outside `CODEX_SANDBOX` with Playwright available. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports; CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
+Outside `CODEX_SANDBOX`, run `node scripts/test-extension-smoke.mjs` plus the footer, tooltip, XLSX-photo-options, and photo-permission browser checks. Every Playwright entrypoint invokes `tooling-policy.js` before loading Playwright. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports; CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 
 **Static-only audit boundary.** A clean local suite proves internal contracts, parsers against fixtures, persistence/rate-limit state, and generated files. It does **not** prove that X's current queryIds, GraphQL feature flags, cookie behavior, or live payload shapes still match the code. Record that distinction explicitly whenever browser/live-X validation is intentionally skipped.
 
@@ -408,7 +417,7 @@ For a real unpacked-browser check, run `node scripts/test-extension-smoke.mjs` o
 | `downloads` | save files |
 | `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
 | `host_permissions` | `https://x.com/*`, `https://twitter.com/*` |
-| `optional_host_permissions` | `https://pbs.twimg.com/*` — requested synchronously via `chrome.permissions.request()` from the "Embed photos in XLSX" toggle click; no async preflight may consume that user gesture. Declining keeps URL-only exports fully functional. Never a required permission: a required increase is what disabled every 1.5.8 installation during the withdrawn 1.5.9 update. Before embedding images, `downloads.js` re-checks the grant with `chrome.permissions.contains()` and fails closed to plain media URLs when it is missing or the check errors. |
+| `optional_host_permissions` | `https://pbs.twimg.com/*` — the first "Embed photo previews" choice shows a mandatory localized explanation with a three-second guard. Its Continue click calls `chrome.permissions.request()` before any await or acknowledgement write; later attempts request directly. Declining keeps URL-only exports fully functional. Never a required permission: that mistake disabled every 1.5.8 installation during the withdrawn 1.5.9 update. A current download checks the grant once in its frozen transaction and fails closed to URLs when missing. |
 
 Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
 
