@@ -12,6 +12,14 @@
   const _origFetch = window.fetch;
   const _origXHROpen = XMLHttpRequest.prototype.open;
 
+  // Readiness only: the probe never carries credentials or export data.
+  window.addEventListener?.('message', event => {
+    if (event.source !== window || event.origin !== window.location.origin) return;
+    if (event.data?.type !== '__XPORTER_CAPTURE_PROBE__' ||
+        typeof event.data.nonce !== 'string' || event.data.nonce.length > 80) return;
+    window.postMessage({ type: '__XPORTER_CAPTURE_READY__', nonce: event.data.nonce }, window.location.origin);
+  });
+
   function postNativeTemplate(template) {
     if (!template) return;
     window.postMessage({
@@ -20,16 +28,20 @@
     }, window.location.origin);
   }
 
-  function postGraphqlResponse(operationName, url, status, bodyText) {
-    // Cap relayed body size — drop oversized payloads entirely.
-    if (typeof bodyText !== 'string' ||
-        bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) return;
+  function postGraphqlResponse(operationName, url, status, bodyText, error) {
+    if (typeof bodyText !== 'string') return;
+    // Report the reason without forwarding an oversized response body.
+    if (bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) {
+      bodyText = '';
+      error = 'SEARCH_RESPONSE_TOO_LARGE';
+    }
     window.postMessage({
       type: '__XPORTER_GRAPHQL_RESPONSE__',
       operationName,
       url,
       status,
-      bodyText
+      bodyText,
+      ...(error ? { error } : {})
     }, window.location.origin);
   }
 
@@ -73,7 +85,15 @@
       }
     } catch (e) { /* ignore */ }
 
-    const response = await _origFetch.apply(this, args);
+    let response;
+    try {
+      response = await _origFetch.apply(this, args);
+    } catch (error) {
+      if (operationName === 'SearchTimeline') {
+        postGraphqlResponse(operationName, requestUrl, 200, '', 'SEARCH_NETWORK_ERROR');
+      }
+      throw error;
+    }
 
     try {
       const capturesExport = operationName === 'SearchTimeline';
@@ -85,14 +105,15 @@
       // retry. Feed collection remains success-only.
       if ((capturesExport || (capturesFeed && successful)) && response) {
         response.clone().text().then((bodyText) => {
-          if (bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) return;
           if (capturesExport) postGraphqlResponse(operationName, requestUrl, response.status, bodyText);
           if (capturesFeed && successful &&
               bodyText.length <= CAPTURE_CONTRACT.MAX_FEED_BODY_CHARS) {
             // Yield once so X can render the response before passive parsing.
             setTimeout(() => postSeenPosts(operationName, bodyText), 0);
           }
-        }).catch(() => { });
+        }).catch(() => {
+          if (capturesExport) postGraphqlResponse(operationName, requestUrl, response.status, '', 'SEARCH_NETWORK_ERROR');
+        });
       }
     } catch (e) { /* ignore */ }
 
@@ -133,8 +154,7 @@
               if (successful && nativeTemplate) postNativeTemplate(nativeTemplate);
               if (capturesExport || (capturesFeed && successful)) {
                 const bodyText = (this.responseType === '' || this.responseType === 'text') ? this.responseText : '';
-                if (bodyText.length <= CAPTURE_CONTRACT.MAX_BODY_CHARS &&
-                    (capturesExport || bodyText)) {
+                if (capturesExport || (bodyText && bodyText.length <= CAPTURE_CONTRACT.MAX_BODY_CHARS)) {
                   if (capturesExport) {
                     postGraphqlResponse(
                       operation.operationName,

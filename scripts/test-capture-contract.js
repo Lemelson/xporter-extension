@@ -231,8 +231,10 @@ async function testMainWorldRejectionBehavior() {
 
     assert.deepEqual(
         harness.posted.map(message => message.type),
-        ['__XPORTER_GRAPHQL_RESPONSE__', '__XPORTER_SEEN_POSTS__']
+        ['__XPORTER_GRAPHQL_RESPONSE__', '__XPORTER_GRAPHQL_RESPONSE__', '__XPORTER_SEEN_POSTS__']
     );
+    assert.equal(harness.posted[0].error, 'SEARCH_RESPONSE_TOO_LARGE');
+    assert.equal(harness.posted[0].bodyText, '', 'oversized data must never cross the relay');
 }
 
 async function testIsolatedRelayRejectionBehavior() {

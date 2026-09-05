@@ -1137,7 +1137,7 @@ async function testSearchCaptureIsArmedBeforeNavigation() {
 
     harness.context.__searchRelayMessage = {
         operationName: 'SearchTimeline',
-        url: 'https://x.com/i/api/graphql/test/SearchTimeline?variables=%7B%7D',
+        url: 'https://x.com/i/api/graphql/test/SearchTimeline?variables=' + encodeURIComponent(JSON.stringify({rawQuery:'(from:test) since:2026-01-01',product:'Latest'})),
         status: 200,
         bodyText: '{}'
     };
@@ -2694,7 +2694,214 @@ async function testProfileFeedDefaultsAndMigratesLegacyReplySetting() {
     );
 }
 
+
+function searchPage(rows = [], cursor = null) {
+    const entries = rows.map(row => ({entryId: 'tweet-' + row.id, content: {itemContent: {tweet_results: {result: {
+        legacy: {id_str: row.id, full_text: row.id, created_at: row.date},
+        core: {user_results: {result: {rest_id: row.authorId || '1', core: {screen_name: row.username || 'test'}}}}
+    }}}}}));
+    if (cursor) entries.push({entryId:'cursor-bottom-' + cursor, content:{value:cursor}});
+    return {url:cursor || 'last-page', status:200, bodyText:JSON.stringify({data:{search_by_raw_query:{search_timeline:{timeline:{instructions:[{type:'TimelineAddEntries',entries}]}}}}})};
+}
+
+function createSearchHarness(pages) {
+    const harness = createWorkerHarness();
+    const context = harness.context;
+    vm.runInContext(source('utils/api-parsers.js'), context);
+    context.__pages = [...pages];
+    vm.runInContext(`
+        currentExport = {
+            username:'test',userId:'1',userInfo:{screenName:'test'},exportMode:'posts',outputFormat:'csv',
+            dateFrom:new Date('2026-09-05T00:00:00Z'),dateTo:new Date('2026-09-05T23:59:59.999Z'),
+            dateSnapshotAt:Date.parse('2026-09-05T12:00:00Z'),startedAt:Date.parse('2026-09-05T12:00:00Z'),
+            running:true,status:'fetching',settings:{quantityLimit:500},tweetBuffer:[],tweetCount:0,totalBatches:0,
+            cursor:null,completionReason:null
+        };
+        rateLimiter={totalRequests:0,batchSize:20,getState:()=>({})};
+        XPorterStorage.MAX_TWEETS_PER_BATCH=50;
+        XPorterAPI.parseSearchTimelineResponse=XPorterApiParsers.parseSearchTimelineResponse;
+        openSearchCaptureTab=async(rawQuery)=>{searchCapture={rawQuery,queue:[],seenUrls:new Set(),resumeScanned:0};};
+        closeSearchCaptureTab=async()=>{};
+        sendSearchCaptureStatus=async()=>true;
+        waitForSearchCapturePayload=async()=>__pages.shift() || null;
+        requestNextSearchCapturePayload=async()=>__pages.shift() || null;
+        recoverStalledSearchCapture=async()=>null;
+        swSleep=async()=>{};
+    `,context);
+    return harness;
+}
+
+async function testSearchErrorsNeverBecomeEmptySuccess() {
+    const invalidInstructions = [{type:'UnknownShape'}, {type:'TimelineAddEntries'}, {type:'TimelineShowAlert'}];
+    for (const value of [{errors:[{message:'temporary'}]}, {}, ...invalidInstructions.map(instruction =>
+        ({data:{search_by_raw_query:{search_timeline:{timeline:{instructions:[instruction]}}}}}))]) {
+        const harness=createSearchHarness([{status:200,url:'error-page',bodyText:JSON.stringify(value)}]);
+        await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context), /SEARCH_(RESPONSE_ERROR|INVALID_RESPONSE)/);
+        assert.equal(vm.runInContext('currentExport.completionReason',harness.context),null);
+    }
+    const harness=createSearchHarness([{status:200,url:'bad-json',bodyText:'{'}]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_INVALID_RESPONSE/);
+    const invalidRow = createSearchHarness([searchPage([
+        {id:'saved-before-error',date:'2026-09-05T01:00:00Z'}, {id:'invalid-date',date:'invalid'}
+    ])]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', invalidRow.context), /SEARCH_INVALID_RESPONSE/);
+    assert.deepEqual(invalidRow.getSavedBatches().flat().map(row => row.id), ['saved-before-error']);
+}
+
+async function testSearchTodayIncludesExactBoundsAndFreezesNow() {
+    const harness=createSearchHarness([
+        searchPage([{id:'late',date:'2026-09-05T11:30:00Z'},{id:'after-snapshot',date:'2026-09-05T12:00:01Z'}],'second'),
+        searchPage([{id:'midnight',date:'2026-09-05T00:00:00Z'},{id:'before',date:'2026-09-04T23:59:59Z'},
+            {id:'foreign',date:'2026-09-05T01:00:00Z',authorId:'2'},
+            {id:'last',date:'2026-09-05T12:00:00Z'}])
+    ]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
+    assert.deepEqual(harness.getSavedBatches().flat().map(row=>row.id),['late','midnight','last']);
+    assert.equal(harness.getSavedState().completionReason,'source_exhausted');
+    assert.equal(harness.getSavedState().dateSnapshotAt,Date.parse('2026-09-05T12:00:00Z'));
+    assert.match(vm.runInContext('searchCapture.rawQuery',harness.context),/since:2026-09-04 until:2026-09-07/);
+}
+
+async function testSearchSilenceNeverUsesDateCoverage() {
+    for (const date of ['2026-09-05T11:30:00Z','2026-09-05T00:01:00Z']) {
+        const harness=createSearchHarness([searchPage([{id:'saved',date}],'more')]);
+        await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_STALLED/);
+        assert.equal(harness.getSavedState().tweetCount,1,'rows must be durable before the next-page wait');
+        assert.equal(harness.getSavedState().completionReason,null,'neither high nor low coverage proves completion');
+    }
+    const empty=createSearchHarness([searchPage([],'more')]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',empty.context),/SEARCH_STALLED/);
+}
+
+async function testSearchEmptyLimitAndStopReasons() {
+    const empty=createSearchHarness([searchPage([])]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',empty.context);
+    assert.equal(empty.getSavedState().completionReason,'no_matches');
+    const limited=createSearchHarness([searchPage([{id:'1',date:'2026-09-05T01:00:00Z'},{id:'2',date:'2026-09-05T02:00:00Z'}],'more')]);
+    vm.runInContext('currentExport.settings.quantityLimit=1',limited.context);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',limited.context);
+    assert.equal(limited.getSavedState().completionReason,'limit_reached');
+    assert.equal(limited.getSavedState().tweetCount,1);
+    const stopped=createSearchHarness([searchPage([{id:'1',date:'2026-09-05T01:00:00Z'}],'more')]);
+    vm.runInContext('requestNextSearchCapturePayload=async()=>{currentExport.running=false;return null;}',stopped.context);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',stopped.context);
+    assert.equal(stopped.getSavedState().completionReason,null);
+    assert.equal(stopped.getSavedState().tweetCount,1);
+}
+
+async function testSearchResumeDedupAndFailureRecovery() {
+    const harness=createSearchHarness([searchPage([{id:'saved',date:'2026-09-05T01:00:00Z'},{id:'new',date:'2026-09-05T02:00:00Z'}])]);
+    harness.getSavedBatches()[0]=[{id:'saved'}];
+    harness.context.XPorterStorage.loadAllTweets=async()=>[{id:'saved'}];
+    vm.runInContext('currentExport.tweetCount=1;currentExport.totalBatches=1;currentExport.dateResume=true;',harness.context);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
+    assert.deepEqual(harness.getSavedBatches().flat().map(row=>row.id),['saved','new']);
+    assert.equal(vm.runInContext('searchCapture.resumeScanned',harness.context),1);
+    const retry=createSearchHarness([{url:'same',status:200,bodyText:'{'},searchPage([{id:'ok',date:'2026-09-05T02:00:00Z'}])]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',retry.context);
+    assert.equal(retry.getSavedState().tweetCount,1);
+}
+
+async function testPageWriteFailureNeverAdvancesCursor() {
+    for (const mode of ['posts','followers']) {
+        const harness=createWorkerHarness();
+        harness.context.__mode=mode;
+        await vm.runInContext(`(async()=>{
+            currentExport={username:'test',userId:'1',userInfo:{followersCount:10},exportMode:__mode,outputFormat:'csv',
+                settings:{quantityLimit:500},tweetBuffer:[],tweetCount:0,totalBatches:0,cursor:'page-A',running:true,status:'fetching'};
+            rateLimiter={executeWithRateLimit:fn=>fn(),totalRequests:0,batchSize:20,getState:()=>({})};
+            XPorterStorage.MAX_TWEETS_PER_BATCH=50;
+            XPorterStorage.saveTweetBatch=async()=>false;
+            XPorterAPI.fetchFollowers=async()=>({users:[{id:'lost'}],nextCursor:'page-B'});
+            try {
+                if(__mode==='posts') await _fetchPostTimelineLoop(async()=>({tweets:[{id:'lost'}],nextCursor:'page-B'}),()=>true);
+                else await _fetchUsersLoop();
+            } catch(error) {currentExport.error=error.message;}
+            currentExport.running=false;currentExport.status='error';
+            await saveCurrentState({bestEffort:true});
+        })()`,harness.context);
+        assert.equal(harness.getSavedState().error,'STORAGE_FULL');
+        assert.equal(harness.getSavedState().cursor,'page-A');
+        assert.equal(harness.getSavedState().tweetCount,0);
+    }
+}
+
+async function testSearchDiagnosesTabAndBridgeFailures() {
+    for(const [kind,expected] of [['closed','SEARCH_TAB_UNAVAILABLE'],['changed','SEARCH_PAGE_CHANGED'],['bridge','SEARCH_BRIDGE_UNAVAILABLE']]) {
+        const harness=createWorkerHarness();
+        harness.context.__kind=kind;
+        await vm.runInContext(`
+            currentExport={running:true,tweetCount:0};
+            searchCapture={tabId:42,rawQuery:'(from:test)',queue:[]};
+            sendSearchCaptureStatus=async()=>true;
+            waitForSearchCapturePayload=async()=>null;
+            chrome.tabs.get=async()=>{if(__kind==='closed')throw new Error('closed');return {status:'complete',url:__kind==='changed'?'https://x.com/home':buildSearchTimelinePageUrl('(from:test)')};};
+            chrome.tabs.sendMessage=async()=>({ready:true,hookReady:false});
+        `,harness.context);
+        await assert.rejects(vm.runInContext('requestNextSearchCapturePayload()',harness.context),new RegExp(expected));
+    }
+    const harness=createSearchHarness([]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_NO_RESPONSE/);
+}
+
+function testSearchCaptureRejectsOtherQueriesAndReportsTransportErrors() {
+    const harness=createWorkerHarness();
+    vm.runInContext("searchCapture={tabId:42,rawQuery:'(from:test)',queue:[],seenUrls:new Set()};",harness.context);
+    for(const [rawQuery,product,accepted] of [['(from:other)','Latest',false],['(from:test)','Top',false],['(from:test)','Latest',true]]) {
+        harness.context.__message={operationName:'SearchTimeline',status:200,bodyText:'',error:'SEARCH_NETWORK_ERROR',
+            url:'https://x.com/i/api/graphql/query/SearchTimeline?variables='+encodeURIComponent(JSON.stringify({rawQuery,product}))};
+        const result=vm.runInContext('handlePageGraphqlResponse(__message,{tab:{id:42}})',harness.context);
+        assert.equal(result.success===true,accepted);
+    }
+    assert.equal(vm.runInContext('searchCapture.queue[0].error',harness.context),'SEARCH_NETWORK_ERROR');
+}
+
+function testDateBoundariesUseLocalCalendarAndRejectInvalidDays() {
+    const harness=createWorkerHarness();
+    assert.equal(vm.runInContext("normalizeDateBoundary('2026-02-30','start')",harness.context),null);
+    assert.equal(vm.runInContext("normalizeDateBoundary('invalid','start')",harness.context),null);
+    const value=vm.runInContext(`({start:normalizeDateBoundary('2026-09-05','start').getTime(),end:normalizeDateBoundary('2026-09-05','end').getTime()})`,harness.context);
+    assert.equal(value.start,new Date(2026,8,5,0,0,0,0).getTime());
+    assert.equal(value.end,new Date(2026,8,5,23,59,59,999).getTime());
+    for (const day of ['2026-03-08', '2026-11-01']) {
+        harness.context.__day = day;
+        const bounds = vm.runInContext(`({
+            start: normalizeDateBoundary(__day, 'start').getTime(),
+            end: normalizeDateBoundary(__day, 'end').getTime()
+        })`, harness.context);
+        assert.equal(bounds.start, new Date(day + 'T00:00:00').getTime());
+        assert.equal(bounds.end, new Date(day + 'T23:59:59.999').getTime());
+        if (process.env.TZ === 'America/New_York') {
+            assert.equal(bounds.end - bounds.start + 1, (day.endsWith('03-08') ? 23 : 25) * 3600000);
+        }
+    }
+    vm.runInContext(`
+        currentExport = {
+            username:'test', userId:'1',
+            dateFrom:normalizeDateBoundary('2026-03-08','start'),
+            dateTo:normalizeDateBoundary('2026-03-08','end'),
+            dateSnapshotAt:Date.parse('2026-09-05T12:00:00Z')
+        };
+    `, harness.context);
+    for (const [timestamp, allowed] of [
+        ['2026-03-07T23:59:59.999', false], ['2026-03-08T00:00:00', true],
+        ['2026-03-08T23:59:59.999', true], ['2026-03-09T00:00:00', false]
+    ]) {
+        harness.context.__row = {_author_id:'1',created_at:new Date(timestamp).toISOString()};
+        assert.equal(vm.runInContext('dateExportAllowsTweet(__row)', harness.context), allowed);
+    }
+}
+
 const tests = [
+    { name: "search errors never become empty success", run: testSearchErrorsNeverBecomeEmptySuccess, order: 78 },
+    { name: "today exact boundaries and snapshot", run: testSearchTodayIncludesExactBoundsAndFreezesNow, order: 79 },
+    { name: "search silence never means date coverage", run: testSearchSilenceNeverUsesDateCoverage, order: 80 },
+    { name: "search empty limit and stop reasons", run: testSearchEmptyLimitAndStopReasons, order: 81 },
+    { name: "search resume dedup and malformed retry", run: testSearchResumeDedupAndFailureRecovery, order: 82 },
+    { name: "page write failure preserves cursor", run: testPageWriteFailureNeverAdvancesCursor, order: 83 },
+    { name: "search tab and bridge diagnosis", run: testSearchDiagnosesTabAndBridgeFailures, order: 84 },
+    { name: "search query identity and transport errors", run: testSearchCaptureRejectsOtherQueriesAndReportsTransportErrors, order: 85 },
+    { name: "local calendar and invalid dates", run: testDateBoundariesUseLocalCalendarAndRejectInvalidDays, order: 86 },
     { name: "download lease protects export batches", run: testExportDataMutationsRespectDownloadLease, order: 75 },
     { name: "Clear cannot race Start or Resume", run: testClearCannotRaceStartingOrResumingExport, order: 76 },
     { name: "explicit zero-row Replies fallback", run: testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot, order: 35 },

@@ -656,7 +656,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!plan?.multipart) {
             downloadPlanEl.classList.add('hidden');
             downloadPlanEl.textContent = '';
-            if (!downloadInProgress) label.textContent = t('download');
+            if (!downloadInProgress) label.textContent = templateText('downloadRows', { count: formatNumber(plan?.count ?? lastItemCount, currentLang) });
             return;
         }
 
@@ -670,7 +670,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             : `${hint} ${t('largeExportCsvTip')}`;
         downloadPlanEl.classList.remove('hidden');
         if (!downloadInProgress) {
-            label.textContent = templateText('downloadFiles', { count: plan.partCount });
+            label.textContent = templateText('downloadRows', { count: formatNumber(plan.count ?? lastItemCount, currentLang) });
         }
         if (outputFormat.value === 'txt') copyBtn.classList.add('hidden');
     }
@@ -1731,7 +1731,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusActionStack.classList.toggle('running-actions', isRunning);
         statusActionStack.classList.toggle('txt-actions', showTxtCopy);
         const canContinueComplete = status === 'complete' && itemCount > 0 &&
-            state.completionReason !== 'source_exhausted';
+            !['source_exhausted', 'no_matches'].includes(state.completionReason);
         const showRepliesFallback = finalError && state.canFallbackWithoutReplies === true;
         resumeAddsItems = canContinueComplete;
         resumeQuantity.classList.toggle('hidden', !resumeAddsItems);
@@ -1811,7 +1811,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'fetching':
                 statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
                 setDotColor('green', true);
-                statusMessage.textContent = state.partialReason === 'replies_unavailable'
+                const searchPhaseKey = { loading: 'searchLoading', connecting: 'searchConnecting', waiting: 'searchWaiting', collecting: 'searchCollecting', retrying: 'searchRetrying' }[state.searchPhase];
+                statusMessage.textContent = searchPhaseKey ? t(searchPhaseKey) : state.partialReason === 'replies_unavailable'
                     ? `${t('postsOnlyFallbackActive')} · ${t('batch')} ${state.batch || 1}`
                     : `${t('fetching')} (${t('batch')} ${state.batch || 1})`;
                 progressFill.classList.add('indeterminate');
@@ -1874,6 +1875,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         statusMessage.append(loginLink);
                         const suffix = t('authSuffix');
                         statusMessage.append(`${suffix ? ' ' + suffix : ''}, ${t('thenTryAgain')}`);
+                    } else if (String(state.error || '').startsWith('SEARCH_')) {
+                        statusMessage.textContent = `${itemCount > 0 ? t('partialSaved') + ' ' : ''}${t('searchResumeHint')}`;
                     } else {
                         statusMessage.textContent = state.error === 'REPLIES_UNAVAILABLE'
                             ? t('repliesUnavailableBody')
@@ -1899,8 +1902,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 statusText.innerHTML = ICONS.circleCheck + ' ';
                 statusText.appendChild(document.createTextNode(t('exportComplete')));
                 setDotColor('green');
-                statusMessage.textContent = itemCount === 0
-                    ? t('errNoData')
+                statusMessage.textContent = state.completionReason === 'limit_reached'
+                    ? t('limitReached')
+                    : itemCount === 0
+                    ? t(state.completionReason === 'no_matches' ? 'noMatchingPosts' : 'errNoData')
                     : (state.partialReason === 'replies_unavailable'
                         ? t('postsOnlyFallbackComplete')
                         : (state.completionReason === 'source_exhausted'

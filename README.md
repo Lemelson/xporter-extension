@@ -54,7 +54,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Multiple export modes** — posts, personal bookmarks, followers, following, and verified followers
 - **CSV, JSON, XLSX, and TXT output** — download the AI-friendly TXT or copy it straight to your clipboard
 - **Two XLSX photo modes** — keep links for the smallest file, or add bounded previews to a separate Media sheet
-- **Date range filtering** — export posts from a specific time window
+- **Date range filtering** — export posts from an inclusive calendar-date window in your browser’s timezone. For today, the cutoff is the moment you start; Resume keeps that cutoff. Keep the search tab open. Search uses extra boundary days and filters rows to the exact interval. A stalled search preserves partial results and offers Resume; it does not claim completeness from date coverage. X search availability still limits which posts can be returned.
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
 - **100% local processing** — everything happens in your browser; your exported data is never transmitted anywhere

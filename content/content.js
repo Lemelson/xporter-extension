@@ -277,10 +277,18 @@ function sanitizeSeenPost(post) {
     };
 }
 
+let captureProbeNonce = '';
+let captureHookReady = false;
+
 // Listen for messages from the MAIN-world interceptor
 window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     if (event.origin !== window.location.origin) return;
+    if (event.data?.type === '__XPORTER_CAPTURE_READY__' &&
+        captureProbeNonce && event.data.nonce === captureProbeNonce) {
+        captureHookReady = true;
+        return;
+    }
     if (event.data?.type === '__XPORTER_NATIVE_REQUEST_TEMPLATE__') {
         // Page scripts can spoof postMessage, so relay only the shared
         // low-authority schema. Reconstruct a fresh object: never spread page
@@ -303,13 +311,16 @@ window.addEventListener('message', (event) => {
         const status = Number(event.data.status);
         if (!Number.isInteger(status) || status < 100 || status > 599) return;
         if (typeof event.data.url !== 'string' || !event.data.url.includes('/i/api/graphql/')) return;
+        const captureError = ['SEARCH_RESPONSE_TOO_LARGE', 'SEARCH_NETWORK_ERROR'].includes(event.data.error)
+            ? event.data.error : null;
         if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
         chrome.runtime.sendMessage({
             type: 'PAGE_GRAPHQL_RESPONSE',
             operationName: operationName,
             url: event.data.url,
             status: status,
-            bodyText: bodyText
+            bodyText: bodyText,
+            ...(captureError ? { error: captureError } : {})
         }).catch(() => { });
     }
     if (event.data?.type === '__XPORTER_SEEN_POSTS__') {
@@ -438,23 +449,6 @@ function ensureXporterCaptureOverlay() {
         #xporter-capture-overlay.xporter-capture-paused .xporter-capture-bar span {
             animation: none;
             background: linear-gradient(90deg, #FFD400, #FFAD1F);
-        }
-        /* ≥95% of the date range collected: the rest is almost certainly a
-           posting gap — say so, and flip Stop into an inviting green finish. */
-        #xporter-capture-overlay.xporter-capture-almost .xporter-capture-subtitle {
-            color: #34D399;
-            font-weight: 650;
-        }
-        #xporter-capture-overlay.xporter-capture-almost .xporter-capture-stop {
-            border-color: rgba(0, 186, 124, 0.65);
-            background: rgba(0, 186, 124, 0.14);
-            color: #34D399;
-            animation: xporter-capture-stop-pulse 1.8s ease-out infinite;
-        }
-        @keyframes xporter-capture-stop-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 186, 124, 0.35); }
-            70% { box-shadow: 0 0 0 8px rgba(0, 186, 124, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 186, 124, 0); }
         }
         @keyframes xporter-capture-bar-sweep {
             from { transform: translateX(-75%); }
@@ -678,7 +672,7 @@ function updateXporterCaptureOverlay(status) {
         const clamped = Math.max(0, Math.min(100, pct));
         // Never a fully empty track while running — keep a visible sliver.
         if (barFill) barFill.style.width = Math.max(2, clamped) + '%';
-        if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
+        if (pctEl) pctEl.textContent = '≈' + Math.round(clamped) + '%';
     } else {
         overlay.classList.remove('xporter-capture-determinate');
         if (barFill) barFill.style.width = '';
@@ -694,10 +688,9 @@ function updateXporterCaptureOverlay(status) {
     const pauseUntil = Number(status.pauseUntil);
     if (Number.isFinite(pauseUntil) && pauseUntil > Date.now()) {
         overlay.classList.add('xporter-capture-paused');
-        overlay.classList.remove('xporter-capture-almost');
         const renderPause = () => {
             const remaining = Math.max(0, Math.ceil((pauseUntil - Date.now()) / 1000));
-            subtitleEl.textContent = `${i.rateLimited || 'X rate limit — retrying in'} ` +
+            subtitleEl.textContent = `${status.pauseLabel || i.rateLimited || 'X rate limit — retrying in'} ` +
                 `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
             if (remaining <= 0 && overlay._xporterPauseTicker) {
                 clearInterval(overlay._xporterPauseTicker);
@@ -708,17 +701,7 @@ function updateXporterCaptureOverlay(status) {
         overlay._xporterPauseTicker = setInterval(renderPause, 1000);
     } else {
         overlay.classList.remove('xporter-capture-paused');
-        // Near the end of the date window the honest message is "that's
-        // probably all of them" — not another phase line that suggests more
-        // posts are coming.
-        if (status.almostDone) {
-            overlay.classList.add('xporter-capture-almost');
-            subtitleEl.textContent = i.almostDone
-                || "Looks like that's all the posts in this range — you can stop the export";
-        } else {
-            overlay.classList.remove('xporter-capture-almost');
-            subtitleEl.textContent = status.phase || i.preparingPage || 'Preparing search page...';
-        }
+        subtitleEl.textContent = status.phase || i.preparingPage || 'Preparing search page...';
     }
 }
 
@@ -742,6 +725,15 @@ const RETRY_BUTTON_LABELS = new Set([
 ]);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'XPORTER_SEARCH_PAGE_STATE') {
+        captureHookReady = false;
+        captureProbeNonce = String(Math.random());
+        window.postMessage({ type: '__XPORTER_CAPTURE_PROBE__', nonce: captureProbeNonce }, window.location.origin);
+        setTimeout(() => {
+            sendResponse({ ready: true, hookReady: captureHookReady });
+        }, 150);
+        return true;
+    }
     if (message?.type === 'GET_ACCOUNT_CONTEXT') {
         const currentAccount = extractCurrentAccount();
         sendResponse({

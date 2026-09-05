@@ -93,6 +93,15 @@ function formatError(error, t) {
         'DOWNLOAD_IN_PROGRESS': 'errDownloadInProgress',
         'COPY_TOO_LARGE': 'errCopyTooLarge',
         'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture',
+        'SEARCH_TAB_UNAVAILABLE': 'errSearchTab',
+        'SEARCH_PAGE_CHANGED': 'errSearchChanged',
+        'SEARCH_BRIDGE_UNAVAILABLE': 'errSearchBridge',
+        'SEARCH_NO_RESPONSE': 'errSearchWaiting',
+        'SEARCH_RESPONSE_ERROR': 'errSearchResponse',
+        'SEARCH_INVALID_RESPONSE': 'errSearchInvalid',
+        'SEARCH_RESPONSE_TOO_LARGE': 'errSearchTooLarge',
+        'SEARCH_NETWORK_ERROR': 'errSearchNetwork',
+        'SEARCH_STALLED': 'errSearchStalled',
         // Timed-out fetch — same user guidance as a failed connection
         'NETWORK_TIMEOUT': 'errEndpointFailed'
     };
@@ -120,7 +129,16 @@ function formatError(error, t) {
         'DOWNLOAD_FAILED': 'Download failed — please try again',
         'DOWNLOAD_IN_PROGRESS': 'A download is already in progress',
         'COPY_TOO_LARGE': 'This export is too large to copy — download the numbered files instead',
-        'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results — keep the search tab open and press Resume to try again',
+        'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results. Resume opens a new search tab.',
+        'SEARCH_TAB_UNAVAILABLE': 'Search tab could not load.',
+        'SEARCH_PAGE_CHANGED': 'The search tab was changed.',
+        'SEARCH_BRIDGE_UNAVAILABLE': 'Could not connect to the search tab.',
+        'SEARCH_NO_RESPONSE': 'X returned no search response.',
+        'SEARCH_RESPONSE_ERROR': 'X returned a search error.',
+        'SEARCH_INVALID_RESPONSE': 'Could not read the search response.',
+        'SEARCH_RESPONSE_TOO_LARGE': 'The search response was too large.',
+        'SEARCH_NETWORK_ERROR': 'The search connection failed.',
+        'SEARCH_STALLED': 'Search stopped before the end was confirmed.',
         'NETWORK_TIMEOUT': 'Could not connect to X API — make sure x.com is accessible',
         'TIMEOUT': 'No response from the extension — please try again',
         'MESSAGING_ERROR': 'Could not reach the extension — please try again'

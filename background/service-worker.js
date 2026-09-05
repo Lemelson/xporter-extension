@@ -137,7 +137,11 @@ async function getOverlayI18n() {
         stopping: g('ovStopping', 'Stopping…'),
         rateLimited: g('ovRateLimited', 'X rate limit — retrying in'),
         resumingFor: g('ovResuming', 'Resuming — checking already saved posts for'),
-        almostDone: g('ovAlmostDone', "Looks like that's all the posts in this range — you can stop the export")
+        searchLoading: g('searchLoading', 'Loading search…'),
+        searchConnecting: g('searchConnecting', 'Connecting to search…'),
+        searchWaiting: g('searchWaiting', 'Waiting for X…'),
+        searchCollecting: g('searchCollecting', 'Collecting posts…'),
+        searchRetrying: g('searchRetrying', 'Retrying search…')
     };
     // Cache only when the locale really loaded. Caching the silent English
     // fallback pinned the overlay to English for the SW's whole lifetime
@@ -153,6 +157,11 @@ async function getOverlayI18n() {
 function overlayPhase(i18n, phaseKey, username, resumeScanned = 0) {
     const u = username || 'profile';
     switch (phaseKey) {
+        case 'loading': return i18n.searchLoading;
+        case 'connecting': return i18n.searchConnecting;
+        case 'waiting': return i18n.searchWaiting;
+        case 'collecting': return i18n.searchCollecting;
+        case 'retrying': return i18n.searchRetrying;
         case 'preparing': return `${i18n.preparingFor} @${u}...`;
         case 'resuming':
             return `${i18n.resumingFor} @${u} (${Number(resumeScanned) || 0} ${i18n.posts})...`;
@@ -373,7 +382,8 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     const normalizedDateFrom = (mode === 'posts') ? normalizeDateBoundary(dateFrom, 'start') : null;
     const normalizedDateTo = (mode === 'posts') ? normalizeDateBoundary(dateTo, 'end') : null;
 
-    if (normalizedDateFrom && normalizedDateTo && normalizedDateFrom > normalizedDateTo) {
+    if (mode === 'posts' && ((dateFrom && !normalizedDateFrom) || (dateTo && !normalizedDateTo) ||
+        (normalizedDateFrom && normalizedDateTo && normalizedDateFrom > normalizedDateTo))) {
         return { error: 'INVALID_DATE_RANGE' };
     }
     const postFeedPlan = mode === 'posts' ? postFeedPlanForSettings(settings) : [];
@@ -422,6 +432,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
         postFeedPlan,
         postFeedIndex: 0,
         startedAt: Date.now(),
+        dateSnapshotAt: Date.now(),
         status: 'resolving_user',
         completionReason: null
     };
@@ -940,6 +951,10 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0 
         const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
         noProgressPages = (acceptedNew > 0 || cursorAdvanced) ? 0 : (noProgressPages + 1);
 
+        // Commit rows before mutating the cursor or completion reason.
+        // On a failed write the error handler must persist the current page.
+        await flushExportBuffer();
+
         // Update cursor
         // Keep the current cursor when stopping on a quantity limit so resume
         // can refetch the same page and skip already-saved IDs.
@@ -955,10 +970,7 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0 
             hasMore = false;
         }
 
-        // Persist the buffer BEFORE the advanced cursor: if the SW dies after
-        // saveCurrentState, resume starts past these items with an empty buffer
-        // and they would be lost forever.
-        await flushExportBuffer();
+        // Rows are durable; the advanced cursor can now be persisted.
         await saveCurrentState();
 
         broadcastStatus({
@@ -976,230 +988,178 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0 
 }
 
 function normalizeDateBoundary(dateValue, boundary) {
-    if (!dateValue) return null;
-
-    const normalized = new Date(`${dateValue}T00:00:00.000Z`);
-    if (isNaN(normalized.getTime())) return null;
-
-    if (boundary === 'end') {
-        normalized.setUTCHours(23, 59, 59, 999);
-    }
-
+    if (!dateValue || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return null;
+    // Calendar dates belong to the browser's timezone, including DST.
+    const normalized = new Date(`${dateValue}T00:00:00`);
+    if (!Number.isFinite(normalized.getTime()) || formatLocalDate(normalized) !== dateValue) return null;
+    if (boundary === 'end') normalized.setHours(23, 59, 59, 999);
     return normalized;
 }
 
+function formatLocalDate(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function dateExportUpperBound() {
+    const snapshot = Number(currentExport?.dateSnapshotAt || currentExport?.startedAt) || Date.now();
+    const requested = toEpochMs(currentExport?.dateTo);
+    return Number.isFinite(requested) ? Math.min(requested, snapshot) : snapshot;
+}
+
+function dateExportAllowsTweet(tweet) {
+    const expectedId = String(currentExport.userId || '');
+    const actualId = String(tweet?._author_id || '');
+    if (expectedId && actualId) {
+        if (actualId !== expectedId) return false;
+    } else {
+        const expected = currentExport.userInfo?.screenName || currentExport.username || '';
+        if (!tweet.author_username || tweet.author_username.toLowerCase() !== expected.toLowerCase()) return false;
+    }
+    const created = toEpochMs(tweet.created_at);
+    // Never silently discard an unclassifiable target row and call it complete.
+    if (!Number.isFinite(created)) throw new Error('SEARCH_INVALID_RESPONSE');
+    const from = toEpochMs(currentExport.dateFrom);
+    return (!Number.isFinite(from) || created >= from) && created <= dateExportUpperBound();
+}
+
 async function _fetchPostsByDateRangeLoop() {
-    let hasMore = true;
-    let emptyPages = 0;
     const seenIds = new Set();
     await preloadSeenIds(seenIds);
-    const recentIds = createRecentIdTracker(seenIds);
-    const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom, currentExport.dateTo);
-    let payload = null;
-
+    // Freeze today's upper bound across Resume; new posts require a new export.
+    currentExport.dateSnapshotAt ||= currentExport.startedAt || Date.now();
+    if (toEpochMs(currentExport.dateFrom) > dateExportUpperBound()) {
+        currentExport.completionReason = 'no_matches';
+        currentExport.cursor = null;
+        return;
+    }
+    const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom,
+        new Date(dateExportUpperBound()));
+    let previousCursor = null;
+    let stalledPages = 0;
+    let badPages = 0;
     await openSearchCaptureTab(rawQuery);
-
     try {
-        payload = await waitForSearchCapturePayload(20000);
-        // Slow machines/connections routinely need more than 20s for X's
-        // search page to boot (real churn case: SEARCH_CAPTURE_TIMEOUT on the
-        // most engaged user we ever lost). Before giving up, actively ping the
-        // capture tab — requestNextSearchCapturePayload retries with scroll
-        // nudges for up to ~48 more seconds.
-        if (!payload) {
-            payload = await requestNextSearchCapturePayload();
-        }
-        if (!payload) {
-            throw new Error('SEARCH_CAPTURE_TIMEOUT');
-        }
-        await sendSearchCaptureStatus({ phaseKey: 'exporting' });
+        await setSearchPhase('loading');
+        let payload = await waitForSearchCapturePayload(20000);
+        if (!payload) payload = await requestNextSearchCapturePayload();
+        if (!payload && currentExport.running) throw new Error('SEARCH_NO_RESPONSE');
 
-        let badPageStreak = 0;
-
-        while (hasMore && currentExport.running) {
+        while (payload && currentExport.running) {
+            if (payload.error) throw new Error(payload.error);
             if (quantityLimitReached()) {
                 currentExport.completionReason = 'limit_reached';
                 break;
             }
-
-            // A captured payload can be an X error response (e.g. 429 while the
-            // search tab is rate-limited) or a truncated body. Neither must be
-            // counted as an "empty page" — that would end the export as
-            // "complete" with a fraction of the range. Pause and re-request.
-            let parsedPayload = null;
+            let parsed;
+            let failure = null;
+            if (payload.status === 401 || payload.status === 403) throw new Error('AUTH_ERROR');
             if (payload.status >= 400) {
-                badPageStreak++;
-                if (badPageStreak > 5) throw new Error('RATE_LIMITED');
-                const waitMs = payload.status === 429 ? 60000 : 10000;
-                lastTransientStatus = {
-                    running: true,
-                    status: 'cooldown',
-                    duration: waitMs,
-                    until: Date.now() + waitMs,
-                    kind: 'window',
-                    reason: `SearchTimeline HTTP ${payload.status}`
-                };
-                broadcastStatus(lastTransientStatus);
-                // Mirror the pause on the in-page overlay (amber countdown).
-                await sendSearchCaptureStatus({ pauseUntil: Date.now() + waitMs });
-                await swSleep(waitMs);
-                if (!currentExport.running) break;
-                await sendSearchCaptureStatus({ phaseKey: 'scrolling' });
-                payload = await requestNextSearchCapturePayload();
-                if (!payload && !searchLikelyComplete()) payload = await recoverStalledSearchCapture();
-                if (!payload) {
-                    if (currentExport.running && !searchLikelyComplete()) {
-                        await flushExportBuffer();
-                        await saveCurrentState();
-                        throw new Error('RATE_LIMITED');
-                    }
-                    hasMore = false;
-                }
-                continue;
-            }
-            try {
-                parsedPayload = XPorterAPI.parseSearchTimelineResponse(JSON.parse(payload.bodyText));
-            } catch (_) {
-                badPageStreak++;
-                if (badPageStreak > 5) throw new Error('SEARCH_CAPTURE_TIMEOUT');
-                // Let a retry of the same cursor URL through. The first response
-                // was unusable, so treating the URL as permanently seen would
-                // discard the later successful response and force a timeout.
-                searchCapture?.seenUrls.delete(payload.url);
-                payload = await requestNextSearchCapturePayload();
-                if (!payload) hasMore = false;
-                continue;
-            }
-            badPageStreak = 0;
-            if (!currentExport.running) break;
-
-            if (!parsedPayload.tweets || parsedPayload.tweets.length === 0) {
-                emptyPages++;
-                if (emptyPages >= 3) {
-                    hasMore = false;
-                    break;
-                }
+                failure = payload.status === 429 ? 'RATE_LIMITED' : 'SEARCH_RESPONSE_ERROR';
             } else {
-                emptyPages = 0;
+                try {
+                    parsed = XPorterAPI.parseSearchTimelineResponse(JSON.parse(payload.bodyText));
+                } catch (error) {
+                    failure = error.message === 'SEARCH_RESPONSE_ERROR'
+                        ? error.message : 'SEARCH_INVALID_RESPONSE';
+                }
             }
-
-            for (const tweet of (parsedPayload.tweets || [])) {
-                // Resume replays X Search from the top and most early rows are
-                // already saved. They still prove how far back through the date
-                // range the page has reached; record coverage before filters and
-                // de-duplication so a completed replay does not look stalled.
+            if (failure) {
+                searchCapture?.seenUrls.delete(payload.url);
+                if (++badPages >= 3) throw new Error(failure);
+                if (failure === 'RATE_LIMITED') {
+                    const until = Date.now() + 60000;
+                    lastTransientStatus = { running: true, status: 'cooldown', duration: 60000,
+                        until, kind: 'window', reason: 'SearchTimeline HTTP 429' };
+                    broadcastStatus(lastTransientStatus);
+                    await sendSearchCaptureStatus({ pauseUntil: until });
+                    await swSleep(60000);
+                } else {
+                    await setSearchPhase('retrying');
+                    await swSleep(1000);
+                }
+                if (!currentExport.running) break;
+                payload = await requestNextSearchCapturePayload();
+                if (!payload && currentExport.running) throw new Error(failure);
+                continue;
+            }
+            badPages = 0;
+            await setSearchPhase('collecting');
+            const countBefore = currentExport.tweetCount;
+            for (const tweet of parsed.tweets || []) {
+                if (!currentExport.running) break;
+                if (!dateExportAllowsTweet(tweet)) continue;
                 noteSearchTimelineCoverage(tweet);
                 if (!postSelectionAllowsTweet(currentExport.settings, tweet)) continue;
-                const expectedUsername =
-                    currentExport.userInfo?.screenName || currentExport.username || '';
-                if (tweet.author_username && expectedUsername &&
-                    tweet.author_username.toLowerCase() !== expectedUsername.toLowerCase()) {
-                    continue;
-                }
                 if (seenIds.has(tweet.id)) {
-                    if (currentExport.dateResume && searchCapture) {
-                        searchCapture.resumeScanned = (searchCapture.resumeScanned || 0) + 1;
-                    }
+                    if (currentExport.dateResume && searchCapture) searchCapture.resumeScanned++;
                     continue;
                 }
-                if (quantityLimitReached()) {
-                    hasMore = false;
-                    break;
-                }
+                if (quantityLimitReached()) break;
                 seenIds.add(tweet.id);
-
-                if (!tweet.author_name && currentExport.userInfo) {
-                    tweet.author_name = currentExport.userInfo.name || '';
-                    tweet.author_username = currentExport.userInfo.screenName || currentExport.username || '';
-                    if (tweet.tweet_url && tweet.tweet_url.includes('/undefined/')) {
-                        tweet.tweet_url = tweet.tweet_url.replace('/undefined/', `/${tweet.author_username}/`);
-                    }
-                }
-
                 currentExport.tweetBuffer.push(tweet);
                 currentExport.tweetCount++;
                 recordFirstItemOnce();
-
                 if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
                     await flushExportBuffer();
                 }
             }
-
-            if (quantityLimitReached()) {
-                hasMore = false;
-                currentExport.completionReason = 'limit_reached';
-            }
-            if (hasMore && parsedPayload.nextCursor) {
-                currentExport.cursor = parsedPayload.nextCursor;
-                await sendSearchCaptureStatus({ phaseKey: 'scrolling' });
-                payload = await requestNextSearchCapturePayload();
-                // A cursor means X advertised more results — silence here is a
-                // stalled/blocked timeline ("Something went wrong"), NOT the
-                // end of data. Wait it out and retry; content.js clicks Retry
-                // on every scroll ping. Never fake a "complete" — EXCEPT when:
-                //  · the collected posts already reach (≥95% cover) the start
-                //    of the requested range — silence IS the end there; or
-                //  · the last page(s) were EMPTY (e.g. a range with no posts:
-                //    X renders "No results", there is nothing to scroll, so no
-                //    new request will ever fire). Recovering for minutes and
-                //    then failing RATE_LIMITED turned "0 posts in range" into
-                //    a fake error.
-                const silenceIsEnd = () => emptyPages > 0 || searchLikelyComplete();
-                if (!payload && !silenceIsEnd()) payload = await recoverStalledSearchCapture();
-                if (!payload) {
-                    if (currentExport.running && !silenceIsEnd()) {
-                        await flushExportBuffer();
-                        await saveCurrentState();
-                        throw new Error('RATE_LIMITED');
-                    }
-                    hasMore = false;
-                }
-            } else {
-                hasMore = false;
-            }
-
+            // Persist every accepted page BEFORE waiting for the next response.
             await flushExportBuffer();
+            if (quantityLimitReached()) currentExport.completionReason = 'limit_reached';
+            else if (parsed.sourceExhausted === true) {
+                currentExport.completionReason = currentExport.tweetCount ? 'source_exhausted' : 'no_matches';
+            }
+            const cursor = parsed.nextCursor;
+            const advanced = !!cursor && cursor !== previousCursor;
+            stalledPages = (advanced || currentExport.tweetCount > countBefore) ? 0 : stalledPages + 1;
+            if (!currentExport.completionReason && stalledPages >= 3) throw new Error('SEARCH_STALLED');
+            currentExport.cursor = currentExport.completionReason === 'limit_reached'
+                ? currentExport.cursor : (currentExport.completionReason ? null : (cursor || null));
             await saveCurrentState();
             await sendSearchCaptureStatus({ phaseKey: 'exporting' });
-
-            broadcastStatus({
-                running: true,
-                status: 'fetching',
-                username: currentExport.username,
-                tweetCount: currentExport.tweetCount,
-                expectedTweets: getExpectedItemCount(),
-                quantityLimit: currentExport.settings?.quantityLimit || 0,
-                batch: Math.floor(rateLimiter.totalRequests / rateLimiter.batchSize) + 1,
-                totalRequests: rateLimiter.totalRequests,
-                exportMode: currentExport.exportMode
-            });
+            broadcastStatus({ running: true, status: 'fetching', searchPhase: 'collecting',
+                username: currentExport.username, tweetCount: currentExport.tweetCount,
+                quantityLimit: currentExport.settings?.quantityLimit || 0, exportMode: 'posts' });
+            if (!currentExport.running || currentExport.completionReason) break;
+            previousCursor = cursor;
+            await setSearchPhase('waiting');
+            payload = await requestNextSearchCapturePayload();
+            if (!payload && currentExport.running) payload = await recoverStalledSearchCapture(1, 10000);
+            if (!payload && currentExport.running) throw new Error('SEARCH_STALLED');
         }
-        if (currentExport.running && !currentExport.completionReason) {
-            currentExport.completionReason = quantityLimitReached()
-                ? 'limit_reached'
-                : 'source_exhausted';
-            if (currentExport.completionReason === 'source_exhausted') {
-                currentExport.cursor = null;
-            }
-        }
+        if (currentExport.running && !currentExport.completionReason) throw new Error('SEARCH_STALLED');
+    } catch (error) {
+        // A later invalid row must not discard earlier validated rows in this page.
+        await flushExportBuffer();
+        throw error;
     } finally {
         await closeSearchCaptureTab();
     }
 }
 
+async function setSearchPhase(phase) {
+    if (!currentExport?.running) return;
+    currentExport.searchPhase = phase;
+    lastTransientStatus = null;
+    broadcastStatus({ running: true, status: 'fetching', searchPhase: phase,
+        tweetCount: currentExport.tweetCount, exportMode: 'posts' });
+    await sendSearchCaptureStatus({ phaseKey: phase });
+}
+
 function buildDateRangeSearchQuery(username, dateFrom, dateTo) {
     const parts = [`(from:${username})`];
-
+    // Search dates use UTC calendar boundaries. Add guard days; exact local
+    // bounds are enforced on every row. A guard row is never proof of fullness.
     if (dateFrom) {
-        parts.push(`since:${formatDateForSearch(dateFrom)}`);
+        const before = new Date(dateFrom.getTime());
+        before.setUTCDate(before.getUTCDate() - 1);
+        parts.push(`since:${formatDateForSearch(before)}`);
     }
-
     if (dateTo) {
-        const dayAfter = new Date(dateTo.getTime());
-        dayAfter.setUTCDate(dayAfter.getUTCDate() + 1);
-        parts.push(`until:${formatDateForSearch(dayAfter)}`);
+        const after = new Date(dateTo.getTime());
+        after.setUTCDate(after.getUTCDate() + 2);
+        parts.push(`until:${formatDateForSearch(after)}`);
     }
-
     return parts.join(' ');
 }
 
@@ -1207,38 +1167,13 @@ function formatDateForSearch(date) {
     return date.toISOString().slice(0, 10);
 }
 
-// The live search feed runs newest → oldest, so once the oldest collected
-// post sits within a day of the range start, a silent timeline means the end
-// of the data — NOT a stall. Finishing cleanly here beats minutes of pointless
-// rate-limit retries and a "failed" export stuck at 98%.
-function dateRangeCovered() {
-    const fromMs = toEpochMs(currentExport?.dateFrom);
-    const oldest = searchCapture?.oldestCollectedMs;
-    if (!Number.isFinite(fromMs) || !Number.isFinite(oldest)) return false;
-    return (oldest - fromMs) <= 24 * 60 * 60 * 1000;
-}
-
-// How much of the requested date window is already collected, in percent.
-// Date coverage only — never the quantity-limit progress, which measures a
-// different thing (a user stopping at their own limit is not "out of posts").
+// Approximate date coverage is display-only, never a termination condition.
 function computeDateCoveragePct() {
     const fromMs = toEpochMs(currentExport?.dateFrom);
-    let toMs = toEpochMs(currentExport?.dateTo);
+    const toMs = dateExportUpperBound();
     const oldest = searchCapture?.oldestCollectedMs;
-    if (!Number.isFinite(fromMs) || !Number.isFinite(oldest)) return null;
-    if (!Number.isFinite(toMs)) toMs = Date.now();
-    if (toMs <= fromMs) return null;
-    return Math.min(100, Math.max(0, ((toMs - oldest) / (toMs - fromMs)) * 100));
-}
-
-// Real churn case: oldest post in range was Jan 2 with the range starting
-// Jan 1 — 38h gap, so the 24h rule alone kept "recovering" a finished export.
-// ≥95% of the window collected + a silent timeline = done for all practical
-// purposes; the sliver left is a gap in the user's posting, not missing data.
-function searchLikelyComplete() {
-    if (dateRangeCovered()) return true;
-    const pct = computeDateCoveragePct();
-    return Number.isFinite(pct) && pct >= 95;
+    if (!Number.isFinite(fromMs) || !Number.isFinite(oldest) || toMs <= fromMs) return null;
+    return Math.min(99, Math.max(0, ((toMs - oldest) / (toMs - fromMs)) * 100));
 }
 
 function noteSearchTimelineCoverage(tweet) {
@@ -1266,7 +1201,7 @@ async function openSearchCaptureTab(rawQuery) {
     const tab = await chrome.tabs.create({
         url: 'about:blank',
         active: true
-    });
+    }).catch(() => { throw new Error('SEARCH_TAB_UNAVAILABLE'); });
 
     searchCapture = {
         tabId: tab.id,
@@ -1274,6 +1209,7 @@ async function openSearchCaptureTab(rawQuery) {
         queue: [],
         resolver: null,
         seenUrls: new Set(),
+        rawQuery,
         oldestCollectedMs: null, // drives the overlay's date-based progress %
         resumeScanned: 0
     };
@@ -1284,11 +1220,12 @@ async function openSearchCaptureTab(rawQuery) {
         });
     } catch (_) {
         await closeSearchCaptureTab();
-        throw new Error('SEARCH_CAPTURE_TIMEOUT');
+        throw new Error('SEARCH_TAB_UNAVAILABLE');
     }
 
+    const capture = searchCapture;
     setTimeout(() => {
-        sendSearchCaptureStatus({ phaseKey: 'preparing' }, 8);
+        if (searchCapture === capture) sendSearchCaptureStatus({ phaseKey: 'loading' }, 8);
     }, 1000);
 }
 
@@ -1344,22 +1281,14 @@ function waitForSearchCapturePayload(timeoutMs = 10000) {
 }
 
 // The search page went quiet while we still hold a cursor — X's timeline is
-// stalled (soft rate limit / "Something went wrong"). Pause with an amber
-// countdown on the overlay and retry a few times; each scroll ping also clicks
+// stalled for an unknown reason. Pause with an amber
+// countdown on the overlay and retry; each scroll ping also clicks
 // X's Retry button. Returns the recovered payload, or null to give up.
-async function recoverStalledSearchCapture(rounds = 3, waitMs = 60000) {
+async function recoverStalledSearchCapture(rounds = 1, waitMs = 10000) {
     for (let round = 0; round < rounds; round++) {
         if (!currentExport?.running || !searchCapture) return null;
-        lastTransientStatus = {
-            running: true,
-            status: 'cooldown',
-            duration: waitMs,
-            until: Date.now() + waitMs,
-            kind: 'window',
-            reason: 'Search timeline stalled (likely rate-limited)'
-        };
-        broadcastStatus(lastTransientStatus);
-        await sendSearchCaptureStatus({ pauseUntil: Date.now() + waitMs });
+        await setSearchPhase('retrying');
+        await sendSearchCaptureStatus({ pauseUntil: Date.now() + waitMs, pauseLabel: (await getOverlayI18n()).searchRetrying });
         await swSleep(waitMs);
         if (!currentExport?.running || !searchCapture) return null;
         await sendSearchCaptureStatus({ phaseKey: 'scrolling' });
@@ -1370,21 +1299,46 @@ async function recoverStalledSearchCapture(rounds = 3, waitMs = 60000) {
 }
 
 async function requestNextSearchCapturePayload() {
-    if (!searchCapture?.tabId) return null;
-
-    for (let attempt = 0; attempt < 6; attempt++) {
-        try {
-            await chrome.tabs.sendMessage(searchCapture.tabId, { type: 'XPORTER_SCROLL_SEARCH_PAGE' });
-        } catch (_) {
-            // Tab may still be loading; wait for the payload timeout instead
+    const capture = searchCapture;
+    if (!capture?.tabId || !currentExport?.running) return null;
+    let lastFailure = 'SEARCH_NO_RESPONSE';
+    for (let attempt = 0; attempt < 6 && currentExport.running && searchCapture === capture; attempt++) {
+        if (capture.queue.length) return capture.queue.shift();
+        let tab;
+        try { tab = await chrome.tabs.get(capture.tabId); }
+        catch (_) { throw new Error('SEARCH_TAB_UNAVAILABLE'); }
+        if (tab.status === 'loading' || tab.url === 'about:blank') {
+            lastFailure = 'SEARCH_TAB_UNAVAILABLE';
+            await setSearchPhase('loading');
+        } else {
+            let matches = false;
+            try {
+                const url = new URL(tab.url);
+                matches = url.hostname === 'x.com' && url.pathname === '/search' &&
+                    url.searchParams.get('q') === capture.rawQuery && url.searchParams.get('f') === 'live';
+            } catch (_) { /* no longer our search */ }
+            if (!matches) throw new Error('SEARCH_PAGE_CHANGED');
+            try {
+                const state = await chrome.tabs.sendMessage(capture.tabId, { type: 'XPORTER_SEARCH_PAGE_STATE' });
+                if (!state?.hookReady) {
+                    lastFailure = 'SEARCH_BRIDGE_UNAVAILABLE';
+                    await setSearchPhase('connecting');
+                } else {
+                    lastFailure = 'SEARCH_NO_RESPONSE';
+                    await setSearchPhase('waiting');
+                    await chrome.tabs.sendMessage(capture.tabId, { type: 'XPORTER_SCROLL_SEARCH_PAGE' });
+                }
+            } catch (_) {
+                lastFailure = 'SEARCH_BRIDGE_UNAVAILABLE';
+                await setSearchPhase('connecting');
+            }
         }
-
         const payload = await waitForSearchCapturePayload(8000);
-        if (payload) {
-            return payload;
-        }
+        if (payload) return payload;
     }
-
+    if (currentExport?.running && searchCapture === capture && lastFailure !== 'SEARCH_NO_RESPONSE') {
+        throw new Error(lastFailure);
+    }
     return null;
 }
 
@@ -1406,7 +1360,7 @@ function computeSearchCaptureProgress() {
         pct = (pct === null) ? datePct : Math.max(pct, datePct);
     }
 
-    return pct === null ? null : Math.round(pct);
+    return pct === null ? null : Math.min(99, Math.round(pct));
 }
 
 function toEpochMs(value) {
@@ -1426,17 +1380,14 @@ async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
         username: currentExport.username,
         tweetCount: currentExport.tweetCount || 0,
         quantityLimit: currentExport.settings?.quantityLimit || 0,
-        dateFrom: currentExport.dateFrom ? formatDateForSearch(currentExport.dateFrom) : '',
-        dateTo: currentExport.dateTo ? formatDateForSearch(currentExport.dateTo) : '',
+        dateFrom: currentExport.dateFrom ? formatLocalDate(currentExport.dateFrom) : '',
+        dateTo: currentExport.dateTo ? formatLocalDate(currentExport.dateTo) : '',
         progressPct: computeSearchCaptureProgress(),
-        // ≥95% of the date window collected → the overlay tells the user the
-        // rest is almost certainly a posting gap, and highlights Stop.
-        almostDone: (computeDateCoveragePct() ?? 0) >= 95,
         i18n,
         ...rest
     };
     if (phaseKey) {
-        const effectivePhase = currentExport.dateResume && phaseKey !== 'preparing'
+        const effectivePhase = currentExport.dateResume && ['collecting', 'exporting', 'scrolling'].includes(phaseKey)
             ? 'resuming'
             : phaseKey;
         message.phase = overlayPhase(
@@ -1471,11 +1422,20 @@ function handlePageGraphqlResponse(message, sender) {
         return { ignored: true };
     }
 
+    try {
+        const url = new URL(message.url);
+        const variables = JSON.parse(url.searchParams.get('variables') || 'null');
+        if (url.protocol !== 'https:' || !['x.com', 'twitter.com'].includes(url.hostname) ||
+            !url.pathname.endsWith('/SearchTimeline') || variables?.rawQuery !== searchCapture.rawQuery ||
+            variables?.product !== 'Latest') return { ignored: true };
+    } catch (_) { return { ignored: true }; }
+    const captureError = ['SEARCH_RESPONSE_TOO_LARGE', 'SEARCH_NETWORK_ERROR'].includes(message.error)
+        ? message.error : null;
     const status = Number(message.status) || 200;
     // Error responses must remain retryable: the successful retry uses the
     // same cursor URL. Successful payloads are deduplicated until parsing says
     // they were malformed and explicitly removes the URL from this set.
-    if (status >= 200 && status < 300) {
+    if (!captureError && status >= 200 && status < 300) {
         if (searchCapture.seenUrls.has(message.url)) {
             return { duplicate: true };
         }
@@ -1485,7 +1445,8 @@ function handlePageGraphqlResponse(message, sender) {
     const payload = {
         url: message.url,
         bodyText: message.bodyText,
-        status
+        status,
+        ...(captureError ? { error: captureError } : {})
     };
 
     if (searchCapture.resolver) {
@@ -1627,6 +1588,10 @@ async function _fetchUsersLoop() {
         const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
         noProgressPages = (acceptedNew > 0 || cursorAdvanced) ? 0 : (noProgressPages + 1);
 
+        // Commit rows before mutating the cursor or completion reason.
+        // On a failed write the error handler must persist the current page.
+        await flushExportBuffer();
+
         // Update cursor
         if (hasMore && cursorAdvanced) {
             currentExport.cursor = result.nextCursor;
@@ -1637,8 +1602,7 @@ async function _fetchUsersLoop() {
             hasMore = false;
         }
 
-        // Buffer first, then the advanced cursor — see _fetchPostsLoop.
-        await flushExportBuffer();
+        // Rows were committed before advancing the cursor.
         if (includeAboutDetails) {
             const cached = await XPorterStorage.saveAboutAccountCache(aboutAccountCache);
             if (!cached) XLog.warn('Could not persist About this Account cache');
@@ -1872,7 +1836,7 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
     const extra = parseInt(extraItems, 10);
     let limitOverride = savedState.limitOverride || 0;
     const canExtendCompletedExport = savedState.status === 'complete' &&
-        savedState.completionReason !== 'source_exhausted';
+        !['source_exhausted', 'no_matches'].includes(savedState.completionReason);
     if (canExtendCompletedExport && Number.isFinite(extra) && extra > 0) {
         limitOverride = (savedState.tweetCount || 0) + extra;
     }
@@ -1915,6 +1879,7 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
             : (savedState.postFeedPlan || postFeedPlanForSettings(settings)),
         postFeedIndex: postsOnlyFallback ? 0 : (savedState.postFeedIndex || 0),
         startedAt: savedState.startedAt,
+        dateSnapshotAt: savedState.dateSnapshotAt || savedState.startedAt,
         status: 'fetching',
         limitOverride: limitOverride || 0,
         dateResume: !!(savedState.dateFrom || savedState.dateTo),
@@ -2001,6 +1966,7 @@ async function getExportStatus() {
             outputFormat: currentExport.outputFormat,
             partialReason: currentExport.partialReason || null,
             completionReason: currentExport.completionReason || null,
+            searchPhase: currentExport.searchPhase || null,
             until: waitUntil,
             canResume: !currentExport.running &&
                 (currentExport.status === 'stopped' || currentExport.status === 'error') &&
@@ -2070,6 +2036,7 @@ async function saveCurrentState({ bestEffort = false } = {}) {
         status: currentExport.status,
         error: currentExport.error,
         startedAt: currentExport.startedAt,
+        dateSnapshotAt: currentExport.dateSnapshotAt,
         completedAt: currentExport.completedAt,
         running: currentExport.running,
         limitOverride: currentExport.limitOverride || 0,
@@ -2193,6 +2160,7 @@ function broadcastStatus(event) {
         startedAt: currentExport?.startedAt,
         partialReason: currentExport?.partialReason || null,
         completionReason: currentExport?.completionReason || null,
+        searchPhase: currentExport?.searchPhase || null,
         ...event
     }).catch(() => {
         // No listeners — that's fine

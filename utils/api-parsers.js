@@ -159,7 +159,36 @@
 
   function parseSearchTimelineResponse(data) {
     const timeline = data?.data?.search_by_raw_query?.search_timeline?.timeline;
-    return parseTimelineByInstructions(timeline?.instructions || [], 'search_timeline');
+    // A successful HTTP status does not imply a successful GraphQL search.
+    // Even partial data with errors is not evidence of an exhausted source.
+    if (data?.errors && (!Array.isArray(data.errors) || data.errors.length)) {
+      throw new Error('SEARCH_RESPONSE_ERROR');
+    }
+    if (!Array.isArray(timeline?.instructions)) {
+      throw new Error('SEARCH_INVALID_RESPONSE');
+    }
+    const known = new Set(['TimelineAddEntries', 'TimelineAddToModule', 'TimelinePinEntry',
+      'TimelineReplaceEntry', 'TimelineTerminateTimeline', 'TimelineClearCache', 'TimelineShowAlert']);
+    if (timeline.instructions.some(instruction => !instruction || !known.has(instruction.type))) {
+      throw new Error('SEARCH_INVALID_RESPONSE');
+    }
+    for (const instruction of timeline.instructions) {
+      if ((instruction.type === 'TimelineAddEntries' && !Array.isArray(instruction.entries)) ||
+          (instruction.type === 'TimelineAddToModule' && !Array.isArray(instruction.moduleItems)) ||
+          (['TimelinePinEntry', 'TimelineReplaceEntry'].includes(instruction.type) &&
+            (!instruction.entry || typeof instruction.entry !== 'object'))) {
+        throw new Error('SEARCH_INVALID_RESPONSE');
+      }
+    }
+    if (timeline.instructions.length && !timeline.instructions.some(instruction =>
+      ['TimelineAddEntries', 'TimelineAddToModule', 'TimelinePinEntry', 'TimelineReplaceEntry',
+        'TimelineTerminateTimeline'].includes(instruction.type))) {
+      throw new Error('SEARCH_INVALID_RESPONSE');
+    }
+    const result = parseTimelineByInstructions(timeline.instructions, 'search_timeline');
+    const terminated = timeline.instructions.some(instruction =>
+      instruction.type === 'TimelineTerminateTimeline' && instruction.direction === 'Bottom');
+    return { ...result, sourceExhausted: terminated || !result.nextCursor };
   }
 
   function parseBookmarksResponse(data) {
