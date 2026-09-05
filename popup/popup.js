@@ -1731,8 +1731,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusActionStack.classList.toggle('running-actions', isRunning);
         statusActionStack.classList.toggle('txt-actions', showTxtCopy);
         const canContinueComplete = status === 'complete' && itemCount > 0 &&
+            !state.resumeBlockedReason &&
             !['source_exhausted', 'no_matches'].includes(state.completionReason);
-        const showRepliesFallback = finalError && state.canFallbackWithoutReplies === true;
+        const showRepliesFallback = finalError && !state.resumeBlockedReason && state.canFallbackWithoutReplies === true;
         resumeAddsItems = canContinueComplete;
         resumeQuantity.classList.toggle('hidden', !resumeAddsItems);
         resumeLabel?.classList.toggle('hidden', !resumeAddsItems);
@@ -1740,7 +1741,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         resumeRow.classList.toggle(
             'hidden',
             showRepliesFallback ||
-            !(status === 'stopped' || canContinueComplete || (finalError && state.canResume))
+            !((status === 'stopped' && !state.resumeBlockedReason) ||
+                canContinueComplete || (finalError && state.canResume))
         );
         resumeRow.classList.toggle('is-stopped', status === 'stopped');
         newExportBtn.classList.toggle('hidden', status !== 'complete' && status !== 'stopped' && status !== 'error');
@@ -1930,6 +1932,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     : t('canBeResumed');
                 setMeasuredProgress();
                 break;
+        }
+
+        if (!isRunning && state.resumeBlockedReason) {
+            statusMessage.textContent = formatError(state.resumeBlockedReason, t);
         }
 
         // Update count display

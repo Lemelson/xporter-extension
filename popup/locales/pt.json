@@ -301,5 +301,7 @@
   "noMatchingPosts": "Nenhuma publicação correspondente neste período.",
   "partialSaved": "Resultados parciais salvos.",
   "downloadRows": "Baixar {count} linhas",
-  "searchResumeHint": "Retomar abre uma nova aba de pesquisa."
+  "searchResumeHint": "Retomar abre uma nova aba de pesquisa.",
+  "errSearchEndUnconfirmed": "O X não confirmou o fim dos resultados.",
+  "errDateExportRestart": "Esta exportação por datas usa um formato antigo ou não compatível. Baixe as linhas salvas e inicie uma nova exportação."
 }

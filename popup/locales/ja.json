@@ -301,5 +301,7 @@
   "noMatchingPosts": "この期間に一致するポストはありません。",
   "partialSaved": "収集済みのデータを保存しました。",
   "downloadRows": "{count}行をダウンロード",
-  "searchResumeHint": "再開すると新しい検索タブが開きます。"
+  "searchResumeHint": "再開すると新しい検索タブが開きます。",
+  "errSearchEndUnconfirmed": "X が検索結果の終了を確認しませんでした。",
+  "errDateExportRestart": "この日付指定エクスポートは古い形式または未対応の形式です。保存済みの行をダウンロードしてから、新しくエクスポートしてください。"
 }

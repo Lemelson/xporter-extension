@@ -301,5 +301,7 @@
   "noMatchingPosts": "No matching posts in this period.",
   "partialSaved": "Partial results saved.",
   "downloadRows": "Download {count} rows",
-  "searchResumeHint": "Resume opens a new search tab."
+  "searchResumeHint": "Resume opens a new search tab.",
+  "errSearchEndUnconfirmed": "X did not confirm the end of the results.",
+  "errDateExportRestart": "This date export uses an older or unsupported format. Download any saved rows, then start a new export."
 }

@@ -301,5 +301,7 @@
   "noMatchingPosts": "Keine passenden Beiträge in diesem Zeitraum.",
   "partialSaved": "Teilergebnisse gespeichert.",
   "downloadRows": "{count} Zeilen herunterladen",
-  "searchResumeHint": "Fortsetzen öffnet einen neuen Such-Tab."
+  "searchResumeHint": "Fortsetzen öffnet einen neuen Such-Tab.",
+  "errSearchEndUnconfirmed": "X hat das Ende der Ergebnisse nicht bestätigt.",
+  "errDateExportRestart": "Dieser Datumsexport verwendet ein älteres oder nicht unterstütztes Format. Laden Sie gespeicherte Zeilen herunter und starten Sie einen neuen Export."
 }

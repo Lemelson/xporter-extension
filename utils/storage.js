@@ -731,7 +731,9 @@ const KNOWN_ERROR_CODES = new Set([
     'SEARCH_INVALID_RESPONSE',
     'SEARCH_RESPONSE_TOO_LARGE',
     'SEARCH_NETWORK_ERROR',
-    'SEARCH_STALLED'
+    'SEARCH_STALLED',
+    'SEARCH_END_UNCONFIRMED',
+    'DATE_EXPORT_RESTART_REQUIRED'
 ]);
 
 /** Bump counters on failure (stores a whitelisted error code, no free text). */

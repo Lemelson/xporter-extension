@@ -1,0 +1,11 @@
+[
+  {"name":"empty instructions", "instructions":[], "exhausted":false},
+  {"name":"empty entries without terminal marker", "instructions":[{"type":"TimelineAddEntries","entries":[]}], "exhausted":false},
+  {"name":"top termination only", "instructions":[{"type":"TimelineTerminateTimeline","direction":"Top"}], "exhausted":false},
+  {"name":"pin without pagination", "instructions":[{"type":"TimelinePinEntry","entry":{}}], "exhausted":false},
+  {"name":"replacement without pagination", "instructions":[{"type":"TimelineReplaceEntry","entry":{}}], "exhausted":false},
+  {"name":"empty module without pagination", "instructions":[{"type":"TimelineAddToModule","moduleItems":[]}], "exhausted":false},
+  {"name":"alert with entries", "instructions":[{"type":"TimelineAddEntries","entries":[]},{"type":"TimelineShowAlert"}], "error":"SEARCH_RESPONSE_ERROR"},
+  {"name":"alert with termination", "instructions":[{"type":"TimelineShowAlert"},{"type":"TimelineTerminateTimeline","direction":"Bottom"}], "error":"SEARCH_RESPONSE_ERROR"},
+  {"name":"explicit empty bottom termination", "instructions":[{"type":"TimelineAddEntries","entries":[]},{"type":"TimelineTerminateTimeline","direction":"Bottom"}], "exhausted":true}
+]

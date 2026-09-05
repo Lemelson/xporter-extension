@@ -301,5 +301,7 @@
   "noMatchingPosts": "Tidak ada postingan yang cocok pada periode ini.",
   "partialSaved": "Hasil sebagian disimpan.",
   "downloadRows": "Unduh {count} baris",
-  "searchResumeHint": "Lanjutkan membuka tab pencarian baru."
+  "searchResumeHint": "Lanjutkan membuka tab pencarian baru.",
+  "errSearchEndUnconfirmed": "X belum mengonfirmasi akhir hasil.",
+  "errDateExportRestart": "Ekspor berdasarkan tanggal ini memakai format lama atau tidak didukung. Unduh baris yang tersimpan, lalu mulai ekspor baru."
 }

@@ -412,6 +412,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
 
     currentExport = {
         running: true,
+        schemaVersion: XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION,
         // Bookmarks are owned by the signed-in viewer. Never carry a typed or
         // tab-detected profile handle into this personal export.
         username: isBookmarks ? '' : username,
@@ -1040,22 +1041,22 @@ async function _fetchPostsByDateRangeLoop() {
     await openSearchCaptureTab(rawQuery);
     try {
         await setSearchPhase('loading');
-        let payload = await waitForSearchCapturePayload(20000);
+        let payload = await waitForSearchCapturePayload(XPORTER_CONFIG.SEARCH_CAPTURE.initialResponseTimeoutMs);
         if (!payload) payload = await requestNextSearchCapturePayload();
         if (!payload && currentExport.running) throw new Error('SEARCH_NO_RESPONSE');
 
         while (payload && currentExport.running) {
-            if (payload.error) throw new Error(payload.error);
+            if (payload.error && payload.error !== 'SEARCH_NETWORK_ERROR') throw new Error(payload.error);
             if (quantityLimitReached()) {
                 currentExport.completionReason = 'limit_reached';
                 break;
             }
             let parsed;
-            let failure = null;
-            if (payload.status === 401 || payload.status === 403) throw new Error('AUTH_ERROR');
-            if (payload.status >= 400) {
+            let failure = payload.error || null;
+            if (!failure && (payload.status === 401 || payload.status === 403)) throw new Error('AUTH_ERROR');
+            if (!failure && payload.status >= 400) {
                 failure = payload.status === 429 ? 'RATE_LIMITED' : 'SEARCH_RESPONSE_ERROR';
-            } else {
+            } else if (!failure) {
                 try {
                     parsed = XPorterAPI.parseSearchTimelineResponse(JSON.parse(payload.bodyText));
                 } catch (error) {
@@ -1065,17 +1066,18 @@ async function _fetchPostsByDateRangeLoop() {
             }
             if (failure) {
                 searchCapture?.seenUrls.delete(payload.url);
-                if (++badPages >= 3) throw new Error(failure);
+                if (++badPages >= XPORTER_CONFIG.SEARCH_CAPTURE.maxConsecutiveFailures) throw new Error(failure);
                 if (failure === 'RATE_LIMITED') {
-                    const until = Date.now() + 60000;
-                    lastTransientStatus = { running: true, status: 'cooldown', duration: 60000,
+                    const duration = XPORTER_CONFIG.SEARCH_CAPTURE.rateLimitPauseMs;
+                    const until = Date.now() + duration;
+                    lastTransientStatus = { running: true, status: 'cooldown', duration,
                         until, kind: 'window', reason: 'SearchTimeline HTTP 429' };
                     broadcastStatus(lastTransientStatus);
                     await sendSearchCaptureStatus({ pauseUntil: until });
-                    await swSleep(60000);
+                    await swSleep(duration);
                 } else {
                     await setSearchPhase('retrying');
-                    await swSleep(1000);
+                    await swSleep(XPORTER_CONFIG.SEARCH_CAPTURE.retryDelayMs);
                 }
                 if (!currentExport.running) break;
                 payload = await requestNextSearchCapturePayload();
@@ -1112,10 +1114,15 @@ async function _fetchPostsByDateRangeLoop() {
             const cursor = parsed.nextCursor;
             const advanced = !!cursor && cursor !== previousCursor;
             stalledPages = (advanced || currentExport.tweetCount > countBefore) ? 0 : stalledPages + 1;
-            if (!currentExport.completionReason && stalledPages >= 3) throw new Error('SEARCH_STALLED');
+            if (!currentExport.completionReason && stalledPages >= XPORTER_CONFIG.SEARCH_CAPTURE.maxNoProgressPages) {
+                throw new Error('SEARCH_STALLED');
+            }
             currentExport.cursor = currentExport.completionReason === 'limit_reached'
                 ? currentExport.cursor : (currentExport.completionReason ? null : (cursor || null));
             await saveCurrentState();
+            if (currentExport.running && !currentExport.completionReason && !cursor) {
+                throw new Error('SEARCH_END_UNCONFIRMED');
+            }
             await sendSearchCaptureStatus({ phaseKey: 'exporting' });
             broadcastStatus({ running: true, status: 'fetching', searchPhase: 'collecting',
                 username: currentExport.username, tweetCount: currentExport.tweetCount,
@@ -1124,7 +1131,7 @@ async function _fetchPostsByDateRangeLoop() {
             previousCursor = cursor;
             await setSearchPhase('waiting');
             payload = await requestNextSearchCapturePayload();
-            if (!payload && currentExport.running) payload = await recoverStalledSearchCapture(1, 10000);
+            if (!payload && currentExport.running) payload = await recoverStalledSearchCapture();
             if (!payload && currentExport.running) throw new Error('SEARCH_STALLED');
         }
         if (currentExport.running && !currentExport.completionReason) throw new Error('SEARCH_STALLED');
@@ -1225,8 +1232,12 @@ async function openSearchCaptureTab(rawQuery) {
 
     const capture = searchCapture;
     setTimeout(() => {
-        if (searchCapture === capture) sendSearchCaptureStatus({ phaseKey: 'loading' }, 8);
-    }, 1000);
+        // Cooldown/retry overlays already have their own status and countdown.
+        if (searchCapture === capture && currentExport?.running && !lastTransientStatus) {
+            sendSearchCaptureStatus({ phaseKey: currentExport.searchPhase || 'loading' },
+                XPORTER_CONFIG.SEARCH_CAPTURE.overlayAttempts);
+        }
+    }, XPORTER_CONFIG.SEARCH_CAPTURE.overlayInitialDelayMs);
 }
 
 async function closeSearchCaptureTab() {
@@ -1256,7 +1267,7 @@ async function closeSearchCaptureTab() {
     }
 }
 
-function waitForSearchCapturePayload(timeoutMs = 10000) {
+function waitForSearchCapturePayload(timeoutMs = XPORTER_CONFIG.SEARCH_CAPTURE.responseTimeoutMs) {
     if (!searchCapture) return Promise.resolve(null);
     if (searchCapture.queue.length > 0) {
         return Promise.resolve(searchCapture.queue.shift());
@@ -1284,7 +1295,10 @@ function waitForSearchCapturePayload(timeoutMs = 10000) {
 // stalled for an unknown reason. Pause with an amber
 // countdown on the overlay and retry; each scroll ping also clicks
 // X's Retry button. Returns the recovered payload, or null to give up.
-async function recoverStalledSearchCapture(rounds = 1, waitMs = 10000) {
+async function recoverStalledSearchCapture(
+    rounds = XPORTER_CONFIG.SEARCH_CAPTURE.recoveryRounds,
+    waitMs = XPORTER_CONFIG.SEARCH_CAPTURE.recoveryDelayMs
+) {
     for (let round = 0; round < rounds; round++) {
         if (!currentExport?.running || !searchCapture) return null;
         await setSearchPhase('retrying');
@@ -1302,7 +1316,8 @@ async function requestNextSearchCapturePayload() {
     const capture = searchCapture;
     if (!capture?.tabId || !currentExport?.running) return null;
     let lastFailure = 'SEARCH_NO_RESPONSE';
-    for (let attempt = 0; attempt < 6 && currentExport.running && searchCapture === capture; attempt++) {
+    for (let attempt = 0; attempt < XPORTER_CONFIG.SEARCH_CAPTURE.responseAttempts &&
+        currentExport.running && searchCapture === capture; attempt++) {
         if (capture.queue.length) return capture.queue.shift();
         let tab;
         try { tab = await chrome.tabs.get(capture.tabId); }
@@ -1333,7 +1348,7 @@ async function requestNextSearchCapturePayload() {
                 await setSearchPhase('connecting');
             }
         }
-        const payload = await waitForSearchCapturePayload(8000);
+        const payload = await waitForSearchCapturePayload(XPORTER_CONFIG.SEARCH_CAPTURE.responseTimeoutMs);
         if (payload) return payload;
     }
     if (currentExport?.running && searchCapture === capture && lastFailure !== 'SEARCH_NO_RESPONSE') {
@@ -1371,8 +1386,11 @@ function toEpochMs(value) {
 
 async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
     if (!searchCapture?.tabId || !currentExport) return false;
-
+    const capture = searchCapture;
+    const revision = (capture.statusRevision || 0) + 1;
+    capture.statusRevision = revision;
     const i18n = await getOverlayI18n();
+    if (searchCapture !== capture || capture.statusRevision !== revision) return false;
     const { phaseKey, ...rest } = overrides;
 
     const message = {
@@ -1399,11 +1417,13 @@ async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
     }
 
     for (let attempt = 0; attempt < attempts; attempt++) {
+        // A newer phase or another capture invalidates pending retries.
+        if (searchCapture !== capture || capture.statusRevision !== revision) return false;
         try {
-            await chrome.tabs.sendMessage(searchCapture.tabId, message);
+            await chrome.tabs.sendMessage(capture.tabId, message);
             return true;
         } catch (_) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, XPORTER_CONFIG.SEARCH_CAPTURE.overlayRetryDelayMs));
         }
     }
 
@@ -1815,11 +1835,21 @@ function applyLivePacingSettings(settingsPatch = {}) {
     return true;
 }
 
+function getResumeBlockedReason(state) {
+    const hasDates = (state?.exportMode || 'posts') === 'posts' && (state?.dateFrom || state?.dateTo);
+    return hasDates && state.schemaVersion !== XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION
+        ? 'DATE_EXPORT_RESTART_REQUIRED' : null;
+}
+
 async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}) {
     const savedState = await XPorterStorage.loadExportState();
     if (!savedState) {
         return { error: 'No export to resume' };
     }
+    // Neither re-interpret UTC-era bounds nor append differently filtered rows.
+    // Keep old batches available to Download; only a new export adopts v1.
+    const resumeBlockedReason = getResumeBlockedReason(savedState);
+    if (resumeBlockedReason) return { error: resumeBlockedReason };
     if (postsOnlyFallback && !canFallbackWithoutReplies(savedState)) {
         return { error: 'REPLIES_UNAVAILABLE' };
     }
@@ -1862,6 +1892,7 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
     currentExport = {
         running: true,
         username: savedState.username,
+        schemaVersion: savedState.schemaVersion || XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION,
         exportMode: savedState.exportMode || 'posts',
         outputFormat: savedState.outputFormat || 'csv',
         dateFrom: savedState.dateFrom ? new Date(savedState.dateFrom) : null,
@@ -1967,8 +1998,9 @@ async function getExportStatus() {
             partialReason: currentExport.partialReason || null,
             completionReason: currentExport.completionReason || null,
             searchPhase: currentExport.searchPhase || null,
+            resumeBlockedReason: getResumeBlockedReason(currentExport),
             until: waitUntil,
-            canResume: !currentExport.running &&
+            canResume: !getResumeBlockedReason(currentExport) && !currentExport.running &&
                 (currentExport.status === 'stopped' || currentExport.status === 'error') &&
                 !!currentExport.userId,
             canFallbackWithoutReplies: canFallbackWithoutReplies(currentExport),
@@ -2007,7 +2039,9 @@ async function getExportStatus() {
             outputFormat: savedState.outputFormat,
             partialReason: savedState.partialReason || null,
             completionReason: savedState.completionReason || null,
-            canResume: (savedState.status === 'stopped' || savedState.status === 'error') && !!savedState.userId,
+            resumeBlockedReason: getResumeBlockedReason(savedState),
+            canResume: !getResumeBlockedReason(savedState) &&
+                (savedState.status === 'stopped' || savedState.status === 'error') && !!savedState.userId,
             canFallbackWithoutReplies: canFallbackWithoutReplies(savedState)
         };
     }
@@ -2021,6 +2055,7 @@ async function saveCurrentState({ bestEffort = false } = {}) {
     if (!currentExport) return;
 
     const saved = await XPorterStorage.saveExportState({
+        schemaVersion: currentExport.schemaVersion,
         username: currentExport.username,
         userId: currentExport.userId,
         userInfo: currentExport.userInfo,

@@ -301,5 +301,7 @@
   "noMatchingPosts": "이 기간에 일치하는 게시물이 없습니다.",
   "partialSaved": "수집한 데이터가 저장되었습니다.",
   "downloadRows": "{count}행 다운로드",
-  "searchResumeHint": "재개하면 새 검색 탭이 열립니다."
+  "searchResumeHint": "재개하면 새 검색 탭이 열립니다.",
+  "errSearchEndUnconfirmed": "X가 검색 결과의 끝을 확인하지 않았습니다.",
+  "errDateExportRestart": "이 날짜별 내보내기는 이전 형식 또는 지원되지 않는 형식을 사용합니다. 저장된 행을 다운로드한 뒤 새 내보내기를 시작하세요."
 }

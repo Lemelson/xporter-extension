@@ -5,6 +5,24 @@ const XPORTER_CONFIG = {
     // Debug mode — set to true to enable verbose console output
     DEBUG: false,
 
+    // v1: browser-local calendar bounds and a fixed launch-time cutoff.
+    // Unversioned date exports must not mix their UTC-era rows with v1 rows.
+    EXPORT_STATE_SCHEMA_VERSION: 1,
+    SEARCH_CAPTURE: {
+        initialResponseTimeoutMs: 20000,
+        responseTimeoutMs: 8000,
+        responseAttempts: 6,
+        maxConsecutiveFailures: 3, // includes the initial failed response
+        maxNoProgressPages: 3,
+        retryDelayMs: 1000,
+        rateLimitPauseMs: 60000,
+        recoveryRounds: 1,
+        recoveryDelayMs: 10000,
+        overlayInitialDelayMs: 1000,
+        overlayAttempts: 8,
+        overlayRetryDelayMs: 500
+    },
+
     // Rate limiting. REQUEST_DELAY is used when adaptive pacing is explicitly
     // disabled; header-less adaptive requests use the mode-specific ranges below.
     REQUEST_DELAY: 3000,           // ms between API requests

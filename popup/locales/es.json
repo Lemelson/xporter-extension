@@ -301,5 +301,7 @@
   "noMatchingPosts": "No hay publicaciones que coincidan en este período.",
   "partialSaved": "Resultados parciales guardados.",
   "downloadRows": "Descargar {count} filas",
-  "searchResumeHint": "Reanudar abre una nueva pestaña de búsqueda."
+  "searchResumeHint": "Reanudar abre una nueva pestaña de búsqueda.",
+  "errSearchEndUnconfirmed": "X no confirmó el final de los resultados.",
+  "errDateExportRestart": "Esta exportación por fechas usa un formato antiguo o no compatible. Descarga las filas guardadas e inicia una nueva exportación."
 }

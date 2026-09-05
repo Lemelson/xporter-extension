@@ -102,6 +102,8 @@ function formatError(error, t) {
         'SEARCH_RESPONSE_TOO_LARGE': 'errSearchTooLarge',
         'SEARCH_NETWORK_ERROR': 'errSearchNetwork',
         'SEARCH_STALLED': 'errSearchStalled',
+        'SEARCH_END_UNCONFIRMED': 'errSearchEndUnconfirmed',
+        'DATE_EXPORT_RESTART_REQUIRED': 'errDateExportRestart',
         // Timed-out fetch — same user guidance as a failed connection
         'NETWORK_TIMEOUT': 'errEndpointFailed'
     };
@@ -139,6 +141,8 @@ function formatError(error, t) {
         'SEARCH_RESPONSE_TOO_LARGE': 'The search response was too large.',
         'SEARCH_NETWORK_ERROR': 'The search connection failed.',
         'SEARCH_STALLED': 'Search stopped before the end was confirmed.',
+        'SEARCH_END_UNCONFIRMED': 'X did not confirm the end of the results.',
+        'DATE_EXPORT_RESTART_REQUIRED': 'This date export uses an older or unsupported format. Download any saved rows, then start a new export.',
         'NETWORK_TIMEOUT': 'Could not connect to X API — make sure x.com is accessible',
         'TIMEOUT': 'No response from the extension — please try again',
         'MESSAGING_ERROR': 'Could not reach the extension — please try again'

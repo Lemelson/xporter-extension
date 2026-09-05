@@ -129,6 +129,10 @@ function createWorkerHarness() {
             }
         }
     });
+    const configContext = vm.createContext({});
+    vm.runInContext(source('utils/config.js'), configContext);
+    context.XPORTER_CONFIG.SEARCH_CAPTURE = { ...configContext.XPORTER_CONFIG.SEARCH_CAPTURE };
+    context.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION = configContext.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION;
     vm.runInContext(source('utils/shared.js'), context, { filename: 'utils/shared.js' });
     vm.runInContext(source('background/export-policy.js'), context, {
         filename: 'background/export-policy.js'
@@ -2701,7 +2705,10 @@ function searchPage(rows = [], cursor = null) {
         core: {user_results: {result: {rest_id: row.authorId || '1', core: {screen_name: row.username || 'test'}}}}
     }}}}}));
     if (cursor) entries.push({entryId:'cursor-bottom-' + cursor, content:{value:cursor}});
-    return {url:cursor || 'last-page', status:200, bodyText:JSON.stringify({data:{search_by_raw_query:{search_timeline:{timeline:{instructions:[{type:'TimelineAddEntries',entries}]}}}}})};
+    const instructions = [{type:'TimelineAddEntries',entries}];
+    // Synthetic terminal page, not a captured live-X response.
+    if (!cursor) instructions.push({type:'TimelineTerminateTimeline', direction:'Bottom'});
+    return {url:cursor || 'last-page', status:200, bodyText:JSON.stringify({data:{search_by_raw_query:{search_timeline:{timeline:{instructions}}}}})};
 }
 
 function createSearchHarness(pages) {
@@ -2712,6 +2719,7 @@ function createSearchHarness(pages) {
     vm.runInContext(`
         currentExport = {
             username:'test',userId:'1',userInfo:{screenName:'test'},exportMode:'posts',outputFormat:'csv',
+            schemaVersion:XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION,
             dateFrom:new Date('2026-09-05T00:00:00Z'),dateTo:new Date('2026-09-05T23:59:59.999Z'),
             dateSnapshotAt:Date.parse('2026-09-05T12:00:00Z'),startedAt:Date.parse('2026-09-05T12:00:00Z'),
             running:true,status:'fetching',settings:{quantityLimit:500},tweetBuffer:[],tweetCount:0,totalBatches:0,
@@ -2892,7 +2900,160 @@ function testDateBoundariesUseLocalCalendarAndRejectInvalidDays() {
     }
 }
 
+async function testLegacyDateResumeRequiresRestartWithoutChangingRows() {
+    for (const schemaVersion of [undefined, 0, 999]) {
+        const harness = createWorkerHarness();
+        const legacy = {
+            schemaVersion, username:'test', userId:'1', exportMode:'posts',
+            dateFrom:'2026-09-05T00:00:00.000Z', dateTo:'2026-09-05T23:59:59.999Z',
+            running:false, status:'stopped', tweetCount:1, totalBatches:1, settings:{quantityLimit:500}
+        };
+        harness.setSavedState(legacy);
+        harness.getSavedBatches()[0] = [{id:'old-row'}];
+        const before = JSON.stringify(legacy);
+        const result = await vm.runInContext('_resumeExportInner(100)', harness.context);
+        assert.equal(result.error, 'DATE_EXPORT_RESTART_REQUIRED');
+        assert.equal(JSON.stringify(harness.getSavedState()), before);
+        assert.equal(harness.wasCleared(), false);
+        assert.deepEqual(harness.getSavedBatches(), [[{id:'old-row'}]]);
+        const status = await vm.runInContext('getExportStatus()', harness.context);
+        assert.equal(status.canResume, false);
+        assert.equal(status.resumeBlockedReason, 'DATE_EXPORT_RESTART_REQUIRED');
+        assert.equal(status.tweetCount, 1, 'old rows must remain available to Download');
+        assert.equal(status.status, 'stopped');
+    }
+    const harness = createWorkerHarness();
+    assert.equal(vm.runInContext("getResumeBlockedReason({exportMode:'posts'})", harness.context), null,
+        'unversioned exports without dates keep their existing Resume path');
+    for (const boundary of ['dateFrom', 'dateTo']) {
+        harness.context.__state = {[boundary]:'2026-09-05T00:00:00Z'};
+        assert.equal(vm.runInContext('getResumeBlockedReason(__state)', harness.context), 'DATE_EXPORT_RESTART_REQUIRED');
+    }
+}
+
+async function testVersionedDateResumePreservesBoundsAndSnapshot() {
+    const harness = createWorkerHarness();
+    vm.runInContext(`
+        createRateLimiter = () => ({onStatusChange(){}, getState(){return {};}, restoreState(){}});
+        launchExportLoop = () => {};
+    `, harness.context);
+    const result = await vm.runInContext(`_startExportInner({
+        username:'test', exportMode:'posts', outputFormat:'csv', dateFrom:'2026-09-05', dateTo:'2026-09-05'
+    })`, harness.context);
+    assert.equal(result.success, true);
+    const initial = {...harness.getSavedState(), userId:'1', running:false, status:'stopped'};
+    assert.equal(initial.schemaVersion, harness.context.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION);
+    assert.equal(initial.dateFrom, new Date('2026-09-05T00:00:00').toISOString());
+    assert.equal(initial.dateTo, new Date('2026-09-05T23:59:59.999').toISOString());
+    harness.setSavedState(initial);
+    vm.runInContext('currentExport=null', harness.context);
+    const resumed = await vm.runInContext('_resumeExportInner()', harness.context);
+    assert.equal(resumed.success, true);
+    for (const key of ['schemaVersion','dateFrom','dateTo','dateSnapshotAt','startedAt']) {
+        assert.equal(harness.getSavedState()[key], initial[key], key + ' must survive Resume unchanged');
+    }
+}
+
+async function testSearchNetworkErrorsHaveBoundedCancellableRetries() {
+    const networkError = {url:'same-request', status:200, bodyText:'', error:'SEARCH_NETWORK_ERROR'};
+    const goodRow = {id:'saved', date:'2026-09-05T01:00:00Z'};
+    const recovered = createSearchHarness([networkError, searchPage([goodRow], 'next'), networkError, searchPage([])]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', recovered.context);
+    assert.equal(recovered.getSavedState().completionReason, 'source_exhausted');
+    assert.equal(recovered.getSavedState().tweetCount, 1, 'a valid page resets the consecutive-failure budget');
+
+    const failed = createSearchHarness([searchPage([goodRow], 'next'), networkError, networkError, searchPage([])]);
+    failed.context.XPORTER_CONFIG.SEARCH_CAPTURE.maxConsecutiveFailures = 2;
+    failed.context.XPORTER_CONFIG.SEARCH_CAPTURE.retryDelayMs = 17;
+    const waits = [];
+    failed.context.__recordWait = duration => waits.push(duration);
+    vm.runInContext('swSleep=async duration=>__recordWait(duration)', failed.context);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', failed.context), /SEARCH_NETWORK_ERROR/);
+    assert.deepEqual(waits, [17], 'configured budget means one retry, not an unbounded loop');
+    assert.equal(failed.context.__pages.length, 1);
+    assert.equal(failed.getSavedState().tweetCount, 1);
+    assert.equal(failed.getSavedState().completionReason, null);
+
+    const stopped = createSearchHarness([networkError, searchPage([goodRow])]);
+    vm.runInContext('swSleep=async()=>{currentExport.running=false;}', stopped.context);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', stopped.context);
+    assert.equal(stopped.context.__pages.length, 1, 'Stop during retry must not request another page');
+    assert.equal(vm.runInContext('currentExport.completionReason', stopped.context), null);
+}
+
+async function testSearchCompletionRequiresExplicitTerminalEvidence() {
+    const cases = JSON.parse(source('scripts/fixtures/search-endings.synthetic.json'));
+    for (const fixture of cases) {
+        const payload = {url:'fixture', status:200, bodyText:JSON.stringify({data:{
+            search_by_raw_query:{search_timeline:{timeline:{instructions:fixture.instructions}}}
+        }})};
+        const harness = createSearchHarness([payload]);
+        if (fixture.exhausted) {
+            await vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context);
+            assert.equal(harness.getSavedState().completionReason, 'no_matches', fixture.name);
+        } else {
+            await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context),
+                new RegExp(fixture.error || 'SEARCH_END_UNCONFIRMED'), fixture.name);
+            assert.equal(vm.runInContext('currentExport.completionReason', harness.context), null, fixture.name);
+        }
+    }
+    const payload = searchPage([{id:'partial', date:'2026-09-05T01:00:00Z'}]);
+    const data = JSON.parse(payload.bodyText);
+    data.data.search_by_raw_query.search_timeline.timeline.instructions.pop();
+    payload.bodyText = JSON.stringify(data);
+    const harness = createSearchHarness([payload]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context), /SEARCH_END_UNCONFIRMED/);
+    assert.equal(harness.getSavedState().tweetCount, 1, 'ambiguous ending must preserve accepted rows');
+}
+
+async function testDelayedOverlayNeverReplaysAnOlderPhase() {
+    const harness = createWorkerHarness();
+    const timers = [];
+    const phases = [];
+    harness.context.setTimeout = fn => {timers.push(fn); return timers.length;};
+    harness.context.__phase = phase => phases.push(phase);
+    await vm.runInContext(`
+        currentExport={running:true,searchPhase:'loading'};
+        sendSearchCaptureStatus=async status=>__phase(status.phaseKey);
+        openSearchCaptureTab('(from:test)');
+    `, harness.context);
+    vm.runInContext("currentExport.searchPhase='collecting'", harness.context);
+    timers.shift()();
+    assert.deepEqual(phases, ['collecting']);
+    await vm.runInContext("openSearchCaptureTab('(from:test)')", harness.context);
+    vm.runInContext("lastTransientStatus={status:'cooldown'}", harness.context);
+    timers.shift()();
+    assert.deepEqual(phases, ['collecting'], 'initial overlay must not replace an active rate-limit countdown');
+
+    const retry = createWorkerHarness();
+    const retryTimers = [];
+    const messages = [];
+    retry.context.setTimeout = fn => {retryTimers.push(fn); return retryTimers.length;};
+    retry.context.chrome.tabs.sendMessage = async (_id, message) => {
+        messages.push(message.phase);
+        if (messages.length === 1) throw new Error('content not ready');
+        return {};
+    };
+    vm.runInContext(`
+        currentExport={running:true,username:'test',settings:{},tweetCount:0};
+        searchCapture={tabId:42};
+        getOverlayI18n=async()=>({searchLoading:'loading', searchWaiting:'waiting'});
+    `, retry.context);
+    const old = vm.runInContext("sendSearchCaptureStatus({phaseKey:'loading'}, 3)", retry.context);
+    for (let i=0; i<10 && !retryTimers.length; i++) await Promise.resolve();
+    assert.equal(retryTimers.length, 1);
+    await vm.runInContext("sendSearchCaptureStatus({phaseKey:'waiting'})", retry.context);
+    retryTimers.shift()();
+    assert.equal(await old, false);
+    assert.deepEqual(messages, ['loading','waiting'], 'failed older delivery must not retry after a new phase');
+}
+
 const tests = [
+    { name: "legacy date Resume is explicit and nondestructive", run: testLegacyDateResumeRequiresRestartWithoutChangingRows, order: 87 },
+    { name: "versioned date Resume preserves exact snapshot", run: testVersionedDateResumePreservesBoundsAndSnapshot, order: 88 },
+    { name: "search network retry budget and Stop", run: testSearchNetworkErrorsHaveBoundedCancellableRetries, order: 89 },
+    { name: "search endings require explicit evidence", run: testSearchCompletionRequiresExplicitTerminalEvidence, order: 90 },
+    { name: "overlay timers cannot replay stale phases", run: testDelayedOverlayNeverReplaysAnOlderPhase, order: 91 },
     { name: "search errors never become empty success", run: testSearchErrorsNeverBecomeEmptySuccess, order: 78 },
     { name: "today exact boundaries and snapshot", run: testSearchTodayIncludesExactBoundsAndFreezesNow, order: 79 },
     { name: "search silence never means date coverage", run: testSearchSilenceNeverUsesDateCoverage, order: 80 },

@@ -134,7 +134,7 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── test-all.js              # Canonical ordered 11-suite deterministic gate
-│   ├── test-extension-core.js   # 87-test aggregator; suites in test-extension-core/
+│   ├── test-extension-core.js   # 92-test aggregator; suites in test-extension-core/
 │   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
 │   │                            # bookmark lifecycle/API cancellation/capture/export policy
 │   ├── test-extension-smoke.mjs               # unpacked extension runtime smoke
@@ -157,6 +157,8 @@ xporter/
 ## 4. Critical Files — Detailed Reference
 
 ### 4.1. `utils/config.js` — Central Configuration
+
+`EXPORT_STATE_SCHEMA_VERSION = 1` identifies local-calendar date exports with a fixed launch cutoff. `SEARCH_CAPTURE` owns response waits/attempts, consecutive-failure and no-progress budgets, retry/rate-limit/recovery waits, and overlay delivery timers.
 All tunable parameters live here. **Never hardcode magic numbers elsewhere.**
 
 | Constant | Default | Purpose |
@@ -287,14 +289,16 @@ Direct GraphQL paging from the service worker.
 
 ### Posts + Date Range (special path)
 XPorter uses native X search rather than assuming profile timelines provide exhaustive, ordered history.
-1. Parse inclusive calendar dates in the browser timezone (including DST). Freeze the effective upper bound at launch via persisted `dateSnapshotAt`; Resume preserves that snapshot. A future-only interval returns `no_matches` without opening a tab.
+1. Parse inclusive calendar dates in the browser timezone (including DST). Freeze the effective upper bound at launch via persisted `dateSnapshotAt`; Resume preserves that snapshot. New states persist `schemaVersion: 1`. Unversioned/unsupported date states (including UTC-era 1.6.4) return `DATE_EXPORT_RESTART_REQUIRED` before any state/row mutation; status includes `resumeBlockedReason`, hides Resume and offers Download/New export. Old exports without dates retain their existing Resume path. A future-only interval returns `no_matches` without opening a tab.
 2. Build `(from:username) since:… until:…` with UTC guard days outside the exact interval. Open a **Latest X search tab** at `https://x.com/search?q=…&f=live`. Guard rows are discarded locally; neither crossing a boundary nor covering 95% proves completeness.
 3. `interceptor.js` captures native `SearchTimeline` responses. The worker checks tab ID, query identity and `product: Latest`; `content.js` scrolls and clicks X's Retry button. `XPORTER_SEARCH_PAGE_STATE` probes the MAIN-world hook through nonce-matched `__XPORTER_CAPTURE_PROBE__` / `__XPORTER_CAPTURE_READY__` messages. This probe diagnoses readiness; it is not authentication.
-4. `parseSearchTimelineResponse` rejects GraphQL errors, malformed JSON and unsupported/malformed instruction envelopes. HTTP 401/403 means authentication failure; only HTTP 429 means a rate limit. Other errors receive bounded retries. Network and oversized-response diagnostics carry an empty body, never an oversized payload.
+4. `parseSearchTimelineResponse` rejects GraphQL errors, malformed JSON and unsupported/malformed instruction envelopes. HTTP 401/403 means authentication failure; only HTTP 429 means a rate limit. HTTP, malformed-response and `SEARCH_NETWORK_ERROR` failures share the configured consecutive-failure budget (three failed responses, two retries by default); a valid page resets it and Stop cancels the wait. Oversized bodies remain terminal. Network and oversized-response diagnostics carry an empty body, never an oversized payload.
 5. Filter each parsed row by target identity, exact inclusive timestamps, selected post types and saved IDs. Commit every page before waiting or advancing a cursor. Date Resume replays search from the top and deduplicates against all saved IDs. Standard posts/user-list paths also flush before mutating their cursor, preserving the retry position on storage failure.
-6. Completion reasons: `limit_reached` for the selected quantity; `source_exhausted` when a valid response has no bottom cursor or explicitly terminates the bottom timeline; `no_matches` for a valid empty result. Silence with a cursor raises resumable `SEARCH_STALLED`, even after an empty page or 99% approximate coverage. Stop remains stopped. This describes what X returned, not proof that X indexed every historical post.
-7. Popup and overlay show loading, connecting, waiting, collecting and retrying phases. Date-depth progress is approximate, capped at 99% while running and display-only. Short localized errors distinguish unavailable/changed tabs, a missing capture bridge, absent responses, invalid/error responses, oversized bodies, network failures and stalled pagination. Saved partial rows remain downloadable via **Download N rows**; Resume opens a new search tab.
+6. Completion reasons: `limit_reached` for the selected quantity; `source_exhausted` only when a valid response explicitly terminates the bottom timeline (`TimelineTerminateTimeline`, `direction: Bottom`); `no_matches` for an explicitly terminated result with no accepted rows. A missing cursor without that marker raises resumable `SEARCH_END_UNCONFIRMED`. Alerts mixed with entries or termination are rejected, not treated as successful empty results. This is a conservative policy awaiting live protocol fixtures; a genuine final X page without the marker will also remain unconfirmed. Silence with a cursor raises resumable `SEARCH_STALLED`, even after an empty page or 99% approximate coverage. Stop remains stopped. This describes what X returned, not proof that X indexed every historical post.
+7. Popup and overlay show loading, connecting, waiting, collecting and retrying phases. Delayed overlay initialization uses the current phase, and newer status revisions invalidate old delivery retries. Date-depth progress is approximate, capped at 99% while running and display-only. Short localized errors distinguish unavailable/changed tabs, a missing capture bridge, absent responses, invalid/error responses, oversized bodies, network failures and stalled pagination. Saved partial rows remain downloadable via **Download N rows**; Resume opens a new search tab.
 8. **Keep the search tab open until the export finishes.** `dateRangeHelp` explains this, local timezone handling and today's launch-time cutoff. No first-run layout or download-success analytics redesign is included.
+
+Constructed regression examples live in `scripts/fixtures/search-endings.synthetic.json`; their provenance and the outstanding live-capture checklist are in `scripts/fixtures/README.md`. They are not real-X captures.
 
 ### Passive seen-post dataset
 `feed-parser.js` inspects only post-bearing GraphQL responses that X has already loaded in the page. It emits compact rows; `content.js` validates them before the SW writes them through `post-database.js`. Replies are excluded as rows, while `reply_count` is retained. IndexedDB uses the post ID as its primary key, so repeat sightings update latest metrics, `last_seen_at`, and `seen_count` without creating duplicates. The first metric snapshot is retained in `first_*` columns. No additional X requests are made, page URLs are not stored, and the oldest rows are trimmed above 50,000 unique posts. Settings exposes count, CSV/JSON download, and explicit clear.
@@ -408,7 +412,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 87-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 92-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
 
 Outside `CODEX_SANDBOX`, run `node scripts/test-extension-smoke.mjs` plus the footer, tooltip, XLSX-photo-options, and photo-permission browser checks. Every Playwright entrypoint invokes `tooling-policy.js` before loading Playwright. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports; CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 

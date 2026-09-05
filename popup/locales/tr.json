@@ -301,5 +301,7 @@
   "noMatchingPosts": "Bu dönemde eşleşen gönderi yok.",
   "partialSaved": "Kısmi sonuçlar kaydedildi.",
   "downloadRows": "{count} satırı indir",
-  "searchResumeHint": "Devam et yeni bir arama sekmesi açar."
+  "searchResumeHint": "Devam et yeni bir arama sekmesi açar.",
+  "errSearchEndUnconfirmed": "X, sonuçların sona erdiğini doğrulamadı.",
+  "errDateExportRestart": "Bu tarih aralığı dışa aktarımı eski veya desteklenmeyen bir biçim kullanıyor. Kaydedilen satırları indirin ve yeni bir dışa aktarım başlatın."
 }

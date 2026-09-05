@@ -301,5 +301,7 @@
   "noMatchingPosts": "Aucune publication correspondante sur cette période.",
   "partialSaved": "Résultats partiels enregistrés.",
   "downloadRows": "Télécharger {count} lignes",
-  "searchResumeHint": "Reprendre ouvre un nouvel onglet de recherche."
+  "searchResumeHint": "Reprendre ouvre un nouvel onglet de recherche.",
+  "errSearchEndUnconfirmed": "X n’a pas confirmé la fin des résultats.",
+  "errDateExportRestart": "Cet export par dates utilise un format ancien ou non pris en charge. Téléchargez les lignes enregistrées, puis lancez un nouvel export."
 }

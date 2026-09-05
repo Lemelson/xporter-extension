@@ -301,5 +301,7 @@
   "noMatchingPosts": "此期间没有符合条件的帖子。",
   "partialSaved": "已保存收集到的数据。",
   "downloadRows": "下载{count}行",
-  "searchResumeHint": "继续将打开新的搜索标签页。"
+  "searchResumeHint": "继续将打开新的搜索标签页。",
+  "errSearchEndUnconfirmed": "X 未确认搜索结果已结束。",
+  "errDateExportRestart": "此日期范围导出使用旧版或不支持的格式。请下载已保存的行，然后开始新的导出。"
 }

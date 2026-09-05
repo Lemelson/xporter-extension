@@ -301,5 +301,7 @@
   "noMatchingPosts": "Nessun post corrispondente in questo periodo.",
   "partialSaved": "Risultati parziali salvati.",
   "downloadRows": "Scarica {count} righe",
-  "searchResumeHint": "Riprendi apre una nuova scheda di ricerca."
+  "searchResumeHint": "Riprendi apre una nuova scheda di ricerca.",
+  "errSearchEndUnconfirmed": "X non ha confermato la fine dei risultati.",
+  "errDateExportRestart": "Questa esportazione per date usa un formato precedente o non supportato. Scarica le righe salvate e avvia una nuova esportazione."
 }

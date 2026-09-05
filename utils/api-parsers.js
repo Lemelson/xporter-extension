@@ -167,6 +167,11 @@
     if (!Array.isArray(timeline?.instructions)) {
       throw new Error('SEARCH_INVALID_RESPONSE');
     }
+    // Alerts may accompany entries. They never prove a successful search,
+    // even if a termination instruction or no bottom cursor accompanies them.
+    if (timeline.instructions.some(instruction => instruction?.type === 'TimelineShowAlert')) {
+      throw new Error('SEARCH_RESPONSE_ERROR');
+    }
     const known = new Set(['TimelineAddEntries', 'TimelineAddToModule', 'TimelinePinEntry',
       'TimelineReplaceEntry', 'TimelineTerminateTimeline', 'TimelineClearCache', 'TimelineShowAlert']);
     if (timeline.instructions.some(instruction => !instruction || !known.has(instruction.type))) {
@@ -188,7 +193,10 @@
     const result = parseTimelineByInstructions(timeline.instructions, 'search_timeline');
     const terminated = timeline.instructions.some(instruction =>
       instruction.type === 'TimelineTerminateTimeline' && instruction.direction === 'Bottom');
-    return { ...result, sourceExhausted: terminated || !result.nextCursor };
+    // Missing pagination metadata is ambiguous. Only an explicit bottom
+    // termination is accepted; other endings need captured live fixtures
+    // before a protocol-specific completion rule can safely be added.
+    return { ...result, sourceExhausted: terminated };
   }
 
   function parseBookmarksResponse(data) {
