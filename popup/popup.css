@@ -103,10 +103,6 @@ body.light .tab.active {
   background: rgba(10, 111, 219, 0.08);
 }
 
-body.light .input-group input {
-  color: var(--text-primary);
-}
-
 body.light .select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23536471' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
 }
@@ -198,35 +194,7 @@ body.light .tab:hover {
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
-/* Glass input group */
-.input-group {
-  background: var(--input-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-edge);
-  display: flex;
-  align-items: center;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
-}
-
-.input-group:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
-}
-
-/* Glass input group — light specific */
-body.light .input-group {
-  border: 1px solid rgba(0, 0, 0, 0.16);
-  box-shadow: var(--glass-inner-glow), 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-body.light .input-group:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
-}
-
-.bookmarks-account-card {
+.account-card {
   min-height: 58px;
   padding: 9px 11px;
   display: flex;
@@ -238,13 +206,29 @@ body.light .input-group:focus-within {
   box-shadow: var(--glass-edge), 0 8px 22px rgba(14, 38, 74, 0.16);
 }
 
-body.light .bookmarks-account-card {
+body.light .account-card {
   background: linear-gradient(135deg, rgba(39, 145, 220, 0.12), rgba(255, 255, 255, 0.68));
   border-color: rgba(18, 115, 186, 0.24);
   box-shadow: var(--glass-inner-glow), 0 4px 14px rgba(14, 38, 74, 0.10);
 }
 
-.bookmarks-account-avatar {
+.account-card--editable {
+  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out,
+    background-color 0.15s ease-out;
+}
+
+.account-card--editable:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
+}
+
+.account-card--editable.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent),
+    var(--glass-inner-glow);
+}
+
+.account-avatar {
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
@@ -254,27 +238,30 @@ body.light .bookmarks-account-card {
   border-radius: 50%;
   font-size: 19px;
   background: rgba(96, 184, 255, 0.14);
-  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.10);
+  outline: 1px solid oklch(1 0 0 / 0.10);
+  outline-offset: -1px;
 }
 
-body.light .bookmarks-account-avatar {
-  box-shadow: 0 0 0 1px oklch(0 0 0 / 0.10);
+body.light .account-avatar {
+  outline-color: oklch(0 0 0 / 0.10);
 }
 
-.bookmarks-account-avatar img {
+.account-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.bookmarks-account-copy {
+.account-copy {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.bookmarks-account-copy strong {
+.account-copy > strong,
+.account-name {
   overflow: hidden;
   color: var(--text-primary);
   font-size: 14px;
@@ -284,7 +271,7 @@ body.light .bookmarks-account-avatar {
   white-space: nowrap;
 }
 
-.bookmarks-account-meta {
+.account-meta {
   min-width: 0;
   display: flex;
   align-items: center;
@@ -297,16 +284,63 @@ body.light .bookmarks-account-avatar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
-.bookmarks-account-owner {
+.account-meta--input {
+  width: 100%;
+  gap: 3px;
+}
+
+.account-input-prefix {
   flex: 0 0 auto;
-  padding: 2px 6px;
-  border-radius: 999px;
-  color: var(--accent);
-  background: rgba(96, 184, 255, 0.12);
-  font-size: 10px;
+  color: var(--text-muted);
+  font-size: 14px;
   font-weight: 600;
+  user-select: none;
+}
+
+.account-meta--input input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.35;
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
+.account-meta--input input::placeholder {
+  color: var(--text-muted);
+}
+
+.account-owner-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #06223a;
+  background: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+body.light .account-owner-badge {
+  color: #fff;
+}
+
+.field-error {
+  margin-top: 5px;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 /* Glass select */
@@ -369,8 +403,9 @@ body.light .input-small {
   border-color: var(--accent);
 }
 
-/* Glass export status — info column on the left, a tall square contextual
-   action (Stop while running / Download when stopped) on the right. */
+/* Glass export status — status content first, compact contextual actions in a
+   separate row below it. Keeping the progress bar full-width makes the state
+   easier to scan and avoids a large square action dominating the card. */
 .export-status {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -384,88 +419,71 @@ body.light .input-small {
   /* Match the 8px rhythm of the .actions button stack below so the gap above
      the Resume row equals the gap between the buttons. */
   margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px; /* direction-agnostic spacing — works in LTR and RTL */
+  display: grid;
+  align-items: stretch;
+  gap: 12px;
 }
 
-/* Left column flexes to fill remaining width, so the progress bar no longer
-   stretches edge-to-edge and the status text has room before it wraps. */
 .status-info {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 
 .status-action-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
-/* Contextual action: a fixed compact square (icon over a short label), centered
-   beside the status — never stretches tall on long translations. */
-/* NOTE: must be `.btn.btn-square`, not `.btn-square` — the base `.btn` rule is
-   defined LATER in this file, so at equal specificity it was overriding the
-   font-size (15px) and padding (16px) here, which blew the label up and forced
-   it to wrap mid-word. The extra `.btn` class wins regardless of order. */
-.btn.btn-square {
-  flex-direction: column;
-  gap: 4px;
-  width: 78px;
-  height: 78px;
-  flex-shrink: 0;
-  padding: 8px 6px;
-  /* ~the size of the "Can be resumed" status line, bold — fits long labels
-     like "Остановить" on one line in the 78px square. */
+/* Stop is intentionally compact and aligned to the trailing edge. It remains
+   easy to reach without competing with the live export count and progress. */
+.status-action-stack.running-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.status-action-stack.txt-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.status-action-stack.txt-actions .btn-status-action {
+  gap: 5px;
+  padding-inline: 10px;
   font-size: 12px;
+}
+
+.btn.btn-status-action {
+  flex-direction: row;
+  gap: 7px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.2;
   border-radius: var(--radius-sm);
 }
 
-.btn.btn-square span {
-  text-align: center;
-  /* Constrain to the button so long single words (e.g. German "Herunterladen")
-     wrap instead of overflowing. Without min-width:0 the flex item's auto
-     minimum equals the whole word, so it can't shrink and spills out — CJK
-     wrapped only because its min-content is a single character. */
-  width: 100%;
+.status-action-stack.running-actions .btn-status-action {
+  width: auto;
+  min-width: 104px;
+  max-width: 100%;
+}
+
+.btn.btn-status-action span {
   min-width: 0;
+  text-align: center;
   overflow-wrap: break-word;
   hyphens: auto;
   -webkit-hyphens: auto;
 }
 
-.btn.btn-square svg {
-  width: 22px;
-  height: 22px;
+.btn.btn-status-action svg {
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-}
-
-/* TXT exposes two equal actions. They are shorter than the normal single
-   square, while min-height + a two-line label area keeps long translations
-   clear of the icon instead of clipping or shrinking unpredictably. */
-.status-action-stack.txt-actions .btn.btn-square {
-  width: 74px;
-  height: 64px;
-  min-height: 64px;
-  padding: 6px 5px;
-  gap: 3px;
-  font-size: 11px;
-}
-
-.status-action-stack.txt-actions .btn.btn-square span {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-
-.status-action-stack.txt-actions .btn.btn-square svg {
-  width: 19px;
-  height: 19px;
 }
 
 /* Glass buttons */
@@ -538,6 +556,68 @@ body.light .btn-primary:hover {
 .btn-copy:hover {
   background: linear-gradient(135deg, rgba(86, 182, 211, 0.96), rgba(54, 145, 184, 0.98));
   box-shadow: 0 6px 20px rgba(25, 100, 132, 0.40), var(--glass-edge);
+}
+
+/* Status actions use restrained horizontal treatments instead of warning-like
+   square tiles. Text and icons provide meaning in addition to color. */
+.btn-status-action.btn-danger {
+  background: rgba(244, 63, 78, 0.11);
+  border: 1px solid rgba(255, 126, 137, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #ff9ba4;
+}
+
+.btn-status-action.btn-danger:hover {
+  background: rgba(244, 63, 78, 0.19);
+  border-color: rgba(255, 142, 152, 0.68);
+  box-shadow: 0 0 0 3px rgba(244, 63, 78, 0.12);
+}
+
+.btn-status-action.btn-warning {
+  background: rgba(255, 209, 102, 0.12);
+  border: 1px solid rgba(255, 209, 102, 0.38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #ffe19b;
+}
+
+.btn-status-action.btn-warning:hover {
+  background: rgba(255, 209, 102, 0.2);
+  border-color: rgba(255, 218, 128, 0.65);
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.11);
+}
+
+.btn-status-action.btn-copy {
+  background: rgba(87, 191, 231, 0.11);
+  border: 1px solid rgba(125, 211, 242, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #b9ecff;
+}
+
+.btn-status-action.btn-copy:hover {
+  background: rgba(87, 191, 231, 0.19);
+  border-color: rgba(145, 222, 249, 0.58);
+  box-shadow: 0 0 0 3px rgba(87, 191, 231, 0.1);
+}
+
+body.light .btn-status-action.btn-danger {
+  background: rgba(190, 24, 42, 0.07);
+  border-color: rgba(190, 24, 42, 0.28);
+  box-shadow: none;
+  color: #a8172d;
+}
+
+body.light .btn-status-action.btn-warning {
+  background: rgba(255, 196, 61, 0.16);
+  border-color: rgba(157, 105, 0, 0.3);
+  box-shadow: none;
+  color: #674500;
+}
+
+body.light .btn-status-action.btn-copy {
+  background: rgba(10, 111, 173, 0.08);
+  border-color: rgba(10, 111, 173, 0.25);
+  box-shadow: none;
+  color: #075d91;
 }
 
 .btn-secondary {
@@ -643,7 +723,7 @@ body.light .input-resume {
    Hover: accent glow ring + a slight lighten, but NO lift — they're fields,
    not buttons. body.light copies are required for specificity (the light base
    rules would otherwise cancel the hover). */
-.input-group:hover,
+.account-card--editable:hover,
 .input-small:hover,
 .input-resume:hover,
 .date-row input[type="date"]:hover {
@@ -652,7 +732,7 @@ body.light .input-resume {
   background-color: rgba(255, 255, 255, 0.14);
 }
 
-body.light .input-group:hover,
+body.light .account-card--editable:hover,
 body.light .input-small:hover,
 body.light .input-resume:hover,
 body.light .date-row input[type="date"]:hover {
@@ -676,6 +756,33 @@ body.light .date-row input[type="date"]:hover {
 .btn-resume {
   flex: 1;
   padding: 10px 16px;
+}
+
+.resume-play-icon {
+  width: 18px;
+  height: 18px;
+  transform-origin: 48% 50%;
+}
+
+/* A saved stopped export is an occasional, actionable state. Let only the
+   play glyph breathe so the native Resume button remains stable and readable. */
+@media (prefers-reduced-motion: no-preference) {
+  .resume-row.is-stopped .resume-play-icon {
+    animation: resumePlayBreathe 2.6s cubic-bezier(0.2, 0, 0, 1) infinite;
+  }
+}
+
+@keyframes resumePlayBreathe {
+  0%,
+  100% {
+    opacity: 0.82;
+    transform: translateX(0) scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateX(1px) scale(1.08);
+  }
 }
 
 /* Glass progress bar */
@@ -816,6 +923,24 @@ body.light .progress-bar {
   background-size: 31px 31px;
   box-shadow: 0 0 12px rgba(88, 224, 210, 0.48);
   animation: safetyBreakStripe 2.2s linear infinite;
+}
+
+/* Stopped by the user: a static violet/slate fill. It preserves measured
+   progress without borrowing the moving stripes used for X or safety waits. */
+.progress-fill.stopped {
+  background: linear-gradient(90deg, #56627d 0%, #8b7fd1 58%, #b8aef0 100%);
+  background-size: 100% 100%;
+  box-shadow: 0 0 10px rgba(184, 174, 240, 0.34);
+  animation: none;
+}
+
+.progress-fill.stopped::after {
+  display: none;
+}
+
+body.light .progress-fill.stopped {
+  background: linear-gradient(90deg, #59647a 0%, #7767c2 58%, #907fd4 100%);
+  box-shadow: 0 0 8px rgba(91, 72, 174, 0.24);
 }
 
 @keyframes rateLimitStripe {
@@ -1848,6 +1973,122 @@ body.light .post-choice input:checked + .post-choice-check::after {
   line-height: 1.35;
 }
 
+.post-type-choice {
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  gap: 10px;
+  min-height: 54px;
+  padding-block: 8px;
+  padding-inline: 10px;
+}
+
+.post-type-choice:has(input:checked) {
+  border-color: rgba(111, 191, 255, 0.14);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.post-type-choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+body.light .post-type-choice:has(input:checked) {
+  border-color: rgba(36, 113, 177, 0.16);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.post-type-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border: 0;
+  background: transparent;
+  opacity: 0.78;
+}
+
+.post-type-icon svg {
+  display: block;
+  inline-size: 28px;
+  block-size: 28px;
+}
+
+.post-type-icon--original {
+  color: #62b9ff;
+}
+
+.post-type-icon--quote {
+  color: #c69aff;
+}
+
+.post-type-icon--reply {
+  color: #54d8e1;
+}
+
+.post-type-icon--repost {
+  color: #68e2a1;
+}
+
+.post-type-icon--article {
+  color: #ffb75e;
+}
+
+body.light .post-type-icon--original {
+  color: #147ac1;
+}
+
+body.light .post-type-icon--quote {
+  color: #7c3aed;
+}
+
+body.light .post-type-icon--reply {
+  color: #0f8f9b;
+}
+
+body.light .post-type-icon--repost {
+  color: #18864b;
+}
+
+body.light .post-type-icon--article {
+  color: #b85800;
+}
+
+.post-type-choice input:checked ~ .post-type-icon {
+  opacity: 1;
+}
+
+.post-type-choice input:not(:checked) ~ .post-choice-copy,
+.post-type-choice input:not(:checked) ~ .post-choice-check {
+  opacity: 0.68;
+}
+
+.post-type-choice input:checked ~ .post-choice-check {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.post-type-choice input:checked ~ .post-choice-check::after {
+  content: "";
+  inline-size: 8px;
+  block-size: 4px;
+  border-inline-start: 2px solid #08223a;
+  border-block-end: 2px solid #08223a;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+body.light .post-type-choice input:checked ~ .post-choice-check::after {
+  border-color: #ffffff;
+}
+
+[dir="rtl"] .post-type-choice input:checked ~ .post-choice-check::after {
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.post-type-choice input:focus-visible ~ .post-choice-check {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
 .post-selection-note,
 .post-selection-error {
   margin: 9px 1px 0;
@@ -1887,15 +2128,122 @@ body.light .post-selection-error {
 }
 
 .xlsx-photo-choice {
-  min-height: 44px;
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  gap: 9px;
+  min-height: 60px;
+  padding-block: 9px;
+}
+
+.xlsx-photo-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border: 0;
+  background: transparent;
+  opacity: 0.78;
+}
+
+.xlsx-photo-icon svg {
+  display: block;
+  inline-size: 28px;
+  block-size: 28px;
+}
+
+.xlsx-photo-icon--links {
+  color: #57c9ff;
+}
+
+.xlsx-photo-icon--embed {
+  color: #cf8dff;
+}
+
+body.light .xlsx-photo-icon--links {
+  color: #087aa9;
+}
+
+body.light .xlsx-photo-icon--embed {
+  color: #7d31b3;
+}
+
+.xlsx-photo-choice input:checked ~ .xlsx-photo-icon {
+  opacity: 1;
+}
+
+.xlsx-photo-choice input:not(:checked) ~ .post-choice-copy,
+.xlsx-photo-choice input:not(:checked) ~ .post-choice-check {
+  opacity: 0.7;
+}
+
+.xlsx-photo-choice--recommended {
+  border-color: rgba(255, 212, 90, 0.28);
+  background: rgba(255, 212, 90, 0.075);
+  box-shadow: inset 0 0 0 1px rgba(255, 212, 90, 0.08),
+    0 3px 12px rgba(255, 196, 61, 0.07);
+}
+
+.xlsx-photo-choice--recommended:hover {
+  border-color: rgba(255, 212, 90, 0.48);
+  background: rgba(255, 212, 90, 0.12);
+}
+
+body.light .xlsx-photo-choice--recommended {
+  border-color: rgba(180, 112, 0, 0.28);
+  background: rgba(255, 188, 46, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(180, 112, 0, 0.06),
+    0 3px 12px rgba(125, 78, 0, 0.07);
+}
+
+body.light .xlsx-photo-choice--recommended:hover {
+  border-color: rgba(160, 96, 0, 0.42);
+  background: rgba(255, 188, 46, 0.16);
+}
+
+.xlsx-photo-choice-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.post-choice-copy .xlsx-photo-recommended-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: #24324a;
+  background: #ffd45a;
+  box-shadow: 0 2px 8px rgba(255, 212, 90, 0.24);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.015em;
+}
+
+body.light .post-choice-copy .xlsx-photo-recommended-badge {
+  color: #24324a;
+  background: #ffd45a;
+  box-shadow: 0 2px 7px rgba(125, 72, 0, 0.18);
 }
 
 .xlsx-photo-choice .post-choice-check {
   border-radius: 50%;
 }
 
-.xlsx-photo-choice input:checked + .post-choice-check::after,
-body.light .xlsx-photo-choice input:checked + .post-choice-check::after {
+.xlsx-photo-choice input:checked ~ .post-choice-check {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.xlsx-photo-choice input:checked ~ .post-choice-check::after,
+body.light .xlsx-photo-choice input:checked ~ .post-choice-check::after {
+  content: "";
   inline-size: 6px;
   block-size: 6px;
   border: 0;
@@ -1904,12 +2252,17 @@ body.light .xlsx-photo-choice input:checked + .post-choice-check::after {
   transform: none;
 }
 
-body.light .xlsx-photo-choice input:checked + .post-choice-check::after {
+body.light .xlsx-photo-choice input:checked ~ .post-choice-check::after {
   background: #ffffff;
 }
 
-[dir="rtl"] .xlsx-photo-choice input:checked + .post-choice-check::after {
+[dir="rtl"] .xlsx-photo-choice input:checked ~ .post-choice-check::after {
   transform: none;
+}
+
+.xlsx-photo-choice input:focus-visible ~ .post-choice-check {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
 }
 
 /* Quantity, Posts/Bookmarks, and User Lists are separate linear sections.
@@ -2148,30 +2501,6 @@ body.light .photo-permission-icon {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-/* Input prefix */
-.input-prefix {
-  padding: 10px 0 10px 12px;
-  color: var(--text-muted);
-  font-weight: 600;
-  font-size: 15px;
-  user-select: none;
-}
-
-.input-group input {
-  flex: 1;
-  padding: 10px 12px 10px 4px;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 15px;
-  outline: none;
-  font-family: inherit;
-}
-
-.input-group input::placeholder {
-  color: var(--text-muted);
 }
 
 /* Toggle Switch */
@@ -2511,6 +2840,35 @@ body.light .safety-break-rows {
   color: #58e0d2;
 }
 
+.export-status.phase-stopped {
+  border-color: rgba(184, 174, 240, 0.54);
+  box-shadow:
+    0 0 0 1px rgba(139, 127, 209, 0.14),
+    0 8px 24px rgba(16, 12, 45, 0.22),
+    var(--glass-edge);
+}
+
+.stopped-state-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: #b8aef0;
+  filter: drop-shadow(0 0 5px rgba(184, 174, 240, 0.38));
+}
+
+body.light .export-status.phase-stopped {
+  border-color: rgba(91, 72, 174, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(91, 72, 174, 0.08),
+    0 6px 18px rgba(42, 31, 92, 0.13),
+    var(--glass-edge);
+}
+
+body.light .stopped-state-icon {
+  color: #5b48ae;
+  filter: drop-shadow(0 0 4px rgba(91, 72, 174, 0.24));
+}
+
 body.light .export-status.phase-rate-limit .status-phase-icon {
   color: #243451;
 }
@@ -2566,6 +2924,33 @@ body.light .export-status.phase-safety-break .status-phase-icon {
 .status-red {
   background: var(--danger);
   box-shadow: 0 0 6px rgba(244, 33, 46, 0.5);
+}
+
+/* Official Tabler player-play makes the saved/resumable affordance explicit.
+   The adjacent localized text still carries the meaning without relying on color. */
+.status-resumable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  box-shadow: none;
+  color: #b8aef0;
+}
+
+.resumable-state-icon {
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(0 0 5px rgba(184, 174, 240, 0.32));
+}
+
+body.light .status-resumable {
+  color: #5b48ae;
+}
+
+body.light .resumable-state-icon {
+  filter: drop-shadow(0 0 4px rgba(91, 72, 174, 0.22));
 }
 
 /* While the export is actively running (fetching or cooling down), the status

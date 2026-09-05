@@ -374,6 +374,13 @@
       article_url: article.url,
       article_text: article.text
     };
+    // Stable identity is needed while filtering combined profile timelines:
+    // their conversation context may omit display fields for foreign authors.
+    // Keep it non-enumerable so it never becomes a user-facing export column.
+    Object.defineProperty(parsed, '_author_id', {
+      enumerable: false,
+      value: tweetUser?.rest_id ? String(tweetUser.rest_id) : ''
+    });
     Object.defineProperty(parsed, '_context_metric_presence', {
       enumerable: false,
       value: {

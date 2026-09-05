@@ -60,6 +60,15 @@
             settings.includeQuotes === true ||
             settings.includeRetweets === true ||
             settings.includeArticles === true;
+        // The legacy combined endpoint is still the only one-pass profile
+        // timeline that contains both the author's ordinary posts and replies
+        // to other accounts. Reuse it for every mixed selection, then apply the
+        // five explicit type filters locally. Running Posts/All and Replies as
+        // two full pagination passes roughly doubles the request surface and
+        // regressed the stable pre-1.6.1 export path.
+        if (needsNonReplyFeed && settings.includeReplies === true) {
+            return ['legacy_with_replies'];
+        }
         if (needsNonReplyFeed) {
             plan.push(settings.includeRetweets === true ? 'all' : 'posts');
         }

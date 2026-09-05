@@ -47,7 +47,7 @@ class RateLimitManager {
         this.listeners = [];
         this._aborted = false;
         this._abortController = null;
-        this.lastRequestAt = null; // wall-clock of the last successful request
+        this.lastRequestAt = null; // wall-clock of the last logical request attempt
         this.waitUntil = null;     // epoch ms the current _wait() ends (UI countdown)
     }
 
@@ -257,6 +257,12 @@ class RateLimitManager {
             + Math.floor(Math.random() * (this.fallbackMaxDelay - this.fallbackMinDelay + 1));
     }
 
+    _recordRequestAttempt() {
+        this.requestCount++;
+        this.totalRequests++;
+        this.lastRequestAt = Date.now();
+    }
+
     /**
      * Execute a request with rate limiting
      */
@@ -317,16 +323,17 @@ class RateLimitManager {
                 });
 
                 const result = await requestFn();
-                this.requestCount++;
-                this.totalRequests++;
-                this.lastRequestAt = Date.now();
+                this._recordRequestAttempt();
                 return result;
 
             } catch (error) {
                 lastError = error;
 
                 if (error.message === 'RATE_LIMITED') {
-                    if (attempt >= this.maxRetries) break;
+                    if (attempt >= this.maxRetries) {
+                        this._recordRequestAttempt();
+                        break;
+                    }
                     const waitTime = this.rateLimitPause;
                     retryReason = 'RATE_LIMITED';
                     this._emitStatus('rate_limited', {
@@ -350,8 +357,14 @@ class RateLimitManager {
                     // freshly-discovered, and fallback candidate. Re-running
                     // that complete recovery cycle here only repeats the same
                     // requests and adds 10+20+30+40+50 seconds of dead time.
-                    if (error.staleCandidatesExhausted === true) throw error;
-                    if (attempt >= this.maxRetries) break;
+                    if (error.staleCandidatesExhausted === true) {
+                        this._recordRequestAttempt();
+                        throw error;
+                    }
+                    if (attempt >= this.maxRetries) {
+                        this._recordRequestAttempt();
+                        break;
+                    }
                     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
                     const waitTime = (C.STALE_RETRY_BASE_WAIT || 10000) * (attempt + 1);
                     retryReason = 'STALE_QUERY_ID';
@@ -367,7 +380,10 @@ class RateLimitManager {
                 // Network errors — retry (NETWORK_TIMEOUT = a fetch that hit
                 // its deadline in api.js; same recovery path as any drop)
                 if (error.message === 'NETWORK_TIMEOUT' || error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
-                    if (attempt >= this.maxRetries) break;
+                    if (attempt >= this.maxRetries) {
+                        this._recordRequestAttempt();
+                        break;
+                    }
                     const waitTime = this.rateLimitPause;
                     retryReason = 'NETWORK_ERROR';
                     this._emitStatus('error', {
@@ -380,6 +396,10 @@ class RateLimitManager {
                 }
 
                 // Non-retryable errors
+                // A terminal logical request still consumed X's request
+                // surface. Recording it makes the next endpoint/page honor
+                // the selected pace without renumbering in-flight retries.
+                this._recordRequestAttempt();
                 throw error;
             }
         }

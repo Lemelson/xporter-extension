@@ -142,6 +142,12 @@ assert(
 );
 assertFile('docs/vendor/x-client-transaction-id.LICENSE', 'transaction generator attribution');
 assertFile('THIRD_PARTY_NOTICES', 'shipped third-party attribution');
+const thirdPartyNotices = fs.readFileSync(path.join(ROOT, 'THIRD_PARTY_NOTICES'), 'utf8');
+assert.match(
+    thirdPartyNotices,
+    /Tabler Icons:[\s\S]*MIT License[\s\S]*Copyright \(c\) 2020-2026 Paweł Kuna/,
+    'the shipped attribution must include the official Tabler Icons MIT notice'
+);
 
 const popupFile = manifest.action.default_popup;
 const popupHtml = read(popupFile);
@@ -243,6 +249,41 @@ assert.deepEqual(
     ['posts', 'followers', 'following', 'verified_followers', 'bookmarks'],
     'modes must include the restored viewer-owned Bookmarks export'
 );
+const usernameFieldHtml = /<div class=["']field["'] id=["']usernameField["']>([\s\S]*?)<\/div>\s*<\/div>/
+    .exec(popupHtml)?.[0] || '';
+assert.match(
+    usernameFieldHtml,
+    /class=["'][^"']*\baccount-card\b[^"']*["'][^>]*id=["']targetAccountCard["']/,
+    'profile exports must keep the editable username inside the shared account card'
+);
+assert.match(
+    usernameFieldHtml,
+    /<img[^>]*id=["']targetAccountAvatar["'][^>]*alt=["']["']/,
+    'the target account card must expose a decorative avatar'
+);
+assert.match(
+    usernameFieldHtml,
+    /<input[^>]*id=["']usernameInput["']/,
+    'the target account card must preserve the native editable username input'
+);
+assert.doesNotMatch(
+    usernameFieldHtml,
+    /data-i18n=["']yourAccount["']/,
+    'profile exports must not label the target profile as the signed-in account'
+);
+const bookmarksAccountHtml =
+    /<div class=["']field hidden["'] id=["']bookmarksAccountField["']>([\s\S]*?)<\/div>\s*<\/div>/
+        .exec(popupHtml)?.[0] || '';
+assert.match(
+    bookmarksAccountHtml,
+    /class=["'][^"']*\baccount-card\b[^"']*["'][^>]*id=["']bookmarksAccountCard["'][^>]*role=["']group["']/,
+    'Bookmarks must use the same static account-card semantics without a live-region role'
+);
+assert.match(
+    bookmarksAccountHtml,
+    /class=["'][^"']*\baccount-owner-badge\b[^"']*["'][^>]*data-i18n=["']yourAccount["']/,
+    'only Bookmarks must show the localized owner badge'
+);
 assert.doesNotMatch(popupHtml, /id=["']profileFeed["']/,
     'the ambiguous profile-feed selector must not remain in the popup');
 for (const postTypeControl of [
@@ -262,6 +303,67 @@ const postSelectionIndex = popupHtml.indexOf('id="postSelectionPanel"');
 const outputFormatIndex = popupHtml.indexOf('id="outputFormat"');
 assert(postSelectionIndex >= 0 && postSelectionIndex < outputFormatIndex,
     'post-type choices must appear on Home before Output Format');
+const tablerPostTypeIcons = {
+    original: {
+        name: 'pencil',
+        paths: [
+            'M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4',
+            'M13.5 6.5l4 4'
+        ]
+    },
+    quote: {
+        name: 'quote',
+        paths: [
+            'M10 11h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v6c0 2.667 -1.333 4.333 -4 5',
+            'M19 11h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h3a1 1 0 0 1 1 1v6c0 2.667 -1.333 4.333 -4 5'
+        ]
+    },
+    reply: {
+        name: 'message-reply',
+        paths: [
+            'M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12',
+            'M11 8l-3 3l3 3',
+            'M16 11h-8'
+        ]
+    },
+    repost: {
+        name: 'repeat',
+        paths: [
+            'M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3',
+            'M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3'
+        ]
+    },
+    article: {
+        name: 'article',
+        paths: [
+            'M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -12',
+            'M7 8h10',
+            'M7 12h10',
+            'M7 16h10'
+        ]
+    }
+};
+for (const [type, tablerIcon] of Object.entries(tablerPostTypeIcons)) {
+    const iconBlock = new RegExp(
+        `<span[^>]*data-post-type-icon=["']${type}["'][^>]*>[\\s\\S]*?<\\/span>`
+    ).exec(popupHtml)?.[0] || '';
+    assert.match(
+        iconBlock,
+        new RegExp(`data-tabler-icon=["']${tablerIcon.name}["']`),
+        `post selection must identify the official Tabler ${tablerIcon.name} icon for ${type}`
+    );
+    assert.match(
+        iconBlock,
+        /<svg\b[^>]*\bviewBox=["']0 0 24 24["'][^>]*\bstroke-width=["']2["']/,
+        `post selection must expose a large inline SVG icon for ${type}`
+    );
+    for (const pathData of tablerIcon.paths) {
+        assert(
+            iconBlock.includes(`<path d="${pathData}" />`),
+            `post selection ${type} must preserve the official Tabler ${tablerIcon.name} path`
+        );
+    }
+}
 for (const id of ['xlsxPhotoOptions', 'xlsxPhotoLinks', 'xlsxPhotoEmbed']) {
     assert.match(
         popupHtml,
@@ -269,6 +371,33 @@ for (const id of ['xlsxPhotoOptions', 'xlsxPhotoLinks', 'xlsxPhotoEmbed']) {
         `XLSX photo choices must expose ${id}`
     );
 }
+for (const type of ['links', 'embed']) {
+    assert.match(
+        popupHtml,
+        new RegExp(`data-xlsx-photo-icon=["']${type}["'][^>]*>[\\s\\S]*?<svg\\b`),
+        `XLSX photo choice ${type} must expose a large inline SVG icon`
+    );
+}
+assert.match(
+    popupHtml,
+    /Tabler Icons \(MIT\): link, photo — https:\/\/github\.com\/tabler\/tabler-icons\/tree\/main\/icons\/outline/,
+    'XLSX photo icons must identify their official Tabler Icons source'
+);
+assert.match(
+    popupHtml,
+    /data-xlsx-photo-icon=["']links["'][\s\S]*?<svg[^>]*viewBox=["']0 0 24 24["'][^>]*stroke-width=["']2["'][\s\S]*?<path d=["']M9 15l6 -6["'] \/>[\s\S]*?<path d=["']M11 6l\.463 -\.536a5 5 0 0 1 7\.071 7\.072l-\.534 \.464["'] \/>[\s\S]*?<path d=["']M13 18l-\.397 \.534a5\.068 5\.068 0 0 1 -7\.127 0a4\.972 4\.972 0 0 1 0 -7\.071l\.524 -\.463["'] \/>/,
+    'links mode must use the exact official Tabler Link outline paths'
+);
+assert.match(
+    popupHtml,
+    /data-xlsx-photo-icon=["']embed["'][\s\S]*?<svg[^>]*viewBox=["']0 0 24 24["'][^>]*stroke-width=["']2["'][\s\S]*?<path d=["']M15 8h\.01["'] \/>[\s\S]*?<path d=["']M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12["'] \/>[\s\S]*?<path d=["']M3 16l5 -5c\.928 -\.893 2\.072 -\.893 3 0l5 5["'] \/>[\s\S]*?<path d=["']M14 14l1 -1c\.928 -\.893 2\.072 -\.893 3 0l3 3["'] \/>/,
+    'embed mode must use the exact official Tabler Photo outline paths'
+);
+assert.match(
+    popupHtml,
+    /class=["'][^"']*xlsx-photo-recommended-badge[^"']*["'][^>]*data-i18n=["']xlsxPhotoRecommended["']/,
+    'the links-only XLSX choice must expose a localized Recommended badge'
+);
 assert.match(
     popupHtml,
     /id=["']xlsxPhotoOptions["'][^>]*\brole=["']radiogroup["']/,
@@ -316,8 +445,15 @@ assert.match(updateEntries[1], /data-i18n=["']updateReleased["']/,
     'the previous public version must be labelled Released');
 assert.match(
     updateEntries[1],
+    /<span class="update-meta-version">v1\.6\.1<\/span>/,
+    'the most recent public release must be v1.6.1'
+);
+assert.match(updateEntries[2], /data-i18n=["']updateReleased["']/,
+    'the older public version must be labelled Released');
+assert.match(
+    updateEntries[2],
     /<span class="update-meta-version">v1\.5\.8<\/span>/,
-    'the previous public release must be v1.5.8'
+    'the older public release must be v1.5.8'
 );
 const currentBuildDate = /<time data-release-date datetime="([^"]+)"/.exec(updateEntries[0])?.[1];
 const footerBuildDate = /footer-build-date">([^<]+)</.exec(popupHtml)?.[1];
@@ -419,6 +555,26 @@ assert.match(read('popup/theme-init.js'), /theme === ['"]light['"]/,
     'the early theme bootstrap must only opt into light when explicitly saved');
 assert.match(read('utils/storage.js'), /theme:\s*['"]dark['"]/,
     'new settings must default to dark');
+assert.doesNotMatch(
+    popupHtml,
+    /\bbtn-square\b/,
+    'export actions must not regress to fixed square tiles'
+);
+assert.match(
+    popupHtml,
+    /id=["']statusActionStack["'][\s\S]*id=["']stopBtn["'][\s\S]*id=["']downloadBtn["'][\s\S]*id=["']copyBtn["']/,
+    'Stop, Download, and Copy must share the status action row'
+);
+assert.match(
+    read('popup/popup.css'),
+    /\.export-status\s*\{[\s\S]*display:\s*grid[\s\S]*\.status-action-stack\.running-actions\s*\{[\s\S]*justify-content:\s*flex-end[\s\S]*\.status-action-stack\.txt-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)[\s\S]*\.btn\.btn-status-action\s*\{[\s\S]*min-height:\s*44px/,
+    'status actions must use compact responsive rows for running, terminal, and TXT states'
+);
+assert.match(
+    read('popup/popup.js'),
+    /statusActionStack\.classList\.toggle\(['"]running-actions['"],\s*isRunning\)/,
+    'running status must activate the compact trailing Stop layout'
+);
 for (const key of ['postSafetyBreakEnabled', 'userSafetyBreakEnabled']) {
     assert.match(
         read('utils/storage.js'),
@@ -435,6 +591,51 @@ assert.match(read('popup/popup.css'), /\.progress-fill\.rate-limit[\s\S]*repeati
     'X rate limits must have a distinct striped progress treatment');
 assert.match(read('popup/popup.css'), /\.progress-fill\.safety-break[\s\S]*repeating-linear-gradient/,
     'scheduled breaks must have a distinct progress treatment');
+assert.match(
+    read('popup/popup.css'),
+    /\.progress-fill\.stopped\s*\{[\s\S]*animation:\s*none/,
+    'a user-stopped export must have its own static progress treatment'
+);
+assert.match(
+    read('popup/popup.css'),
+    /\.progress-fill\.stopped::after\s*\{[\s\S]*display:\s*none/,
+    'the stopped progress bar must not keep the active-export shine animation'
+);
+assert.match(
+    read('popup/popup.css'),
+    /@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{[\s\S]*\.resume-row\.is-stopped[\s\S]*\.resume-play-icon[\s\S]*animation:/,
+    'the stopped Resume cue may breathe only when motion is allowed'
+);
+assert.match(
+    read('popup/popup.js'),
+    /case\s+['"]stopped['"]:[\s\S]*classList\.add\(['"]phase-stopped['"]\)[\s\S]*classList\.add\(['"]stopped['"]\)/,
+    'the stopped state must explicitly apply its own card and progress phases'
+);
+assert.match(
+    read('popup/popup.js'),
+    /case\s+['"]stopped['"]:[\s\S]*setDotColor\(['"]resumable['"]\)/,
+    'the stopped state must replace the generic yellow dot with a resumable cue'
+);
+assert.match(
+    read('popup/theme.js'),
+    /playerStop:\s*['"][\s\S]*?<path d=["']M5 7a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -10["']/,
+    'the stopped title must use the official Tabler player-stop path'
+);
+assert.match(
+    read('popup/theme.js'),
+    /playerPlay:\s*['"][\s\S]*?<path d=["']M7 4v16l13 -8l-13 -8["']/,
+    'the resumable cue must use the official Tabler player-play path'
+);
+assert.match(
+    popupHtml,
+    /class=["'][^"']*resume-play-icon[^"']*["'][\s\S]*?<path d=["']M7 4v16l13 -8l-13 -8["']/,
+    'the Resume button must use the official Tabler player-play path'
+);
+assert.doesNotMatch(
+    read('popup/popup.css'),
+    /\.status-resumable::after/,
+    'the resumable cue must not use a hand-drawn CSS arrow'
+);
 assert.match(read('popup/popup.js'), /state\.kind\s*===\s*['"]batch['"][\s\S]*setStatusPhase\(['"]safety-break['"]\)/,
     'batch cooldowns must render as the user-configured Scheduled break, not as an X rate limit');
 assert.match(read('popup/popup.js'), /case\s+['"]rate_limited['"]:[\s\S]*setStatusPhase\(['"]rate-limit['"]\)/,
@@ -766,11 +967,19 @@ for (const match of JSON.stringify(manifest).matchAll(/__MSG_([^_][A-Za-z0-9_]*)
 
 const workerCases = new Set([...workerSource.matchAll(/case\s+['"]([A-Z][A-Z0-9_]*)['"]/g)]
     .map((match) => match[1]));
-const senderSource = popupRuntime + '\n' + read('content/content.js');
+const contentSource = read('content/content.js');
+const contentCases = new Set(
+    [...contentSource.matchAll(/message\?\.type\s*===\s*['"]([A-Z][A-Z0-9_]*)['"]/g)]
+        .map((match) => match[1])
+);
+const senderSource = popupRuntime + '\n' + contentSource;
 const sentToWorker = new Set([...senderSource.matchAll(/type\s*:\s*['"]([A-Z][A-Z0-9_]*)['"]/g)]
     .map((match) => match[1]));
 for (const type of sentToWorker) {
-    assert(workerCases.has(type), `runtime message has no service-worker handler: ${type}`);
+    assert(
+        workerCases.has(type) || contentCases.has(type),
+        `runtime message has no service-worker/content handler: ${type}`
+    );
 }
 
 const workerEmits = new Set([...workerSource.matchAll(/type\s*:\s*['"]([A-Z][A-Z0-9_]*)['"]/g)]

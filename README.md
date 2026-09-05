@@ -24,10 +24,10 @@
 
 ## Release status
 
-This repository still reports version `1.6.1`. The current code combines the
-1.6.1 release baseline with additional local reliability and interface work.
-It is not a new Chrome Web Store release: do not upload it without a separate
-version and release decision.
+This repository reports version `1.6.4`. This local release candidate combines
+the 1.6.1 release baseline with additional reliability and interface work,
+including one-pass mixed post exports. It has not been uploaded to the Chrome
+Web Store; publishing remains a separate release decision.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. When you first select **Embed photo previews**,
@@ -176,10 +176,11 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 |---|---|---|
 | Original posts | On | Export standalone posts written by the profile |
 | Quotes | On | Export posts that add the author's comment above another post |
-| Replies | On | Export the author's replies, including replies to other accounts; mixed selections combine X's Posts/All and Replies feeds without duplicate rows |
+| Replies | On | Export the author's replies, including replies to other accounts; mixed selections use X's combined posts-and-replies feed and keep only the selected row types |
 | Reposts | On | Export posts reshared without an added comment |
 | Articles | On | Export X long-form Articles and the text X returns |
-| Photos in Excel — Posts / Bookmarks | Keep links / Keep links | Store each mode independently: keep source URLs only, or add bounded previews to a separate Media sheet |
+| Photos in Excel — Posts / Bookmarks | Keep links / Keep links | Store each mode independently: the recommended Links choice keeps source URLs only, while the other choice adds bounded previews to a separate Media sheet |
+| Selection UI | — | Post types, XLSX photo modes, and stopped/resumable states use official Tabler outline SVGs while keeping native keyboard-accessible controls |
 | Export mode | Posts | Data type to export: posts, personal bookmarks, followers, following, or verified followers |
 | Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for post-shaped exports |
 | Quantity limit | 500 | Maximum posts or users per export (0 = unlimited); changing it retargets an ordinary active export |

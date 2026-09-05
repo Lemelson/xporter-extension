@@ -41,6 +41,36 @@ function sendUsername(username) {
     }
 }
 
+function sanitizeAccountAvatarUrl(rawAvatar) {
+    try {
+        const parsed = new URL(String(rawAvatar || ''));
+        if (parsed.protocol === 'https:' &&
+            ['pbs.twimg.com', 'abs.twimg.com'].includes(parsed.hostname)) {
+            return parsed.href;
+        }
+    } catch (_) { /* avatar is optional */ }
+    return '';
+}
+
+function accountIdentityFromText(container, username) {
+    const lines = String(container?.innerText || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const normalizedUsername = String(username || '').replace(/^@/, '').toLowerCase();
+    const handleIndex = lines.findIndex(
+        (line) => line.toLowerCase() === `@${normalizedUsername}`
+    );
+    if (handleIndex < 0) return null;
+    const name = lines.slice(0, handleIndex).find(
+        (line) => line !== '·' && !/^@[a-zA-Z0-9_]{1,15}$/.test(line)
+    ) || '';
+    return {
+        name: name.slice(0, 200),
+        username: String(username || '').replace(/^@/, '')
+    };
+}
+
 function extractCurrentAccount() {
     const switcher = document.querySelector?.(
         '[data-testid="SideNav_AccountSwitcher_Button"]'
@@ -58,21 +88,85 @@ function extractCurrentAccount() {
     const username = String(handleLine || linkHandle).replace(/^@/, '');
     if (!username || RESERVED_PATHS.has(username.toLowerCase())) return null;
 
-    const name = lines.find((line) =>
+    const avatar = switcher?.querySelector?.('img');
+    const avatarName = String(avatar?.alt || '').trim();
+    const name = (
+        avatarName &&
+        !/^@[a-zA-Z0-9_]{1,15}$/.test(avatarName) &&
+        avatarName.length <= 200
+    ) ? avatarName : (lines.find((line) =>
         line !== handleLine &&
         !/^@[a-zA-Z0-9_]{1,15}$/.test(line) &&
         line.length <= 200
-    ) || '';
-    const rawAvatar = switcher?.querySelector?.('img')?.src || '';
-    let avatarUrl = '';
-    try {
-        const parsed = new URL(rawAvatar);
-        if (parsed.protocol === 'https:' &&
-            ['pbs.twimg.com', 'abs.twimg.com'].includes(parsed.hostname)) {
-            avatarUrl = parsed.href;
-        }
-    } catch (_) { /* avatar is optional */ }
+    ) || '');
+    const rawAvatar = avatar?.src || '';
+    const avatarUrl = sanitizeAccountAvatarUrl(rawAvatar);
     return { name, username, avatarUrl };
+}
+
+function extractTargetAccount(currentAccount = null) {
+    const username = extractUsername();
+    if (!username) return null;
+    const normalizedUsername = username.toLowerCase();
+    let identity = null;
+    let avatar = null;
+
+    const profileIdentity = document.querySelector?.('[data-testid="UserName"]');
+    identity = accountIdentityFromText(profileIdentity, username);
+    if (identity) {
+        const avatarContainers = Array.from(
+            document.querySelectorAll?.('[data-testid^="UserAvatar-Container-"]') || []
+        );
+        const avatarContainer = avatarContainers.find((element) => {
+            const testId = String(element?.getAttribute?.('data-testid') || '');
+            return testId.slice('UserAvatar-Container-'.length).toLowerCase() ===
+                normalizedUsername;
+        });
+        avatar = avatarContainer?.querySelector?.('img') ||
+            document.querySelector?.(`a[href="/${username}/photo"] img`);
+    }
+
+    if (!identity) {
+        const tweets = Array.from(
+            document.querySelectorAll?.('article[data-testid="tweet"]') || []
+        );
+        const targetTweet = tweets.find((tweet) =>
+            accountIdentityFromText(
+                tweet?.querySelector?.('[data-testid="User-Name"]'),
+                username
+            )
+        );
+        identity = accountIdentityFromText(
+            targetTweet?.querySelector?.('[data-testid="User-Name"]'),
+            username
+        );
+        avatar = targetTweet?.querySelector?.(
+            '[data-testid="Tweet-User-Avatar"] img'
+        );
+    }
+
+    const isCurrentAccount = Boolean(
+        currentAccount?.username &&
+        String(currentAccount.username).toLowerCase() === normalizedUsername
+    );
+    if (!identity) {
+        identity = { name: '', username };
+    }
+    if (isCurrentAccount) {
+        if (!identity.name) identity.name = currentAccount.name || '';
+        if (!avatar) {
+            return {
+                ...identity,
+                avatarUrl: currentAccount.avatarUrl || '',
+                isCurrentAccount: true
+            };
+        }
+    }
+    return {
+        ...identity,
+        avatarUrl: sanitizeAccountAvatarUrl(avatar?.src || ''),
+        isCurrentAccount
+    };
 }
 
 let lastCurrentAccountKey = '';
@@ -648,6 +742,15 @@ const RETRY_BUTTON_LABELS = new Set([
 ]);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'GET_ACCOUNT_CONTEXT') {
+        const currentAccount = extractCurrentAccount();
+        sendResponse({
+            currentAccount,
+            targetAccount: extractTargetAccount(currentAccount)
+        });
+        return true;
+    }
+
     if (message?.type === 'XPORTER_SEARCH_CAPTURE_STATUS') {
         try {
             updateXporterCaptureOverlay(message);

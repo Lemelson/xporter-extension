@@ -456,6 +456,30 @@ async function run() {
         'terminal stale exhaustion must not add another 10/20/30/40/50 second wait'
     );
 
+    const terminalFailureWaits = [];
+    const terminalFailure = new RateLimitManager({
+        fallbackMinDelay: 4000,
+        fallbackMaxDelay: 4000
+    });
+    terminalFailure._wait = async (ms) => terminalFailureWaits.push(ms);
+    await assert.rejects(
+        terminalFailure.executeWithRateLimit(async () => {
+            throw new Error('REPLIES_UNAVAILABLE');
+        }),
+        /REPLIES_UNAVAILABLE/
+    );
+    assert.equal(
+        terminalFailure.totalRequests,
+        1,
+        'a terminal logical request must count even when its endpoint is unavailable'
+    );
+    await terminalFailure.executeWithRateLimit(async () => 'fallback-ok');
+    assert.deepEqual(
+        terminalFailureWaits,
+        [4000],
+        'the first fallback endpoint request must be paced after the failed combined request'
+    );
+
     let recoverableStaleCalls = 0;
     const recoverableStaleWaits = [];
     const recoverableStale = new RateLimitManager({ maxRetries: 1 });

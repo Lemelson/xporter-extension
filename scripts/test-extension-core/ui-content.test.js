@@ -33,10 +33,15 @@ function testThemeInitializationCanRevertToDark() {
 async function testContentScriptDetectsSignedInAccountFromXNavigation() {
     const messages = [];
     const switcher = {
-        innerText: 'Lucas Strand\n@bylemelson',
+        // X's compact sidebar exposes no visible text in the switcher. The
+        // signed-in display name remains available as the avatar alt text.
+        innerText: '',
         querySelector(selector) {
             return selector === 'img'
-                ? { src: 'https://pbs.twimg.com/profile_images/123/avatar_normal.jpg' }
+                ? {
+                    src: 'https://pbs.twimg.com/profile_images/123/avatar_normal.jpg',
+                    alt: 'Lucas Strand'
+                }
                 : null;
         }
     };
@@ -93,6 +98,112 @@ async function testContentScriptDetectsSignedInAccountFromXNavigation() {
         name: 'Lucas Strand',
         username: 'bylemelson',
         avatarUrl: 'https://pbs.twimg.com/profile_images/123/avatar_normal.jpg'
+    });
+}
+
+async function testContentScriptReturnsLiveTargetAndViewerAccounts() {
+    let runtimeListener = null;
+    const viewerSwitcher = {
+        innerText: '',
+        querySelector(selector) {
+            return selector === 'img'
+                ? {
+                    src: 'https://pbs.twimg.com/profile_images/1/viewer_x96.jpg',
+                    alt: 'Lucas Strand'
+                }
+                : null;
+        }
+    };
+    const profileLink = {
+        getAttribute(name) {
+            return name === 'href' ? '/strndstein' : null;
+        }
+    };
+    const targetAvatar = {
+        src: 'https://pbs.twimg.com/profile_images/2/target_x96.jpg'
+    };
+    const targetTweet = {
+        querySelector(selector) {
+            if (selector === '[data-testid="User-Name"]') {
+                return { innerText: 'Ohegao_sf\n@Oheva_sf' };
+            }
+            if (selector === '[data-testid="Tweet-User-Avatar"] img') {
+                return targetAvatar;
+            }
+            return null;
+        }
+    };
+    const document = {
+        documentElement: {},
+        body: {},
+        querySelector(selector) {
+            if (selector.includes('SideNav_AccountSwitcher_Button')) return viewerSwitcher;
+            if (selector.includes('AppTabBar_Profile_Link')) return profileLink;
+            if (selector === '[data-testid="UserName"]') return null;
+            return null;
+        },
+        querySelectorAll(selector) {
+            if (selector === 'article[data-testid="tweet"]') return [targetTweet];
+            if (selector === '[data-testid^="UserAvatar-Container-"]') return [];
+            return [];
+        },
+        addEventListener() {}
+    };
+    const window = {
+        location: {
+            pathname: '/Oheva_sf/status/2092143399465889810',
+            href: 'https://x.com/Oheva_sf/status/2092143399465889810',
+            origin: 'https://x.com'
+        },
+        addEventListener() {},
+        postMessage() {}
+    };
+    const context = vm.createContext({
+        console,
+        URL,
+        document,
+        window,
+        setTimeout,
+        clearTimeout,
+        MutationObserver: class {
+            constructor(callback) { this.callback = callback; }
+            observe() {}
+        },
+        chrome: {
+            runtime: {
+                onMessage: {
+                    addListener(listener) {
+                        runtimeListener = listener;
+                    }
+                },
+                sendMessage() {
+                    return Promise.resolve({ success: true });
+                }
+            }
+        }
+    });
+    vm.runInContext(source('content/content.js'), context, { filename: 'content/content.js' });
+
+    let response = null;
+    const keepsChannelOpen = runtimeListener(
+        { type: 'GET_ACCOUNT_CONTEXT' },
+        {},
+        (value) => { response = value; }
+    );
+
+    assert.equal(keepsChannelOpen, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(response)), {
+        currentAccount: {
+            name: 'Lucas Strand',
+            username: 'strndstein',
+            avatarUrl: 'https://pbs.twimg.com/profile_images/1/viewer_x96.jpg'
+        },
+        targetAccount: {
+            name: 'Ohegao_sf',
+            username: 'Oheva_sf',
+            avatarUrl: 'https://pbs.twimg.com/profile_images/2/target_x96.jpg',
+            isCurrentAccount: false
+        }
     });
 }
 
@@ -164,7 +275,8 @@ async function testAcknowledgementCountdownRequiresFiveFullTicks() {
 const tests = [
     { name: "theme restore", run: testThemeInitializationCanRevertToDark, order: 70 },
     { name: "signed-in account navigation detection", run: testContentScriptDetectsSignedInAccountFromXNavigation, order: 71 },
-    { name: "acknowledgement countdown", run: testAcknowledgementCountdownRequiresFiveFullTicks, order: 72 }
+    { name: "acknowledgement countdown", run: testAcknowledgementCountdownRequiresFiveFullTicks, order: 72 },
+    { name: "live target and viewer account context", run: testContentScriptReturnsLiveTargetAndViewerAccounts, order: 77 }
 ];
 
 module.exports = {

@@ -107,7 +107,18 @@ function testSelectionPolicy(policy) {
             includeRetweets: false,
             includeArticles: false
         })),
-        ['posts', 'replies']
+        ['legacy_with_replies']
+    );
+    assert.deepEqual(
+        plain(policy.postFeedPlanForSettings({
+            postSelectionVersion: 1,
+            includeOriginalPosts: true,
+            includeQuotes: true,
+            includeReplies: true,
+            includeRetweets: true,
+            includeArticles: true
+        })),
+        ['legacy_with_replies']
     );
     assert.deepEqual(
         plain(policy.postFeedPlanForSettings({
@@ -145,6 +156,29 @@ function testSelectionPolicy(policy) {
     assert.equal(policy.postSelectionAllowsTweet(explicit, { type: 'article' }), true);
     assert.equal(policy.postSelectionAllowsTweet(explicit, { type: 'quote' }), false);
     assert.equal(policy.postSelectionAllowsTweet(explicit, { type: 'retweet' }), false);
+
+    const typeSettings = {
+        tweet: 'includeOriginalPosts',
+        quote: 'includeQuotes',
+        reply: 'includeReplies',
+        retweet: 'includeRetweets',
+        article: 'includeArticles'
+    };
+    const selectionKeys = Object.values(typeSettings);
+    for (let mask = 1; mask < (1 << selectionKeys.length); mask += 1) {
+        const settings = { postSelectionVersion: 1 };
+        selectionKeys.forEach((key, index) => {
+            settings[key] = Boolean(mask & (1 << index));
+        });
+        for (const [type, key] of Object.entries(typeSettings)) {
+            assert.equal(
+                policy.postSelectionAllowsTweet(settings, { type }),
+                settings[key],
+                `selection ${mask.toString(2).padStart(5, '0')} must filter ${type} exactly`
+            );
+        }
+    }
+
     assert.equal(
         policy.postSelectionAllowsTweet(
             { includeReplies: false, includeRetweets: false, includeArticles: false },
@@ -166,6 +200,10 @@ function testRateLimitKeys(policy) {
     );
     assert.equal(
         policy.rateLimitKeyForMode('posts', { includeReplies: true }),
+        'UserTweetsAndReplies'
+    );
+    assert.equal(
+        policy.rateLimitKeyForMode('posts', { profileFeed: 'legacy_with_replies' }),
         'UserTweetsAndReplies'
     );
     assert.equal(policy.rateLimitKeyForMode('bookmarks', {}), 'Bookmarks');

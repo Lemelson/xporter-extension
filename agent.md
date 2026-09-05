@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the local experimental **v1.6.1** runtime (2026-08-23), which restores the packaged v1.5.9 feature set for local testing.
+> Last verified against the local **v1.6.4** release candidate runtime (2026-08-25).
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | Local experimental 1.6.1 (`manifest.json`) |
+| Version | Local 1.6.4 release candidate (`manifest.json`) |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
@@ -54,6 +54,7 @@
 ### Communication Pattern
 All inter-component communication uses `chrome.runtime.sendMessage` / `onMessage`:
 - **popup/export → service-worker**: commands (`START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `DOWNLOAD_EXPORT`, `SAVE_SETTINGS`, …)
+- **popup → active content.js**: `GET_ACCOUNT_CONTEXT` reads the live target profile/post and signed-in viewer identities without a GraphQL request
 - **service-worker → popup/export**: live status (`EXPORT_STATUS_UPDATE` broadcast)
 - **content.js → service-worker**: username/current-account detection, captured request templates, date-range payloads, and compact seen-post batches
 - **interceptor.js → content.js**: `window.postMessage` events constrained by the immutable `XPorterCaptureContract`; the isolated relay and worker/API still revalidate at their own trust boundaries
@@ -91,8 +92,8 @@ xporter/
 ├── content/
 │   ├── feed-parser.js           # MAIN-world parser for compact non-reply rows from
 │   │                            #   GraphQL responses already loaded by X
-│   ├── content.js               # Username detection from the X page URL; validates + relays
-│   │                            #   interceptor messages; drives the search-capture tab.
+│   ├── content.js               # Target/current-account DOM identity detection; validates
+│   │                            #   and relays interceptor messages; drives search capture.
 │   │                            #   Manifest-registered at document_start (isolated world).
 │   └── interceptor.js           # Manifest-registered at document_start in the page MAIN
 │                                #   world (Chrome 111+); wraps fetch/XHR to capture live
@@ -189,8 +190,8 @@ The most complex, most fragile area.
 - **Feature flags** (`api-features.js`): `USER_FEATURES`, `TWEETS_FEATURES` (large!), `FOLLOWERS_FEATURES`. Missing/renamed flags → `400 Bad Request`. To fix: copy the live `features` object from a real x.com GraphQL request in DevTools.
 - **`withStaleRetry(key, fn)`**: catches `STALE_QUERY_ID`, forces re-discovery, retries once. Self-healing against X changes.
 - **Auth**: reads cookies directly — `ct0` → `x-csrf-token`, `auth_token` → session. Requests go to `https://x.com/i/api/graphql/…` and use `encodeURIComponent` (NOT `URLSearchParams` — X rejects `+` for spaces).
-- **Target ops**: identity/enrichment `UserByScreenName`, `AboutAccountQuery`; posts `UserOriginalsTimeline`, `UserTweets`, `UserRepliesTimeline` (plus legacy `UserTweetsAndReplies` recovery); personal `Bookmarks` with `TweetResultsByRestIds` context; user lists `Followers`, `Following`, `BlueVerifiedFollowers`; `SearchTimeline` for date range.
-- **Parser seam**: `api-parsers.js` owns response-shape traversal and normalized rows; `api.js` owns network/auth/queryId behavior only.
+- **Target ops**: identity/enrichment `UserByScreenName`, `AboutAccountQuery`; posts `UserOriginalsTimeline`, `UserTweets`, `UserRepliesTimeline`, and the one-pass mixed-selection `UserTweetsAndReplies`; personal `Bookmarks` with `TweetResultsByRestIds` context; user lists `Followers`, `Following`, `BlueVerifiedFollowers`; `SearchTimeline` for date range.
+- **Parser seam**: `api-parsers.js` owns response-shape traversal and normalized rows; `api.js` owns network/auth/queryId behavior only. Parsed posts retain a non-enumerable `_author_id` solely so the worker can reject foreign context rows whose display fields are absent; it must never become an export column.
 - **Cancellation**: `XPorterAPI.abortActiveRequests()` aborts an in-flight fetch when the user presses Stop; fetch and response-body reads share the same deadline.
 
 ### 4.3. `background/service-worker.js` — Export Coordinator
@@ -210,6 +211,7 @@ currentExport = {
 
 **Message types** (`onMessage` cases):
 - identity/settings: `SET_USERNAME`, `GET_USERNAME`, `SET_CURRENT_ACCOUNT`, `GET_CURRENT_ACCOUNT`, `SAVE_SETTINGS`, `GET_SETTINGS`;
+- active-tab identity: `GET_ACCOUNT_CONTEXT` is handled directly by `content.js` and returns separate `targetAccount` and `currentAccount` snapshots;
 - lifecycle/status: `START_EXPORT`, `STOP_EXPORT`, `GET_STATUS`, `RESUME_EXPORT`, `RESUME_POSTS_ONLY`, `CLEAR_EXPORT`;
 - current/history downloads: `DOWNLOAD_CSV`/`DOWNLOAD_EXPORT`, `GET_DOWNLOAD_PLAN`, `GET_EXPORT_TEXT`, `DOWNLOAD_HISTORY_ENTRY`, `GET_EXPORT_HISTORY`, `DELETE_HISTORY_ENTRY`, `CLEAR_HISTORY`;
 - page capture/local dataset: `DISCOVERED_REQUEST_TEMPLATE`, `PAGE_GRAPHQL_RESPONSE`, `CAPTURE_FEED_POSTS`, `GET_FEED_DB_SUMMARY`, `DOWNLOAD_FEED_DB`, `CLEAR_FEED_DB`;
@@ -224,7 +226,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 
 `background/export-policy.js` is the pure facade for feed selection, pacing keys/options, About concurrency/retries, and resume merging. The worker owns limiter instances and reconfigures all active instances in place so live settings apply on the next request without discarding counters.
 
-**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for the active profile-feed operation (`UserTweets`, `UserOriginalsTimeline`, or `UserRepliesTimeline`) and for `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing at their advertised delay; advertised headers are advisory, and only an actual 429 enters the one-minute retry wait. Missing/stale headers use mode-specific fallback delays. Optional Scheduled breaks independently opt a mode into a longer batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders ordinary pacing with an amber bar, Scheduled breaks with a teal pause icon/bar, and X rate limits with a shield plus monochrome diagonal bar. A stable original duration plus absolute `until` keeps wait progress monotonic across the popup's 2-second status polls. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
+**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for the active profile-feed operation (`UserTweets`, `UserOriginalsTimeline`, `UserRepliesTimeline`, or `UserTweetsAndReplies`) and for `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing at their advertised delay; advertised headers are advisory, and only an actual 429 enters the one-minute retry wait. Missing/stale headers use mode-specific fallback delays. Optional Scheduled breaks independently opt a mode into a longer batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders ordinary pacing with an amber bar, Scheduled breaks with a teal pause icon/bar, and X rate limits with a shield plus monochrome diagonal bar. A stable original duration plus absolute `until` keeps wait progress monotonic across the popup's 2-second status polls. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
 
 **Export Speed presets.** Posts/Bookmarks and user-list exports have separate `exportSpeed` / `userExportSpeed` controls (`'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'`, default `'standard'`). The five named tiers advertise 2 / 3 / 4 / 7 / 12 second delays; Standard is the recommended 4-second default. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus `fallbackScale`; `resolveSpeedPreset()` in the SW resolves it. **`'custom'` (⚠️ in the UI)** uses only the user-typed `customDelaySec` or `userCustomDelaySec`; decimal dots and commas are accepted and the exact delay is used without preset padding or jitter.
 
@@ -237,8 +239,8 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 
 | Setting | Default | Notes |
 |---|---|---|
-| `includeOriginalPosts` / `includeQuotes` / `includeReplies` / `includeRetweets` / `includeArticles` | all `true` | Exact primary-row types selected on Home. A mixed Replies + non-reply export persists a two-pass feed plan, removes duplicate primary rows, and preserves foreign parents only as nested reply context. |
-| `embedPostPhotos` / `embedBookmarkPhotos` | both `false` | The Home XLSX-only radio group stores independent Posts/Bookmarks choices: false keeps URLs only; true downloads bounded previews into the Media sheet. |
+| `includeOriginalPosts` / `includeQuotes` / `includeReplies` / `includeRetweets` / `includeArticles` | all `true` | Exact primary-row types selected on Home. Replies-only uses `UserRepliesTimeline`; Replies mixed with any non-reply type use one `UserTweetsAndReplies` pass, filter exact primary types locally, and preserve foreign parents only as nested reply context. |
+| `embedPostPhotos` / `embedBookmarkPhotos` | both `false` | The Home XLSX-only radio group stores independent Posts/Bookmarks choices: false keeps URLs only and is visibly labelled Recommended; true downloads bounded previews into the Media sheet. |
 | `quantityLimit` | `500` | 0 = unlimited; live for an ordinary active export, but never overwrites a `+N more` per-run target |
 | `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
 | `customDelaySec` / `userCustomDelaySec` | `5` / `5` | exact Custom delay for Posts/Bookmarks and User Lists; decimal dot or comma accepted |
@@ -267,7 +269,7 @@ Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 
 ### 4.7. `content/content.js` + `content/interceptor.js`
 - **`utils/capture-contract.js`** loads first in both manifest worlds and exposes frozen tracked-operation and payload-size limits. It contains no credentials or mutable authority.
-- **content.js** (isolated world, `document_start`): detects profile/current-account identity, reconstructs and validates captured request templates, relays bounded date-range/feed payloads, and drives the search-capture tab.
+- **content.js** (isolated world, `document_start`): detects the signed-in account from X's account switcher and the target account from a visible profile header or permalink author; `GET_ACCOUNT_CONTEXT` returns both to the popup without GraphQL, while the script also reconstructs and validates captured request templates, relays bounded date-range/feed payloads, and drives the search-capture tab.
 - **interceptor.js** (MAIN world, `document_start`, Chrome 111+): wraps `fetch`/`XHR` to capture sanitized GraphQL templates plus bounded timeline bodies, posting only to `location.origin`.
 - Validation is layered: MAIN-world capture → isolated relay → worker sender/template validation → `api.js` validation before authenticated request construction.
 
@@ -308,6 +310,9 @@ X has no clean date-filter on the timeline GraphQL, so XPorter:
 - Strings are applied by `applyI18nToDOM()` (in `utils/shared.js`) via attributes: `data-i18n` (textContent), `data-i18n-placeholder`, `data-i18n-title`, `data-i18n-tooltip`, `data-i18n-aria-label`.
 - **Help tooltips** (the `!` icons, class `.date-help`): the tooltip text supports a tiny markup — `**bold**` marks the "gist" so a reader can scan the bold for the essence or read it all. `applyI18nToDOM` renders it into a real `.help-pop` child element via `renderHelpMarkup` (escapes HTML, then `**…**` → `<strong>`, `\n` → `<br>`). The matching `aria-label` uses `stripHelpMarkup` so screen readers don't read the asterisks. **When writing/translating a help string, keep the two `**…**` spans.**
 - **Adding a setting/string** → add the key to **all 14** `popup/locales/*.json` (en first).
+- Post-type, XLSX photo-choice, and stopped/resumable controls use official Tabler Icons outline SVG paths (MIT notice ships in `THIRD_PARTY_NOTICES`). The selection cards keep native checkbox/radio semantics; decorative SVGs are `aria-hidden` and intentionally have no icon box. Checked state, card background, text, and focus outline provide non-color cues. Logical layout properties keep the icon at the leading edge and input at the trailing edge in both LTR and RTL.
+- A user-stopped export uses `.phase-stopped` plus a static `.progress-fill.stopped`, separate from active pacing, Scheduled-break, and X-rate-limit animations. Its Resume play glyph may breathe only inside `prefers-reduced-motion: no-preference`.
+- The export-status card keeps status text, progress, detail, and count full-width. `statusActionStack` renders a compact trailing Stop row while running, one horizontal Download row for ordinary terminal exports, or equal Download/Copy columns for terminal TXT exports; never restore fixed square action tiles.
 
 ### 6.2. Easter Egg: the Ladybug (`popup/ladybug.js`)
 A ladybug wanders the "Questions or found a bug?" contact card on the **About** tab.

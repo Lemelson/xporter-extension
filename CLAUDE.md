@@ -2,7 +2,7 @@
 
 **XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, personal bookmarks, followers, following, and verified followers to **CSV / JSON / XLSX / TXT**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Version:** local experimental 1.6.1 (`manifest.json`), restoring the packaged 1.5.9 feature set; do not publish without a separate release decision.
+- **Version:** local 1.6.4 release candidate (`manifest.json`); do not publish without a separate Chrome Web Store release decision.
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 
@@ -17,7 +17,7 @@
 | Storage, settings + defaults | `utils/storage.js`; partial settings writes and usage-counter mutations each use recoverable promise queues |
 | Passive seen-post database | `utils/post-database.js` (IndexedDB; one row per post ID, 50k-row cap) |
 | Tunable constants + logger (`XLog`) | `utils/config.js` |
-| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css`; history and seen-post UI live in `popup/history.js` / `popup/seen-posts.js`; Posts/Bookmarks + XLSX exposes one Links/embedded-previews choice, and the one-time photo-permission explanation persists as `xporter_photo_permission_intro_seen` |
+| Popup UI (Home/Settings/About tabs) | `popup/popup.html` · `popup/popup.js` · `popup/popup.css`; history and seen-post UI live in `popup/history.js` / `popup/seen-posts.js`; the editable target account and viewer-owned Bookmarks use shared name/avatar/handle cards sourced from the active X tab via `GET_ACCOUNT_CONTEXT`; post types, XLSX photo choices, and stopped/resumable states use official Tabler outline SVGs while retaining native inputs, Links is visibly recommended, the one-time photo-permission explanation persists as `xporter_photo_permission_intro_seen`, and the export-status card places compact Stop/Download/Copy actions below full-width status content |
 | Popup UI helpers | `utils/shared.js` (incl. `sendMessage` w/ error sentinels, `formatError`, `isValidUsername`, `bidiIsolate`, `localizeQuantityOptions`, `createCooldownTicker`) |
 | In-app UI strings (14 languages) | `popup/locales/*.json` (`en.json` = fallback) |
 | Localized CSV/XLSX column headers | `utils/columns-i18n.js` (`XPorterColumns`; data keys + JSON stay English; gated by the `localizeExportHeaders` setting, default on) |
@@ -47,7 +47,7 @@
 13. **Rate-limit budgets are endpoint-specific:** use `XPorterAPI.getRateLimit(operationName)` and never reuse one operation's headers for another. Header-less responses must take the mode-specific fallback path.
 14. **Deterministic proof has a boundary:** `test-all.js` proves repository contracts, not current authenticated X behavior. Query IDs, feature flags, cookies, and live response shapes require separate authenticated live-X verification.
 15. **Large downloads are multipart:** never call `loadAllTweets()` for the current export download path. `downloads.js` reads bounded batch ranges and uses `DOWNLOAD_PART_LIMITS`; XLSX/JSON/CSV/TXT parts must remain below their configured row ceilings. Embedded-photo XLSX parts use bounded previews and report `photos` plus `building_xlsx` stages.
-16. **Post types are explicit and feed plans are resumable:** originals/quotes/articles use `UserOriginalsTimeline`; selecting reposts upgrades that pass to `UserTweets`; replies use `UserRepliesTimeline`. Mixed selections run the needed passes sequentially, persist `postFeedPlan`/`postFeedIndex`, de-duplicate primary rows, and keep foreign parent rows only as nested context. Never reuse a cursor across feeds.
+16. **Post types are explicit and feed plans are resumable:** originals/quotes/articles use `UserOriginalsTimeline`; selecting reposts upgrades that pass to `UserTweets`; replies-only uses `UserRepliesTimeline`. Replies mixed with any other selected type use the one-pass `UserTweetsAndReplies` timeline and filter exact row types locally, matching the pre-1.6.1 request surface. Filter combined rows by the parser's non-exported stable author ID before display-field fallback, persist `postFeedPlan`/`postFeedIndex`, keep foreign parent rows only as nested context, and never reuse a cursor across feeds.
 17. **Cursor de-duplication is bounded:** ordinary posts/user-list exports keep only `RECENT_EXPORT_ID_LIMIT` IDs in memory. Do not restore an unbounded per-run `Set`; date-range search is the separate path that needs full saved-ID de-duplication on resume.
 
 ## When you change things

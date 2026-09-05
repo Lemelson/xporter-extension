@@ -726,7 +726,23 @@ async function _fetchPostsLoop() {
         if (!postSelectionAllowsTweet(currentExport.settings, tweet)) return false;
         if (hasExplicitPostSelection(currentExport.settings)) {
             if (profileFeed === 'replies' && tweet.type !== 'reply') return false;
-            if (profileFeed !== 'replies' && tweet.type === 'reply') return false;
+            if (profileFeed !== 'replies' &&
+                profileFeed !== 'legacy_with_replies' &&
+                tweet.type === 'reply') return false;
+        }
+
+        // The combined timeline contains foreign conversation rows. X may omit
+        // their display fields, so username-only filtering can mistake a
+        // foreign parent for a target-profile post and later backfill the
+        // target's name. Prefer the stable internal author id when available;
+        // an unidentified combined-feed row is context only, never primary.
+        if (profileFeed === 'legacy_with_replies') {
+            const expectedAuthorId = String(currentExport.userId || '');
+            const actualAuthorId = String(tweet?._author_id || '');
+            if (expectedAuthorId && actualAuthorId) {
+                return actualAuthorId === expectedAuthorId;
+            }
+            if (!tweet.author_username) return false;
         }
 
         // Reply timelines can contain foreign conversation rows so X can draw

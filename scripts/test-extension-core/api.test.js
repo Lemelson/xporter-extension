@@ -1329,6 +1329,21 @@ function testTimelineV2UserListsAreParsed() {
         'authorless payloads must still receive a valid canonical status URL'
     );
 
+    const idOnlyAuthor = vm.runInContext(`XPorterApiParsers.parseTweetObject({
+        legacy: { id_str: '12346', full_text: 'hello from an id-only author' },
+        core: { user_results: { result: { rest_id: '10' } } }
+    })`, context);
+    assert.equal(
+        idOnlyAuthor._author_id,
+        '10',
+        'parser metadata must preserve the stable author id when display fields are omitted'
+    );
+    assert.equal(
+        Object.keys(idOnlyAuthor).includes('_author_id'),
+        false,
+        'internal author identity must not become a new exported column'
+    );
+
     const reply = vm.runInContext(`XPorterApiParsers.parseTweetObject({
         legacy: {
             id_str: '222',

@@ -625,7 +625,7 @@ async function testAllFeedKeepsOnlyProfilePostsAndContext() {
     );
 }
 
-async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
+async function testExplicitPostTypeSelectionUsesCombinedFeed() {
     const helperHarness = createWorkerHarness();
     const plan = (settings) => JSON.parse(JSON.stringify(
         vm.runInContext(`postFeedPlanForSettings(${JSON.stringify(settings)})`, helperHarness.context)
@@ -654,8 +654,8 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
         includeReplies: true,
         includeRetweets: false,
         includeArticles: false
-    }), ['posts', 'replies'],
-    'originals/quotes plus replies must combine the two native X timelines');
+    }), ['legacy_with_replies'],
+    'a mixed reply selection must use the one-pass combined timeline');
     assert.deepEqual(plan({
         postSelectionVersion: 1,
         includeOriginalPosts: true,
@@ -690,10 +690,13 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
             settings.includeQuotes ||
             settings.includeRetweets ||
             settings.includeArticles;
-        if (hasNonReplies) {
+        if (hasNonReplies && settings.includeReplies) {
+            expected.push('legacy_with_replies');
+        } else if (hasNonReplies) {
             expected.push(settings.includeRetweets ? 'all' : 'posts');
+        } else if (settings.includeReplies) {
+            expected.push('replies');
         }
-        if (settings.includeReplies) expected.push('replies');
         assert.deepEqual(
             plan(settings),
             expected,
@@ -704,7 +707,7 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
     const harness = createWorkerHarness();
     const requestedFeeds = [];
     const rowsByFeed = {
-        posts: [{
+        legacy_with_replies: [{
             id: 'original',
             type: 'tweet',
             author_username: 'TargetUser'
@@ -713,15 +716,6 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
             type: 'quote',
             author_username: 'TargetUser'
         }, {
-            id: 'article',
-            type: 'article',
-            author_username: 'TargetUser'
-        }, {
-            id: 'opportunistic-reply',
-            type: 'reply',
-            author_username: 'TargetUser'
-        }],
-        replies: [{
             id: 'reply',
             type: 'reply',
             author_username: 'TargetUser',
@@ -730,6 +724,28 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
             id: 'foreign-parent',
             type: 'tweet',
             author_username: 'OtherUser'
+        }, {
+            id: 'retweet',
+            type: 'retweet',
+            author_username: 'TargetUser'
+        }, {
+            id: 'article',
+            type: 'article',
+            author_username: 'TargetUser'
+        }, {
+            id: 'target-id-only',
+            type: 'tweet',
+            author_username: '',
+            _author_id: '10'
+        }, {
+            id: 'foreign-id-only',
+            type: 'tweet',
+            author_username: '',
+            _author_id: '999'
+        }, {
+            id: 'unknown-author',
+            type: 'tweet',
+            author_username: ''
         }, {
             id: 'reply',
             type: 'reply',
@@ -766,7 +782,7 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
                 includeReplies: true,
                 includeRetweets: false,
                 includeArticles: false,
-                quantityLimit: 3
+                quantityLimit: 0
             },
             tweetCount: 0,
             totalBatches: 0,
@@ -778,35 +794,108 @@ async function testExplicitPostTypeSelectionPlansAndCombinesFeeds() {
         _fetchPostsLoop();
     `, harness.context);
 
-    assert.deepEqual(requestedFeeds, ['posts', 'replies'],
-        'a mixed selection must fetch each required native feed exactly once');
+    assert.deepEqual(requestedFeeds, ['legacy_with_replies'],
+        'a mixed selection must paginate one combined feed instead of two feeds');
     assert.deepEqual(
         harness.getSavedBatches().flat().map(item => item.id),
-        ['original', 'quote', 'reply'],
-        'a small global limit must reserve room for both feeds while exact filters remove foreign rows'
+        ['original', 'quote', 'reply', 'target-id-only'],
+        'the combined feed must keep exact selected target rows and remove foreign or unidentified primary rows'
+    );
+    assert.equal(
+        harness.getSavedBatches().flat().at(-1).author_username,
+        'TargetUser',
+        'a target row identified only by stable author id may receive the profile display fields'
     );
     const saved = harness.getSavedState();
-    assert.equal(saved.postFeedIndex, 1,
-        'resume state must identify the feed whose cursor was last persisted');
-}
+    assert.equal(saved.postFeedIndex, 0,
+        'a one-pass combined export must persist the only feed index');
 
-async function testLiveQuantityChangeUpdatesMixedFeedBudget() {
-    const harness = createWorkerHarness();
-    const rowsByFeed = {
-        posts: ['p1', 'p2', 'p3', 'p4'].map(id => ({
-            id,
+    const fallbackHarness = createWorkerHarness();
+    const fallbackFeeds = [];
+    const fallbackRows = {
+        posts: [{
+            id: 'fallback-original',
             type: 'tweet',
             author_username: 'TargetUser'
-        })),
-        replies: ['r1', 'r2', 'r3', 'r4'].map(id => ({
-            id,
+        }],
+        replies: [{
+            id: 'fallback-reply',
             type: 'reply',
             author_username: 'TargetUser'
-        }))
+        }]
+    };
+    fallbackHarness.context.XPorterAPI.fetchUserTweets =
+        async (_userId, _cursor, _count, feed) => {
+            fallbackFeeds.push(feed);
+            if (feed === 'legacy_with_replies') {
+                throw new Error('REPLIES_UNAVAILABLE');
+            }
+            return { tweets: fallbackRows[feed], nextCursor: null };
+        };
+    fallbackHarness.context.__makeRateLimiter = harness.context.__makeRateLimiter;
+
+    await vm.runInContext(`
+        currentExport = {
+            running: true,
+            username: 'targetuser',
+            userId: '10',
+            exportMode: 'posts',
+            outputFormat: 'txt',
+            userInfo: { screenName: 'TargetUser', tweetCount: 2 },
+            settings: {
+                postSelectionVersion: 1,
+                includeOriginalPosts: true,
+                includeQuotes: false,
+                includeReplies: true,
+                includeRetweets: false,
+                includeArticles: false,
+                quantityLimit: 0
+            },
+            tweetCount: 0,
+            totalBatches: 0,
+            tweetBuffer: [],
+            cursor: null,
+            postFeedPlan: ['legacy_with_replies'],
+            postFeedIndex: 0
+        };
+        rateLimiter = __makeRateLimiter();
+    `, fallbackHarness.context);
+    await assert.rejects(
+        vm.runInContext('_fetchPostsLoop()', fallbackHarness.context),
+        /REPLIES_UNAVAILABLE/,
+        'an unavailable combined endpoint must fail closed instead of silently starting two traversals'
+    );
+    assert.deepEqual(
+        fallbackFeeds,
+        ['legacy_with_replies'],
+        'combined-feed failure must never expand into hidden Posts and Replies requests'
+    );
+    assert.deepEqual(
+        fallbackHarness.getSavedBatches().flat(),
+        [],
+        'a failed combined request must not invent partial fallback rows'
+    );
+}
+
+async function testLiveQuantityChangeUpdatesCombinedFeedLimit() {
+    const harness = createWorkerHarness();
+    const rowsByFeed = {
+        legacy_with_replies: [
+            ...['p1', 'p2', 'p3', 'p4'].map(id => ({
+                id,
+                type: 'tweet',
+                author_username: 'TargetUser'
+            })),
+            ...['r1', 'r2', 'r3', 'r4'].map(id => ({
+                id,
+                type: 'reply',
+                author_username: 'TargetUser'
+            }))
+        ]
     };
     let raised = false;
     harness.context.XPorterAPI.fetchUserTweets = async (_userId, _cursor, _count, feed) => {
-        if (feed === 'posts' && !raised) {
+        if (feed === 'legacy_with_replies' && !raised) {
             raised = true;
             await harness.context.handleMessage({
                 type: 'SAVE_SETTINGS',
@@ -2610,8 +2699,8 @@ const tests = [
     { name: "Clear cannot race Start or Resume", run: testClearCannotRaceStartingOrResumingExport, order: 76 },
     { name: "explicit zero-row Replies fallback", run: testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot, order: 35 },
     { name: "All feed profile filtering and context", run: testAllFeedKeepsOnlyProfilePostsAndContext, order: 36 },
-    { name: "explicit post-type combinations", run: testExplicitPostTypeSelectionPlansAndCombinesFeeds, order: 37 },
-    { name: "live mixed-feed quantity retargeting", run: testLiveQuantityChangeUpdatesMixedFeedBudget, order: 38 },
+    { name: "explicit post-type combined feed", run: testExplicitPostTypeSelectionUsesCombinedFeed, order: 37 },
+    { name: "live combined-feed quantity retargeting", run: testLiveQuantityChangeUpdatesCombinedFeedLimit, order: 38 },
     { name: "Bookmarks mode and reply context", run: testBookmarksModeSkipsUsernameResolutionAndKeepsEverySavedAuthor, order: 39 },
     { name: "Bookmarks Article payload setting", run: testBookmarkArticleSettingRemovesOnlyArticlePayload, order: 40 },
     { name: "search capture arms before navigation", run: testSearchCaptureIsArmedBeforeNavigation, order: 41 },

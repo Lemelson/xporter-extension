@@ -8,6 +8,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usernameLabel = document.getElementById('usernameLabel');
     const usernamePrefix = document.getElementById('usernamePrefix');
     const usernameField = document.getElementById('usernameField');
+    const usernameError = document.getElementById('usernameError');
+    const targetAccountCard = document.getElementById('targetAccountCard');
+    const targetAccountName = document.getElementById('targetAccountName');
+    const targetAccountAvatar = document.getElementById('targetAccountAvatar');
+    const targetAccountAvatarFallback =
+        document.getElementById('targetAccountAvatarFallback');
     const bookmarksAccountField = document.getElementById('bookmarksAccountField');
     const bookmarksAccountName = document.getElementById('bookmarksAccountName');
     const bookmarksAccountHandle = document.getElementById('bookmarksAccountHandle');
@@ -197,6 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let resumeAddsItems = false;
     let bookmarksUsernameBackup = '';
     let detectedCurrentAccount = null;
+    let detectedTargetAccount = null;
     let currentTranslations = {};
 
     function ratePromptExportKey(state) {
@@ -238,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     function clearStatusPhase() {
-        exportStatus.classList.remove('phase-rate-limit', 'phase-safety-break');
+        exportStatus.classList.remove('phase-rate-limit', 'phase-safety-break', 'phase-stopped');
         statusPhaseIcon.classList.add('hidden');
         statusPhaseIcon.replaceChildren();
         statusSubtitle.classList.add('hidden');
@@ -340,20 +347,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Parallel Init ====================
     // Fire all independent async requests at once instead of sequentially
+    const activeTabsPromise =
+        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+    const liveAccountContextPromise = activeTabsPromise.then(async ([activeTab]) => {
+        if (!activeTab?.id ||
+            !/^https:\/\/(?:www\.)?(?:x|twitter)\.com\//i.test(activeTab.url || '')) {
+            return null;
+        }
+        try {
+            return await chrome.tabs.sendMessage(activeTab.id, {
+                type: 'GET_ACCOUNT_CONTEXT'
+            });
+        } catch (_) {
+            return null;
+        }
+    });
     const [settingsResult, authResult, status, activeTabs, currentAccountResult,
-        photoPermissionIntroState] = await Promise.all([
+        liveAccountContext, photoPermissionIntroState] = await Promise.all([
         sendMessage({ type: 'GET_SETTINGS' }),
         checkAuth().catch(() => null),
         sendMessage({ type: 'GET_STATUS' }),
-        chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []),
+        activeTabsPromise,
         sendMessage({ type: 'GET_CURRENT_ACCOUNT' }).catch(() => null),
+        liveAccountContextPromise,
         chrome.storage.local.get(PHOTO_PERMISSION_INTRO_KEY).catch(() => ({}))
     ]);
 
     const currentSettings = settingsResult?.settings || {};
     let photoPermissionIntroSeen =
         photoPermissionIntroState?.[PHOTO_PERMISSION_INTRO_KEY] === true;
-    detectedCurrentAccount = currentAccountResult?.account || null;
+    const activeTabSupportsAccountContext = Boolean(
+        activeTabs[0]?.id &&
+        /^https:\/\/(?:www\.)?(?:x|twitter)\.com\//i.test(activeTabs[0].url || '')
+    );
+    detectedCurrentAccount = liveAccountContext
+        ? (liveAccountContext.currentAccount || null)
+        : (activeTabSupportsAccountContext ? null : (currentAccountResult?.account || null));
+    detectedTargetAccount = liveAccountContext?.targetAccount || null;
 
     // ==================== Theme & Design ====================
     initTheme(currentSettings.theme, themeIcon);
@@ -451,6 +481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             usernameLabel.textContent =
                 currentTranslations.fieldUsername || 'Twitter Username';
             usernamePrefix.classList.remove('hidden');
+            renderTargetAccount();
         }
         const txtOption = outputFormat.querySelector('option[value="txt"]');
         if (txtOption) txtOption.disabled = !isPostRows;
@@ -467,6 +498,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         syncPostSelectionUI();
     }
 
+    function renderAccountAvatar(image, fallback, avatarUrl) {
+        const showFallback = () => {
+            image.removeAttribute('src');
+            image.classList.add('hidden');
+            fallback.classList.remove('hidden');
+        };
+        image.onerror = showFallback;
+        if (avatarUrl) {
+            image.src = avatarUrl;
+            image.classList.remove('hidden');
+            fallback.classList.add('hidden');
+        } else {
+            showFallback();
+        }
+    }
+
+    function renderTargetAccount() {
+        const username = extractUsernameFromInput(usernameInput.value);
+        const account = (
+            username &&
+            String(detectedTargetAccount?.username || '').toLowerCase() ===
+                username.toLowerCase()
+        ) ? detectedTargetAccount : null;
+        const name = String(account?.name || '').trim();
+        targetAccountName.textContent = name;
+        targetAccountName.classList.toggle('hidden', !name);
+        renderAccountAvatar(
+            targetAccountAvatar,
+            targetAccountAvatarFallback,
+            String(account?.avatarUrl || '')
+        );
+    }
+
     function renderBookmarksAccount() {
         const account = detectedCurrentAccount || {};
         const username = String(account.username || '').replace(/^@/, '');
@@ -474,17 +538,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentTranslations.signedInXAccount || 'Signed-in X account';
         bookmarksAccountHandle.textContent = username ? `@${username}` : '';
         bookmarksAccountHandle.classList.toggle('hidden', !username);
-
-        const avatarUrl = String(account.avatarUrl || '');
-        if (avatarUrl) {
-            bookmarksAccountAvatar.src = avatarUrl;
-            bookmarksAccountAvatar.classList.remove('hidden');
-            bookmarksAccountAvatarFallback.classList.add('hidden');
-        } else {
-            bookmarksAccountAvatar.removeAttribute('src');
-            bookmarksAccountAvatar.classList.add('hidden');
-            bookmarksAccountAvatarFallback.classList.remove('hidden');
-        }
+        renderAccountAvatar(
+            bookmarksAccountAvatar,
+            bookmarksAccountAvatarFallback,
+            String(account.avatarUrl || '')
+        );
     }
 
     // Apply saved mode or default
@@ -1351,6 +1409,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 usernameInput.value = cleaned;
             }
         }
+        targetAccountCard.classList.remove('is-invalid');
+        usernameInput.removeAttribute('aria-invalid');
+        usernameError.classList.add('hidden');
+        renderTargetAccount();
     });
 
     // ==================== Apply Auth Result ====================
@@ -1446,13 +1508,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 : extractUsernameFromInput(usernameInput.value);
             if (mode !== 'bookmarks' && (!username || !isValidUsername(username))) {
                 usernameInput.focus();
-                usernameInput.style.borderColor = 'var(--danger)';
-                setTimeout(() => usernameInput.style.borderColor = '', 2000);
+                targetAccountCard.classList.add('is-invalid');
+                usernameInput.setAttribute('aria-invalid', 'true');
+                usernameError.classList.remove('hidden');
                 // A silent red flash left first-time users stranded (churn
                 // rows: opened popup, never started an export). Say what to do.
                 showToast(t('errEnterUsername'), 'error');
                 return;
             }
+            targetAccountCard.classList.remove('is-invalid');
+            usernameInput.removeAttribute('aria-invalid');
+            usernameError.classList.add('hidden');
 
             ratePromptCounted = false; // fresh export — allow it to be counted again
 
@@ -1652,6 +1718,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         stopBtn.classList.toggle('hidden', !isRunning);
         downloadBtn.classList.toggle('hidden', !showTerminalActions);
         copyBtn.classList.toggle('hidden', !showTxtCopy);
+        statusActionStack.classList.toggle('hidden', !isRunning && !showTerminalActions);
+        statusActionStack.classList.toggle('running-actions', isRunning);
         statusActionStack.classList.toggle('txt-actions', showTxtCopy);
         const canContinueComplete = status === 'complete' && itemCount > 0 &&
             state.completionReason !== 'source_exhausted';
@@ -1665,6 +1733,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             showRepliesFallback ||
             !(status === 'stopped' || canContinueComplete || (finalError && state.canResume))
         );
+        resumeRow.classList.toggle('is-stopped', status === 'stopped');
         newExportBtn.classList.toggle('hidden', status !== 'complete' && status !== 'stopped' && status !== 'error');
         exportStatus.classList.toggle('hidden', status === 'idle');
         statusDetail.classList.remove('hidden');
@@ -1692,7 +1761,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // `live` adds a pulsing animation to the status dot while the export is
         // actively working (fetching / cooling down / retrying).
         function setDotColor(color, live = false) {
-            statusIndicator.className = 'status-dot status-' + color + (live ? ' live' : '');
+            const statusClass = color === 'resumable'
+                ? 'status-resumable'
+                : 'status-' + color;
+            statusIndicator.className = 'status-dot ' + statusClass + (live ? ' live' : '');
+            statusIndicator.innerHTML = color === 'resumable' ? ICONS.playerPlay : '';
         }
 
         function setMeasuredProgress() {
@@ -1706,7 +1779,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Wait styling is per-state; clear it before each render, re-add below.
-        progressFill.classList.remove('cooldown', 'rate-limit', 'safety-break');
+        progressFill.classList.remove('cooldown', 'rate-limit', 'safety-break', 'stopped');
         clearStatusPhase();
 
         // Ordinary pacing and a real X rate-limit pause both own the live
@@ -1833,9 +1906,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
 
             case 'stopped':
-                statusText.innerHTML = ICONS.circlePause + ' ';
+                exportStatus.classList.add('phase-stopped');
+                progressFill.classList.add('stopped');
+                statusText.innerHTML = ICONS.playerStop + ' ';
                 statusText.appendChild(document.createTextNode(t('exportStopped')));
-                setDotColor('yellow');
+                setDotColor('resumable');
                 statusMessage.textContent = state.partialReason === 'replies_unavailable'
                     ? t('postsOnlyFallbackActive')
                     : t('canBeResumed');
