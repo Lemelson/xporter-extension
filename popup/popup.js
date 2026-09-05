@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usernameError = document.getElementById('usernameError');
     const targetAccountCard = document.getElementById('targetAccountCard');
     const targetAccountName = document.getElementById('targetAccountName');
+    const targetAccountHandleEditor =
+        document.getElementById('targetAccountHandleEditor');
     const targetAccountAvatar = document.getElementById('targetAccountAvatar');
     const targetAccountAvatarFallback =
         document.getElementById('targetAccountAvatarFallback');
@@ -1398,6 +1400,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Date Range Toggle ====================
     dateCheck.addEventListener('change', () => {
         dateFields.classList.toggle('hidden', !dateCheck.checked);
+    });
+
+    // The full inset reads as an editable field; clicking its prefix or pencil
+    // should place the caret in the real native input without blocking paste or
+    // text selection inside the input itself.
+    targetAccountHandleEditor.addEventListener('click', (event) => {
+        if (event.target !== usernameInput) usernameInput.focus();
     });
 
     // Auto-clean input on paste or type

@@ -266,6 +266,16 @@ assert.match(
     /<input[^>]*id=["']usernameInput["']/,
     'the target account card must preserve the native editable username input'
 );
+assert.match(
+    usernameFieldHtml,
+    /class=["'][^"']*\baccount-handle-editor\b[^"']*["'][^>]*id=["']targetAccountHandleEditor["']/,
+    'the username must sit in an explicit editable inset instead of looking like static metadata'
+);
+assert.match(
+    usernameFieldHtml,
+    /class=["'][^"']*\baccount-edit-icon\b[^"']*["'][^>]*aria-hidden=["']true["'][\s\S]*?data-tabler-icon=["']pencil["']/,
+    'the editable handle inset must expose a decorative official pencil cue'
+);
 assert.doesNotMatch(
     usernameFieldHtml,
     /data-i18n=["']yourAccount["']/,
@@ -434,13 +444,28 @@ const updateEntries = [...popupHtml.matchAll(
     /<div class="detail-item update-item">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/g
 )].map((match) => match[1]);
 assert.equal(updateEntries.length, 3, 'About must show the current build and two latest public releases');
+const readme = read('README.md');
+const chromeWebStoreRelease = /`v(\d+\.\d+\.\d+)` tag matches the package released through the Chrome Web Store/
+    .exec(readme)?.[1];
+const mainDevelopmentVersion = /`main` branch now reports version `(\d+\.\d+\.\d+)`/
+    .exec(readme)?.[1];
+assert.match(
+    chromeWebStoreRelease || '',
+    /^\d+\.\d+\.\d+$/,
+    'README must identify the version released through the Chrome Web Store'
+);
+assert.equal(
+    mainDevelopmentVersion,
+    manifest.version,
+    'README must identify the manifest version as the current development version'
+);
 assert.match(
     updateEntries[0],
-    new RegExp(`<span class="update-meta-version">v${manifest.version.replace(/\./g, '\\.')}</span>`),
-    'the first About update must describe the manifest build'
+    new RegExp(`<span class="update-meta-version">v${chromeWebStoreRelease.replace(/\./g, '\\.')}</span>`),
+    'the first About update must describe the Chrome Web Store release'
 );
-assert.match(updateEntries[0], /data-i18n=["']updateBuilt["']/,
-    'an unpublished current build must be labelled Build');
+assert.match(updateEntries[0], /data-i18n=["']updateReleased["']/,
+    'the Chrome Web Store version must be labelled Released');
 assert.match(updateEntries[1], /data-i18n=["']updateReleased["']/,
     'the previous public version must be labelled Released');
 assert.match(

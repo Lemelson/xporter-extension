@@ -68,6 +68,56 @@ async function main() {
     );
     await popup.locator('#usernameInput').fill('@Oheva_sf');
     assert.equal(await popup.locator('#usernameInput').inputValue(), 'Oheva_sf');
+    await popup.evaluate(() => {
+      const name = document.querySelector('#targetAccountName');
+      name.textContent = 'Свидетели и Егоры';
+      name.classList.remove('hidden');
+    });
+    const editableHandle = await popup.evaluate(() => {
+      const name = document.querySelector('#targetAccountName');
+      const editor = document.querySelector('#targetAccountHandleEditor');
+      const prefix = document.querySelector('#usernamePrefix');
+      const input = document.querySelector('#usernameInput');
+      const icon = document.querySelector('.account-edit-icon');
+      const nameStyle = getComputedStyle(name);
+      const editorStyle = getComputedStyle(editor);
+      const prefixStyle = getComputedStyle(prefix);
+      const inputStyle = getComputedStyle(input);
+      const prefixRect = prefix.getBoundingClientRect();
+      const inputRect = input.getBoundingClientRect();
+      return {
+        gap: inputRect.left - prefixRect.right,
+        nameColor: nameStyle.color,
+        nameSize: parseFloat(nameStyle.fontSize),
+        inputColor: inputStyle.color,
+        inputSize: parseFloat(inputStyle.fontSize),
+        inputWeight: inputStyle.fontWeight,
+        prefixColor: prefixStyle.color,
+        prefixSize: parseFloat(prefixStyle.fontSize),
+        prefixWeight: prefixStyle.fontWeight,
+        sameFont: inputStyle.fontFamily === prefixStyle.fontFamily,
+        editorBackground: editorStyle.backgroundColor,
+        editorCursor: editorStyle.cursor,
+        iconVisible: icon.getBoundingClientRect().width >= 14
+      };
+    });
+    assert(Math.abs(editableHandle.gap) <= 0.5, '@ and username must have no layout gap');
+    assert.equal(editableHandle.inputColor, editableHandle.prefixColor);
+    assert.equal(editableHandle.inputSize, editableHandle.prefixSize);
+    assert.equal(editableHandle.inputWeight, editableHandle.prefixWeight);
+    assert.equal(editableHandle.sameFont, true);
+    assert(editableHandle.inputSize > editableHandle.nameSize,
+      'the editable handle must be typographically stronger than the display name');
+    assert.notEqual(editableHandle.inputColor, editableHandle.nameColor);
+    assert.notEqual(editableHandle.editorBackground, 'rgba(0, 0, 0, 0)');
+    assert.equal(editableHandle.editorCursor, 'text');
+    assert.equal(editableHandle.iconVisible, true);
+    await popup.locator('#usernamePrefix').click();
+    assert.equal(
+      await popup.evaluate(() => document.activeElement?.id),
+      'usernameInput',
+      'clicking the @ prefix must focus the editable username input'
+    );
     await popup.locator('#exportMode').selectOption('bookmarks');
     assert.equal(await popup.locator('#usernameField').isVisible(), false);
     assert.equal(await popup.locator('#bookmarksAccountCard').isVisible(), true);

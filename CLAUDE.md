@@ -2,7 +2,7 @@
 
 **XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, personal bookmarks, followers, following, and verified followers to **CSV / JSON / XLSX / TXT**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Version:** local 1.6.4 release candidate (`manifest.json`); do not publish without a separate Chrome Web Store release decision.
+- **Version:** 1.6.5 development (`manifest.json`); the `v1.6.4` tag is the Chrome Web Store release.
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 

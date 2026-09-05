@@ -24,10 +24,9 @@
 
 ## Release status
 
-This repository reports version `1.6.4`. This local release candidate combines
-the 1.6.1 release baseline with additional reliability and interface work,
-including one-pass mixed post exports. It has not been uploaded to the Chrome
-Web Store; publishing remains a separate release decision.
+The `v1.6.4` tag matches the package released through the Chrome Web Store.
+The `main` branch now reports version `1.6.5` and contains subsequent
+development work that is not part of the 1.6.4 release archive.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. When you first select **Embed photo previews**,

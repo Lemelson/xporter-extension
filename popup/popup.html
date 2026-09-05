@@ -144,10 +144,19 @@
           </div>
           <div class="account-copy" id="targetAccountCopy">
             <strong class="account-name hidden" id="targetAccountName"></strong>
-            <div class="account-meta account-meta--input">
+            <div class="account-meta account-meta--input account-handle-editor"
+              id="targetAccountHandleEditor">
               <span class="account-input-prefix" id="usernamePrefix" aria-hidden="true">@</span>
               <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername" placeholder="elonmusk"
                 autocomplete="off" spellcheck="false" aria-describedby="usernameError">
+              <span class="account-edit-icon" aria-hidden="true">
+                <svg data-tabler-icon="pencil" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  focusable="false">
+                  <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+                  <path d="M13.5 6.5l4 4" />
+                </svg>
+              </span>
             </div>
           </div>
         </div>
@@ -1100,7 +1109,7 @@
                   compact trailing action, Download uses a clear horizontal row, and TXT places equal Download and
                   Copy actions side by side without square tiles or wasted space.</p>
                 <div class="update-meta">
-                  <span data-i18n="updateBuilt">Build</span>
+                  <span data-i18n="updateReleased">Released</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
                   <time data-release-date datetime="2026-08-25">August 25, 2026</time>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
