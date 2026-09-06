@@ -4,157 +4,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { source } = require('./support.js');
 
-function createWorkerHarness() {
-    let savedState = null;
-    let cleared = false;
-    let firstItemRecords = 0;
-    let saveStateSucceeds = true;
-    let loadAllCalls = 0;
-    let savedHistory = null;
-    let aboutAccountCache = {};
-    let downloadActive = false;
-    let downloadStarts = 0;
-    let textReads = 0;
-    const savedBatches = [];
-    const settings = {
-        quantityLimit: 500,
-        autoExpireEnabled: true,
-        autoExpireHours: 4
-    };
-
-    const context = vm.createContext({
-        console,
-        URL,
-        Blob,
-        setTimeout,
-        clearTimeout,
-        setInterval,
-        clearInterval,
-        importScripts() {},
-        XPORTER_CONFIG: { SPEED_PRESETS: { standard: {} } },
-        XLog: { log() {}, warn() {}, error() {}, info() {} },
-        XPorterAPI: {
-            discoverEndpoints: async () => ({}),
-            getRateLimit: () => null,
-            toPostContext: (tweet) => ({ ...tweet }),
-            setLiveQueryId() {}
-        },
-        XPorterCSV: {},
-        XPorterColumns: {},
-        XPorterFeedback: { refresh() {}, maybeRefresh() {} },
-        XPorterDownloads: {
-            isCurrentDataReadActive() { return downloadActive; },
-            isCurrentDownloadActive() { return downloadActive; },
-            async startCurrentDownload() {
-                downloadStarts += 1;
-                return { success: true };
-            },
-            async getCurrentPlan() { return { count: 0, partCount: 1 }; },
-            async getCurrentPostsText() {
-                textReads += 1;
-                return { error: 'NO_DATA' };
-            },
-            async downloadCurrent() { return { success: true }; },
-            async downloadHistory() { return { success: true }; },
-            async downloadSeenPosts() { return { success: true }; }
-        },
-        XPorterPostDB: {
-            upsertPosts: async () => ({}),
-            getSummary: async () => ({ count: 0 }),
-            getAllPosts: async () => [],
-            clear: async () => {}
-        },
-        XPorterStorage: {
-            async saveExportState(state) {
-                if (!saveStateSucceeds) return false;
-                savedState = { ...state, updatedAt: Date.now() };
-                return true;
-            },
-            async loadExportState() { return savedState; },
-            async loadSettings() { return { ...settings }; },
-            async clearExportState() { cleared = true; savedState = null; return true; },
-            async pruneExpiredExportHistory() { return { changed: false, expired: 0 }; },
-            async loadDetectedUsername() { return ''; },
-            async loadUsage() { return {}; },
-            async markInstalled() {},
-            async backfillInstalledAt() {},
-            async saveSettings() { return true; },
-            async recordExportStart() {},
-            async recordExportPhase() {},
-            async recordFirstItem() { firstItemRecords += 1; },
-            async recordExportComplete() {},
-            async recordExportStopped() {},
-            async recordExportError() {},
-            async loadAllTweets() { loadAllCalls += 1; return [{ id: '1' }]; },
-            async saveTweetBatch(index, items) { savedBatches[index] = items.map(item => ({ ...item })); return true; },
-            async loadTweetBatch(index) { return savedBatches[index] || []; },
-            async loadAboutAccountCache() {
-                return JSON.parse(JSON.stringify(aboutAccountCache));
-            },
-            async saveAboutAccountCache(cache) {
-                aboutAccountCache = JSON.parse(JSON.stringify(cache));
-                return true;
-            },
-            async saveExportHistory(entry) { savedHistory = entry; return true; }
-        },
-        RateLimitManager: class {
-            constructor(options) {
-                Object.assign(this, options);
-            }
-        },
-        detectBrowserLanguage: () => 'en',
-        loadTranslations: async () => ({}),
-        chrome: {
-            storage: { local: { setAccessLevel: async () => {} } },
-            runtime: {
-                id: 'test-extension',
-                onInstalled: { addListener() {} },
-                onStartup: { addListener() {} },
-                onMessage: { addListener() {} },
-                getManifest: () => ({ version: '1.4.8' }),
-                setUninstallURL() {},
-                getPlatformInfo: async () => ({ os: 'mac' }),
-                sendMessage: async () => ({})
-            },
-            tabs: {
-                query: async () => [],
-                create: async () => ({ id: 1 }),
-                remove: async () => {},
-                update: async () => {},
-                sendMessage: async () => ({})
-            },
-            action: {
-                setBadgeText() {},
-                setBadgeBackgroundColor() {}
-            }
-        }
-    });
-    const configContext = vm.createContext({});
-    vm.runInContext(source('utils/config.js'), configContext);
-    context.XPORTER_CONFIG.SEARCH_CAPTURE = { ...configContext.XPORTER_CONFIG.SEARCH_CAPTURE };
-    context.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION = configContext.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION;
-    vm.runInContext(source('utils/shared.js'), context, { filename: 'utils/shared.js' });
-    vm.runInContext(source('background/export-policy.js'), context, {
-        filename: 'background/export-policy.js'
-    });
-    vm.runInContext(source('background/service-worker.js'), context, { filename: 'background/service-worker.js' });
-    return {
-        context,
-        setSavedState(state) { savedState = state; },
-        getSavedState() { return savedState; },
-        wasCleared() { return cleared; },
-        firstItemRecords() { return firstItemRecords; },
-        setSaveStateSucceeds(value) { saveStateSucceeds = value; },
-        loadAllCalls() { return loadAllCalls; },
-        getSavedHistory() { return savedHistory; },
-        setAboutAccountCache(cache) { aboutAccountCache = JSON.parse(JSON.stringify(cache)); },
-        getAboutAccountCache() { return aboutAccountCache; },
-        getSavedBatches() { return savedBatches; },
-        setDownloadActive(value) { downloadActive = value; },
-        downloadStarts() { return downloadStarts; },
-        textReads() { return textReads; }
-    };
-}
+const { createWorkerHarness } = require('./worker-harness.js');
 
 async function testExportDataMutationsRespectDownloadLease() {
     const harness = createWorkerHarness();
@@ -2699,370 +2549,68 @@ async function testProfileFeedDefaultsAndMigratesLegacyReplySetting() {
 }
 
 
-function searchPage(rows = [], cursor = null) {
-    const entries = rows.map(row => ({entryId: 'tweet-' + row.id, content: {itemContent: {tweet_results: {result: {
-        legacy: {id_str: row.id, full_text: row.id, created_at: row.date},
-        core: {user_results: {result: {rest_id: row.authorId || '1', core: {screen_name: row.username || 'test'}}}}
-    }}}}}));
-    if (cursor) entries.push({entryId:'cursor-bottom-' + cursor, content:{value:cursor}});
-    const instructions = [{type:'TimelineAddEntries',entries}];
-    // Synthetic terminal page, not a captured live-X response.
-    if (!cursor) instructions.push({type:'TimelineTerminateTimeline', direction:'Bottom'});
-    return {url:cursor || 'last-page', status:200, bodyText:JSON.stringify({data:{search_by_raw_query:{search_timeline:{timeline:{instructions}}}}})};
-}
-
-function createSearchHarness(pages) {
-    const harness = createWorkerHarness();
-    const context = harness.context;
-    vm.runInContext(source('utils/api-parsers.js'), context);
-    context.__pages = [...pages];
-    vm.runInContext(`
-        currentExport = {
-            username:'test',userId:'1',userInfo:{screenName:'test'},exportMode:'posts',outputFormat:'csv',
-            schemaVersion:XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION,
-            dateFrom:new Date('2026-09-05T00:00:00Z'),dateTo:new Date('2026-09-05T23:59:59.999Z'),
-            dateSnapshotAt:Date.parse('2026-09-05T12:00:00Z'),startedAt:Date.parse('2026-09-05T12:00:00Z'),
-            running:true,status:'fetching',settings:{quantityLimit:500},tweetBuffer:[],tweetCount:0,totalBatches:0,
-            cursor:null,completionReason:null
-        };
-        rateLimiter={totalRequests:0,batchSize:20,getState:()=>({})};
-        XPorterStorage.MAX_TWEETS_PER_BATCH=50;
-        XPorterAPI.parseSearchTimelineResponse=XPorterApiParsers.parseSearchTimelineResponse;
-        openSearchCaptureTab=async(rawQuery)=>{searchCapture={rawQuery,queue:[],seenUrls:new Set(),resumeScanned:0};};
-        closeSearchCaptureTab=async()=>{};
-        sendSearchCaptureStatus=async()=>true;
-        waitForSearchCapturePayload=async()=>__pages.shift() || null;
-        requestNextSearchCapturePayload=async()=>__pages.shift() || null;
-        recoverStalledSearchCapture=async()=>null;
-        swSleep=async()=>{};
-    `,context);
-    return harness;
-}
-
-async function testSearchErrorsNeverBecomeEmptySuccess() {
-    const invalidInstructions = [{type:'UnknownShape'}, {type:'TimelineAddEntries'}, {type:'TimelineShowAlert'}];
-    for (const value of [{errors:[{message:'temporary'}]}, {}, ...invalidInstructions.map(instruction =>
-        ({data:{search_by_raw_query:{search_timeline:{timeline:{instructions:[instruction]}}}}}))]) {
-        const harness=createSearchHarness([{status:200,url:'error-page',bodyText:JSON.stringify(value)}]);
-        await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context), /SEARCH_(RESPONSE_ERROR|INVALID_RESPONSE)/);
-        assert.equal(vm.runInContext('currentExport.completionReason',harness.context),null);
-    }
-    const harness=createSearchHarness([{status:200,url:'bad-json',bodyText:'{'}]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_INVALID_RESPONSE/);
-    const invalidRow = createSearchHarness([searchPage([
-        {id:'saved-before-error',date:'2026-09-05T01:00:00Z'}, {id:'invalid-date',date:'invalid'}
-    ])]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', invalidRow.context), /SEARCH_INVALID_RESPONSE/);
-    assert.deepEqual(invalidRow.getSavedBatches().flat().map(row => row.id), ['saved-before-error']);
-}
-
-async function testSearchTodayIncludesExactBoundsAndFreezesNow() {
-    const harness=createSearchHarness([
-        searchPage([{id:'late',date:'2026-09-05T11:30:00Z'},{id:'after-snapshot',date:'2026-09-05T12:00:01Z'}],'second'),
-        searchPage([{id:'midnight',date:'2026-09-05T00:00:00Z'},{id:'before',date:'2026-09-04T23:59:59Z'},
-            {id:'foreign',date:'2026-09-05T01:00:00Z',authorId:'2'},
-            {id:'last',date:'2026-09-05T12:00:00Z'}])
-    ]);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
-    assert.deepEqual(harness.getSavedBatches().flat().map(row=>row.id),['late','midnight','last']);
-    assert.equal(harness.getSavedState().completionReason,'source_exhausted');
-    assert.equal(harness.getSavedState().dateSnapshotAt,Date.parse('2026-09-05T12:00:00Z'));
-    assert.match(vm.runInContext('searchCapture.rawQuery',harness.context),/since:2026-09-04 until:2026-09-07/);
-}
-
-async function testSearchSilenceNeverUsesDateCoverage() {
-    for (const date of ['2026-09-05T11:30:00Z','2026-09-05T00:01:00Z']) {
-        const harness=createSearchHarness([searchPage([{id:'saved',date}],'more')]);
-        await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_STALLED/);
-        assert.equal(harness.getSavedState().tweetCount,1,'rows must be durable before the next-page wait');
-        assert.equal(harness.getSavedState().completionReason,null,'neither high nor low coverage proves completion');
-    }
-    const empty=createSearchHarness([searchPage([],'more')]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',empty.context),/SEARCH_STALLED/);
-}
-
-async function testSearchEmptyLimitAndStopReasons() {
-    const empty=createSearchHarness([searchPage([])]);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()',empty.context);
-    assert.equal(empty.getSavedState().completionReason,'no_matches');
-    const limited=createSearchHarness([searchPage([{id:'1',date:'2026-09-05T01:00:00Z'},{id:'2',date:'2026-09-05T02:00:00Z'}],'more')]);
-    vm.runInContext('currentExport.settings.quantityLimit=1',limited.context);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()',limited.context);
-    assert.equal(limited.getSavedState().completionReason,'limit_reached');
-    assert.equal(limited.getSavedState().tweetCount,1);
-    const stopped=createSearchHarness([searchPage([{id:'1',date:'2026-09-05T01:00:00Z'}],'more')]);
-    vm.runInContext('requestNextSearchCapturePayload=async()=>{currentExport.running=false;return null;}',stopped.context);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()',stopped.context);
-    assert.equal(stopped.getSavedState().completionReason,null);
-    assert.equal(stopped.getSavedState().tweetCount,1);
-}
-
-async function testSearchResumeDedupAndFailureRecovery() {
-    const harness=createSearchHarness([searchPage([{id:'saved',date:'2026-09-05T01:00:00Z'},{id:'new',date:'2026-09-05T02:00:00Z'}])]);
-    harness.getSavedBatches()[0]=[{id:'saved'}];
-    harness.context.XPorterStorage.loadAllTweets=async()=>[{id:'saved'}];
-    vm.runInContext('currentExport.tweetCount=1;currentExport.totalBatches=1;currentExport.dateResume=true;',harness.context);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
-    assert.deepEqual(harness.getSavedBatches().flat().map(row=>row.id),['saved','new']);
-    assert.equal(vm.runInContext('searchCapture.resumeScanned',harness.context),1);
-    const retry=createSearchHarness([{url:'same',status:200,bodyText:'{'},searchPage([{id:'ok',date:'2026-09-05T02:00:00Z'}])]);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()',retry.context);
-    assert.equal(retry.getSavedState().tweetCount,1);
-}
-
 async function testPageWriteFailureNeverAdvancesCursor() {
-    for (const mode of ['posts','followers']) {
-        const harness=createWorkerHarness();
-        harness.context.__mode=mode;
-        await vm.runInContext(`(async()=>{
-            currentExport={username:'test',userId:'1',userInfo:{followersCount:10},exportMode:__mode,outputFormat:'csv',
-                settings:{quantityLimit:500},tweetBuffer:[],tweetCount:0,totalBatches:0,cursor:'page-A',running:true,status:'fetching'};
-            rateLimiter={executeWithRateLimit:fn=>fn(),totalRequests:0,batchSize:20,getState:()=>({})};
-            XPorterStorage.MAX_TWEETS_PER_BATCH=50;
-            XPorterStorage.saveTweetBatch=async()=>false;
-            XPorterAPI.fetchFollowers=async()=>({users:[{id:'lost'}],nextCursor:'page-B'});
-            try {
-                if(__mode==='posts') await _fetchPostTimelineLoop(async()=>({tweets:[{id:'lost'}],nextCursor:'page-B'}),()=>true);
-                else await _fetchUsersLoop();
-            } catch(error) {currentExport.error=error.message;}
-            currentExport.running=false;currentExport.status='error';
-            await saveCurrentState({bestEffort:true});
-        })()`,harness.context);
-        assert.equal(harness.getSavedState().error,'STORAGE_FULL');
-        assert.equal(harness.getSavedState().cursor,'page-A');
-        assert.equal(harness.getSavedState().tweetCount,0);
-    }
-}
-
-async function testSearchDiagnosesTabAndBridgeFailures() {
-    for(const [kind,expected] of [['closed','SEARCH_TAB_UNAVAILABLE'],['changed','SEARCH_PAGE_CHANGED'],['bridge','SEARCH_BRIDGE_UNAVAILABLE']]) {
-        const harness=createWorkerHarness();
-        harness.context.__kind=kind;
-        await vm.runInContext(`
-            currentExport={running:true,tweetCount:0};
-            searchCapture={tabId:42,rawQuery:'(from:test)',queue:[]};
-            sendSearchCaptureStatus=async()=>true;
-            waitForSearchCapturePayload=async()=>null;
-            chrome.tabs.get=async()=>{if(__kind==='closed')throw new Error('closed');return {status:'complete',url:__kind==='changed'?'https://x.com/home':buildSearchTimelinePageUrl('(from:test)')};};
-            chrome.tabs.sendMessage=async()=>({ready:true,hookReady:false});
-        `,harness.context);
-        await assert.rejects(vm.runInContext('requestNextSearchCapturePayload()',harness.context),new RegExp(expected));
-    }
-    const harness=createSearchHarness([]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_NO_RESPONSE/);
-}
-
-function testSearchCaptureRejectsOtherQueriesAndReportsTransportErrors() {
-    const harness=createWorkerHarness();
-    vm.runInContext("searchCapture={tabId:42,rawQuery:'(from:test)',queue:[],seenUrls:new Set()};",harness.context);
-    for(const [rawQuery,product,accepted] of [['(from:other)','Latest',false],['(from:test)','Top',false],['(from:test)','Latest',true]]) {
-        harness.context.__message={operationName:'SearchTimeline',status:200,bodyText:'',error:'SEARCH_NETWORK_ERROR',
-            url:'https://x.com/i/api/graphql/query/SearchTimeline?variables='+encodeURIComponent(JSON.stringify({rawQuery,product}))};
-        const result=vm.runInContext('handlePageGraphqlResponse(__message,{tab:{id:42}})',harness.context);
-        assert.equal(result.success===true,accepted);
-    }
-    assert.equal(vm.runInContext('searchCapture.queue[0].error',harness.context),'SEARCH_NETWORK_ERROR');
-}
-
-function testDateBoundariesUseLocalCalendarAndRejectInvalidDays() {
-    const harness=createWorkerHarness();
-    assert.equal(vm.runInContext("normalizeDateBoundary('2026-02-30','start')",harness.context),null);
-    assert.equal(vm.runInContext("normalizeDateBoundary('invalid','start')",harness.context),null);
-    const value=vm.runInContext(`({start:normalizeDateBoundary('2026-09-05','start').getTime(),end:normalizeDateBoundary('2026-09-05','end').getTime()})`,harness.context);
-    assert.equal(value.start,new Date(2026,8,5,0,0,0,0).getTime());
-    assert.equal(value.end,new Date(2026,8,5,23,59,59,999).getTime());
-    for (const day of ['2026-03-08', '2026-11-01']) {
-        harness.context.__day = day;
-        const bounds = vm.runInContext(`({
-            start: normalizeDateBoundary(__day, 'start').getTime(),
-            end: normalizeDateBoundary(__day, 'end').getTime()
-        })`, harness.context);
-        assert.equal(bounds.start, new Date(day + 'T00:00:00').getTime());
-        assert.equal(bounds.end, new Date(day + 'T23:59:59.999').getTime());
-        if (process.env.TZ === 'America/New_York') {
-            assert.equal(bounds.end - bounds.start + 1, (day.endsWith('03-08') ? 23 : 25) * 3600000);
-        }
-    }
-    vm.runInContext(`
-        currentExport = {
-            username:'test', userId:'1',
-            dateFrom:normalizeDateBoundary('2026-03-08','start'),
-            dateTo:normalizeDateBoundary('2026-03-08','end'),
-            dateSnapshotAt:Date.parse('2026-09-05T12:00:00Z')
-        };
-    `, harness.context);
-    for (const [timestamp, allowed] of [
-        ['2026-03-07T23:59:59.999', false], ['2026-03-08T00:00:00', true],
-        ['2026-03-08T23:59:59.999', true], ['2026-03-09T00:00:00', false]
-    ]) {
-        harness.context.__row = {_author_id:'1',created_at:new Date(timestamp).toISOString()};
-        assert.equal(vm.runInContext('dateExportAllowsTweet(__row)', harness.context), allowed);
-    }
-}
-
-async function testLegacyDateResumeRequiresRestartWithoutChangingRows() {
-    for (const schemaVersion of [undefined, 0, 999]) {
+    for (const mode of ['posts', 'followers']) {
         const harness = createWorkerHarness();
-        const legacy = {
-            schemaVersion, username:'test', userId:'1', exportMode:'posts',
-            dateFrom:'2026-09-05T00:00:00.000Z', dateTo:'2026-09-05T23:59:59.999Z',
-            running:false, status:'stopped', tweetCount:1, totalBatches:1, settings:{quantityLimit:500}
+        const broadcasts = [];
+        const requestedCursors = [];
+        harness.getSavedBatches()[0] = [{id:'already-saved'}];
+        harness.context.chrome.runtime.sendMessage = async message => {
+            if (message.type === 'EXPORT_STATUS_UPDATE') broadcasts.push({...message});
         };
-        harness.setSavedState(legacy);
-        harness.getSavedBatches()[0] = [{id:'old-row'}];
-        const before = JSON.stringify(legacy);
-        const result = await vm.runInContext('_resumeExportInner(100)', harness.context);
-        assert.equal(result.error, 'DATE_EXPORT_RESTART_REQUIRED');
-        assert.equal(JSON.stringify(harness.getSavedState()), before);
-        assert.equal(harness.wasCleared(), false);
-        assert.deepEqual(harness.getSavedBatches(), [[{id:'old-row'}]]);
-        const status = await vm.runInContext('getExportStatus()', harness.context);
-        assert.equal(status.canResume, false);
-        assert.equal(status.resumeBlockedReason, 'DATE_EXPORT_RESTART_REQUIRED');
-        assert.equal(status.tweetCount, 1, 'old rows must remain available to Download');
-        assert.equal(status.status, 'stopped');
+        const originalSaveBatch = harness.context.XPorterStorage.saveTweetBatch;
+        harness.context.XPorterStorage.saveTweetBatch = async () => false;
+        const page = async (_userId, cursor) => {
+            requestedCursors.push(cursor);
+            const row = {id:'recoverable', author_username:'test', type:'tweet'};
+            return {tweets:[row], users:[row], nextCursor:requestedCursors.length === 1 ? 'page-B' : null};
+        };
+        harness.context.XPorterAPI.fetchUserTweets = page;
+        harness.context.XPorterAPI.fetchFollowers = page;
+        harness.context.__mode = mode;
+        await vm.runInContext(`
+            createRateLimiter = () => ({
+                executeWithRateLimit:fn=>fn(), totalRequests:0, batchSize:20,
+                getState:()=>({}), restoreState(){}, onStatusChange(){}
+            });
+            currentExport={
+                username:'test', userId:'1', userInfo:{id:'1',screenName:'test',tweetCount:10,followersCount:10},
+                exportMode:__mode, outputFormat:'csv',
+                settings:{quantityLimit:500,includeRetweets:true,includeReplies:false},
+                tweetBuffer:[],tweetCount:1,totalBatches:1,cursor:'page-A',running:true,status:'fetching'
+            };
+            rateLimiter=createRateLimiter();
+            XPorterStorage.MAX_TWEETS_PER_BATCH=50;
+            launchExportLoop('test write failure');
+            exportLoopPromise;
+        `, harness.context);
+        const failed = harness.getSavedState();
+        assert.equal(failed.error, 'STORAGE_FULL');
+        assert.equal(failed.status, 'error');
+        assert.equal(failed.running, false);
+        assert.equal(failed.cursor, 'page-A');
+        assert.equal(failed.tweetCount, 1);
+        assert.deepEqual(harness.getSavedBatches(), [[{id:'already-saved'}]]);
+        assert.equal(broadcasts.at(-1).status, 'error');
+        assert.equal(broadcasts.at(-1).canResume, true);
+        assert(!broadcasts.some(event => event.status === 'complete'));
+
+        // Restart the worker's in-memory state and drive its real Resume path.
+        harness.context.XPorterStorage.saveTweetBatch = originalSaveBatch;
+        vm.runInContext('currentExport=null', harness.context);
+        const result = await vm.runInContext('_resumeExportInner()', harness.context);
+        assert.equal(result.success, true);
+        await vm.runInContext('exportLoopPromise', harness.context);
+        assert.deepEqual(requestedCursors, ['page-A', 'page-A'], 'Resume must re-fetch the failed page');
+        assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['already-saved','recoverable']);
+        assert.equal(harness.getSavedState().status, 'complete');
+        assert.equal(harness.getSavedState().tweetCount, 2);
     }
-    const harness = createWorkerHarness();
-    assert.equal(vm.runInContext("getResumeBlockedReason({exportMode:'posts'})", harness.context), null,
-        'unversioned exports without dates keep their existing Resume path');
-    for (const boundary of ['dateFrom', 'dateTo']) {
-        harness.context.__state = {[boundary]:'2026-09-05T00:00:00Z'};
-        assert.equal(vm.runInContext('getResumeBlockedReason(__state)', harness.context), 'DATE_EXPORT_RESTART_REQUIRED');
-    }
 }
 
-async function testVersionedDateResumePreservesBoundsAndSnapshot() {
-    const harness = createWorkerHarness();
-    vm.runInContext(`
-        createRateLimiter = () => ({onStatusChange(){}, getState(){return {};}, restoreState(){}});
-        launchExportLoop = () => {};
-    `, harness.context);
-    const result = await vm.runInContext(`_startExportInner({
-        username:'test', exportMode:'posts', outputFormat:'csv', dateFrom:'2026-09-05', dateTo:'2026-09-05'
-    })`, harness.context);
-    assert.equal(result.success, true);
-    const initial = {...harness.getSavedState(), userId:'1', running:false, status:'stopped'};
-    assert.equal(initial.schemaVersion, harness.context.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION);
-    assert.equal(initial.dateFrom, new Date('2026-09-05T00:00:00').toISOString());
-    assert.equal(initial.dateTo, new Date('2026-09-05T23:59:59.999').toISOString());
-    harness.setSavedState(initial);
-    vm.runInContext('currentExport=null', harness.context);
-    const resumed = await vm.runInContext('_resumeExportInner()', harness.context);
-    assert.equal(resumed.success, true);
-    for (const key of ['schemaVersion','dateFrom','dateTo','dateSnapshotAt','startedAt']) {
-        assert.equal(harness.getSavedState()[key], initial[key], key + ' must survive Resume unchanged');
-    }
-}
-
-async function testSearchNetworkErrorsHaveBoundedCancellableRetries() {
-    const networkError = {url:'same-request', status:200, bodyText:'', error:'SEARCH_NETWORK_ERROR'};
-    const goodRow = {id:'saved', date:'2026-09-05T01:00:00Z'};
-    const recovered = createSearchHarness([networkError, searchPage([goodRow], 'next'), networkError, searchPage([])]);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()', recovered.context);
-    assert.equal(recovered.getSavedState().completionReason, 'source_exhausted');
-    assert.equal(recovered.getSavedState().tweetCount, 1, 'a valid page resets the consecutive-failure budget');
-
-    const failed = createSearchHarness([searchPage([goodRow], 'next'), networkError, networkError, searchPage([])]);
-    failed.context.XPORTER_CONFIG.SEARCH_CAPTURE.maxConsecutiveFailures = 2;
-    failed.context.XPORTER_CONFIG.SEARCH_CAPTURE.retryDelayMs = 17;
-    const waits = [];
-    failed.context.__recordWait = duration => waits.push(duration);
-    vm.runInContext('swSleep=async duration=>__recordWait(duration)', failed.context);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', failed.context), /SEARCH_NETWORK_ERROR/);
-    assert.deepEqual(waits, [17], 'configured budget means one retry, not an unbounded loop');
-    assert.equal(failed.context.__pages.length, 1);
-    assert.equal(failed.getSavedState().tweetCount, 1);
-    assert.equal(failed.getSavedState().completionReason, null);
-
-    const stopped = createSearchHarness([networkError, searchPage([goodRow])]);
-    vm.runInContext('swSleep=async()=>{currentExport.running=false;}', stopped.context);
-    await vm.runInContext('_fetchPostsByDateRangeLoop()', stopped.context);
-    assert.equal(stopped.context.__pages.length, 1, 'Stop during retry must not request another page');
-    assert.equal(vm.runInContext('currentExport.completionReason', stopped.context), null);
-}
-
-async function testSearchCompletionRequiresExplicitTerminalEvidence() {
-    const cases = JSON.parse(source('scripts/fixtures/search-endings.synthetic.json'));
-    for (const fixture of cases) {
-        const payload = {url:'fixture', status:200, bodyText:JSON.stringify({data:{
-            search_by_raw_query:{search_timeline:{timeline:{instructions:fixture.instructions}}}
-        }})};
-        const harness = createSearchHarness([payload]);
-        if (fixture.exhausted) {
-            await vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context);
-            assert.equal(harness.getSavedState().completionReason, 'no_matches', fixture.name);
-        } else {
-            await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context),
-                new RegExp(fixture.error || 'SEARCH_END_UNCONFIRMED'), fixture.name);
-            assert.equal(vm.runInContext('currentExport.completionReason', harness.context), null, fixture.name);
-        }
-    }
-    const payload = searchPage([{id:'partial', date:'2026-09-05T01:00:00Z'}]);
-    const data = JSON.parse(payload.bodyText);
-    data.data.search_by_raw_query.search_timeline.timeline.instructions.pop();
-    payload.bodyText = JSON.stringify(data);
-    const harness = createSearchHarness([payload]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context), /SEARCH_END_UNCONFIRMED/);
-    assert.equal(harness.getSavedState().tweetCount, 1, 'ambiguous ending must preserve accepted rows');
-}
-
-async function testDelayedOverlayNeverReplaysAnOlderPhase() {
-    const harness = createWorkerHarness();
-    const timers = [];
-    const phases = [];
-    harness.context.setTimeout = fn => {timers.push(fn); return timers.length;};
-    harness.context.__phase = phase => phases.push(phase);
-    await vm.runInContext(`
-        currentExport={running:true,searchPhase:'loading'};
-        sendSearchCaptureStatus=async status=>__phase(status.phaseKey);
-        openSearchCaptureTab('(from:test)');
-    `, harness.context);
-    vm.runInContext("currentExport.searchPhase='collecting'", harness.context);
-    timers.shift()();
-    assert.deepEqual(phases, ['collecting']);
-    await vm.runInContext("openSearchCaptureTab('(from:test)')", harness.context);
-    vm.runInContext("lastTransientStatus={status:'cooldown'}", harness.context);
-    timers.shift()();
-    assert.deepEqual(phases, ['collecting'], 'initial overlay must not replace an active rate-limit countdown');
-
-    const retry = createWorkerHarness();
-    const retryTimers = [];
-    const messages = [];
-    retry.context.setTimeout = fn => {retryTimers.push(fn); return retryTimers.length;};
-    retry.context.chrome.tabs.sendMessage = async (_id, message) => {
-        messages.push(message.phase);
-        if (messages.length === 1) throw new Error('content not ready');
-        return {};
-    };
-    vm.runInContext(`
-        currentExport={running:true,username:'test',settings:{},tweetCount:0};
-        searchCapture={tabId:42};
-        getOverlayI18n=async()=>({searchLoading:'loading', searchWaiting:'waiting'});
-    `, retry.context);
-    const old = vm.runInContext("sendSearchCaptureStatus({phaseKey:'loading'}, 3)", retry.context);
-    for (let i=0; i<10 && !retryTimers.length; i++) await Promise.resolve();
-    assert.equal(retryTimers.length, 1);
-    await vm.runInContext("sendSearchCaptureStatus({phaseKey:'waiting'})", retry.context);
-    retryTimers.shift()();
-    assert.equal(await old, false);
-    assert.deepEqual(messages, ['loading','waiting'], 'failed older delivery must not retry after a new phase');
-}
 
 const tests = [
-    { name: "legacy date Resume is explicit and nondestructive", run: testLegacyDateResumeRequiresRestartWithoutChangingRows, order: 87 },
-    { name: "versioned date Resume preserves exact snapshot", run: testVersionedDateResumePreservesBoundsAndSnapshot, order: 88 },
-    { name: "search network retry budget and Stop", run: testSearchNetworkErrorsHaveBoundedCancellableRetries, order: 89 },
-    { name: "search endings require explicit evidence", run: testSearchCompletionRequiresExplicitTerminalEvidence, order: 90 },
-    { name: "overlay timers cannot replay stale phases", run: testDelayedOverlayNeverReplaysAnOlderPhase, order: 91 },
-    { name: "search errors never become empty success", run: testSearchErrorsNeverBecomeEmptySuccess, order: 78 },
-    { name: "today exact boundaries and snapshot", run: testSearchTodayIncludesExactBoundsAndFreezesNow, order: 79 },
-    { name: "search silence never means date coverage", run: testSearchSilenceNeverUsesDateCoverage, order: 80 },
-    { name: "search empty limit and stop reasons", run: testSearchEmptyLimitAndStopReasons, order: 81 },
-    { name: "search resume dedup and malformed retry", run: testSearchResumeDedupAndFailureRecovery, order: 82 },
     { name: "page write failure preserves cursor", run: testPageWriteFailureNeverAdvancesCursor, order: 83 },
-    { name: "search tab and bridge diagnosis", run: testSearchDiagnosesTabAndBridgeFailures, order: 84 },
-    { name: "search query identity and transport errors", run: testSearchCaptureRejectsOtherQueriesAndReportsTransportErrors, order: 85 },
-    { name: "local calendar and invalid dates", run: testDateBoundariesUseLocalCalendarAndRejectInvalidDays, order: 86 },
     { name: "download lease protects export batches", run: testExportDataMutationsRespectDownloadLease, order: 75 },
     { name: "Clear cannot race Start or Resume", run: testClearCannotRaceStartingOrResumingExport, order: 76 },
     { name: "explicit zero-row Replies fallback", run: testRepliesFallbackRequiresZeroRowsAndPreservesSnapshot, order: 35 },

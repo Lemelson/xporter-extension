@@ -134,7 +134,7 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── test-all.js              # Canonical ordered 11-suite deterministic gate
-│   ├── test-extension-core.js   # 92-test aggregator; suites in test-extension-core/
+│   ├── test-extension-core.js   # 94-test aggregator; suites in test-extension-core/
 │   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
 │   │                            # bookmark lifecycle/API cancellation/capture/export policy
 │   ├── test-extension-smoke.mjs               # unpacked extension runtime smoke
@@ -412,7 +412,9 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 92-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 11 explicit suites in order: static contracts; the 94-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. The core runner applies a per-test deadline, validates all registrations before an optional `--suite=<id>` selection, and keeps date-export cases in `date-export.test.js`. Worker-based suites share detached JSON storage doubles in `worker-harness.js`. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+
+XLSX ZIP/text-cell validation is deterministic; opening the workbook in LibreOffice is the separate, strict `node scripts/test-xlsx-libreoffice.js` integration gate. Missing LibreOffice fails that check instead of silently skipping it. `scripts/package.sh` requires both gates. GitHub CI runs the deterministic gate in UTC, Moscow, New York and Kiritimati, and installs LibreOffice in a separate compatibility job. See `scripts/TESTING.md`.
 
 Outside `CODEX_SANDBOX`, run `node scripts/test-extension-smoke.mjs` plus the footer, tooltip, XLSX-photo-options, and photo-permission browser checks. Every Playwright entrypoint invokes `tooling-policy.js` before loading Playwright. The authenticated date-range debug scripts may require macOS Full Disk Access to read a copied browser cookie database. Also verify both themes; stop/resume; large exports; CSV/XLSX in a spreadsheet app; every language; and a live date range when an authenticated test profile is available.
 

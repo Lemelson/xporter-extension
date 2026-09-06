@@ -279,6 +279,8 @@ node scripts/test-all.js
 git diff --check
 ```
 
+Opening generated XLSX files in LibreOffice is checked separately with `node scripts/test-xlsx-libreoffice.js`. This requires LibreOffice and fails explicitly if it is missing or cannot complete the conversion. Release packaging runs both checks. CI tests four timezones and has a separate LibreOffice compatibility job. See [Testing](scripts/TESTING.md).
+
 For focused iteration, the individual `scripts/test-*.js` files remain directly runnable; `test-all.js` is the required complete gate and the source of truth for their order.
 
 For a real unpacked-Chromium check, run `node scripts/test-extension-smoke.mjs` from a normal Terminal session or an approved unsandboxed environment. Do not launch it inside `CODEX_SANDBOX`: macOS can abort GUI-backed Chromium during LaunchServices registration, and the script intentionally fails fast there.

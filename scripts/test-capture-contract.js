@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { createWorkerHarness } = require('./test-extension-core/worker-harness.js');
+const { withTimeout } = require('./test-extension-core/support.js');
 
 const ROOT = path.join(__dirname, '..');
 const CONTRACT_FILE = 'utils/capture-contract.js';
@@ -83,9 +85,6 @@ function testManifestOrderAndConsumerOwnership() {
     assert.match(relay, /XPorterCaptureContract/);
     assert.doesNotMatch(interceptor, /const\s+TRACKED\s*=/);
     assert.doesNotMatch(relay, /const\s+RELAY_TRACKED_OPERATIONS\s*=/);
-    assert.match(relay, /event\.source\s*!==\s*window/);
-    assert.match(relay, /event\.origin\s*!==\s*window\.location\.origin/);
-    assert.match(relay, /Number\.isInteger\(status\)/);
     assert.match(relay, /RELAY_POST_ID_PATTERN/);
     assert.match(relay, /RELAY_POST_OPERATION_PATTERN/);
     assert.match(interceptor, /operationFromUrl/);
@@ -95,9 +94,10 @@ function testManifestOrderAndConsumerOwnership() {
     }
 }
 
-function createContentHarness() {
+function createContentHarness({ onRuntimeMessage, postToMain } = {}) {
     const windowListeners = new Map();
     const runtimeMessages = [];
+    let runtimeListener;
     const window = {
         location: {
             pathname: '/home',
@@ -106,7 +106,8 @@ function createContentHarness() {
         },
         addEventListener(type, listener) {
             windowListeners.set(type, listener);
-        }
+        },
+        postMessage(message) { postToMain?.(message); }
     };
     window.window = window;
     const document = {
@@ -134,9 +135,9 @@ function createContentHarness() {
                     runtimeMessages.push(
                         JSON.parse(JSON.stringify(message))
                     );
-                    return Promise.resolve({ success: true });
+                    return Promise.resolve(onRuntimeMessage?.(message) || { success: true });
                 },
-                onMessage: { addListener() {} }
+                onMessage: { addListener(listener) { runtimeListener = listener; } }
             }
         }
     });
@@ -145,36 +146,50 @@ function createContentHarness() {
     return {
         context,
         runtimeMessages,
-        dispatch(data) {
+        dispatchRuntime(message) {
+            return new Promise(resolve => runtimeListener(message, {}, resolve));
+        },
+        dispatch(data, eventOverrides = {}) {
             windowListeners.get('message')({
                 source: window,
                 origin: window.location.origin,
-                data
+                data,
+                ...eventOverrides
             });
         }
     };
 }
 
-function createInterceptorHarness() {
+function createInterceptorHarness({ postToContent } = {}) {
     const posted = [];
+    const listeners = new Map();
     class FakeXHR {
-        addEventListener() {}
+        constructor() { this.listeners = []; this.responseType = ''; }
+        addEventListener(type, callback) { if (type === 'load') this.listeners.push(callback); }
+        emitLoad() {
+            const pending = this.listeners.splice(0);
+            for (const callback of pending) callback();
+        }
     }
-    FakeXHR.prototype.open = function () {};
+    FakeXHR.prototype.open = function (_method, url) { this.responseURL = url; };
 
     const window = {
         location: { origin: 'https://x.com' },
         _bodyText: '{}',
+        addEventListener(type, listener) { listeners.set(type, listener); },
         postMessage(message) {
             posted.push(JSON.parse(JSON.stringify(message)));
+            postToContent?.(message);
         },
         async fetch() {
+            if (this._networkError) throw this._networkError;
             const bodyText = this._bodyText;
+            const readError = this._readError;
             return {
-                status: 200,
+                status: this._status || 200,
                 clone() {
                     return {
-                        async text() { return bodyText; }
+                        async text() { if (readError) throw readError; return bodyText; }
                     };
                 }
             };
@@ -203,11 +218,17 @@ function createInterceptorHarness() {
     });
     load(CONTRACT_FILE, context);
     load('content/interceptor.js', context);
-    return { context, window, posted };
+    return { context, window, posted, FakeXHR,
+        dispatch(data) { listeners.get('message')?.({source:window, origin:window.location.origin, data}); }
+    };
 }
 
 async function testMainWorldRejectionBehavior() {
-    const harness = createInterceptorHarness();
+    let signalFeed;
+    const feed = new Promise(resolve => { signalFeed = resolve; });
+    const harness = createInterceptorHarness({postToContent: message => {
+        if (message.type === '__XPORTER_SEEN_POSTS__') signalFeed();
+    }});
     const contract =
         harness.context.globalThis.XPorterCaptureContract;
     const graphqlUrl = operation =>
@@ -227,7 +248,9 @@ async function testMainWorldRejectionBehavior() {
 
     harness.window._bodyText = '{"tweet_results":{}}';
     await harness.window.fetch(graphqlUrl('HomeTimeline'));
-    await new Promise(resolve => setTimeout(resolve, 5));
+    // The passive parser schedules work once; wait for that event explicitly.
+    // Its own bounded test deadline catches a missing dispatch.
+    await withTimeout(() => feed, 'passive feed dispatch', 1000);
 
     assert.deepEqual(
         harness.posted.map(message => message.type),
@@ -247,6 +270,14 @@ async function testIsolatedRelayRejectionBehavior() {
         status: 200,
         bodyText: '{}'
     };
+    // Behavioral checks replace source-pattern assertions: the same spelling
+    // in a comment would not satisfy these rejection cases.
+    for (const invalidEvent of [{origin:'https://example.invalid'}, {source:{}}]) {
+        harness.dispatch({...baseResponse, operationName:'SearchTimeline'}, invalidEvent);
+    }
+    for (const status of [0, 99, 600, 200.5]) {
+        harness.dispatch({...baseResponse, operationName:'SearchTimeline', status});
+    }
 
     harness.dispatch({
         ...baseResponse,
@@ -299,7 +330,81 @@ async function testIsolatedRelayRejectionBehavior() {
     );
 }
 
+function createLinkedCaptureHarness() {
+    const worker = createWorkerHarness();
+    vm.runInContext(`
+        currentExport={running:true};
+        searchCapture={tabId:42,rawQuery:'(from:test)',queue:[],resolver:null,seenUrls:new Set()};
+    `, worker.context);
+    let main;
+    const content = createContentHarness({
+        postToMain: message => queueMicrotask(() => main.dispatch(message)),
+        onRuntimeMessage: message => worker.dispatchRuntime(message, {tab:{id:42,url:'https://x.com/search'}})
+    });
+    main = createInterceptorHarness({postToContent: message => queueMicrotask(() => content.dispatch(message))});
+    const url = 'https://x.com/i/api/graphql/query/SearchTimeline?variables=' +
+        encodeURIComponent(JSON.stringify({rawQuery:'(from:test)',product:'Latest'}));
+    return {main, content, worker, url,
+        nextPayload() { return vm.runInContext('waitForSearchCapturePayload(1000)', worker.context); }
+    };
+}
+
+async function testLinkedCaptureReadinessAndResponses() {
+    const harness = createLinkedCaptureHarness();
+    const ready = await harness.content.dispatchRuntime({type:'XPORTER_SEARCH_PAGE_STATE'});
+    assert.equal(ready.hookReady, true, 'real MAIN/isolated listeners must complete the readiness probe');
+    const body = JSON.stringify({data:{search_by_raw_query:{search_timeline:{timeline:{
+        instructions:[{type:'TimelineTerminateTimeline',direction:'Bottom'}]
+    }}}}});
+    harness.main.window._bodyText = body;
+    const pending = harness.nextPayload();
+    const response = await harness.main.window.fetch(harness.url);
+    const payload = await pending;
+    assert.equal(response.status, 200, 'page fetch must still receive its response');
+    assert.equal(payload?.bodyText, body);
+    assert.equal(payload?.url, harness.url);
+    assert.equal(payload?.error, undefined);
+
+    // Independently cover the XHR capture branch, with a real load callback.
+    const xhrHarness = createLinkedCaptureHarness();
+    const xhrPayload = xhrHarness.nextPayload();
+    const xhr = new xhrHarness.main.FakeXHR();
+    xhr.open('GET', xhrHarness.url);
+    xhr.status = 429;
+    xhr.responseText = '{"errors":[{"message":"rate limited"}]}';
+    xhr.emitLoad();
+    assert.equal((await xhrPayload)?.status, 429);
+}
+
+async function testLinkedCaptureNetworkFailureAndSameUrlRetry() {
+    const harness = createLinkedCaptureHarness();
+    harness.main.window._networkError = new Error('temporary connection failure');
+    const pendingFailure = harness.nextPayload();
+    await assert.rejects(harness.main.window.fetch(harness.url), /temporary connection failure/);
+    const failure = await pendingFailure;
+    assert.equal(failure?.error, 'SEARCH_NETWORK_ERROR');
+    assert.equal(failure?.bodyText, '');
+    assert.equal(vm.runInContext('searchCapture.seenUrls.size', harness.worker.context), 0,
+        'a transport error must not make the request URL permanently seen');
+
+    harness.main.window._networkError = null;
+    harness.main.window._bodyText = '{"retry":"succeeded"}';
+    const pendingRetry = harness.nextPayload();
+    await harness.main.window.fetch(harness.url);
+    assert.equal((await pendingRetry)?.bodyText, '{"retry":"succeeded"}');
+
+    const oversized = createLinkedCaptureHarness();
+    oversized.main.window._bodyText = 'x'.repeat(oversized.main.window.XPorterCaptureContract.MAX_BODY_CHARS + 1);
+    const pendingOversized = oversized.nextPayload();
+    await oversized.main.window.fetch(oversized.url);
+    const diagnostic = await pendingOversized;
+    assert.equal(diagnostic?.error, 'SEARCH_RESPONSE_TOO_LARGE');
+    assert.equal(diagnostic?.bodyText, '');
+}
+
 const tests = [
+    ['linked capture readiness, fetch and XHR', testLinkedCaptureReadinessAndResponses],
+    ['linked network failure and same-URL retry', testLinkedCaptureNetworkFailureAndSameUrlRetry],
     ['shared immutable contract', testSharedContractShape],
     ['manifest order and consumer ownership', testManifestOrderAndConsumerOwnership],
     ['MAIN-world rejection behavior', testMainWorldRejectionBehavior],
@@ -310,7 +415,7 @@ const tests = [
     const failures = [];
     for (const [name, test] of tests) {
         try {
-            await test();
+            await withTimeout(test, name);
             console.log(`PASS ${name}`);
         } catch (error) {
             failures.push({ name, error });

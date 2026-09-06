@@ -6,7 +6,6 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
-const { requireSofficeExecutable } = require('../tooling-policy.js');
 const { source } = require('./support.js');
 
 async function testXlsxIsRealOoxmlZip() {
@@ -45,17 +44,14 @@ async function testXlsxIsRealOoxmlZip() {
     try {
         fs.writeFileSync(workbookPath, bytes);
         execFileSync('unzip', ['-t', workbookPath], { stdio: 'pipe' });
-        const soffice = requireSofficeExecutable();
-        if (soffice) {
-            const profileUrl = `file://${path.join(tempDir, 'libreoffice-profile')}`;
-            execFileSync(soffice, [
-                `-env:UserInstallation=${profileUrl}`,
-                '--headless', '--convert-to', 'csv', '--outdir', tempDir, workbookPath
-            ], { stdio: 'pipe', timeout: 30_000 });
-            const converted = fs.readFileSync(path.join(tempDir, 'export.csv'), 'utf8');
-            assert(converted.includes('2075277820528607704'), 'LibreOffice must preserve long IDs');
-            assert(converted.includes('Привет & hello'), 'LibreOffice must open Unicode cell text');
-        }
+        // Inspect the worksheet entry, not incidental text elsewhere in the ZIP.
+        const sheet = execFileSync('unzip', ['-p', workbookPath, 'xl/worksheets/sheet1.xml'], {encoding:'utf8'});
+        const idCell = [...sheet.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)]
+            .find(cell => /\br="A2"/.test(cell[1]));
+        assert(idCell, 'the first data row must have an ID cell');
+        assert.match(idCell[1], /\bt="inlineStr"/, 'long IDs must be text cells, not rounded spreadsheet numbers');
+        assert.match(idCell[2], /<t\b[^>]*>2075277820528607704<\/t>/);
+        assert(sheet.includes('Привет &amp; hello'), 'Unicode text must be in the worksheet itself');
     } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
     }

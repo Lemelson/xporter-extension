@@ -28,7 +28,7 @@
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Public site | `docs/` only (`index.html`, `privacy-policy.html`, `feedback.html`, `assets/`); root site copies were removed |
-| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 92-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the gate then atomically replaces an allowlist ZIP |
+| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 94-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the deterministic and explicit LibreOffice gates before atomically replacing an allowlist ZIP |
 
 ## Gotchas that bite
 
@@ -51,4 +51,4 @@
 17. **Cursor de-duplication is bounded:** ordinary posts/user-list exports keep only `RECENT_EXPORT_ID_LIMIT` IDs in memory. Do not restore an unbounded per-run `Set`; date-range search is the separate path that needs full saved-ID de-duplication on resume.
 
 ## When you change things
-Keep **`agent.md`** and this file in sync (new files, messages, storage keys, settings, export modes, and load order). Run `node scripts/test-all.js` plus `git diff --check`; outside `CODEX_SANDBOX`, run the unpacked smoke and the popup footer, tooltip, XLSX-photo-layout, and permission-rationale browser checks. Record authenticated live-X proof separately. Bump `version` in `manifest.json` only for releases. Build the CWS ZIP with `scripts/package.sh`.
+Keep **`agent.md`** and this file in sync (new files, messages, storage keys, settings, export modes, and load order). Run `node scripts/test-all.js` plus `git diff --check`; outside `CODEX_SANDBOX`, run the unpacked smoke and the popup footer, tooltip, XLSX-photo-layout, and permission-rationale browser checks. Record authenticated live-X proof separately. The strict `node scripts/test-xlsx-libreoffice.js` compatibility gate is separate from deterministic tests and mandatory in the packager. See `scripts/TESTING.md` for focused runs, timezone CI and proof boundaries. Bump `version` in `manifest.json` only for releases. Build the CWS ZIP with `scripts/package.sh`.

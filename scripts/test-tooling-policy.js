@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { withTimeout } = require('./test-extension-core/support.js');
 
 const {
     assertBrowserSmokeCanLaunch,
@@ -32,6 +33,16 @@ function createPackageFixture() {
     fs.chmodSync(path.join(binDir, 'node'), 0o755);
     return { root, scriptsDir, binDir };
 }
+
+// Use Node's independent test runner: if the deadline helper itself loses its
+// timer, node:test reports cancelled pending work rather than a false pass.
+test('test deadlines execute work, propagate failures and reject unresolved promises', async () => {
+    let calls = 0;
+    assert.equal(await withTimeout(() => { calls++; return 42; }, 'sync fixture'), 42);
+    assert.equal(calls, 1);
+    await assert.rejects(withTimeout(() => { throw new Error('fixture failure'); }, 'failure fixture'), /fixture failure/);
+    await assert.rejects(withTimeout(() => new Promise(() => {}), 'hung fixture', 1), /hung fixture timed out/);
+});
 
 test('browser smoke refuses to launch a macOS app inside the Codex sandbox', () => {
     assert.throws(
@@ -157,6 +168,27 @@ test('sandboxed soffice requirement fails closed when the managed runtime is mis
         }),
         error => error?.code === 'CODEX_SANDBOX_SOFFICE_BLOCKED'
     );
+});
+
+test('runtime and LibreOffice failures both block release before replacing an artifact', () => {
+    for (const failingScript of ['scripts/test-all.js', 'scripts/test-xlsx-libreoffice.js']) {
+        const fixture = createPackageFixture();
+        const output = path.join(fixture.root, 'existing.zip');
+        const previous = Buffer.from('previous-good-artifact');
+        fs.writeFileSync(output, previous);
+        fs.writeFileSync(path.join(fixture.binDir, 'node'),
+            `#!/bin/sh\nif [ "$1" = "${failingScript}" ]; then exit 41; fi\nexit 0\n`);
+        try {
+            const result = spawnSync(path.join(fixture.scriptsDir, 'package.sh'), [], {
+                cwd:fixture.root, encoding:'utf8',
+                env:{...process.env, PATH:`${fixture.binDir}:/usr/bin:/bin`, XPORTER_ZIP_OUT:output}
+            });
+            assert.equal(result.status, 41, `${failingScript} must be a mandatory packaging gate`);
+            assert.deepEqual(fs.readFileSync(output), previous);
+        } finally {
+            fs.rmSync(fixture.root, {recursive:true, force:true});
+        }
+    }
 });
 
 test('package creation failure preserves the previous output artifact', () => {

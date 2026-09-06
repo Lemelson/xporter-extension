@@ -16,6 +16,12 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [Etc/UTC, Europe/Moscow, America/New_York, Pacific/Kiritimati]
+    env:
+      TZ: ${{ matrix.timezone }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,3 +33,19 @@ jobs:
 
       - name: Deterministic gate
         run: node scripts/test-all.js
+
+  xlsx-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install LibreOffice for an explicit compatibility check
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc
+      - name: Open generated workbook and verify saved values
+        run: node scripts/test-xlsx-libreoffice.js

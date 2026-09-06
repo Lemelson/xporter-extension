@@ -844,6 +844,13 @@ const englishKeys = Object.keys(english).sort();
 for (const file of localeFiles) {
     const locale = JSON.parse(read(`popup/locales/${file}`));
     assert.deepEqual(Object.keys(locale).sort(), englishKeys, `${file} must match en.json keys`);
+    for (const key of englishKeys) {
+        assert.equal(typeof locale[key], 'string', `${file} ${key} must be a string`);
+        const placeholders = value => [...new Set([...value.matchAll(/\{[A-Za-z][A-Za-z0-9_]*\}/g)]
+            .map(match => match[0]))].sort();
+        assert.deepEqual(placeholders(locale[key]), placeholders(english[key]),
+            `${file} ${key} must preserve every interpolation placeholder`);
+    }
     for (const key of [
         'formatTxt',
         'xlsxPhotosTitle',

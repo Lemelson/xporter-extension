@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const suiteManifest = require('./test-extension-core/suite-manifest.js');
+const { withTimeout } = require('./test-extension-core/support.js');
 
 function validateManifest(manifest) {
     assert(Array.isArray(manifest) && manifest.length > 0,
@@ -105,6 +106,7 @@ function runGuardSelfChecks() {
         () => assertUniqueTests([validOne, { name: 'two', run: testTwo, order: 0 }]),
         /duplicate core test order/
     );
+    assert.throws(() => selectTests(['--suite=missing'], [], suiteManifest), /unknown core suite/);
 }
 
 function loadTests(manifest) {
@@ -119,14 +121,25 @@ function loadTests(manifest) {
     return tests.sort((left, right) => left.order - right.order);
 }
 
+function selectTests(args, tests, manifest) {
+    if (!args.length) return tests;
+    assert.equal(args.length, 1, 'use --suite=<id> for a focused core run');
+    const suiteId = /^--suite=(.+)$/.exec(args[0])?.[1];
+    const entry = manifest.find(item => item.id === suiteId);
+    assert(entry, `unknown core suite: ${args[0]}`);
+    const functions = new Set(require(entry.module).tests.map(test => test.run));
+    return tests.filter(test => functions.has(test.run));
+}
+
 (async () => {
     runGuardSelfChecks();
-    const tests = loadTests(suiteManifest);
+    const tests = selectTests(process.argv.slice(2), loadTests(suiteManifest), suiteManifest);
+    if (process.argv.length > 2) console.log(`Focused core run: ${process.argv[2]}`);
     const failures = [];
     let executed = 0;
     for (const test of tests) {
         try {
-            await test.run();
+            await withTimeout(test.run, test.name);
             console.log(`PASS ${test.name}`);
         } catch (error) {
             failures.push({ name: test.name, error });

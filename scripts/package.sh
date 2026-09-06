@@ -27,6 +27,7 @@ command -v node >/dev/null 2>&1 || { echo "ERROR: 'node' not found in PATH" >&2;
 # checklist that can be forgotten.
 echo "Running release checks..."
 node scripts/test-all.js
+node scripts/test-xlsx-libreoffice.js
 
 # Read version from manifest.json (no jq dependency).
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json | head -n 1)"
