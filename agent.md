@@ -274,7 +274,7 @@ Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 - `createCooldownTicker(render)` — live cooldown countdown driven by the SW's `until` timestamps
 - RTL + number-formatting helpers
 
-The popup coordinator passes a complete display snapshot to `export-status.js`; rating and download side effects remain outside the renderer. `settings-form.js` owns only ordinary controls. It derives quantity presets from `<option>` values and restores the previously accepted About retry value while confirmation is pending. Photo settings are persisted only by the permission flow. `guarded-dialog.js` cancels timers and stale focus callbacks and invokes confirmation synchronously so native Chrome permission requests retain the user gesture.
+The popup coordinator passes a complete display snapshot to `export-status.js`; rating and download side effects remain outside the renderer. `settings-form.js` owns only ordinary controls. It derives quantity presets from `<option>` values and saves only the accepted About retry value: typing before blur and pending confirmation cannot enter another control's autosave. Photo settings are persisted only by the permission flow. `guarded-dialog.js` cancels timers and stale focus callbacks and invokes confirmation synchronously so native Chrome permission requests retain the user gesture.
 
 ### 4.7. `content/content.js` + `content/interceptor.js`
 - **`utils/capture-contract.js`** loads first in MAIN (the generated `content/capture-prerequisites.js` bundle loads first in the isolated world) and exposes frozen tracked-operation and payload-size limits. It contains no credentials or mutable authority.

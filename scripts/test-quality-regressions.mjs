@@ -27,7 +27,12 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`chrome-extension://${new URL(worker.url()).host}/popup/popup.html`);
-  await page.waitForFunction(() => document.documentElement.lang === 'en');
+  // The empty database disables Clear only after the final popup module mounts.
+  const waitForPopup = () => page.waitForFunction(
+    () => document.getElementById('clearFeedDb')?.disabled === true,
+    null, { timeout: 10000 }
+  );
+  await waitForPopup();
   const defaults = await page.evaluate(async () =>
     (await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' })).settings);
 
@@ -37,8 +42,7 @@ try {
       await chrome.storage.local.remove('xporter_photo_permission_intro_seen');
     }, { ...defaults, language: 'en', ...patch });
     await page.reload();
-    await page.waitForFunction(() => document.querySelector('#feedDbCount')?.textContent !== '', { timeout: 10000 });
-    await page.waitForTimeout(300);
+    await waitForPopup();
     await page.locator('[data-tab="settings"]').click();
   }
   const saved = () => page.evaluate(async () =>
@@ -78,6 +82,31 @@ try {
     assert.equal((await saved()).aboutAccountMaxRetries, 5);
     await page.locator('#aboutRiskCancel').click();
     assert.equal(await page.locator('#aboutAccountMaxRetries').inputValue(), '5');
+  });
+
+  await check('typing retries cannot enter autosave before blur and confirmation', async () => {
+    await reset({ includeAboutAccountDetails: true, aboutAccountMaxRetries: 5 });
+    await page.locator('#aboutAccountMaxRetries').focus();
+    await change('quantityLimit', 100);
+    await page.locator('#aboutAccountMaxRetries').fill('120');
+    await page.waitForTimeout(700);
+    assert.equal((await saved()).quantityLimit, 100, 'the unrelated autosave must actually run');
+    assert.equal((await saved()).aboutAccountMaxRetries, 5);
+    await page.locator('#aboutAccountMaxRetries').press('Tab');
+    await page.locator('#aboutRiskDialog').waitFor({ state: 'visible' });
+    await page.locator('#aboutRiskCancel').click();
+    assert.equal(await page.locator('#aboutAccountMaxRetries').inputValue(), '5');
+
+    await page.locator('#aboutAccountMaxRetries').fill('120');
+    await page.locator('#aboutAccountMaxRetries').press('Tab');
+    await page.locator('#aboutRiskConfirm').click({ timeout: 10000 });
+    await page.waitForFunction(async () =>
+      (await chrome.storage.local.get('xporter_settings')).xporter_settings.aboutAccountMaxRetries === 120);
+    await page.locator('#aboutAccountMaxRetries').fill('10');
+    await page.locator('#aboutAccountMaxRetries').press('Tab');
+    await page.waitForFunction(async () =>
+      (await chrome.storage.local.get('xporter_settings')).xporter_settings.aboutAccountMaxRetries === 10);
+    assert.equal(await page.locator('#aboutRiskDialog').isVisible(), false);
   });
 
   await check('pending autosave cannot enable unconfirmed photo embedding', async () => {

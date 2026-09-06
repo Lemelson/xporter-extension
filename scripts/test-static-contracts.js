@@ -735,8 +735,8 @@ assert.match(
 );
 assert.match(
     popupRuntime,
-    /aboutAccountMaxRetries:\s*clampToInput\(aboutAccountMaxRetries,\s*5\)/,
-    'the popup must persist the bounded About retry setting'
+    /aboutAccountMaxRetries:\s*lastAcceptedAboutRetries/,
+    'the popup must persist only the accepted About retry setting'
 );
 assert.match(
     popupHtml,

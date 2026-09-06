@@ -227,7 +227,8 @@
                 includeAboutAccountDetails: includeAboutAccountDetails.checked,
                 aboutAccountSpeed: aboutAccountSpeed.value || 'standard',
                 aboutAccountCustomBatchSize: clampToInput(aboutAccountCustomBatchSize, 5),
-                aboutAccountMaxRetries: clampToInput(aboutAccountMaxRetries, 5),
+                // Typed input is still a draft until change/confirmation accepts it.
+                aboutAccountMaxRetries: lastAcceptedAboutRetries,
                 autoExpireEnabled: autoExpireEnabled.checked,
                 autoExpireHours: clampToInput(autoExpireHours, 4),
                 ladybugEnabled: ladybugEnabled ? ladybugEnabled.checked : true,

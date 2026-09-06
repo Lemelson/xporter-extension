@@ -34,3 +34,11 @@ The worker remains large (2,326 lines); the API client remains 1,248 lines. They
 - Final `node scripts/test-all.js`: all 12 suites passed, including 101 core cases. `git diff --check` passed. Reproduction and browser commands are documented in `scripts/TESTING.md`.
 
 Authenticated live-X compatibility and Store publication are separate from this local review. No release ZIP or published release is part of this change.
+
+## Follow-up verification
+
+Re-reviewed the complete `45382be..dbc39e9` diff, including popup initialization and extracted ownership, shared status projection, default settings, locale failures, storage queues and IndexedDB cleanup. A remaining confirmation gap was reproduced against `dbc39e9`: while the retry input still had focus, typing 120 let an unrelated pending autosave persist 120 before the field's `change` handler could request confirmation. The form now persists `lastAcceptedAboutRetries`, never the draft input value.
+
+The sixth browser regression failed with `120 !== 5` before that fix and passes afterward. It also verifies cancellation, explicit confirmation after the countdown, and decreasing the accepted value without another warning. The runner now waits for the final popup module's empty-database button state instead of treating the initial count text as readiness and sleeping an arbitrary 300 ms.
+
+Fresh verification passed all 12 deterministic suites (101 core cases), all six quality regressions, and the six existing unpacked smoke/layout/permission/status runners. These checks ran with the separately added UI commit `c1f409f` present in the shared checkout. No additional defect was confirmed in the reviewed diff. Authenticated live-X compatibility was not retested.
