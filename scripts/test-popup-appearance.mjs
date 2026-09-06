@@ -18,7 +18,7 @@ try {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.setViewportSize({ width: 400, height: 600 });
+  await page.setViewportSize({ width: 350, height: 600 });
   await page.goto(`chrome-extension://${new URL(worker.url()).host}/popup/popup.html`);
   await page.waitForFunction(() => document.getElementById('postSelectionCount').textContent.includes('5'));
   const earlyHover = await page.locator('[data-i18n-tooltip="exportModeHelp"]').evaluate(trigger => {
@@ -33,7 +33,7 @@ try {
   await page.locator('[data-tab="settings"]').click();
   const help = page.locator('[data-i18n-tooltip="autoExpireHelp"]');
   assert.equal(await help.count(), 1);
-  await page.setViewportSize({ width: 400, height: 300 });
+  await page.setViewportSize({ width: 350, height: 300 });
   await help.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 220));
   await help.hover();
   // Hover may scroll the trigger into view; position the bottom-edge fixture afterwards.
@@ -48,7 +48,7 @@ try {
   assert(bounds.y + bounds.height <= (await help.boundingBox()).y,
     'Auto-clear help must open above when below has insufficient room');
 
-  await page.setViewportSize({ width: 400, height: 600 });
+  await page.setViewportSize({ width: 350, height: 600 });
   const output = process.env.XPORTER_APPEARANCE_OUTPUT || '/private/tmp/xporter-appearance-qa';
   fs.mkdirSync(output, { recursive: true });
   const readSettings = () => page.evaluate(async () => (await chrome.storage.local.get('xporter_settings')).xporter_settings);
@@ -62,7 +62,7 @@ try {
   await page.locator('label:has(#simplifiedDesign)').click();
   await page.waitForFunction(() => document.body.classList.contains('simplified'));
   assert.equal((await readSettings()).quantityLimit, 777, 'appearance saves must preserve newer settings from another surface');
-  await page.setViewportSize({ width: 460, height: 600 });
+  await page.setViewportSize({ width: 403, height: 600 });
   await page.locator('#uiScale').selectOption('115');
   await page.waitForFunction(() => document.body.style.getPropertyValue('--ui-scale') === '1.15');
   assert.equal((await readSettings()).uiScale, 115);
@@ -70,7 +70,7 @@ try {
   assert.equal(overlayAppearance.simplifiedDesign, true);
   assert.equal(overlayAppearance.uiScale, 115);
   const scaledWidth = (await page.locator('body').boundingBox()).width;
-  assert(Math.abs(scaledWidth - 460) < 1, `115% should produce a 460px popup, got ${scaledWidth}`);
+  assert(Math.abs(scaledWidth - 402.5) < 1, `115% should produce a 402.5px popup, got ${scaledWidth}`);
   await page.reload();
   await page.waitForFunction(() => document.getElementById('postSelectionCount').textContent.includes('5'));
   assert.equal(await page.locator('#simplifiedDesign').isChecked(), true);
@@ -82,7 +82,7 @@ try {
   for (const language of languages) for (const theme of ['dark','light']) for (const simplifiedDesign of [false,true]) {
     const scales = [85,100,115,130];
     for (const uiScale of scales) {
-      const width = Math.round(400 * uiScale / 100);
+      const width = Math.round(350 * uiScale / 100);
       const tag = `${language}-${theme}-${simplifiedDesign ? 'simple' : 'blue'}-${uiScale}`;
       await page.setViewportSize({width,height:600});
       await page.evaluate(async settings => {
@@ -91,8 +91,21 @@ try {
       }, {language,theme,simplifiedDesign,uiScale});
       await page.reload();
       await page.waitForFunction(language => document.documentElement.lang === language && document.getElementById('postSelectionCount').textContent.includes('5'), language);
-      assert.equal(await page.locator('.post-type-description').first().isVisible(), !simplifiedDesign, `${tag}: default descriptions / optional compact rows`);
+      assert.equal(await page.locator('.post-type-description').count(), 0, `${tag}: explanations belong only in help`);
       assert.equal(await page.locator('.post-type-help').count(), 5);
+      const helpLayout = await page.locator('.post-type-row').evaluateAll(rows => rows.map(row => {
+        const info = row.querySelector('.post-type-help').getBoundingClientRect();
+        const check = row.querySelector('.post-choice-check').getBoundingClientRect();
+        const label = row.querySelector('.post-choice-copy').getBoundingClientRect();
+        return { info: info.toJSON(), check: check.toJSON(), label: label.toJSON() };
+      }));
+      for (const {info, check} of helpLayout) {
+        assert(Math.abs(info.width - 16 * uiScale / 100) < 1, `${tag}: help uses the original 16px icon size`);
+        assert(language === 'ar' ? info.left >= check.right : info.right <= check.left,
+          `${tag}: help must precede the checkbox without overlapping it`);
+      }
+      assert.equal(await page.locator('.post-type-help .help-pop strong').count(), 5,
+        `${tag}: every post type has a highlighted explanation`);
       const fontHeight = await page.locator('.post-choice-copy strong').first().evaluate(el => el.getBoundingClientRect().height);
       assert(fontHeight >= 14 * uiScale / 100, `${tag}: text must scale with controls`);
       for (const testWidth of [width,320]) {
@@ -152,7 +165,7 @@ try {
       cases++;
     }
   }
-  console.log(`PASS ${cases} appearance combinations, ${languages.length} locales, all 4 scales, normal/320px widths, descriptions and adaptive help`);
+  console.log(`PASS ${cases} appearance combinations, ${languages.length} locales, all 4 scales, normal/320px widths, compact rows and adaptive help`);
   assert.deepEqual(errors, []);
 
   console.log('PASS bottom-edge Auto-clear help');

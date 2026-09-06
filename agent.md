@@ -99,7 +99,7 @@ xporter/
 │                                #   world (Chrome 111+); wraps fetch/XHR to capture live
 │                                #   GraphQL request templates + timeline payloads
 │
-├── popup/                       # Scalable popup UI (400px base)
+├── popup/                       # Scalable popup UI (350px base)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
 │   ├── popup.css                # 🔑 ALL popup styles (themes, animations, ladybug, logo)
 │   ├── popup.js                 # ~1,000-line initialization and command coordinator
@@ -333,11 +333,11 @@ The popup uses the resolved export profile (`GET_STATUS.userInfo`) as a handle-m
 
 ### Export workspace layout
 
-The default popup retains blue glass surfaces in dark and light themes. The optional Settings → Design section selects `simplifiedDesign` (default false) and `uiScale` (85, 100, 115, 130; default 100). Both styles use one DOM and the same export controllers. `theme-init.js` applies the shared appearance policy before content renders; `theme.js` persists each appearance key independently, preserving other settings and restoring controls after failed saves. The base width is 400px, scaled together with text and controls; narrow windows wrap the header and use vertical scrolling.
+The default popup retains blue glass surfaces in dark and light themes. The appearance controls in Settings select `simplifiedDesign` (default false) and `uiScale` (85, 100, 115, 130; default 100). Both styles use one DOM and the same export controllers. `theme-init.js` applies the shared appearance policy before content renders; `theme.js` persists each appearance key independently, preserving other settings and restoring controls after failed saves. The base width is 350px, scaled together with text and controls; narrow windows wrap the header and use vertical scrolling.
 
-Status, Download/Copy, Resume and New Export precede setup. Mode and output format share a row. Post descriptions are visible by default; each post row also has a separate information button, so reading help cannot toggle the checkbox. `presentation.js` positions all help relative to visible viewport space, converts measured coordinates for CSS zoom, supports Escape and scrolling long explanations. The worker includes appearance in the cached overlay presentation; SAVE_SETTINGS invalidates that cache. The overlay applies blue/simplified, dark/light and the same scale presets.
+Status, Download/Copy, Resume and New Export precede setup. Mode and output format share a row. Post descriptions live only in tooltips. Every row has a separate 16px information button before its checkbox, so reading help cannot toggle the checkbox. `presentation.js` positions all help relative to visible viewport space, converts measured coordinates for CSS zoom, supports Escape and scrolling long explanations. The worker includes appearance in the cached overlay presentation; SAVE_SETTINGS invalidates that cache. The overlay applies blue/simplified, dark/light and the same scale presets.
 
-`scripts/test-popup-appearance.mjs` covers persistence, independent settings patches, all four scales, both designs/themes, 14 languages, normal/320px widths, descriptions and bottom-edge help. `scripts/test-ui-refresh.mjs` covers real popup/content-script rendering with synthetic worker data, export actions, overlay collapse, progress, waiting and Stop. No authenticated export is started by either test.
+`scripts/test-popup-appearance.mjs` covers persistence, independent settings patches, all four scales, both designs/themes, 14 languages, normal/320px widths, compact rows and bottom-edge help. `scripts/test-ui-refresh.mjs` covers real popup/content-script rendering with synthetic worker data, export actions, overlay collapse, progress, waiting and Stop. No authenticated export is started by either test.
 
 ### 6.2. Easter Egg: the Ladybug (`popup/ladybug.js`)
 A ladybug wanders the "Questions or found a bug?" contact card on the **About** tab.
@@ -495,4 +495,4 @@ In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-p
 ## 14. How to Update This File
 Update `agent.md` (and `CLAUDE.md`) whenever you add/rename a file, change the message protocol or storage schema, add export modes/formats/settings, update feature flags or queryIds, or change the data flow. Keep sections numbered; update §2's diagram for architectural changes.
 
-Native action popup sizing: `theme-init.js` detects action views with `chrome.extension.getViews` before layout. Only action windows bypass `max-width: 100vw`, which otherwise traps the initial preferred size; normal tabs remain responsive. Navigation retains the original icon-only tabs and spacing, with localized screen-reader labels. Tooltips stay hidden until their localized content exists and their viewport position has been measured; legacy local help uses the same positioned trigger. `scripts/test-native-popup-size.mjs` opens actual action windows in disposable Helium profiles and verifies 340/400/460/520px widths across both styles and themes.
+Native action popup sizing: `theme-init.js` detects action views with `chrome.extension.getViews` before layout. Only action windows bypass `max-width: 100vw`, which otherwise traps the initial preferred size; normal tabs remain responsive. Navigation retains the original icon-only tabs and spacing, with localized screen-reader labels. Tooltips use manual top-layer popovers so measurement and rendering cannot enlarge native action windows or their scrollable area. They stay hidden until localized content exists; viewport coordinates account for CSS zoom. `scripts/test-native-popup-size.mjs` opens actual action windows in disposable Helium profiles and verifies 297/350/402/455px native widths across both styles and themes, traces every hover frame for size/position changes, and checks that downward scrolling reaches the About footer.

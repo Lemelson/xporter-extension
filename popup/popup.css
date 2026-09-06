@@ -2057,7 +2057,7 @@ body.light .post-choice input:checked + .post-choice-check::after {
 .post-type-choice {
   grid-template-columns: 30px minmax(0, 1fr) 18px;
   gap: 10px;
-  min-height: 54px;
+  min-height: 44px;
   padding-block: 8px;
   padding-inline: 10px;
 }
@@ -3969,7 +3969,7 @@ html {
 }
 
 /* Shared workspace layout and user-controlled scale. */
-body { --ui-scale: 1; width: calc(400px * var(--ui-scale)); max-width: 100vw; }
+body { --ui-scale: 1; width: calc(350px * var(--ui-scale)); max-width: 100vw; }
 html.action-popup body { max-width: none; }
 .popup { width: 100%; zoom: var(--ui-scale); }
 .header { flex-wrap: wrap; gap: 8px; }
@@ -3981,22 +3981,23 @@ html.action-popup body { max-width: none; }
 .post-selection-panel.is-empty { outline: 2px solid var(--danger); outline-offset: 4px; }
 .post-selection-heading h2 { font-size: 14px; font-weight: 600; }
 .post-selection-count { font-variant-numeric: tabular-nums; }
-.post-type-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px; align-items: center; gap: 5px; padding-inline-end: 8px; border: 1px solid var(--glass-border); border-radius: 9px; background: var(--glass-bg); }
+.post-type-row { position: relative; border: 1px solid var(--glass-border); border-radius: 9px; background: var(--glass-bg); }
 .post-type-choice, body.light .post-type-choice,
 .post-type-choice:has(input:checked), body.light .post-type-choice:has(input:checked) {
   grid-template-columns: 24px minmax(0, 1fr) 18px; gap: 9px;
-  min-height: 54px; padding: 10px; border: 0; border-radius: 8px; background: transparent;
+  min-height: 44px; padding: 10px; border: 0; border-radius: 8px; background: transparent;
 }
 .post-type-choice:hover, body.light .post-type-choice:hover { background: var(--bg-hover); }
 .post-type-choice:has(input:focus-visible) { outline-offset: -2px; }
 .post-type-choice:has(input:not(:checked)), body.light .post-type-choice:has(input:not(:checked)) { background: var(--bg-tertiary); }
 .post-type-icon, .post-type-icon svg { width: 24px; height: 24px; }
 .post-choice-copy strong { font-size: 14px; font-weight: 600; }
-.post-choice-copy .post-type-description { font-size: 12px; line-height: 1.4; margin-top: 3px; }
+.post-type-choice .post-choice-copy { padding-inline-end: 24px; }
 .post-type-choice input:not(:checked) ~ .post-choice-copy { opacity: 1; }
 .post-type-choice input:checked ~ .post-choice-check { box-shadow: none; }
 .date-help, .date-help.help-local { position: relative; flex: 0 0 auto; }
-button.date-help { background: transparent; padding: 0; width: 24px; height: 24px; font-family: inherit; }
+button.date-help { background: transparent; padding: 0; width: 16px; height: 16px; font-family: inherit; }
+.post-type-row .post-type-help { position: absolute; inset-inline-end: 39px; top: 50%; transform: translateY(-50%); }
 .appearance-settings { margin-bottom: 12px; }
 .export-status { margin-bottom: 16px; gap: 10px; }
 .status-text { overflow-wrap: anywhere; }
@@ -4124,7 +4125,6 @@ body.simplified .logo { color: var(--accent); filter: none; animation: none; }
 body.simplified .tab.active { background: var(--bg-hover); color: var(--accent); }
 body.simplified .select, body.simplified .input-small, body.simplified .account-card { background-color: var(--input-bg); border-color: var(--border); box-shadow: none; backdrop-filter: none; }
 body.simplified .account-meta--input { background: var(--bg-secondary); border-color: transparent; box-shadow: none; }
-body.simplified .post-type-description { display: none; }
 body.simplified .post-type-choice { min-height: 42px; padding-block: 10px; }
 body.simplified .post-type-icon { color: var(--text-secondary); }
 body.simplified .post-type-choice input:checked ~ .post-type-icon { color: var(--accent); }
@@ -4194,3 +4194,11 @@ body.simplified .progress-fill::after { display: none; }
   .export-status.is-running .progress-fill::after { animation: none; transition: none; }
   .export-status .btn:active { scale: 1; }
 }
+
+/* Top-layer help never participates in the action window's preferred size. */
+.date-help .help-pop[popover] {
+  position: fixed; inset: auto; margin: 0;
+  left: var(--help-pop-left, 0px); top: var(--help-pop-safe-top, 0px);
+}
+.date-help .help-pop[popover]:not(:popover-open) { display: none; }
+.date-help .help-pop[popover]:popover-open { display: block; }

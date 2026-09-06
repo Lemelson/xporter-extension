@@ -5,9 +5,8 @@
     function mount({ popup, t }) {
         const tabs = document.querySelectorAll('.tab');
         const tabContents = document.querySelectorAll('.tab-content');
-        // All help targets share the same placement and keyboard behavior.
-        // Geometry is measured in viewport pixels, then converted to the trigger's
-        // CSS coordinates so user zoom and scrolled/transformed tabs stay aligned.
+        // All help lives in the browser top layer, outside preferred-size and scroll
+        // calculations. Viewport coordinates are converted for inherited CSS zoom.
         let openHelp = null;
         let helpCloseTimer = null;
         function positionViewportHelp(trigger) {
@@ -23,8 +22,8 @@
                 ? footerRect.top - 8 : innerHeight - 8;
             const width = Math.max(0, Math.min(360 * zoom, innerWidth - 32));
             const left = Math.max(16, Math.min(triggerRect.left, innerWidth - width - 16));
-            trigger.style.setProperty('--help-pop-width', `${width / zoom}px`);
-            trigger.style.setProperty('--help-pop-max-height', 'none');
+            tooltip.style.setProperty('--help-pop-width', `${width / zoom}px`);
+            tooltip.style.setProperty('--help-pop-max-height', 'none');
             const border = getComputedStyle(tooltip);
             const naturalHeight = (tooltip.scrollHeight + parseFloat(border.borderTopWidth) +
                 parseFloat(border.borderBottomWidth)) * zoom;
@@ -35,21 +34,26 @@
             const placeBelow = naturalHeight <= below || (naturalHeight > above && below >= above);
             const maxHeight = placeBelow ? below : above;
             const top = placeBelow ? belowTop : Math.max(safeTop, aboveBottom - Math.min(naturalHeight, above));
-            trigger.style.setProperty('--help-pop-left', `${(left - triggerRect.left) / zoom - trigger.clientLeft}px`);
-            trigger.style.setProperty('--help-pop-safe-top', `${(top - triggerRect.top) / zoom - trigger.clientTop}px`);
-            trigger.style.setProperty('--help-pop-max-height', `${maxHeight / zoom}px`);
+            tooltip.style.setProperty('--help-pop-left', `${left / zoom}px`);
+            tooltip.style.setProperty('--help-pop-safe-top', `${top / zoom}px`);
+            tooltip.style.setProperty('--help-pop-max-height', `${maxHeight / zoom}px`);
         }
         function closeHelp() {
             clearTimeout(helpCloseTimer);
+            const tooltip = openHelp?.querySelector(':scope > .help-pop');
+            if (tooltip?.matches(':popover-open')) tooltip.hidePopover();
             openHelp?.classList.remove('help-open');
             openHelp = null;
         }
         function showHelp(trigger) {
             // Localization may still be inserting the popover during initial hover.
-            if (!trigger.querySelector(':scope > .help-pop')) return;
+            const tooltip = trigger.querySelector(':scope > .help-pop');
+            if (!tooltip) return;
             clearTimeout(helpCloseTimer);
             if (openHelp !== trigger) closeHelp();
             openHelp = trigger;
+            tooltip.setAttribute('popover', 'manual');
+            if (!tooltip.matches(':popover-open')) tooltip.showPopover();
             trigger.classList.remove('help-dismissed');
             trigger.classList.add('help-open');
             positionViewportHelp(trigger);
