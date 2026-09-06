@@ -38,6 +38,7 @@ async function main() {
 
     const extensionId = new URL(serviceWorker.url()).host;
     const popup = await context.newPage();
+    popup.on('pageerror', error => console.error('Popup runtime error:', error.message));
     await popup.setViewportSize({ width: 350, height: 600 });
     await popup.goto(`chrome-extension://${extensionId}/popup/popup.html`, {
       waitUntil: 'domcontentloaded',
@@ -57,7 +58,17 @@ async function main() {
     await popup.locator('[data-tab="settings"]').click();
 
     const trigger = popup.locator('#settingsBookmarksOnly .help-viewport.help-below');
-    await trigger.waitFor({ state: 'visible' });
+    try {
+      await trigger.waitFor({ state: 'visible' });
+    } catch (error) {
+      console.error(await popup.evaluate(async () => ({
+        activeTab: document.querySelector('.tab.active')?.dataset.tab,
+        mode: document.getElementById('exportMode').value,
+        classes: document.getElementById('settingsBookmarksOnly').className,
+        settings: (await chrome.storage.local.get('xporter_settings')).xporter_settings
+      })));
+      throw error;
+    }
     await trigger.evaluate(element => {
       const tooltip = element.querySelector(':scope > .help-pop');
       tooltip.textContent = Array.from(

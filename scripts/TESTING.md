@@ -1,6 +1,6 @@
 # Testing XPorter
 
-Run `node scripts/test-all.js` and `git diff --check` before committing. The complete deterministic gate still runs all 11 suites; each core test has a deadline so an unresolved Promise cannot silently end the process with success.
+Run `node scripts/test-all.js` and `git diff --check` before committing. The complete deterministic gate still runs all 12 suites; each core test has a deadline so an unresolved Promise cannot silently end the process with success.
 
 For focused work, use `node scripts/test-extension-core.js --suite=date-export` (also `worker-state`, `api`, `serialization-download`, `ui-content`) or run the relevant standalone suite. The core runner validates every test registration even during a focused run. An unknown suite is an error. A focused run does not replace the complete gate.
 
@@ -17,3 +17,7 @@ Run `node scripts/test-xlsx-libreoffice.js` for real workbook compatibility. It 
 CI runs deterministic tests under `Etc/UTC`, `Europe/Moscow`, `America/New_York` and `Pacific/Kiritimati`. Run the relevant timezone locally with `TZ=America/New_York node scripts/test-extension-core.js --suite=date-export` when investigating dates.
 
 Keep real-X and browser verification separate. `fixtures/search-endings.synthetic.json` contains constructed cases, not captured responses. A green gate does not establish which final-page/alert shapes X currently emits, authenticated endpoint compatibility, popup layout, or completed Chrome download behavior. See `fixtures/README.md` for the outstanding live-search captures and the repository browser policy for unpacked checks.
+
+The core currently contains 101 tests, including guarded-dialog cancellation, focus restoration and synchronous confirmation. `test-storage-concurrency.js` exercises concurrent history saves/deletes/expiry/clear, failed history/counter reads and recoverable queues.
+
+Run `node scripts/test-quality-regressions.mjs` outside the macOS sandbox (approved unsandboxed exec in Codex). It loads the unpacked extension into a disposable Chromium profile and checks old quantity presets, pending-save confirmation boundaries, concurrent IndexedDB trimming at 50,000 rows, and whole-batch rollback after an injected write failure. `XPORTER_TEST_EXTENSION_ROOT` can point this test at a separate baseline checkout for before/after proof; its synthetic data never enters a user's browser profile.

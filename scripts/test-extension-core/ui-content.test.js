@@ -272,11 +272,105 @@ async function testAcknowledgementCountdownRequiresFiveFullTicks() {
     timer.cancel();
 }
 
+async function testLocaleLoadsShareRequestsAndRetryFailures() {
+    const requests = [];
+    let russianAttempts = 0;
+    const context = vm.createContext({
+        console: { warn() {} },
+        chrome: { runtime: { getURL: value => value } },
+        async fetch(url) {
+            requests.push(url);
+            await Promise.resolve();
+            if (url.endsWith('/ru.json')) {
+                russianAttempts++;
+                if (russianAttempts === 1) return { ok: false, status: 503 };
+                return { ok: true, json: async () => ({ greeting: 'Привет' }) };
+            }
+            return { ok: true, json: async () => ({ greeting: 'Hello', fallback: 'English' }) };
+        }
+    });
+    vm.runInContext(source('popup/i18n.js'), context);
+    const english = await Promise.all([context.loadTranslations('en'), context.loadTranslations('en')]);
+    assert.equal(requests.length, 1, 'the requested English locale and its fallback must share one fetch');
+    assert.equal(english[0].greeting, 'Hello');
+    assert.equal((await context.loadTranslations('ru')).greeting, 'Hello');
+    const retried = await context.loadTranslations('ru');
+    assert.equal(retried.greeting, 'Привет', 'a temporary locale failure must remain retryable');
+    assert.equal(retried.fallback, 'English');
+    assert.equal(russianAttempts, 2);
+    assert.equal(requests.filter(url => url.endsWith('/en.json')).length, 1);
+}
+
+function testGuardedDialogKeepsConfirmationSynchronousAndCancelsStaleFocus() {
+    const frames = [];
+    const timers = new Map();
+    const document = { activeElement: null };
+    let nextTimer = 0;
+    function element() {
+        const listeners = {};
+        const classes = new Set(['hidden']);
+        return {
+            disabled: false, textContent: 'Continue',
+            classList: { add: name => classes.add(name), remove: name => classes.delete(name) },
+            setAttribute() {}, removeAttribute() {},
+            addEventListener(type, handler) { listeners[type] = handler; },
+            dispatch(type, event = {}) { listeners[type](event); },
+            focus() { if (!this.disabled) document.activeElement = this; }
+        };
+    }
+    const context = vm.createContext({
+        document,
+        requestAnimationFrame: callback => frames.push(callback),
+        setTimeout(callback) { timers.set(++nextTimer, callback); return nextTimer; },
+        clearTimeout: id => timers.delete(id)
+    });
+    for (const file of ['popup/acknowledgement-timer.js', 'popup/guarded-dialog.js']) {
+        vm.runInContext(source(file), context, { filename: file });
+    }
+    const popup = { inert: false };
+    const dialog = element();
+    const cancelButton = element();
+    const confirmButton = element();
+    const trigger = element();
+    const controller = context.XPorterGuardedDialog.mount({
+        popup, dialog, cancelButton, confirmButton, countdownStatus: element()
+    });
+    let confirmed = 0;
+    let cancelled = 0;
+    const open = seconds => controller.open({
+        trigger, seconds,
+        onConfirm() { confirmed++; },
+        onCancel() { cancelled++; }
+    });
+    const flushFrames = () => { while (frames.length) frames.shift()(); };
+    open(5);
+    flushFrames();
+    assert.equal(document.activeElement, cancelButton);
+    assert.equal(popup.inert, true);
+    confirmButton.dispatch('click');
+    assert.equal(confirmed, 0, 'disabled confirmation cannot run even through a synthetic click');
+    dialog.dispatch('keydown', { key: 'Tab', shiftKey: true, preventDefault() {} });
+    assert.equal(document.activeElement, cancelButton, 'countdown leaves only Cancel focusable');
+    dialog.dispatch('keydown', { key: 'Escape', preventDefault() {} });
+    assert.equal(cancelled, 1);
+    assert.equal(timers.size, 0, 'dismissal must cancel the countdown');
+    assert.equal(popup.inert, false);
+    open(0);
+    flushFrames();
+    assert.equal(document.activeElement, cancelButton, 'stale close must not focus behind a reopened dialog');
+    confirmButton.dispatch('click');
+    assert.equal(confirmed, 1, 'confirmation must finish in the click stack, before any await');
+    flushFrames();
+    assert.equal(document.activeElement, trigger);
+}
+
 const tests = [
     { name: "theme restore", run: testThemeInitializationCanRevertToDark, order: 70 },
     { name: "signed-in account navigation detection", run: testContentScriptDetectsSignedInAccountFromXNavigation, order: 71 },
     { name: "acknowledgement countdown", run: testAcknowledgementCountdownRequiresFiveFullTicks, order: 72 },
-    { name: "live target and viewer account context", run: testContentScriptReturnsLiveTargetAndViewerAccounts, order: 77 }
+    { name: "live target and viewer account context", run: testContentScriptReturnsLiveTargetAndViewerAccounts, order: 77 },
+    { name: "guarded dialog lifecycle and synchronous confirmation", run: testGuardedDialogKeepsConfirmationSynchronousAndCancelsStaleFocus, order: 99 },
+    { name: "locale single-flight and failure recovery", run: testLocaleLoadsShareRequestsAndRetryFailures, order: 100 }
 ];
 
 module.exports = {

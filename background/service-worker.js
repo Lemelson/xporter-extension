@@ -1977,16 +1977,24 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
 }
 
 async function getExportStatus() {
-    // Expiration must also run while a terminal export is still held in this
-    // live worker. Previously it only ran after currentExport became null, so
-    // a long-lived worker could retain "auto-cleared" data indefinitely.
-    let savedSettings = null;
-    if (!currentExport?.running) {
-        savedSettings = await applyAutoExpiration();
+    // Expire terminal data even while this worker still holds it in memory.
+    const savedSettings = currentExport?.running ? null : await applyAutoExpiration();
+    const liveState = currentExport;
+    const state = liveState || await XPorterStorage.loadExportState();
+    if (!state) return { running: false, status: 'idle' };
+
+    // A persisted running flag without an in-memory loop means Chrome killed
+    // the worker. Repair it before returning the same status contract as a live run.
+    if (!liveState && state.running) {
+        state.running = false;
+        state.status = 'stopped';
+        await XPorterStorage.saveExportState(state);
     }
 
-    if (currentExport) {
-        const waitUntil = Math.max(
+    let waitUntil = null;
+    let transient = {};
+    if (liveState) {
+        waitUntil = Math.max(
             ...exportRateLimiterResources()
                 .map(({ limiter }) => limiter.waitUntil || 0),
             manualWaitUntil || 0
@@ -1995,86 +2003,49 @@ async function getExportStatus() {
         const transientIsActive = waitUntil > Date.now() ||
             transientStatus === 'retrying' ||
             transientStatus === 'rate_limited';
-        const transient = currentExport.running && transientIsActive && lastTransientStatus
+        transient = liveState.running && transientIsActive && lastTransientStatus
             ? {
                 ...lastTransientStatus,
                 until: waitUntil,
                 ...(lastTransientStatus.retryIn
                     ? {
                         duration: Number(lastTransientStatus.duration) ||
-                            Number(lastTransientStatus.retryIn)
+                            Number(lastTransientStatus.retryIn),
+                        retryIn: Math.max(0, waitUntil - Date.now())
                     }
-                    : {}),
-                ...(lastTransientStatus.retryIn
-                    ? { retryIn: Math.max(0, waitUntil - Date.now()) }
                     : {})
             }
             : {};
-        return {
-            running: currentExport.running,
-            status: currentExport.status,
-            username: currentExport.username,
-            tweetCount: currentExport.tweetCount,
-            expectedTweets: getExpectedItemCount(currentExport),
-            quantityLimit: currentExport.settings?.quantityLimit || 0,
-            error: currentExport.error || null,
-            startedAt: currentExport.startedAt,
-            completedAt: currentExport.completedAt,
-            userInfo: currentExport.userInfo,
-            exportMode: currentExport.exportMode,
-            outputFormat: currentExport.outputFormat,
-            partialReason: currentExport.partialReason || null,
-            completionReason: currentExport.completionReason || null,
-            searchPhase: currentExport.searchPhase || null,
-            resumeBlockedReason: getResumeBlockedReason(currentExport),
-            until: waitUntil,
-            canResume: !getResumeBlockedReason(currentExport) && !currentExport.running &&
-                (currentExport.status === 'stopped' || currentExport.status === 'error') &&
-                !!currentExport.userId,
-            canFallbackWithoutReplies: canFallbackWithoutReplies(currentExport),
-            ...transient
-        };
     }
-
-    // Check saved state
-    if (!savedSettings) savedSettings = await applyAutoExpiration();
-    const savedState = await XPorterStorage.loadExportState();
-    if (savedState) {
-        // A persisted running=true with no in-memory export means Chrome killed
-        // the SW mid-export (sleep, crash, update). Repair it to a resumable
-        // 'stopped' — otherwise the UI shows a phantom in-progress export with
-        // neither Resume nor Download, forever.
-        if (savedState.running) {
-            savedState.running = false;
-            savedState.status = 'stopped';
-            await XPorterStorage.saveExportState(savedState);
-        }
-
-        return {
-            running: false,
-            status: savedState.status,
-            username: savedState.username,
-            tweetCount: savedState.tweetCount || 0,
-            expectedTweets: getExpectedItemCount(savedState),
-            quantityLimit: savedState.limitOverride > 0
-                ? savedState.limitOverride
-                : (savedState.settings?.quantityLimit ?? savedSettings?.quantityLimit ?? 0),
-            error: savedState.error || null,
-            startedAt: savedState.startedAt,
-            completedAt: savedState.completedAt,
-            userInfo: savedState.userInfo,
-            exportMode: savedState.exportMode,
-            outputFormat: savedState.outputFormat,
-            partialReason: savedState.partialReason || null,
-            completionReason: savedState.completionReason || null,
-            resumeBlockedReason: getResumeBlockedReason(savedState),
-            canResume: !getResumeBlockedReason(savedState) &&
-                (savedState.status === 'stopped' || savedState.status === 'error') && !!savedState.userId,
-            canFallbackWithoutReplies: canFallbackWithoutReplies(savedState)
-        };
-    }
-
-    return { running: false, status: 'idle' };
+    const resumeBlockedReason = getResumeBlockedReason(state);
+    const quantityLimit = liveState
+        ? (state.settings?.quantityLimit || 0)
+        : (state.limitOverride > 0
+            ? state.limitOverride
+            : (state.settings?.quantityLimit ?? savedSettings?.quantityLimit ?? 0));
+    return {
+        running: state.running === true,
+        status: state.status,
+        username: state.username,
+        tweetCount: state.tweetCount || 0,
+        expectedTweets: getExpectedItemCount(state),
+        quantityLimit,
+        error: state.error || null,
+        startedAt: state.startedAt,
+        completedAt: state.completedAt,
+        userInfo: state.userInfo,
+        exportMode: state.exportMode,
+        outputFormat: state.outputFormat,
+        partialReason: state.partialReason || null,
+        completionReason: state.completionReason || null,
+        searchPhase: state.searchPhase || null,
+        resumeBlockedReason,
+        until: waitUntil,
+        canResume: !resumeBlockedReason && !state.running &&
+            (state.status === 'stopped' || state.status === 'error') && !!state.userId,
+        canFallbackWithoutReplies: canFallbackWithoutReplies(state),
+        ...transient
+    };
 }
 
 // ==================== Helpers ====================
@@ -2342,40 +2313,9 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 // Also check on install/update
-chrome.runtime.onInstalled.addListener(async (details) => {
-    if (details.reason === 'install') {
-        await XPorterStorage.saveSettings({
-            postSelectionVersion: 1,
-            includeOriginalPosts: true,
-            includeQuotes: true,
-            includeReplies: true,
-            includeRetweets: true,
-            includeArticles: true,
-            includeAboutAccountDetails: false,
-            aboutAccountSpeed: 'standard',
-            aboutAccountCustomBatchSize: 5,
-            aboutAccountMaxRetries: 5,
-            quantityLimit: 500,
-            requestDelay: 3000,
-            exportSpeed: 'standard',
-            customDelaySec: 5,
-            postSafetyBreakEnabled: false,
-            postSafetyBreakEvery: 20,
-            postSafetyBreakMin: 3,
-            userExportSpeed: 'standard',
-            userCustomDelaySec: 5,
-            userSafetyBreakEnabled: false,
-            userSafetyBreakEvery: 20,
-            userSafetyBreakMin: 3,
-            batchSize: 20,
-            cooldownDuration: 180000,
-            adaptivePacing: true,
-            theme: 'dark',
-            exportMode: 'posts',
-            outputFormat: 'csv'
-        });
-    }
-
+// Settings defaults are supplied on read by loadSettings(). An install-time
+// full snapshot write could race the first popup edit and overwrite its choice.
+chrome.runtime.onInstalled.addListener(async () => {
     // Pre-discover endpoints on install/update
     try {
         await XPorterAPI.discoverEndpoints();

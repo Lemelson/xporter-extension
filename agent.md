@@ -102,7 +102,12 @@ xporter/
 ├── popup/                       # Compact popup UI (~350px)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
 │   ├── popup.css                # 🔑 ALL popup styles (themes, animations, ladybug, logo)
-│   ├── popup.js                 # Tabs, export controls, settings, live status
+│   ├── popup.js                 # ~1,000-line initialization and command coordinator
+│   ├── settings-form.js         # Form loading/validation and owned settings patches
+│   ├── export-status.js         # Status/actions/progress renderer; no persistence
+│   ├── account-fields.js        # Editable target and viewer-owned account cards
+│   ├── guarded-dialog.js        # Shared modal lifecycle and synchronous confirmation
+│   ├── presentation.js          # Tabs, tooltips, toasts, clipboard and accordions
 │   ├── history.js               # Export-history rendering/download/delete UI
 │   ├── seen-posts.js            # Passive dataset summary/download/clear UI
 │   ├── ladybug.js               # Easter-egg ladybug on the About tab (see §6.2)
@@ -124,7 +129,7 @@ xporter/
 │   ├── rateLimit.js             # RateLimitManager (spacing, batch cooldown, retry, abort)
 │   ├── csv.js                   # CSV / XLSX output generation (JSON is built in the SW)
 │   ├── columns-i18n.js          # Localized CSV/XLSX headers
-│   ├── storage.js               # Storage + queued settings/usage mutations
+│   ├── storage.js               # Storage + queued settings/history/usage mutations
 │   ├── post-database.js         # IndexedDB seen-post store (dedupe by ID; 50k cap)
 │   ├── usage-tracker.js         # Popup open/active-time signals
 │   └── shared.js                # 🔑 Shared popup/UI helpers (see §4.6)
@@ -134,7 +139,7 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── test-all.js              # Canonical ordered 12-suite deterministic gate
-│   ├── test-extension-core.js   # 99-test aggregator; suites in test-extension-core/
+│   ├── test-extension-core.js   # 101-test aggregator; suites in test-extension-core/
 │   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
 │   │                            # bookmark lifecycle/API cancellation/capture/export policy
 │   ├── test-extension-smoke.mjs               # unpacked extension runtime smoke
@@ -221,7 +226,7 @@ currentExport = {
 
 `RESUME_EXPORT.extraItems` becomes a persisted per-run `limitOverride`; it never rewrites the stored `quantityLimit`. Resume keeps snapshot filters but takes current pacing keys through `XPorterExportPolicy.buildResumeSettings`. Worker broadcasts include `EXPORT_STATUS_UPDATE` and multipart `DOWNLOAD_PROGRESS`/`DOWNLOAD_COMPLETE`/`DOWNLOAD_ERROR`.
 
-**Lifecycle**: Chrome can kill the worker mid-export, so state is saved after each page/batch. `onStartup` marks interrupted exports `stopped`; `onInstalled` seeds defaults. One export may own three limiter slots—primary feed, bookmark reply-context, and About-account enrichment. Stop, live pacing changes, terminal/error cleanup, and fresh-run initialization operate through the canonical limiter-resource list so secondary work cannot survive the export.
+**Lifecycle**: Chrome can kill the worker mid-export, so state is saved after each page/batch. `onStartup` marks interrupted exports `stopped`; settings defaults are supplied on read instead of an install-time snapshot write. One export may own three limiter slots—primary feed, bookmark reply-context, and About-account enrichment. Stop, live pacing changes, terminal/error cleanup, and fresh-run initialization operate through the canonical limiter-resource list so secondary work cannot survive the export.
 
 ### 4.4. `utils/rateLimit.js` — `RateLimitManager`
 Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backoff, instant `abort()` via `AbortController`. `executeWithRateLimit(fn)` wraps any async request; `getState()`/`restoreState()` for persistence.
@@ -237,7 +242,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 ### 4.5. `utils/storage.js` — Chrome Storage + Settings
 `chrome.storage.local` with the `unlimitedStorage` permission. Access is restricted to trusted extension contexts with `setAccessLevel`; X.com content scripts use messages instead of reading export data directly. Keys include `xporter_export_state`, `xporter_settings`, `xporter_detected_username`, `xporter_current_account`, `xporter_tweets_batch_N`, `xporter_export_history`, `xporter_about_account_cache`, and `xporter_usage`.
 
-`loadSettings()` merges defaults with saved values. `saveSettings()` serializes every partial read→merge→write through a recoverable promise queue; a read failure aborts the patch rather than merging into `{}` and wiping unrelated settings. Anonymous usage mutations use a separate recoverable queue so concurrent popup ticks/export events cannot lose increments.
+`loadSettings()` merges defaults with saved values. `saveSettings()` serializes every partial read→merge→write through a recoverable promise queue; a read failure aborts the patch rather than merging into `{}` and wiping unrelated settings. History saves/deletes/expiry/clear share another queue so they cannot overwrite each other. Usage counters share `mutateUsage`, which owns their read/write boundary. Failed history or usage reads reject rather than overwriting real data with empty defaults. Defaults are applied on read, so no install-time settings write can race the first popup edit.
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -268,6 +273,8 @@ Loaded by `popup.html` (`popup/utils.js` was removed in v1.4.0). Provides:
 - `localizeQuantityOptions(select, lang, translations)` — quantity `<select>` relabeling
 - `createCooldownTicker(render)` — live cooldown countdown driven by the SW's `until` timestamps
 - RTL + number-formatting helpers
+
+The popup coordinator passes a complete display snapshot to `export-status.js`; rating and download side effects remain outside the renderer. `settings-form.js` owns only ordinary controls. It derives quantity presets from `<option>` values and restores the previously accepted About retry value while confirmation is pending. Photo settings are persisted only by the permission flow. `guarded-dialog.js` cancels timers and stale focus callbacks and invokes confirmation synchronously so native Chrome permission requests retain the user gesture.
 
 ### 4.7. `content/content.js` + `content/interceptor.js`
 - **`utils/capture-contract.js`** loads first in MAIN (the generated `content/capture-prerequisites.js` bundle loads first in the isolated world) and exposes frozen tracked-operation and payload-size limits. It contains no credentials or mutable authority.
@@ -302,7 +309,7 @@ XPorter uses native X search rather than assuming profile timelines provide exha
 Constructed regression examples live in `scripts/fixtures/search-endings.synthetic.json`; their provenance and the outstanding live-capture checklist are in `scripts/fixtures/README.md`. They are not real-X captures.
 
 ### Passive seen-post dataset
-`feed-parser.js` inspects only post-bearing GraphQL responses that X has already loaded in the page. It emits compact rows; `content.js` validates them before the SW writes them through `post-database.js`. Replies are excluded as rows, while `reply_count` is retained. IndexedDB uses the post ID as its primary key, so repeat sightings update latest metrics, `last_seen_at`, and `seen_count` without creating duplicates. The first metric snapshot is retained in `first_*` columns. No additional X requests are made, page URLs are not stored, and the oldest rows are trimmed above 50,000 unique posts. Settings exposes count, CSV/JSON download, and explicit clear.
+`feed-parser.js` inspects only post-bearing GraphQL responses that X has already loaded in the page. It emits compact rows; `content.js` validates them before the SW writes them through `post-database.js`. Replies are excluded as rows, while `reply_count` is retained. IndexedDB uses the post ID as its primary key, so repeat sightings update latest metrics, `last_seen_at`, and `seen_count` without creating duplicates. The first metric snapshot is retained in `first_*` columns. No additional X requests are made, page URLs are not stored, and the oldest rows are trimmed above 50,000 unique posts. Upsert, count and eviction share one readwrite transaction, preventing concurrent batches from evicting too many rows. `withPostStore` owns commit, rollback and connection cleanup for every operation. Settings exposes count, CSV/JSON download, and explicit clear.
 
 ### Schemas
 - **Posts CSV**: `id, text, tweet_url, language, type, author_name, author_username, view_count, bookmark_count, favorite_count, retweet_count, reply_count, quote_count, created_at, source, hashtags, urls, media_type, media_urls` (types: `tweet`/`retweet`/`reply`/`quote`).
@@ -327,7 +334,7 @@ A ladybug wanders the "Questions or found a bug?" contact card on the **About** 
 - **Behaviour**: spawns at a random spot above the Telegram button, wanders with a steering algorithm (biased away from pure-horizontal so it doesn't sit on a word), turns in place for big turns, pauses occasionally. Legs are CSS-animated; their gait is driven from JS state (`--gait-dur` + `.gait-paused`): legs freeze when it stops, shuffle while turning, step faster/slower with speed.
 - **Click to squash**: flattens (`scale(1.32,0.16)`), leaves a translucent `.lb-splat` that holds then fades (`SPLAT_VISIBLE`/`SPLAT_FADE`, currently 3.5s each). It does **not** respawn until you leave and re-enter the About tab.
 - **Respawn**: a `MutationObserver` on `#tab-about`'s `active` class spawns/despawns it.
-- **Toggle**: Settings → "Show ladybug" (`ladybugEnabled`). `popup.js` calls `window.XPorterLadybug.setEnabled(bool)`.
+- **Toggle**: Settings → "Show ladybug" (`ladybugEnabled`). `settings-form.js` calls `window.XPorterLadybug.setEnabled(bool)`.
 - **Theming**: dark bug in both themes; a very subtle `.lb-shadow` underneath (white-ish on dark, dark on light).
 
 ### 6.3. Lightning Logo (`.logo`, `.about-icon`)
@@ -387,7 +394,7 @@ On `status:'error'` the popup still offers **Download** (when items were collect
 10. **FOUC** — `theme-init.js` must stay first in `popup.html`.
 11. **CSS variables** — never hardcode colours.
 12. **`docs/` is the only Pages source** — root site HTML/icons were removed. `scripts/` and `docs/` are not packaged with the extension.
-13. **Do not bypass mutation queues** — settings patches and usage counters have separate serialized mutation paths in `storage.js`.
+13. **Do not bypass mutation queues** — settings patches, history operations, and usage counters have separate serialized mutation paths in `storage.js`.
 14. **Do not reconstruct current-download state per part** — preserve the immutable transaction, bounded photo cache, in-flight de-duplication, and timeout cleanup.
 
 ---
@@ -401,9 +408,9 @@ On `status:'error'` the popup still offers **Download** (when items were collect
 4. Add the UI option in `popup.html`; add CSV headers; add i18n keys to all 14 locales.
 
 ### Add a setting
-1. Default in `loadSettings()` (`storage.js`) and `onInstalled` (SW).
+1. Default in `loadSettings()` (`storage.js`); defaults are applied on read without a separate installation write.
 2. UI in the Settings tab of `popup.html`.
-3. Wire save handler in `popup.js` (read → `SAVE_SETTINGS`), apply on load.
+3. Wire ordinary fields in `settings-form.js` (read → `SAVE_SETTINGS`), apply on load. Permission-backed choices keep their own transaction in the coordinator. Never copy unchecked confirmation state into a pending form save.
 4. Add the i18n key to all 14 locales (en first).
 
 ### Update feature flags / queryIds
@@ -413,7 +420,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 12 explicit suites in order: capture bundle freshness; static contracts; the 99-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. The core runner applies a per-test deadline, validates all registrations before an optional `--suite=<id>` selection, and keeps date-export cases in `date-export.test.js`. Worker-based suites share detached JSON storage doubles in `worker-harness.js`. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 12 explicit suites in order: capture bundle freshness; static contracts; the 101-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. The core runner applies a per-test deadline, validates all registrations before an optional `--suite=<id>` selection, and keeps date-export cases in `date-export.test.js`. Worker-based suites share detached JSON storage doubles in `worker-harness.js`. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
 
 XLSX ZIP/text-cell validation is deterministic; opening the workbook in LibreOffice is the separate, strict `node scripts/test-xlsx-libreoffice.js` integration gate. Missing LibreOffice fails that check instead of silently skipping it. `scripts/package.sh` requires both gates. GitHub CI runs the deterministic gate in UTC, Moscow, New York and Kiritimati, and installs LibreOffice in a separate compatibility job. See `scripts/TESTING.md`.
 
@@ -444,7 +451,7 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 `config.js` → `shared.js` → `api-features.js` → `api-parsers.js` → `native-request-template.js` → `transaction-id.js` → `api.js` → `background/export-policy.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
 
 **Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
-`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `popup.js` → `ladybug.js`.
+`theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `acknowledgement-timer.js` → `guarded-dialog.js` → `export-status.js` → `presentation.js` → `account-fields.js` → `settings-form.js` → `popup.js` → `ladybug.js`.
 
 **Manifest content worlds** (`document_start`): `capture-contract.js` → `native-request-template.js` → `feed-parser.js` → `interceptor.js` in MAIN; `content/capture-prerequisites.js` → `content.js` in the isolated world. The bundle combines the two canonical prerequisite sources under a distinct resource path because Chromium deduplicates script paths across worlds. Regenerate with `node scripts/check-capture-bundle.js --write`; `test-all.js` and packaging enforce byte-for-byte freshness.
 
@@ -461,7 +468,7 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 | `XPorterNativeTemplate` | `native-request-template.js` | sanitized request-template validation |
 | `RateLimitManager` | `rateLimit.js` | class |
 | `XPorterCSV` | `csv.js` | `.generateCSV`, `.generateXLSX`, `.generateExportFilename` |
-| `XPorterStorage` | `storage.js` | export state, batches, history, queued settings/usage mutations, identity, About cache |
+| `XPorterStorage` | `storage.js` | export state, batches, history, queued settings/history/usage mutations, identity, About cache |
 | `XPorterFeedback` | `uninstall-feedback.js` | `.refresh`, `.maybeRefresh` |
 | `XPorterDownloads` | `downloads.js` | current download planning/start, incremental multipart generation, history/seen-post downloads |
 

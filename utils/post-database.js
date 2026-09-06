@@ -44,6 +44,29 @@
         });
     }
 
+    // Own transaction completion and connection cleanup in one place. The
+    // operation may await IDB requests, but must not wait on unrelated I/O.
+    async function withPostStore(mode, operation) {
+        const database = await openDatabase();
+        let transaction;
+        let done;
+        try {
+            transaction = database.transaction(STORE_POSTS, mode);
+            done = transactionDone(transaction);
+            const [result] = await Promise.all([
+                operation(transaction.objectStore(STORE_POSTS)),
+                done
+            ]);
+            return result;
+        } catch (error) {
+            try { transaction?.abort(); } catch (_) { /* already settled */ }
+            await done?.catch(() => {});
+            throw error;
+        } finally {
+            database.close();
+        }
+    }
+
     function finiteCount(value) {
         if (value === null || value === undefined || value === '') return null;
         const number = Number(value);
@@ -118,49 +141,36 @@
     async function upsertPosts(posts, context = {}) {
         if (!Array.isArray(posts) || posts.length === 0) return { inserted: 0, updated: 0 };
 
-        const database = await openDatabase();
-        const transaction = database.transaction(STORE_POSTS, 'readwrite');
-        const done = transactionDone(transaction);
-        const store = transaction.objectStore(STORE_POSTS);
-        const seenAt = Date.now();
-        let inserted = 0;
-        let updated = 0;
+        return withPostStore('readwrite', async (store) => {
+            const seenAt = Date.now();
+            let inserted = 0;
+            let updated = 0;
 
-        for (const post of posts) {
-            if (!post?.id || !/^\d{5,30}$/.test(String(post.id))) continue;
-            const normalized = normalizePost(post, context, seenAt);
-            const existing = await requestResult(store.get(normalized.id));
-            if (existing) {
-                store.put(mergePost(existing, normalized, context, seenAt));
-                updated += 1;
-            } else {
-                store.add(normalized);
-                inserted += 1;
+            for (const post of posts) {
+                if (!post?.id || !/^\d{5,30}$/.test(String(post.id))) continue;
+                const normalized = normalizePost(post, context, seenAt);
+                const existing = await requestResult(store.get(normalized.id));
+                if (existing) {
+                    store.put(mergePost(existing, normalized, context, seenAt));
+                    updated += 1;
+                } else {
+                    store.add(normalized);
+                    inserted += 1;
+                }
             }
-        }
 
-        await done;
-        database.close();
-
-        if (inserted > 0) await trimToLimit();
-        return { inserted, updated };
+            // Count and evict under the same write transaction as the upsert.
+            // Another batch cannot act on a stale count and evict extra rows.
+            if (inserted > 0) await trimToLimit(store);
+            return { inserted, updated };
+        });
     }
 
-    async function trimToLimit() {
-        const database = await openDatabase();
-        const countTransaction = database.transaction(STORE_POSTS, 'readonly');
-        const countDone = transactionDone(countTransaction);
-        const count = await requestResult(countTransaction.objectStore(STORE_POSTS).count());
-        await countDone;
-        if (count <= MAX_POSTS) {
-            database.close();
-            return 0;
-        }
-
+    async function trimToLimit(store) {
+        const count = await requestResult(store.count());
         const removeCount = count - MAX_POSTS;
-        const transaction = database.transaction(STORE_POSTS, 'readwrite');
-        const done = transactionDone(transaction);
-        const index = transaction.objectStore(STORE_POSTS).index('last_seen_at');
+        if (removeCount <= 0) return 0;
+        const index = store.index('last_seen_at');
         let removed = 0;
         await new Promise((resolve, reject) => {
             const request = index.openCursor();
@@ -176,49 +186,27 @@
                 cursor.continue();
             };
         });
-        await done;
-        database.close();
         return removed;
     }
 
-    async function getSummary() {
-        const database = await openDatabase();
-        const transaction = database.transaction(STORE_POSTS, 'readonly');
-        const done = transactionDone(transaction);
-        const store = transaction.objectStore(STORE_POSTS);
-        const count = await requestResult(store.count());
-        let lastSeenAt = 0;
-
-        if (count > 0) {
-            lastSeenAt = await new Promise((resolve, reject) => {
-                const request = store.index('last_seen_at').openCursor(null, 'prev');
-                request.onsuccess = () => resolve(request.result?.value?.last_seen_at || 0);
-                request.onerror = () => reject(request.error);
-            });
-        }
-        await done;
-        database.close();
-        return { count, lastSeenAt, maxPosts: MAX_POSTS };
+    function getSummary() {
+        return withPostStore('readonly', async (store) => {
+            const [count, latest] = await Promise.all([
+                requestResult(store.count()),
+                requestResult(store.index('last_seen_at').openCursor(null, 'prev'))
+            ]);
+            return { count, lastSeenAt: latest?.value?.last_seen_at || 0, maxPosts: MAX_POSTS };
+        });
     }
 
     async function getAllPosts() {
-        const database = await openDatabase();
-        const transaction = database.transaction(STORE_POSTS, 'readonly');
-        const done = transactionDone(transaction);
-        const posts = await requestResult(transaction.objectStore(STORE_POSTS).getAll());
-        await done;
-        database.close();
+        const posts = await withPostStore('readonly', store => requestResult(store.getAll()));
         posts.sort((a, b) => (b.last_seen_at || 0) - (a.last_seen_at || 0));
         return posts;
     }
 
-    async function clear() {
-        const database = await openDatabase();
-        const transaction = database.transaction(STORE_POSTS, 'readwrite');
-        const done = transactionDone(transaction);
-        transaction.objectStore(STORE_POSTS).clear();
-        await done;
-        database.close();
+    function clear() {
+        return withPostStore('readwrite', store => requestResult(store.clear()));
     }
 
     globalThis.XPorterPostDB = {

@@ -21,6 +21,21 @@ const MAX_TWEETS_PER_BATCH = (typeof XPORTER_CONFIG !== 'undefined')
     ? XPORTER_CONFIG.TWEETS_PER_BATCH
     : 50;
 
+// Each storage record owns one recoverable queue. All writers run in the worker;
+// independent records can still be updated concurrently.
+function createMutationQueue() {
+    let tail = Promise.resolve();
+    return (mutate) => {
+        const run = tail.then(mutate, mutate);
+        tail = run.catch(() => {});
+        return run;
+    };
+}
+
+const queueHistoryMutation = createMutationQueue();
+const queueSettingsMutation = createMutationQueue();
+const queueUsageMutation = createMutationQueue();
+
 // ==================== Storage Quota ====================
 
 /**
@@ -243,51 +258,54 @@ async function clearExportState() {
 /**
  * Save a completed export to history (metadata only, max 20 entries FIFO)
  */
-async function saveExportHistory(entry) {
-    const history = await loadExportHistory();
-    history.unshift({
-        ...entry,
-        // Date.now() alone can collide for same-millisecond writes, making
-        // delete-by-id remove two entries.
-        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        hasData: Array.isArray(entry.items) && entry.items.length > 0
-    });
-    // Keep only the most recent entries
-    while (history.length > MAX_HISTORY_ENTRIES) {
-        history.pop();
-    }
-    history.forEach((item, index) => {
-        if (index >= MAX_HISTORY_DATA_ENTRIES && item.items) {
-            delete item.items;
-            item.hasData = false;
+function saveExportHistory(entry) {
+    return queueHistoryMutation(async () => {
+        const history = await loadExportHistory();
+        history.unshift({
+            ...entry,
+            // Date.now() alone can collide for same-millisecond writes, making
+            // delete-by-id remove two entries.
+            id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            hasData: Array.isArray(entry.items) && entry.items.length > 0
+        });
+        // Keep only the most recent entries
+        while (history.length > MAX_HISTORY_ENTRIES) {
+            history.pop();
         }
-    });
-    const saved = await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
-    if (!saved) {
-        // Quota retry: strip item payloads from EVERY entry, not just the new
-        // one — older large entries can be what is actually blocking the write.
-        let stripped = false;
-        history.forEach(item => {
-            if (item.items) {
+        history.forEach((item, index) => {
+            if (index >= MAX_HISTORY_DATA_ENTRIES && item.items) {
                 delete item.items;
                 item.hasData = false;
-                stripped = true;
             }
         });
-        if (stripped) {
-            return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+        const saved = await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+        if (!saved) {
+            // Quota retry: strip item payloads from EVERY entry, not just the new
+            // one — older large entries can be what is actually blocking the write.
+            let stripped = false;
+            history.forEach(item => {
+                if (item.items) {
+                    delete item.items;
+                    item.hasData = false;
+                    stripped = true;
+                }
+            });
+            if (stripped) {
+                return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+            }
         }
-    }
-    return saved;
+        return saved;
+    });
 }
 
 /**
  * Load export history array
  */
 async function loadExportHistory() {
-    const result = await safeGet(STORAGE_KEYS.EXPORT_HISTORY);
+    // A failed read must abort a mutation; an empty fallback would erase history.
+    const result = await chrome.storage.local.get(STORAGE_KEYS.EXPORT_HISTORY);
     return result[STORAGE_KEYS.EXPORT_HISTORY] || [];
 }
 
@@ -307,36 +325,38 @@ function historyEntryCompletedAtMs(entry) {
  * Drop downloadable payloads for history entries older than the auto-expire
  * window. The metadata stays visible in Export History.
  */
-async function pruneExpiredExportHistory(settings, now = Date.now()) {
-    const effectiveSettings = settings || await loadSettings();
-    if (effectiveSettings.autoExpireEnabled === false) {
-        return { changed: false, expired: 0 };
-    }
-
-    const hours = Number(effectiveSettings.autoExpireHours) || 4;
-    const maxAge = Math.max(1, hours) * 60 * 60 * 1000;
-    const history = await loadExportHistory();
-    let changed = false;
-    let expired = 0;
-
-    for (const entry of history) {
-        const completedAtMs = historyEntryCompletedAtMs(entry);
-        const isExpired = Number.isFinite(completedAtMs) && now - completedAtMs > maxAge;
-        if (isExpired && entry.items) {
-            delete entry.items;
-            entry.hasData = false;
-            changed = true;
-            expired++;
-        } else if (!entry.items && entry.hasData) {
-            entry.hasData = false;
-            changed = true;
+function pruneExpiredExportHistory(settings, now = Date.now()) {
+    return queueHistoryMutation(async () => {
+        const effectiveSettings = settings || await loadSettings();
+        if (effectiveSettings.autoExpireEnabled === false) {
+            return { changed: false, expired: 0 };
         }
-    }
 
-    if (changed) {
-        await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
-    }
-    return { changed, expired };
+        const hours = Number(effectiveSettings.autoExpireHours) || 4;
+        const maxAge = Math.max(1, hours) * 60 * 60 * 1000;
+        const history = await loadExportHistory();
+        let changed = false;
+        let expired = 0;
+
+        for (const entry of history) {
+            const completedAtMs = historyEntryCompletedAtMs(entry);
+            const isExpired = Number.isFinite(completedAtMs) && now - completedAtMs > maxAge;
+            if (isExpired && entry.items) {
+                delete entry.items;
+                entry.hasData = false;
+                changed = true;
+                expired++;
+            } else if (!entry.items && entry.hasData) {
+                entry.hasData = false;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+        }
+        return { changed, expired };
+    });
 }
 
 async function loadExportHistoryEntry(id) {
@@ -347,20 +367,24 @@ async function loadExportHistoryEntry(id) {
 /**
  * Delete a single history entry by id
  */
-async function deleteExportHistoryEntry(id) {
-    const history = await loadExportHistory();
-    // Older releases stored numeric Date.now() IDs; DOM dataset/message
-    // transport turns them into strings. Compare canonically so those legacy
-    // entries remain deletable after migrating new entries to UUIDs.
-    const filtered = history.filter(e => String(e.id) !== String(id));
-    return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: filtered });
+function deleteExportHistoryEntry(id) {
+    return queueHistoryMutation(async () => {
+        const history = await loadExportHistory();
+        // Older releases stored numeric Date.now() IDs; DOM dataset/message
+        // transport turns them into strings. Compare canonically so those legacy
+        // entries remain deletable after migrating new entries to UUIDs.
+        const filtered = history.filter(e => String(e.id) !== String(id));
+        return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: filtered });
+    });
 }
 
 /**
  * Clear all export history
  */
-async function clearExportHistory() {
-    return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: [] });
+function clearExportHistory() {
+    return queueHistoryMutation(async () => {
+        return safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: [] });
+    });
 }
 
 // ==================== Settings ====================
@@ -369,16 +393,12 @@ async function clearExportHistory() {
 // this mutation path so two concurrent popup/worker patches cannot both read
 // the same snapshot and overwrite each other. Keep the queue recoverable: a
 // rejected transaction must not prevent later settings writes from running.
-let _settingsMutationQueue = Promise.resolve();
 
 /**
  * Save settings
  */
 function saveSettings(settings) {
-    const mutate = () => saveSettingsPatch(settings);
-    const run = _settingsMutationQueue.then(mutate, mutate);
-    _settingsMutationQueue = run.catch(() => {});
-    return run;
+    return queueSettingsMutation(() => saveSettingsPatch(settings));
 }
 
 async function saveSettingsPatch(settings) {
@@ -467,6 +487,8 @@ async function loadSettings() {
         aboutAccountSpeed: 'standard',
         aboutAccountCustomBatchSize: C.ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE?.[2] ?? 5,
         aboutAccountMaxRetries: C.ABOUT_ACCOUNT_RETRY_RANGE?.[2] ?? 5,
+        exportMode: 'posts',
+        outputFormat: 'csv',
         quantityLimit: 500,
         requestDelay: C.REQUEST_DELAY || 3000,
         exportSpeed: 'standard',
@@ -561,59 +583,46 @@ function defaultUsage() {
 }
 
 async function loadUsage() {
-    const result = await safeGet(STORAGE_KEYS.USAGE);
+    // Counter mutations must stop on read failure instead of resetting to defaults.
+    const result = await chrome.storage.local.get(STORAGE_KEYS.USAGE);
     return { ...defaultUsage(), ...(result[STORAGE_KEYS.USAGE] || {}) };
 }
 
-async function saveUsage(usage) {
-    return safeSet({ [STORAGE_KEYS.USAGE]: usage });
-}
-
-// All usage mutations are unserialized load→mutate→save; two interleaved
-// message handlers (an active-time tick during recordExportStart) would lose
-// increments. Serialize them through a single promise chain — every mutation
-// happens in the SW context, so an in-process lock is sufficient.
-let _usageLock = Promise.resolve();
-function withUsageLock(fn) {
-    const run = _usageLock.then(fn, fn);
-    _usageLock = run.catch(() => {});
-    return run;
+// Mutators edit one snapshot synchronously; returning false skips a no-op write.
+// Reads, writes and queue recovery belong here, not in every individual counter.
+function mutateUsage(mutate) {
+    return queueUsageMutation(async () => {
+        const usage = await loadUsage();
+        if (mutate(usage) !== false) {
+            await safeSet({ [STORAGE_KEYS.USAGE]: usage });
+        }
+        return usage;
+    });
 }
 
 /** Record the first install time + version (no-op if already set). */
 function markInstalled(version) {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
-        if (!usage.installedAt) {
-            usage.installedAt = Date.now();
-            usage.installVersion = version || '';
-            await saveUsage(usage);
-        }
-        return usage;
+    return mutateUsage(usage => {
+        if (usage.installedAt) return false;
+        usage.installedAt = Date.now();
+        usage.installVersion = version || '';
     });
 }
 
 /** Backfill install time for users who installed before usage tracking existed. */
 function backfillInstalledAt() {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
-        if (!usage.installedAt) {
-            usage.installedAt = Date.now();
-            usage.installedAtApprox = true;
-            await saveUsage(usage);
-        }
-        return usage;
+    return mutateUsage(usage => {
+        if (usage.installedAt) return false;
+        usage.installedAt = Date.now();
+        usage.installedAtApprox = true;
     });
 }
 
 /** Count one open of the popup / export UI. */
 function recordOpen() {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.opens = (usage.opens || 0) + 1;
         usage.lastOpenAt = Date.now();
-        await saveUsage(usage);
-        return usage;
     });
 }
 
@@ -621,18 +630,14 @@ function recordOpen() {
 function addActiveMs(ms) {
     const n = Number(ms) || 0;
     if (n <= 0) return Promise.resolve();
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.activeMs = (usage.activeMs || 0) + n;
-        await saveUsage(usage);
-        return usage;
     });
 }
 
 /** Bump counters when an export begins (mode + output format known up front). */
 function recordExportStart(mode, format, opts = {}) {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.exportsStarted += 1;
         const m = mode === 'verified_followers' ? 'verifiedFollowers' : (mode || 'posts');
         usage.byMode[m] = (usage.byMode[m] || 0) + 1;
@@ -645,8 +650,6 @@ function recordExportStart(mode, format, opts = {}) {
         usage.lastPhase = opts.resume ? 'fetching' : 'resolving_user';
         usage.firstItemMs = 0;
         usage.currentExportStartedAt = Date.now();
-        await saveUsage(usage);
-        return usage;
     });
 }
 
@@ -657,58 +660,42 @@ const KNOWN_EXPORT_PHASES = new Set([
 /** Store only a small whitelisted phase label for uninstall diagnosis. */
 function recordExportPhase(phase) {
     if (!KNOWN_EXPORT_PHASES.has(phase)) return Promise.resolve();
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.lastPhase = phase;
-        await saveUsage(usage);
-        return usage;
     });
 }
 
 /** Capture time from export start to the first collected row, once per run. */
 function recordFirstItem(at = Date.now()) {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
-        if (!usage.firstItemMs && usage.currentExportStartedAt) {
-            usage.firstItemMs = Math.max(0, Math.round(at - usage.currentExportStartedAt));
-            await saveUsage(usage);
-        }
-        return usage;
+    return mutateUsage(usage => {
+        if (usage.firstItemMs || !usage.currentExportStartedAt) return false;
+        usage.firstItemMs = Math.max(0, Math.round(at - usage.currentExportStartedAt));
     });
 }
 
 /** Count one file download (fresh export or re-download from history). */
 function recordDownload() {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.downloads = (usage.downloads || 0) + 1;
-        await saveUsage(usage);
-        return usage;
     });
 }
 
 /** Bump counters on successful completion. */
 function recordExportComplete(itemCount) {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.exportsOk += 1;
         usage.itemsTotal += (itemCount || 0);
         usage.lastExportAt = Date.now();
         usage.lastPhase = 'complete';
-        await saveUsage(usage);
-        return usage;
     });
 }
 
 /** Bump counters when an export is stopped by the user. */
 function recordExportStopped() {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.exportsStopped += 1;
         usage.lastExportAt = Date.now();
         usage.lastPhase = 'stopped';
-        await saveUsage(usage);
-        return usage;
     });
 }
 
@@ -738,8 +725,7 @@ const KNOWN_ERROR_CODES = new Set([
 
 /** Bump counters on failure (stores a whitelisted error code, no free text). */
 function recordExportError(error) {
-    return withUsageLock(async () => {
-        const usage = await loadUsage();
+    return mutateUsage(usage => {
         usage.exportsErr += 1;
         const code = String(error || '');
         usage.lastError = KNOWN_ERROR_CODES.has(code)
@@ -747,8 +733,6 @@ function recordExportError(error) {
             : (/^API_ERROR_\d{3}$/.test(code) ? code : 'UNKNOWN');
         usage.lastExportAt = Date.now();
         usage.lastPhase = 'error';
-        await saveUsage(usage);
-        return usage;
     });
 }
 

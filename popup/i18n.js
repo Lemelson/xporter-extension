@@ -31,41 +31,25 @@ function detectBrowserLanguage() {
     return LANGUAGES.find(l => l.code === base) ? base : 'en';
 }
 
-// ==================== Translation Cache ====================
-// Loaded translations are cached to avoid re-fetching
-const _loadedLocales = {};
-let _fallbackLocale = null; // English, loaded once
+// One promise per locale owns both in-flight and completed loads. English uses
+// this same path, so concurrent locale/fallback requests cannot fetch it twice.
+const _loadedLocales = new Map();
 
-/**
- * Load a locale JSON file and cache it.
- * @param {string} langCode - Language code (e.g. 'en', 'ru')
- * @returns {Promise<Object>} Parsed translation object
- */
-async function _loadLocale(langCode) {
-    if (_loadedLocales[langCode]) {
-        return _loadedLocales[langCode];
+function _loadLocale(langCode) {
+    if (!_loadedLocales.has(langCode)) {
+        const request = (async () => {
+            const url = chrome.runtime.getURL(`popup/locales/${langCode}.json`);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })().catch(error => {
+            _loadedLocales.delete(langCode); // retry transient failures next time
+            console.warn(`[i18n] Failed to load locale "${langCode}":`, error.message);
+            return null;
+        });
+        _loadedLocales.set(langCode, request);
     }
-    try {
-        const url = chrome.runtime.getURL(`popup/locales/${langCode}.json`);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        _loadedLocales[langCode] = data;
-        return data;
-    } catch (e) {
-        console.warn(`[i18n] Failed to load locale "${langCode}":`, e.message);
-        return null;
-    }
-}
-
-/**
- * Ensure English fallback locale is loaded.
- */
-async function _ensureFallback() {
-    if (!_fallbackLocale) {
-        _fallbackLocale = await _loadLocale('en');
-    }
-    return _fallbackLocale;
+    return _loadedLocales.get(langCode);
 }
 
 // ==================== Public API ====================
@@ -80,7 +64,7 @@ async function _ensureFallback() {
 async function loadTranslations(langCode) {
     const [locale, fallback] = await Promise.all([
         _loadLocale(langCode),
-        _ensureFallback()
+        _loadLocale('en')
     ]);
 
     // Merge: current language overrides English defaults

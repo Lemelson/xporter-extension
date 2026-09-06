@@ -435,11 +435,11 @@ for (const file of popupRefs) assertFile(file, 'popup asset');
 const popupScripts = [...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
     .map((match) => match[1]);
 assert.equal(popupScripts[0], 'theme-init.js', 'theme-init.js must remain the first popup script');
-assert(
-    popupScripts.indexOf('history.js') < popupScripts.indexOf('popup.js') &&
-    popupScripts.indexOf('seen-posts.js') < popupScripts.indexOf('popup.js'),
-    'popup modules must load before popup.js initializes them'
-);
+for (const script of ['history.js', 'seen-posts.js', 'guarded-dialog.js', 'export-status.js',
+    'presentation.js', 'account-fields.js', 'settings-form.js']) {
+    assert(popupScripts.indexOf(script) >= 0 && popupScripts.indexOf(script) < popupScripts.indexOf('popup.js'),
+        `${script} must load before the popup coordinator`);
+}
 const updateEntries = [...popupHtml.matchAll(
     /<div class="detail-item update-item">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/g
 )].map((match) => match[1]);
@@ -572,12 +572,14 @@ assert.match(
     'Download must wait for the most recent XLSX photo choice to finish saving'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0/,
     'zero-item complete exports must not offer a pointless Resume loop'
 );
 assert.match(read('popup/theme-init.js'), /theme === ['"]light['"]/,
     'the early theme bootstrap must only opt into light when explicitly saved');
+assert.doesNotMatch(workerSource.split('chrome.runtime.onInstalled.addListener', 2)[1], /saveSettings\(/,
+    'install must use read-time defaults, never overwrite the first popup edit with an initial snapshot');
 assert.match(read('utils/storage.js'), /theme:\s*['"]dark['"]/,
     'new settings must default to dark');
 assert.doesNotMatch(
@@ -596,7 +598,7 @@ assert.match(
     'status actions must use compact responsive rows for running, terminal, and TXT states'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /statusActionStack\.classList\.toggle\(['"]running-actions['"],\s*isRunning\)/,
     'running status must activate the compact trailing Stop layout'
 );
@@ -605,11 +607,6 @@ for (const key of ['postSafetyBreakEnabled', 'userSafetyBreakEnabled']) {
         read('utils/storage.js'),
         new RegExp(`${key}:\\s*false`),
         `${key} must be opt-in for missing settings`
-    );
-    assert.match(
-        workerSource,
-        new RegExp(`${key}:\\s*false`),
-        `${key} must be off for fresh installs`
     );
 }
 assert.match(read('popup/popup.css'), /\.progress-fill\.rate-limit[\s\S]*repeating-linear-gradient/,
@@ -632,12 +629,12 @@ assert.match(
     'the stopped Resume cue may breathe only when motion is allowed'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /case\s+['"]stopped['"]:[\s\S]*classList\.add\(['"]phase-stopped['"]\)[\s\S]*classList\.add\(['"]stopped['"]\)/,
     'the stopped state must explicitly apply its own card and progress phases'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /case\s+['"]stopped['"]:[\s\S]*setDotColor\(['"]resumable['"]\)/,
     'the stopped state must replace the generic yellow dot with a resumable cue'
 );
@@ -661,9 +658,9 @@ assert.doesNotMatch(
     /\.status-resumable::after/,
     'the resumable cue must not use a hand-drawn CSS arrow'
 );
-assert.match(read('popup/popup.js'), /state\.kind\s*===\s*['"]batch['"][\s\S]*setStatusPhase\(['"]safety-break['"]\)/,
+assert.match(popupRuntime, /state\.kind\s*===\s*['"]batch['"][\s\S]*setStatusPhase\(['"]safety-break['"]\)/,
     'batch cooldowns must render as the user-configured Scheduled break, not as an X rate limit');
-assert.match(read('popup/popup.js'), /case\s+['"]rate_limited['"]:[\s\S]*setStatusPhase\(['"]rate-limit['"]\)/,
+assert.match(popupRuntime, /case\s+['"]rate_limited['"]:[\s\S]*setStatusPhase\(['"]rate-limit['"]\)/,
     'real X rate limits must render their own status phase');
 assert.match(popupHtml, /id=["']includeAboutAccountDetails["']/,
     'Settings must expose the detailed About this Account opt-in');
@@ -692,12 +689,7 @@ assert.match(
     'missing settings must preserve the fast 15-field user-list export'
 );
 assert.match(
-    workerSource,
-    /includeAboutAccountDetails:\s*false/,
-    'fresh installs must persist the safe detailed-export default'
-);
-assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /includeAboutAccountDetails\.checked\s*=\s*[\s\S]*currentSettings\.includeAboutAccountDetails\s*===\s*true/,
     'the popup must opt into per-user About requests only after an explicit saved choice'
 );
@@ -723,7 +715,7 @@ assert.match(
     'About rate-limit retries must be configurable from one minute up to one day'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /aboutAccountOptions\.classList\.toggle\(\s*['"]hidden['"],\s*!includeAboutAccountDetails\.checked\s*\)/,
     'the About dependent settings must track the detailed-enrichment toggle'
 );
@@ -733,22 +725,12 @@ assert.match(
     'missing settings must use Standard About concurrency'
 );
 assert.match(
-    workerSource,
-    /aboutAccountSpeed:\s*['"]standard['"]/,
-    'fresh installs must persist Standard About concurrency'
-);
-assert.match(
     read('utils/storage.js'),
     /aboutAccountMaxRetries:\s*C\.ABOUT_ACCOUNT_RETRY_RANGE\?\.\[2\]\s*\?\?\s*5/,
     'missing settings must default to five one-minute About retries'
 );
 assert.match(
-    workerSource,
-    /aboutAccountMaxRetries:\s*5/,
-    'fresh installs must persist five one-minute About retries'
-);
-assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /aboutAccountMaxRetries:\s*clampToInput\(aboutAccountMaxRetries,\s*5\)/,
     'the popup must persist the bounded About retry setting'
 );
@@ -771,12 +753,12 @@ assert.match(popupHtml, /id=["']photoPermissionCancel["']/,
 assert.match(popupHtml, /id=["']photoPermissionConfirm["'][^>]*\bdisabled\b/,
     'the photo permission dialog confirmation must start disabled');
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /ABOUT_RETRY_WARNING_THRESHOLD\s*=\s*60/,
     'more than one hour of About retries must require explicit confirmation'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /popup\.inert\s*=\s*true/,
     'opening the About risk dialog must make background controls inert'
 );
@@ -785,25 +767,20 @@ assert.match(
     /userExportSpeed:\s*['"]standard['"]/,
     'user-list exports must have an independent Standard speed default'
 );
-assert.match(
-    workerSource,
-    /userExportSpeed:\s*['"]standard['"]/,
-    'fresh installs must persist the independent user-list speed default'
-);
 assert.match(popupHtml, /id=["']exportSpeed["']/, 'popup must expose the posts speed control');
 assert.match(popupHtml, /id=["']userExportSpeed["']/, 'popup must expose the user-list speed control');
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /if\s*\(resumeAddsItems\)\s*message\.extraItems\s*=\s*extraPosts/,
     'only a completed export may turn Resume into a +N quantity extension'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /updateUI\(\{\s*\.\.\.lastExportState,\s*running:\s*false,\s*status:\s*['"]stopped['"]/,
     'Stop must preserve partialReason and other export metadata in local popup state'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /partialReason:\s*result\.partialReason\s*\?\?\s*lastExportState\.partialReason\s*\?\?\s*null/,
     'ordinary Resume must preserve the Posts-only partial marker'
 );
@@ -813,7 +790,7 @@ assert.match(
     'history must visibly distinguish Posts-only fallback exports'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /status\s*===\s*['"]error['"]/,
     'terminal errors must participate in Start-button visibility rules'
 );
@@ -972,12 +949,12 @@ assert.doesNotMatch(
 assert.match(english.aboutDesc, /TXT/, 'English About summary must advertise TXT');
 assert.match(english.detailFormatsBody, /TXT/, 'English format details must include TXT');
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /PHOTO_PERMISSION_INTRO_SECONDS\s*=\s*3/,
     'the mandatory photo-permission explanation must guard Continue for three seconds'
 );
 assert.match(
-    read('popup/popup.js'),
+    popupRuntime,
     /PHOTO_PERMISSION_INTRO_KEY\s*=\s*['"]xporter_photo_permission_intro_seen['"]/,
     'the completed photo-permission explanation must persist exactly once'
 );
@@ -1016,7 +993,7 @@ for (const type of sentToWorker) {
 
 const workerEmits = new Set([...workerSource.matchAll(/type\s*:\s*['"]([A-Z][A-Z0-9_]*)['"]/g)]
     .map((match) => match[1]));
-const consumerSource = read('popup/popup.js') + '\n' + read('content/content.js');
+const consumerSource = popupRuntime + '\n' + read('content/content.js');
 for (const type of workerEmits) {
     assert(consumerSource.includes(`'${type}'`) || consumerSource.includes(`"${type}"`),
         `service-worker message has no popup/content consumer: ${type}`);

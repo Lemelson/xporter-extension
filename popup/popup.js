@@ -5,23 +5,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
     const usernameInput = document.getElementById('usernameInput');
-    const usernameLabel = document.getElementById('usernameLabel');
-    const usernamePrefix = document.getElementById('usernamePrefix');
-    const usernameField = document.getElementById('usernameField');
     const usernameError = document.getElementById('usernameError');
     const targetAccountCard = document.getElementById('targetAccountCard');
-    const targetAccountName = document.getElementById('targetAccountName');
-    const targetAccountHandleEditor =
-        document.getElementById('targetAccountHandleEditor');
-    const targetAccountAvatar = document.getElementById('targetAccountAvatar');
-    const targetAccountAvatarFallback =
-        document.getElementById('targetAccountAvatarFallback');
-    const bookmarksAccountField = document.getElementById('bookmarksAccountField');
-    const bookmarksAccountName = document.getElementById('bookmarksAccountName');
-    const bookmarksAccountHandle = document.getElementById('bookmarksAccountHandle');
-    const bookmarksAccountAvatar = document.getElementById('bookmarksAccountAvatar');
-    const bookmarksAccountAvatarFallback =
-        document.getElementById('bookmarksAccountAvatarFallback');
     const exportMode = document.getElementById('exportMode');
     const outputFormat = document.getElementById('outputFormat');
     const outputFormatHint = document.getElementById('outputFormatHint');
@@ -34,67 +19,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const stopBtn = document.getElementById('stopBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const copyBtn = document.getElementById('copyBtn');
-    const statusActionStack = document.getElementById('statusActionStack');
     const resumeBtn = document.getElementById('resumeBtn');
-    const resumeRow = document.getElementById('resumeRow');
     const resumeQuantity = document.getElementById('resumeQuantity');
     const resumeLabel = document.querySelector('.resume-label');
-    const repliesFallbackActions = document.getElementById('repliesFallbackActions');
     const continuePostsOnlyBtn = document.getElementById('continuePostsOnlyBtn');
     const retryRepliesBtn = document.getElementById('retryRepliesBtn');
     const newExportBtn = document.getElementById('newExportBtn');
-    const exportStatus = document.getElementById('exportStatus');
-    const statusText = document.getElementById('statusText');
-    const statusPhaseIcon = document.getElementById('statusPhaseIcon');
-    const statusSubtitle = document.getElementById('statusSubtitle');
-    const statusPhaseHelp = document.getElementById('statusPhaseHelp');
-    const statusDetail = document.getElementById('statusDetail');
-    const statusIndicator = document.getElementById('statusIndicator');
     const statusMessage = document.getElementById('statusMessage');
-    const progressFill = document.getElementById('progressFill');
-    const tweetCountEl = document.getElementById('tweetCount');
     const downloadPlanEl = document.getElementById('downloadPlan');
     const authWarning = document.getElementById('authWarning');
-    const tabs = document.querySelectorAll('.tab');
-    const tabContents = document.querySelectorAll('.tab-content');
 
-    // Settings elements
-    const includeOriginalPosts = document.getElementById('includeOriginalPosts');
-    const includeQuotes = document.getElementById('includeQuotes');
-    const includeReplies = document.getElementById('includeReplies');
-    const includeRetweets = document.getElementById('includeRetweets');
-    const includeArticles = document.getElementById('includeArticles');
-    const postSelectionPanel = document.getElementById('postSelectionPanel');
-    const postSelectionCount = document.getElementById('postSelectionCount');
-    const postSelectionNote = document.getElementById('postSelectionNote');
-    const postSelectionError = document.getElementById('postSelectionError');
     const xlsxPhotoOptions = document.getElementById('xlsxPhotoOptions');
     const xlsxPhotoLinks = document.getElementById('xlsxPhotoLinks');
     const xlsxPhotoEmbed = document.getElementById('xlsxPhotoEmbed');
-    const includeBookmarkReplyContext =
-        document.getElementById('includeBookmarkReplyContext');
-    const includeBookmarkArticles = document.getElementById('includeBookmarkArticles');
-    const quantityLimit = document.getElementById('quantityLimit');
-    const exportSpeed = document.getElementById('exportSpeed');
-    const customSpeedRows = document.getElementById('customSpeedRows');
-    const customDelaySec = document.getElementById('customDelaySec');
-    const postSafetyBreakEnabled = document.getElementById('postSafetyBreakEnabled');
-    const postSafetyBreakRows = document.getElementById('postSafetyBreakRows');
-    const postSafetyBreakMin = document.getElementById('postSafetyBreakMin');
-    const postSafetyBreakEvery = document.getElementById('postSafetyBreakEvery');
-    const userExportSpeed = document.getElementById('userExportSpeed');
-    const userCustomSpeedRows = document.getElementById('userCustomSpeedRows');
-    const userCustomDelaySec = document.getElementById('userCustomDelaySec');
-    const userSafetyBreakEnabled = document.getElementById('userSafetyBreakEnabled');
-    const userSafetyBreakRows = document.getElementById('userSafetyBreakRows');
-    const userSafetyBreakMin = document.getElementById('userSafetyBreakMin');
-    const userSafetyBreakEvery = document.getElementById('userSafetyBreakEvery');
-    const includeAboutAccountDetails = document.getElementById('includeAboutAccountDetails');
-    const aboutAccountOptions = document.getElementById('aboutAccountOptions');
-    const aboutAccountSpeed = document.getElementById('aboutAccountSpeed');
-    const aboutAccountCustomRows = document.getElementById('aboutAccountCustomRows');
-    const aboutAccountCustomBatchSize = document.getElementById('aboutAccountCustomBatchSize');
-    const aboutAccountMaxRetries = document.getElementById('aboutAccountMaxRetries');
     const aboutRiskDialog = document.getElementById('aboutRiskDialog');
     const aboutRiskTitle = document.getElementById('aboutRiskTitle');
     const aboutRiskBody = document.getElementById('aboutRiskBody');
@@ -108,75 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const photoPermissionConfirm = document.getElementById('photoPermissionConfirm');
     const photoPermissionCountdownStatus =
         document.getElementById('photoPermissionCountdownStatus');
-    const customQuantityRow = document.getElementById('customQuantityRow');
-    const customQuantity = document.getElementById('customQuantity');
-    const autoExpireEnabled = document.getElementById('autoExpireEnabled');
-    const autoExpireHours = document.getElementById('autoExpireHours');
-    const autoExpireRow = document.getElementById('autoExpireRow');
-    const ladybugEnabled = document.getElementById('ladybugEnabled');
-    const localizeExportHeaders = document.getElementById('localizeExportHeaders');
     const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
     const PHOTO_PERMISSION_INTRO_KEY = 'xporter_photo_permission_intro_seen';
     const PHOTO_PERMISSION_INTRO_SECONDS = 3;
-
-    // Long localized help must use the visible popup area below the tabs.
-    // Recalculate on every open because Chromium can scroll the popup between
-    // interactions, which changes whether the header, tabs, and footer are visible.
-    function positionViewportHelp(trigger) {
-        const tooltip = trigger.querySelector(':scope > .help-pop');
-        if (!tooltip) return;
-        const tabsRect = document.querySelector('.tabs')?.getBoundingClientRect();
-        const tabsAreVisible = tabsRect &&
-            tabsRect.bottom > 0 &&
-            tabsRect.top < window.innerHeight;
-        const safeTop = tabsAreVisible ? Math.max(8, tabsRect.bottom + 8) : 8;
-        const footerRect = document.querySelector('.footer')?.getBoundingClientRect();
-        const safeBottom = footerRect && footerRect.top > 0 && footerRect.top < window.innerHeight
-            ? footerRect.top - 8
-            : window.innerHeight - 8;
-        const triggerRect = trigger.getBoundingClientRect();
-        // The active tab briefly animates with transform, so a fixed child can
-        // unexpectedly become relative to that tab. Position explicitly from
-        // the tooltip's actual offset parent to keep viewport geometry stable.
-        const parentRect = tooltip.offsetParent?.getBoundingClientRect() ||
-            trigger.parentElement.getBoundingClientRect();
-        trigger.style.setProperty('--help-pop-left', `${16 - parentRect.left}px`);
-        trigger.style.setProperty('--help-pop-width', `${window.innerWidth - 32}px`);
-        const safeAreaTop = safeTop + 4;
-        let tooltipTop = safeAreaTop;
-        let maxHeight = Math.max(0, safeBottom - safeAreaTop);
-
-        if (trigger.classList.contains('help-below')) {
-            const belowTop = Math.max(safeAreaTop, triggerRect.bottom + 8);
-            const availableBelow = Math.max(0, safeBottom - belowTop);
-            const aboveBottom = triggerRect.top - 8;
-            const availableAbove = Math.max(0, aboveBottom - safeAreaTop);
-            const borderHeight = parseFloat(getComputedStyle(tooltip).borderTopWidth) +
-                parseFloat(getComputedStyle(tooltip).borderBottomWidth);
-            const naturalHeight = tooltip.scrollHeight + borderHeight;
-
-            if (naturalHeight <= availableBelow ||
-                (naturalHeight > availableAbove && availableBelow >= availableAbove)) {
-                tooltipTop = belowTop;
-                maxHeight = availableBelow;
-            } else {
-                maxHeight = availableAbove;
-                tooltipTop = Math.max(
-                    safeAreaTop,
-                    aboveBottom - Math.min(naturalHeight, availableAbove)
-                );
-            }
-        }
-
-        trigger.style.setProperty('--help-pop-safe-top', `${tooltipTop - parentRect.top}px`);
-        trigger.style.setProperty('--help-pop-max-height', `${maxHeight}px`);
-    }
-
-    document.querySelectorAll('.help-viewport').forEach((trigger) => {
-        trigger.addEventListener('pointerenter', () => positionViewportHelp(trigger));
-        trigger.addEventListener('pointermove', () => positionViewportHelp(trigger));
-        trigger.addEventListener('focus', () => positionViewportHelp(trigger));
-    });
 
     // Settings tab — posts-only elements
     const settingsBookmarksOnly = document.getElementById('settingsBookmarksOnly');
@@ -203,10 +74,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let downloadInProgress = false;
     let pendingXlsxPhotoChoice = Promise.resolve({ success: true });
     let resumeAddsItems = false;
-    let bookmarksUsernameBackup = '';
-    let detectedCurrentAccount = null;
-    let detectedTargetAccount = null;
     let currentTranslations = {};
+    const { showToast, writeClipboardText } = XPorterPopupUI.mount({ popup, t });
 
     function ratePromptExportKey(state) {
         const completedAt = state?.completedAt || 'complete';
@@ -221,6 +90,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         extensionVersion.textContent = `v${chrome.runtime.getManifest().version}`;
     }
 
+    const exportStatusView = XPorterExportStatus.mount({
+        t, modeLabel,
+        getLocale: () => ({ language: currentLang, translations: currentTranslations })
+    });
+
     // ==================== Listen for Status Updates ====================
     // Registered BEFORE the awaited init chain so broadcasts that arrive while
     // the popup is still initializing are not lost. Until i18n is ready we
@@ -231,51 +105,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // A12: after a local Stop render, ignore stale `running:true` broadcasts
     // (already in flight from the SW) for a short grace period.
     let ignoreRunningUntil = 0;
-
-    // Live cooldown countdown (shared ticker; driven by the SW's `until`).
-    // Declared before the first updateUI call — updateUI stops it on every
-    // non-cooldown render.
-    // Which localized label the countdown uses — set per event from the SW's
-    // `kind` ('pacing' = normal spacing, 'window' = X budget spent, 'batch' =
-    // fallback batch cooldown).
-    let cooldownLabelKey = 'cooldown';
-    const cooldownTicker = createCooldownTicker((remaining) => {
-        const countdown = cooldownLabelKey === 'statusPacing' && remaining < 60
-            ? String(remaining)
-            : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
-        statusMessage.textContent = `${t(cooldownLabelKey)} ${countdown}`;
-    });
-
-    function clearStatusPhase() {
-        exportStatus.classList.remove('phase-rate-limit', 'phase-safety-break', 'phase-stopped');
-        statusPhaseIcon.classList.add('hidden');
-        statusPhaseIcon.replaceChildren();
-        statusSubtitle.classList.add('hidden');
-        statusSubtitle.textContent = '';
-        statusPhaseHelp.classList.add('hidden');
-    }
-
-    function setStatusPhase(kind) {
-        const isRateLimit = kind === 'rate-limit';
-        const titleKey = isRateLimit ? 'statusRateLimitTitle' : 'statusSafetyBreakTitle';
-        const subtitleKey = isRateLimit
-            ? 'statusRateLimitSubtitle'
-            : 'statusSafetyBreakSubtitle';
-        const helpKey = isRateLimit ? 'statusRateLimitHelp' : 'statusSafetyBreakHelp';
-        exportStatus.classList.add(
-            isRateLimit ? 'phase-rate-limit' : 'phase-safety-break'
-        );
-        statusPhaseIcon.innerHTML = isRateLimit ? ICONS.rateLimit : ICONS.safetyBreak;
-        statusPhaseIcon.classList.remove('hidden');
-        statusText.textContent = t(titleKey);
-        statusSubtitle.textContent = t(subtitleKey);
-        statusSubtitle.classList.remove('hidden');
-        const helpText = currentTranslations[helpKey] || helpKey;
-        statusPhaseHelp.setAttribute('aria-label', stripHelpMarkup(helpText));
-        const helpPop = statusPhaseHelp.querySelector(':scope > .help-pop');
-        if (helpPop) helpPop.innerHTML = renderHelpMarkup(helpText);
-        statusPhaseHelp.classList.remove('hidden');
-    }
 
     function handleStatusUpdate(state) {
         if (state.running && Date.now() < ignoreRunningUntil) return;
@@ -382,10 +211,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeTabs[0]?.id &&
         /^https:\/\/(?:www\.)?(?:x|twitter)\.com\//i.test(activeTabs[0].url || '')
     );
-    detectedCurrentAccount = liveAccountContext
+    const detectedCurrentAccount = liveAccountContext
         ? (liveAccountContext.currentAccount || null)
         : (activeTabSupportsAccountContext ? null : (currentAccountResult?.account || null));
-    detectedTargetAccount = liveAccountContext?.targetAccount || null;
+    const detectedTargetAccount = liveAccountContext?.targetAccount || null;
+
+    const accountFields = XPorterAccountFields.mount({
+        detectedCurrentAccount, detectedTargetAccount,
+        getTranslations: () => currentTranslations
+    });
 
     // ==================== Theme & Design ====================
     initTheme(currentSettings.theme, themeIcon);
@@ -403,29 +237,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ==================== Export Mode Switching ====================
-    const postTypeControls = [
-        includeOriginalPosts,
-        includeQuotes,
-        includeReplies,
-        includeRetweets,
-        includeArticles
-    ];
-
-    function syncPostSelectionUI() {
-        const selectedCount = postTypeControls.filter(control => control.checked).length;
-        postSelectionCount.textContent = `${selectedCount}/${postTypeControls.length}`;
-        postSelectionPanel.classList.toggle('is-empty', selectedCount === 0);
-        postSelectionError.classList.toggle('hidden', selectedCount !== 0);
-        const hasOtherTypes = postTypeControls.some(
-            control => control !== includeReplies && control.checked
-        );
-        postSelectionNote.classList.toggle(
-            'hidden',
-            !includeReplies.checked || !hasOtherTypes
-        );
-        return selectedCount;
-    }
-
     function modeEmbedsXlsxPhotos(mode = exportMode.value) {
         if (mode === 'posts') return currentSettings.embedPostPhotos === true;
         if (mode === 'bookmarks') return currentSettings.embedBookmarkPhotos === true;
@@ -468,23 +279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (settingsBookmarksOnly) {
             settingsBookmarksOnly.classList.toggle('hidden', !isBookmarksMode);
         }
-        if (isBookmarksMode) {
-            if (!usernameInput.disabled) bookmarksUsernameBackup = usernameInput.value;
-            usernameInput.disabled = true;
-            usernameInput.value = '';
-            usernameField.classList.add('hidden');
-            bookmarksAccountField.classList.remove('hidden');
-            renderBookmarksAccount();
-        } else {
-            if (usernameInput.disabled) usernameInput.value = bookmarksUsernameBackup;
-            usernameInput.disabled = false;
-            usernameField.classList.remove('hidden');
-            bookmarksAccountField.classList.add('hidden');
-            usernameLabel.textContent =
-                currentTranslations.fieldUsername || 'Twitter Username';
-            usernamePrefix.classList.remove('hidden');
-            renderTargetAccount();
-        }
+        accountFields.applyMode(mode);
         const txtOption = outputFormat.querySelector('option[value="txt"]');
         if (txtOption) txtOption.disabled = !isPostRows;
         if (!isPostRows && outputFormat.value === 'txt') outputFormat.value = 'csv';
@@ -496,54 +291,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         outputFormatHint.classList.toggle(
             'hidden',
             !isPostRows || outputFormat.value !== 'txt'
-        );
-        syncPostSelectionUI();
-    }
-
-    function renderAccountAvatar(image, fallback, avatarUrl) {
-        const showFallback = () => {
-            image.removeAttribute('src');
-            image.classList.add('hidden');
-            fallback.classList.remove('hidden');
-        };
-        image.onerror = showFallback;
-        if (avatarUrl) {
-            image.src = avatarUrl;
-            image.classList.remove('hidden');
-            fallback.classList.add('hidden');
-        } else {
-            showFallback();
-        }
-    }
-
-    function renderTargetAccount() {
-        const username = extractUsernameFromInput(usernameInput.value);
-        const account = (
-            username &&
-            String(detectedTargetAccount?.username || '').toLowerCase() ===
-                username.toLowerCase()
-        ) ? detectedTargetAccount : null;
-        const name = String(account?.name || '').trim();
-        targetAccountName.textContent = name;
-        targetAccountName.classList.toggle('hidden', !name);
-        renderAccountAvatar(
-            targetAccountAvatar,
-            targetAccountAvatarFallback,
-            String(account?.avatarUrl || '')
-        );
-    }
-
-    function renderBookmarksAccount() {
-        const account = detectedCurrentAccount || {};
-        const username = String(account.username || '').replace(/^@/, '');
-        bookmarksAccountName.textContent = account.name ||
-            currentTranslations.signedInXAccount || 'Signed-in X account';
-        bookmarksAccountHandle.textContent = username ? `@${username}` : '';
-        bookmarksAccountHandle.classList.toggle('hidden', !username);
-        renderAccountAvatar(
-            bookmarksAccountAvatar,
-            bookmarksAccountAvatarFallback,
-            String(account.avatarUrl || '')
         );
     }
 
@@ -701,7 +448,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         applyI18nToDOM(t);
 
         // Update quantity limit options (shared: locale-aware number grouping)
-        localizeQuantityOptions(quantityLimit, code, t);
+        localizeQuantityOptions(document.getElementById('quantityLimit'), code, t);
 
         document.documentElement.lang = code;
         formatReleaseDates(code);
@@ -796,501 +543,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         return currentTranslations[key] || key;
     }
 
-    const ABOUT_RETRY_WARNING_THRESHOLD = 60;
-    let activeAboutRisk = null;
-    let aboutRiskCountdown = null;
-
-    function guardedButtonCountdown(
-        button,
-        readyLabel,
-        statusElement,
-        seconds = 5,
-        waitingLabel = null
-    ) {
-        return window.XPorterAcknowledgementTimer.start(button, {
-            seconds,
-            readyLabel,
-            waitingLabel: waitingLabel || ((action, remainingSeconds) => templateText(
-                'acknowledgementCountdown',
-                {
-                    action,
-                    seconds: formatNumber(remainingSeconds, currentLang)
-                }
-            )),
-            onChange({ text }) {
-                if (statusElement) statusElement.textContent = text;
-            }
-        });
-    }
-
-    function closeAboutRiskDialog(confirmed) {
-        if (!activeAboutRisk) return;
-        const action = activeAboutRisk;
-        activeAboutRisk = null;
-        aboutRiskCountdown?.cancel();
-        aboutRiskCountdown = null;
-        aboutRiskDialog.classList.add('hidden');
-        popup.inert = false;
-        if (confirmed) action.onConfirm();
-        else action.onCancel();
-        requestAnimationFrame(() => action.trigger?.focus());
-    }
+    const aboutDialog = XPorterGuardedDialog.mount({
+        popup, dialog: aboutRiskDialog,
+        cancelButton: aboutRiskCancel, confirmButton: aboutRiskConfirm,
+        countdownStatus: aboutRiskCountdownStatus
+    });
+    const photoDialog = XPorterGuardedDialog.mount({
+        popup, dialog: photoPermissionDialog,
+        cancelButton: photoPermissionCancel, confirmButton: photoPermissionConfirm,
+        countdownStatus: photoPermissionCountdownStatus
+    });
+    let photoPermissionSelectionVersion = 0;
 
     function openAboutRiskDialog(kind, { trigger, onConfirm, onCancel }) {
         const isRetryRisk = kind === 'retries';
-        aboutRiskTitle.textContent = t(isRetryRisk
-            ? 'aboutRetryRiskTitle'
-            : 'aboutEnableRiskTitle');
-        aboutRiskBody.textContent = t(isRetryRisk
-            ? 'aboutRetryRiskBody'
-            : 'aboutEnableRiskBody');
+        aboutRiskTitle.textContent = t(isRetryRisk ? 'aboutRetryRiskTitle' : 'aboutEnableRiskTitle');
+        aboutRiskBody.textContent = t(isRetryRisk ? 'aboutRetryRiskBody' : 'aboutEnableRiskBody');
         aboutRiskCancel.textContent = t('aboutRiskCancel');
-        aboutRiskConfirm.textContent = t(isRetryRisk
-            ? 'aboutRetryRiskConfirm'
-            : 'aboutEnableRiskConfirm');
-        aboutRiskCountdown?.cancel();
-        aboutRiskCountdown = guardedButtonCountdown(
-            aboutRiskConfirm,
-            aboutRiskConfirm.textContent,
-            aboutRiskCountdownStatus
-        );
-        activeAboutRisk = { trigger, onConfirm, onCancel };
-        popup.inert = true;
-        aboutRiskDialog.classList.remove('hidden');
-        requestAnimationFrame(() => aboutRiskCancel.focus());
-    }
-
-    aboutRiskCancel.addEventListener('click', () => closeAboutRiskDialog(false));
-    aboutRiskConfirm.addEventListener('click', () => closeAboutRiskDialog(true));
-    aboutRiskDialog.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            closeAboutRiskDialog(false);
-            return;
-        }
-        if (event.key !== 'Tab') return;
-        const first = aboutRiskCancel;
-        const last = aboutRiskConfirm;
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        }
-    });
-
-    let activePhotoPermissionCheckbox = null;
-    let photoPermissionCountdown = null;
-    let photoPermissionSelectionVersion = 0;
-
-    function finishPhotoPermissionDialog(continueToChrome) {
-        if (!activePhotoPermissionCheckbox) return;
-        const checkbox = activePhotoPermissionCheckbox;
-        activePhotoPermissionCheckbox = null;
-        photoPermissionCountdown?.cancel();
-        photoPermissionCountdown = null;
-        photoPermissionDialog.classList.add('hidden');
-        popup.inert = false;
-
-        if (continueToChrome) {
-            // Keep the permission request inside this confirmation click. Any
-            // await or permission preflight before request() loses Chromium's
-            // transient user activation and suppresses the native prompt.
-            trackXlsxPhotoChoice(
-                requestAndSavePhotoEmbedPermission(checkbox, true)
-            );
-        } else {
-            checkbox.checked = false;
-            xlsxPhotoLinks.checked = true;
-        }
-        requestAnimationFrame(() => checkbox.focus());
+        aboutRiskConfirm.textContent = t(isRetryRisk ? 'aboutRetryRiskConfirm' : 'aboutEnableRiskConfirm');
+        aboutDialog.open({
+            trigger, onConfirm, onCancel,
+            waitingLabel: (action, remaining) => templateText('acknowledgementCountdown', {
+                action, seconds: formatNumber(remaining, currentLang)
+            })
+        });
     }
 
     function openPhotoPermissionDialog(checkbox) {
-        activePhotoPermissionCheckbox = checkbox;
         photoPermissionTitle.textContent = t('photoPermissionTitle');
         photoPermissionBody.innerHTML = renderHelpMarkup(t('photoPermissionBody'));
         photoPermissionCancel.textContent = t('photoPermissionCancel');
         photoPermissionConfirm.textContent = t('photoPermissionContinue');
-        photoPermissionCountdown?.cancel();
-        photoPermissionCountdown = guardedButtonCountdown(
-            photoPermissionConfirm,
-            photoPermissionConfirm.textContent,
-            photoPermissionCountdownStatus,
-            PHOTO_PERMISSION_INTRO_SECONDS,
-            (_action, remainingSeconds) => templateText(
-                'photoPermissionWaiting',
-                { seconds: formatNumber(remainingSeconds, currentLang) }
-            )
-        );
-        popup.inert = true;
-        photoPermissionDialog.classList.remove('hidden');
-        requestAnimationFrame(() => photoPermissionCancel.focus());
-    }
-
-    photoPermissionCancel.addEventListener('click', () => finishPhotoPermissionDialog(false));
-    photoPermissionConfirm.addEventListener('click', () => finishPhotoPermissionDialog(true));
-    photoPermissionDialog.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            finishPhotoPermissionDialog(false);
-            return;
-        }
-        if (event.key !== 'Tab') return;
-        const first = photoPermissionCancel;
-        const last = photoPermissionConfirm;
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        }
-    });
-
-    // ==================== Toast Notifications ====================
-    // Replaces native alert() — keeps the glass aesthetic and is non-blocking.
-    let toastContainer = null;
-    function showToast(message, type = 'info') {
-        if (!message) return;
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container';
-            popup.appendChild(toastContainer);
-        }
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
-        toast.textContent = message;
-        toastContainer.appendChild(toast);
-        // Force reflow then animate in
-        requestAnimationFrame(() => toast.classList.add('toast-show'));
-        setTimeout(() => {
-            toast.classList.remove('toast-show');
-            setTimeout(() => toast.remove(), 250);
-        }, type === 'error' ? 4500 : 2800);
-    }
-
-    // ==================== Tabs ====================
-    function activateTab(tab, focus = false) {
-        tabs.forEach(t => {
-            const selected = t === tab;
-            t.classList.toggle('active', selected);
-            t.setAttribute('aria-selected', selected ? 'true' : 'false');
-            t.tabIndex = selected ? 0 : -1;
-        });
-        tabContents.forEach(c => c.classList.remove('active'));
-        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-        if (focus) tab.focus();
-    }
-
-    tabs.forEach((tab, index) => {
-        tab.addEventListener('click', () => activateTab(tab));
-        tab.addEventListener('keydown', (event) => {
-            let nextIndex = null;
-            if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
-            if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
-            if (event.key === 'Home') nextIndex = 0;
-            if (event.key === 'End') nextIndex = tabs.length - 1;
-            if (nextIndex === null) return;
-            event.preventDefault();
-            activateTab(tabs[nextIndex], true);
-        });
-    });
-    activateTab(document.querySelector('.tab.active') || tabs[0]);
-
-    async function writeClipboardText(text) {
-        try {
-            await navigator.clipboard.writeText(text);
-            return true;
-        } catch {
-            // Fallback for older browsers / restricted clipboard access.
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.position = 'fixed';
-            ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.select();
-            let copied = false;
-            try { copied = document.execCommand('copy'); } catch { /* noop */ }
-            ta.remove();
-            return copied;
-        }
-    }
-
-    // ==================== Copy-to-clipboard (About tab email) ====================
-    document.querySelectorAll('[data-copy]').forEach(el => {
-        el.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const text = el.getAttribute('data-copy');
-            if (!text) return;
-            if (!await writeClipboardText(text)) {
-                showToast(t('errCopyFailed'), 'error');
-                return;
-            }
-            const target = el.closest('.email-action') || el;
-            target.classList.add('is-copied');
-            showToast(t('contactCopied') || 'Copied!', 'success');
-            clearTimeout(el._copyTimer);
-            el._copyTimer = setTimeout(() => target.classList.remove('is-copied'), 1800);
-        });
-    });
-
-    // ==================== About-tab accordions ====================
-    document.querySelectorAll('.detail-head').forEach(head => {
-        head.addEventListener('click', () => {
-            const item = head.closest('.detail-item');
-            const isOpen = item.classList.toggle('open');
-            head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        });
-    });
-
-    // ==================== Load Settings ====================
-    let lastAcceptedAboutRetries = 5;
-    if (currentSettings) {
-        includeOriginalPosts.checked = currentSettings.includeOriginalPosts !== false;
-        includeQuotes.checked = currentSettings.includeQuotes !== false;
-        includeReplies.checked = currentSettings.includeReplies === true;
-        includeRetweets.checked = currentSettings.includeRetweets === true;
-        includeArticles.checked = currentSettings.includeArticles === true;
-        syncPostSelectionUI();
-        includeBookmarkReplyContext.checked =
-            currentSettings.includeBookmarkReplyContext !== false;
-        includeBookmarkArticles.checked =
-            currentSettings.includeBookmarkArticles !== false;
-        syncXlsxPhotoChoice();
-        const savedLimit = currentSettings.quantityLimit ?? 500;
-        const presetValues = ['0', '100', '500', '1000', '5000', '10000'];
-        if (presetValues.includes(String(savedLimit))) {
-            quantityLimit.value = String(savedLimit);
-        } else {
-            quantityLimit.value = 'custom';
-            customQuantityRow.classList.remove('hidden');
-            customQuantity.value = String(savedLimit);
-        }
-        exportSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom'].includes(currentSettings.exportSpeed)
-            ? currentSettings.exportSpeed
-            : 'standard';
-        customDelaySec.value = currentSettings.customDelaySec || 5;
-        customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
-        postSafetyBreakEnabled.checked = currentSettings.postSafetyBreakEnabled === true;
-        postSafetyBreakMin.value = currentSettings.postSafetyBreakMin ?? 3;
-        postSafetyBreakEvery.value = currentSettings.postSafetyBreakEvery ?? 20;
-        userExportSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom'].includes(currentSettings.userExportSpeed)
-            ? currentSettings.userExportSpeed
-            : 'standard';
-        userCustomDelaySec.value = currentSettings.userCustomDelaySec || 5;
-        userCustomSpeedRows.classList.toggle('hidden', userExportSpeed.value !== 'custom');
-        userSafetyBreakEnabled.checked = currentSettings.userSafetyBreakEnabled === true;
-        userSafetyBreakMin.value = currentSettings.userSafetyBreakMin ?? 3;
-        userSafetyBreakEvery.value = currentSettings.userSafetyBreakEvery ?? 20;
-        syncSafetyBreakVisibility();
-        includeAboutAccountDetails.checked =
-            currentSettings.includeAboutAccountDetails === true;
-        aboutAccountSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom']
-            .includes(currentSettings.aboutAccountSpeed)
-            ? currentSettings.aboutAccountSpeed
-            : 'standard';
-        aboutAccountCustomBatchSize.value =
-            currentSettings.aboutAccountCustomBatchSize || 5;
-        aboutAccountMaxRetries.value =
-            currentSettings.aboutAccountMaxRetries || 5;
-        lastAcceptedAboutRetries = clampToInput(aboutAccountMaxRetries, 5);
-        syncAboutAccountSpeedVisibility();
-        autoExpireEnabled.checked = currentSettings.autoExpireEnabled !== false;
-        autoExpireHours.value = currentSettings.autoExpireHours || 4;
-        autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
-        if (ladybugEnabled) {
-            ladybugEnabled.checked = currentSettings.ladybugEnabled !== false;
-            window.XPorterLadybug?.setEnabled?.(ladybugEnabled.checked);
-        }
-        if (localizeExportHeaders) {
-            localizeExportHeaders.checked = currentSettings.localizeExportHeaders === true;
-        }
-    }
-
-    quantityLimit.addEventListener('change', () => {
-        if (quantityLimit.value === 'custom') {
-            customQuantityRow.classList.remove('hidden');
-            customQuantity.focus();
-        } else {
-            customQuantityRow.classList.add('hidden');
-        }
-        saveSettingsDebounced();
-    });
-
-    autoExpireEnabled.addEventListener('change', () => {
-        autoExpireRow.classList.toggle('hidden', !autoExpireEnabled.checked);
-        saveSettingsDebounced();
-    });
-
-    if (ladybugEnabled) {
-        ladybugEnabled.addEventListener('change', () => {
-            window.XPorterLadybug?.setEnabled?.(ladybugEnabled.checked);
-            saveSettingsDebounced();
-        });
-    }
-
-    // Clamp a typed number input to its own min/max attributes.
-    function clampToInput(el, fallback) {
-        const parsed = parseInt(el.value, 10);
-        const value = Number.isFinite(parsed) ? parsed : fallback;
-        const min = parseInt(el.min, 10);
-        const max = parseInt(el.max, 10);
-        return Math.max(Number.isFinite(min) ? min : value, Math.min(Number.isFinite(max) ? max : value, value));
-    }
-
-    function clampDecimalInput(el, fallback) {
-        const parsed = parseLocalizedDecimal(el.value, fallback);
-        const min = parseLocalizedDecimal(el.dataset.min, parsed);
-        const max = parseLocalizedDecimal(el.dataset.max, parsed);
-        return Math.max(min, Math.min(max, parsed));
-    }
-
-    function syncAboutAccountSpeedVisibility() {
-        aboutAccountOptions.classList.toggle(
-            'hidden',
-            !includeAboutAccountDetails.checked
-        );
-        aboutAccountCustomRows.classList.toggle(
-            'hidden',
-            !includeAboutAccountDetails.checked || aboutAccountSpeed.value !== 'custom'
-        );
-    }
-
-    function syncSafetyBreakVisibility() {
-        postSafetyBreakRows.classList.toggle('hidden', !postSafetyBreakEnabled.checked);
-        userSafetyBreakRows.classList.toggle('hidden', !userSafetyBreakEnabled.checked);
-        postSafetyBreakEnabled.setAttribute(
-            'aria-expanded',
-            String(postSafetyBreakEnabled.checked)
-        );
-        userSafetyBreakEnabled.setAttribute(
-            'aria-expanded',
-            String(userSafetyBreakEnabled.checked)
-        );
-    }
-
-    const saveSettingsDebounced = debounce(async () => {
-        let qLimit;
-        if (quantityLimit.value === 'custom') {
-            // Empty/0 custom value must keep the previous limit — never
-            // silently persist 0 (= Unlimited).
-            const parsed = parseInt(customQuantity.value, 10);
-            qLimit = (parsed > 0) ? parsed : (currentSettings.quantityLimit ?? 500);
-        } else {
-            qLimit = parseInt(quantityLimit.value, 10) || 0;
-        }
-        const nextSettings = {
-            postSelectionVersion: 1,
-            includeOriginalPosts: includeOriginalPosts.checked,
-            includeQuotes: includeQuotes.checked,
-            includeReplies: includeReplies.checked,
-            includeRetweets: includeRetweets.checked,
-            includeArticles: includeArticles.checked,
-            includeBookmarkReplyContext: includeBookmarkReplyContext.checked,
-            includeBookmarkArticles: includeBookmarkArticles.checked,
-            embedPostPhotos: exportMode.value === 'posts'
-                ? xlsxPhotoEmbed.checked
-                : currentSettings.embedPostPhotos === true,
-            embedBookmarkPhotos: exportMode.value === 'bookmarks'
-                ? xlsxPhotoEmbed.checked
-                : currentSettings.embedBookmarkPhotos === true,
-            quantityLimit: qLimit,
-            requestDelay: 3000,
-            exportSpeed: exportSpeed.value || 'standard',
-            customDelaySec: clampDecimalInput(customDelaySec, 5),
-            postSafetyBreakEnabled: postSafetyBreakEnabled.checked,
-            postSafetyBreakMin: clampDecimalInput(postSafetyBreakMin, 3),
-            postSafetyBreakEvery: clampToInput(postSafetyBreakEvery, 20),
-            userExportSpeed: userExportSpeed.value || 'standard',
-            userCustomDelaySec: clampDecimalInput(userCustomDelaySec, 5),
-            userSafetyBreakEnabled: userSafetyBreakEnabled.checked,
-            userSafetyBreakMin: clampDecimalInput(userSafetyBreakMin, 3),
-            userSafetyBreakEvery: clampToInput(userSafetyBreakEvery, 20),
-            includeAboutAccountDetails: includeAboutAccountDetails.checked,
-            aboutAccountSpeed: aboutAccountSpeed.value || 'standard',
-            aboutAccountCustomBatchSize: clampToInput(aboutAccountCustomBatchSize, 5),
-            aboutAccountMaxRetries: clampToInput(aboutAccountMaxRetries, 5),
-            adaptivePacing: currentSettings?.adaptivePacing !== false,
-            theme: document.body.classList.contains('light') ? 'light' : 'dark',
-            language: currentLang,
-            exportMode: exportMode.value,
-            outputFormat: outputFormat.value,
-            autoExpireEnabled: autoExpireEnabled.checked,
-            autoExpireHours: clampToInput(autoExpireHours, 4),
-            ladybugEnabled: ladybugEnabled ? ladybugEnabled.checked : true,
-            localizeExportHeaders: localizeExportHeaders ? localizeExportHeaders.checked : false
-        };
-        // Send only values that this UI actually changed. A second open surface
-        // may have updated another setting since our initial GET_SETTINGS; a
-        // full stale snapshot would roll that newer value back.
-        const patch = {};
-        for (const [key, value] of Object.entries(nextSettings)) {
-            if (currentSettings[key] !== value) patch[key] = value;
-        }
-        if (Object.keys(patch).length > 0) {
-            return await persistSettingsPatch(currentSettings, patch);
-        }
-        return { success: true };
-    }, 500);
-
-    if (localizeExportHeaders) {
-        localizeExportHeaders.addEventListener('change', saveSettingsDebounced);
-    }
-
-    exportSpeed.addEventListener('change', () => {
-        customSpeedRows.classList.toggle('hidden', exportSpeed.value !== 'custom');
-    });
-    userExportSpeed.addEventListener('change', () => {
-        userCustomSpeedRows.classList.toggle('hidden', userExportSpeed.value !== 'custom');
-    });
-    [postSafetyBreakEnabled, userSafetyBreakEnabled].forEach((control) => {
-        control.addEventListener('change', syncSafetyBreakVisibility);
-    });
-    includeAboutAccountDetails.addEventListener('change', () => {
-        if (!includeAboutAccountDetails.checked) {
-            syncAboutAccountSpeedVisibility();
-            saveSettingsDebounced();
-            return;
-        }
-
-        // Revert until the consequence is explicitly confirmed. This prevents
-        // the debounced settings save from enabling expensive requests behind
-        // a dismissed warning.
-        includeAboutAccountDetails.checked = false;
-        syncAboutAccountSpeedVisibility();
-        openAboutRiskDialog('enable', {
-            trigger: includeAboutAccountDetails,
+        photoDialog.open({
+            trigger: checkbox,
+            seconds: PHOTO_PERMISSION_INTRO_SECONDS,
+            waitingLabel: (_action, remaining) => templateText('photoPermissionWaiting', {
+                seconds: formatNumber(remaining, currentLang)
+            }),
             onConfirm() {
-                includeAboutAccountDetails.checked = true;
-                syncAboutAccountSpeedVisibility();
-                saveSettingsDebounced();
+                // No await before the native permission request: preserve the click.
+                trackXlsxPhotoChoice(requestAndSavePhotoEmbedPermission(checkbox, true));
             },
-            onCancel() {}
+            onCancel() {
+                checkbox.checked = false;
+                xlsxPhotoLinks.checked = true;
+            }
         });
-    });
-    aboutAccountSpeed.addEventListener('change', syncAboutAccountSpeedVisibility);
-    aboutAccountMaxRetries.addEventListener('change', () => {
-        const nextRetries = clampToInput(aboutAccountMaxRetries, 5);
-        aboutAccountMaxRetries.value = String(nextRetries);
-        if (nextRetries > ABOUT_RETRY_WARNING_THRESHOLD &&
-            nextRetries !== lastAcceptedAboutRetries) {
-            openAboutRiskDialog('retries', {
-                trigger: aboutAccountMaxRetries,
-                onConfirm() {
-                    lastAcceptedAboutRetries = nextRetries;
-                    saveSettingsDebounced();
-                },
-                onCancel() {
-                    aboutAccountMaxRetries.value = String(lastAcceptedAboutRetries);
-                }
-            });
-            return;
-        }
-        lastAcceptedAboutRetries = nextRetries;
-        saveSettingsDebounced();
+    }
+
+    const settingsForm = XPorterSettingsForm.mount({
+        currentSettings, t, showToast, openAboutRiskDialog
     });
 
     // Photo embedding needs https://pbs.twimg.com/* access. That origin lives
@@ -1372,15 +674,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    [includeOriginalPosts, includeQuotes, includeReplies, includeRetweets, includeArticles,
-        includeBookmarkReplyContext, includeBookmarkArticles,
-        quantityLimit, exportSpeed, customQuantity, autoExpireHours,
-        customDelaySec, postSafetyBreakEnabled, postSafetyBreakMin, postSafetyBreakEvery,
-        userExportSpeed, userCustomDelaySec, userSafetyBreakEnabled,
-        userSafetyBreakMin, userSafetyBreakEvery,
-        aboutAccountSpeed, aboutAccountCustomBatchSize].forEach(el => {
-        el.addEventListener('change', saveSettingsDebounced);
-    });
     xlsxPhotoLinks.addEventListener('change', () => {
         if (xlsxPhotoLinks.checked) {
             photoPermissionSelectionVersion += 1;
@@ -1391,37 +684,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (xlsxPhotoEmbed.checked) handleEmbedPhotosChange(xlsxPhotoEmbed);
     });
     await syncEmbedPhotoPermissionState();
-    customQuantity.addEventListener('input', saveSettingsDebounced);
-    postTypeControls.forEach(control => {
-        control.addEventListener('change', syncPostSelectionUI);
-    });
     resumeQuantity.addEventListener('input', updateResumeQuantityLabel);
 
     // ==================== Date Range Toggle ====================
     dateCheck.addEventListener('change', () => {
         dateFields.classList.toggle('hidden', !dateCheck.checked);
-    });
-
-    // The full inset reads as an editable field; clicking its prefix or pencil
-    // should place the caret in the real native input without blocking paste or
-    // text selection inside the input itself.
-    targetAccountHandleEditor.addEventListener('click', (event) => {
-        if (event.target !== usernameInput) usernameInput.focus();
-    });
-
-    // Auto-clean input on paste or type
-    usernameInput.addEventListener('input', () => {
-        const raw = usernameInput.value;
-        if (raw.includes('x.com/') || raw.includes('twitter.com/') || raw.startsWith('@')) {
-            const cleaned = extractUsernameFromInput(raw);
-            if (cleaned && cleaned !== raw) {
-                usernameInput.value = cleaned;
-            }
-        }
-        targetAccountCard.classList.remove('is-invalid');
-        usernameInput.removeAttribute('aria-invalid');
-        usernameError.classList.add('hidden');
-        renderTargetAccount();
     });
 
     // ==================== Apply Auth Result ====================
@@ -1505,11 +772,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     startBtn.addEventListener('click', async () => {
         try {
             const mode = exportMode.value;
-            if (mode === 'posts' && syncPostSelectionUI() === 0) {
-                postSelectionPanel.scrollIntoView({ block: 'nearest' });
-                showToast(t('postSelectionRequired'), 'error');
-                return;
-            }
+            if (mode === 'posts' && !settingsForm.validatePostSelection()) return;
             // extractUsernameFromInput returns '' for anything that is not a
             // valid username or X profile URL — never submit garbage.
             const username = mode === 'bookmarks'
@@ -1533,7 +796,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Apply any pending settings edit before the worker snapshots
             // settings for this export.
-            const settingsSave = await saveSettingsDebounced.flush();
+            const settingsSave = await settingsForm.flush();
             if (settingsSave?.success !== true) {
                 showToast(formatError(settingsSave?.error || 'STORAGE_FULL', t), 'error');
                 return;
@@ -1696,252 +959,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== UI Update Function ====================
     function updateUI(state) {
         lastExportState = { ...state };
-
-        const isRunning = state.running;
-        const status = state.status;
-        const mode = state.exportMode || exportMode.value;
-
-        // Update cached values
-        if (state.tweetCount !== undefined && state.tweetCount !== null) {
-            lastItemCount = state.tweetCount;
-        }
-        if (state.expectedTweets !== undefined && state.expectedTweets !== null) {
-            lastExpectedItems = state.expectedTweets;
-        }
+        if (state.tweetCount != null) lastItemCount = state.tweetCount;
+        if (state.expectedTweets != null) lastExpectedItems = state.expectedTweets;
         if (state.quantityLimit !== undefined) lastQuantityLimit = state.quantityLimit;
-
-        const itemCount = lastItemCount;
-
-        // Show/hide elements. A final error must still offer Download (data
-        // was collected) and Resume (SW says it can continue) — otherwise
-        // "New Export" is the only way out and destroys the collected data.
-        const finalError = (status === 'error' && !isRunning);
-        const showTerminalActions = (status === 'complete' || status === 'stopped' || finalError) && itemCount > 0;
-        const showTxtCopy = showTerminalActions &&
-            (mode === 'posts' || mode === 'bookmarks') &&
-            outputFormat.value === 'txt';
-        startBtn.classList.toggle(
-            'hidden',
-            isRunning || status === 'complete' || status === 'stopped' || finalError
-        );
-        stopBtn.classList.toggle('hidden', !isRunning);
-        downloadBtn.classList.toggle('hidden', !showTerminalActions);
-        copyBtn.classList.toggle('hidden', !showTxtCopy);
-        statusActionStack.classList.toggle('hidden', !isRunning && !showTerminalActions);
-        statusActionStack.classList.toggle('running-actions', isRunning);
-        statusActionStack.classList.toggle('txt-actions', showTxtCopy);
-        const canContinueComplete = status === 'complete' && itemCount > 0 &&
-            !state.resumeBlockedReason &&
-            !['source_exhausted', 'no_matches'].includes(state.completionReason);
-        const showRepliesFallback = finalError && !state.resumeBlockedReason && state.canFallbackWithoutReplies === true;
-        resumeAddsItems = canContinueComplete;
-        resumeQuantity.classList.toggle('hidden', !resumeAddsItems);
-        resumeLabel?.classList.toggle('hidden', !resumeAddsItems);
-        repliesFallbackActions.classList.toggle('hidden', !showRepliesFallback);
-        resumeRow.classList.toggle(
-            'hidden',
-            showRepliesFallback ||
-            !((status === 'stopped' && !state.resumeBlockedReason) ||
-                canContinueComplete || (finalError && state.canResume))
-        );
-        resumeRow.classList.toggle('is-stopped', status === 'stopped');
-        newExportBtn.classList.toggle('hidden', status !== 'complete' && status !== 'stopped' && status !== 'error');
-        exportStatus.classList.toggle('hidden', status === 'idle');
-        statusDetail.classList.remove('hidden');
-
-        // Lock mode selector only during active export (not when stopped/complete)
-        exportMode.disabled = isRunning || downloadInProgress;
-        outputFormat.disabled = isRunning || downloadInProgress;
-
-        if (state.username && mode !== 'bookmarks') {
-            usernameInput.value = state.username;
-        }
+        const mode = state.exportMode || exportMode.value;
+        exportMode.disabled = state.running || downloadInProgress;
+        outputFormat.disabled = state.running || downloadInProgress;
+        if (state.username && mode !== 'bookmarks') usernameInput.value = state.username;
         applyModeUI(mode);
-
-        const subject = mode === 'bookmarks'
-            ? modeLabel('bookmarks')
-            : bidiIsolate('@' + (state.username || usernameInput.value));
-
-        // Measured progress remains useful for paused/error states. While an
-        // export is active, the bar instead communicates activity: blue while
-        // fetching and a timed amber fill between requests.
-        const hasTarget = lastQuantityLimit > 0 || lastExpectedItems > 0;
-        const target = (lastQuantityLimit > 0) ? lastQuantityLimit : (lastExpectedItems || 1);
-        const progressPct = Math.min(100, Math.round(itemCount / target * 100));
-
-        // `live` adds a pulsing animation to the status dot while the export is
-        // actively working (fetching / cooling down / retrying).
-        function setDotColor(color, live = false) {
-            const statusClass = color === 'resumable'
-                ? 'status-resumable'
-                : 'status-' + color;
-            statusIndicator.className = 'status-dot ' + statusClass + (live ? ' live' : '');
-            statusIndicator.innerHTML = color === 'resumable' ? ICONS.playerPlay : '';
+        const view = exportStatusView.render({
+            ...state,
+            exportMode: mode,
+            outputFormat: outputFormat.value,
+            tweetCount: lastItemCount,
+            expectedTweets: lastExpectedItems,
+            quantityLimit: lastQuantityLimit
+        }, { username: usernameInput.value });
+        resumeAddsItems = view.resumeAddsItems;
+        if (state.status === 'complete' && !ratePromptCounted) {
+            ratePromptCounted = true;
+            window.XPorterRatePrompt?.incrementExports(ratePromptExportKey(state));
         }
-
-        function setMeasuredProgress() {
-            if (hasTarget) {
-                progressFill.classList.remove('indeterminate');
-                progressFill.style.width = progressPct + '%';
-            } else {
-                progressFill.classList.add('indeterminate');
-                progressFill.style.width = '100%';
-            }
-        }
-
-        // Wait styling is per-state; clear it before each render, re-add below.
-        progressFill.classList.remove('cooldown', 'rate-limit', 'safety-break', 'stopped');
-        clearStatusPhase();
-
-        // Ordinary pacing and a real X rate-limit pause both own the live
-        // countdown. Every other state stops it immediately.
-        if (status !== 'cooldown' && status !== 'rate_limited') {
-            cooldownTicker.stop();
-            stopWaitProgress(progressFill);
-        }
-
-        // Status-specific display
-        switch (status) {
-            case 'resolving_user':
-                statusText.textContent = `${t('lookingUp')} ${subject}`;
-                setDotColor('green', true);
-                statusMessage.textContent = t('resolvingUser');
-                progressFill.classList.add('indeterminate');
-                progressFill.style.width = '100%';
-                break;
-
-            case 'fetching':
-                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
-                setDotColor('green', true);
-                const searchPhaseKey = { loading: 'searchLoading', connecting: 'searchConnecting', waiting: 'searchWaiting', collecting: 'searchCollecting', retrying: 'searchRetrying' }[state.searchPhase];
-                statusMessage.textContent = searchPhaseKey ? t(searchPhaseKey) : state.partialReason === 'replies_unavailable'
-                    ? `${t('postsOnlyFallbackActive')} · ${t('batch')} ${state.batch || 1}`
-                    : `${t('fetching')} (${t('batch')} ${state.batch || 1})`;
-                progressFill.classList.add('indeterminate');
-                progressFill.style.width = '100%';
-                break;
-
-            case 'cooldown':
-                setDotColor('yellow', true);
-                if (state.kind === 'batch') {
-                    setStatusPhase('safety-break');
-                    cooldownLabelKey = 'statusResumesIn';
-                    progressFill.classList.add('safety-break');
-                } else if (state.kind === 'window') {
-                    setStatusPhase('rate-limit');
-                    cooldownLabelKey = 'retryIn';
-                    progressFill.classList.add('rate-limit');
-                } else {
-                    statusText.textContent =
-                        `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
-                    cooldownLabelKey = 'statusPacing';
-                    progressFill.classList.add('cooldown');
-                }
-                // Live countdown to the SW's absolute deadline (duration is
-                // the fallback for events that predate `until`).
-                cooldownTicker.start(state.until, state.duration || 180000);
-                startWaitProgress(progressFill, state.until, state.duration || 180000);
-                break;
-
-            case 'rate_limited':
-                setStatusPhase('rate-limit');
-                setDotColor('yellow', true);
-                cooldownLabelKey = 'retryIn';
-                cooldownTicker.start(state.until, state.duration || state.retryIn || 60000);
-                progressFill.classList.add('rate-limit');
-                startWaitProgress(
-                    progressFill,
-                    state.until,
-                    state.duration || state.retryIn || 60000
-                );
-                break;
-
-            case 'error':
-                if (state.retryIn) {
-                    setDotColor('red');
-                    statusMessage.textContent = `${formatError(state.error, t)} — ${t('retryIn')} ${Math.round(state.retryIn / 1000)}s`;
-                } else {
-                    statusText.textContent = `${t('errorTitle')}: ${formatError(state.error, t)}`;
-                    setDotColor('red');
-                    // A dead rate-limited export reads as "waiting..." forever —
-                    // tell the user the truth: progress is saved, come back and Resume.
-                    if (state.error === 'NOT_LOGGED_IN') {
-                        // Dead-end text loses first-run users — give them the
-                        // actual login link using strings present in all locales.
-                        statusMessage.textContent = '';
-                        statusMessage.append(`${t('authWarning')} `);
-                        const loginLink = document.createElement('a');
-                        loginLink.href = 'https://x.com/login';
-                        loginLink.target = '_blank';
-                        loginLink.textContent = t('authLink');
-                        statusMessage.append(loginLink);
-                        const suffix = t('authSuffix');
-                        statusMessage.append(`${suffix ? ' ' + suffix : ''}, ${t('thenTryAgain')}`);
-                    } else if (String(state.error || '').startsWith('SEARCH_')) {
-                        statusMessage.textContent = `${itemCount > 0 ? t('partialSaved') + ' ' : ''}${t('searchResumeHint')}`;
-                    } else {
-                        statusMessage.textContent = state.error === 'REPLIES_UNAVAILABLE'
-                            ? t('repliesUnavailableBody')
-                            : ((state.error === 'RATE_LIMITED' && state.canResume)
-                                ? t('rateLimitedResumeHint')
-                                : formatError(state.error, t));
-                    }
-                }
-                setMeasuredProgress();
-                break;
-
-            case 'retrying':
-                statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
-                setDotColor('yellow', true);
-                statusMessage.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
-                progressFill.classList.add('indeterminate');
-                progressFill.style.width = '100%';
-                break;
-
-            case 'complete':
-                // Icon markup is ours; the translated text goes in as a text
-                // node so locale strings can never inject HTML.
-                statusText.innerHTML = ICONS.circleCheck + ' ';
-                statusText.appendChild(document.createTextNode(t('exportComplete')));
-                setDotColor('green');
-                statusMessage.textContent = state.completionReason === 'limit_reached'
-                    ? t('limitReached')
-                    : itemCount === 0
-                    ? t(state.completionReason === 'no_matches' ? 'noMatchingPosts' : 'errNoData')
-                    : (state.partialReason === 'replies_unavailable'
-                        ? t('postsOnlyFallbackComplete')
-                        : (state.completionReason === 'source_exhausted'
-                            ? t('sourceExhausted')
-                            : t('canContinue')));
-                progressFill.classList.remove('indeterminate');
-                progressFill.style.width = '100%';
-                if (!ratePromptCounted) {
-                    ratePromptCounted = true;
-                    window.XPorterRatePrompt?.incrementExports(ratePromptExportKey(state));
-                }
-                break;
-
-            case 'stopped':
-                exportStatus.classList.add('phase-stopped');
-                progressFill.classList.add('stopped');
-                statusText.innerHTML = ICONS.playerStop + ' ';
-                statusText.appendChild(document.createTextNode(t('exportStopped')));
-                setDotColor('resumable');
-                statusMessage.textContent = state.partialReason === 'replies_unavailable'
-                    ? t('postsOnlyFallbackActive')
-                    : t('canBeResumed');
-                setMeasuredProgress();
-                break;
-        }
-
-        if (!isRunning && state.resumeBlockedReason) {
-            statusMessage.textContent = formatError(state.resumeBlockedReason, t);
-        }
-
-        // Update count display
-        tweetCountEl.textContent = formatCollectedCount(itemCount, mode, currentLang, currentTranslations);
-
-        // Resume label follows the export mode (posts vs user-list modes).
         updateResumeQuantityLabel();
         void refreshDownloadPlan(state);
     }
