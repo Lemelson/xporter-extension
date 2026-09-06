@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "디자인",
+  "simplifiedDesign": "간소화된 디자인",
+  "simplifiedDesignHelp": "차분한 색상과 간결한 게시물 유형 표시. 끄면 설명이 있는 파란색 디자인으로 돌아갑니다.",
+  "uiScale": "인터페이스 배율",
+  "uiScaleHelp": "텍스트, 컨트롤 및 창 너비를 함께 조정합니다. 필요한 경우 세로로 스크롤하세요.",
   "toggleTheme": "테마 전환",
   "changeLang": "언어 변경",
   "tabHome": "홈",

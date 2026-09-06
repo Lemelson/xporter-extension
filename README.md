@@ -59,7 +59,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
 - **100% local processing** — everything happens in your browser; your exported data is never transmitted anywhere
-- **Dark and light themes** — compact, high-contrast UI with a one-click toggle
+- **Dark and light themes** — blue styling with a one-click toggle; optional simplified styling and 85–130% interface scale in Settings → Design
 - **14 languages** — auto-detects Chrome's UI language on first launch
 - **Dynamic API discovery** — extracts fresh GraphQL query IDs from X's JS bundles at runtime; gracefully falls back to hardcoded IDs
 - **Crash-resilient** — export progress is persisted to Chrome storage and survives browser restarts

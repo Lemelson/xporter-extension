@@ -505,6 +505,8 @@ async function loadSettings() {
         cooldownDuration: C.COOLDOWN_DURATION || 180000,
         adaptivePacing: (C.ADAPTIVE_PACING !== false),
         theme: 'dark',
+        simplifiedDesign: false,
+        uiScale: 100,
         autoExpireEnabled: true,
         autoExpireHours: 4,
         ladybugEnabled: true,

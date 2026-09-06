@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Design",
+  "simplifiedDesign": "Vereinfachtes Design",
+  "simplifiedDesignHelp": "Neutrale Farben und kompakte Beitragstypen. Ausschalten, um das blaue Design mit Beschreibungen zu verwenden.",
+  "uiScale": "Oberflächenskalierung",
+  "uiScaleHelp": "Vergrößert Text, Bedienelemente und Fensterbreite gemeinsam. Bei Bedarf vertikal scrollen.",
   "toggleTheme": "Design umschalten",
   "changeLang": "Sprache ändern",
   "tabHome": "Startseite",

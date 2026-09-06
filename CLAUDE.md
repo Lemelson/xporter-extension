@@ -33,9 +33,11 @@
 
 ## Export interface
 
-The Home tab places active status and all result actions before setup. Mode and format share one row; the five native post-type checkboxes use a compact list with explanations in a localized `postTypeDetails` disclosure. The Start button remains in a sticky form action row. The in-page date-export overlay sits at the trailing bottom corner; collapsing it retains the count, approximate percentage and activity bar. Its toggle exposes `aria-expanded` and respects reduced motion.
+The Home tab places status and result actions before setup; mode and format share one row. Blue dark/light styling is the default. Settings → Design owns `simplifiedDesign` (default false) and `uiScale` (85/100/115/130; default 100). Both styles share the same markup and export controllers. The base popup width is 400px; CSS zoom scales text, controls and width together, with vertical scrolling and narrow-window reflow. `theme-init.js` defines `XPorterUIAppearance` before the first render; `theme.js` saves appearance as independent partial patches.
 
-`node scripts/test-ui-refresh.mjs` checks the loaded popup and content script with synthetic state in an isolated browser profile: 14 locales, both popup themes, 320/350px popup widths, 320px/desktop overlays, keyboard controls and result actions. It serves a local X-page fixture and does not start an export or prove live-X compatibility.
+Each post type has its description (hidden only in simplified mode) and a separate keyboard-accessible information button. `presentation.js` measures all help targets against the viewport, chooses above/below, accounts for zoom, and supports Escape. Overlay appearance travels with its cached localized presentation and refreshes after settings changes.
+
+`test-popup-appearance.mjs` checks both designs, both themes, all four scales, 14 languages, normal/320px widths, settings persistence, and bottom-edge help. `test-ui-refresh.mjs` checks export states and the real content-script overlay against synthetic data. Browser tests use disposable profiles and never establish real-X compatibility.
 
 ## Gotchas that bite
 

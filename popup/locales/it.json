@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Aspetto",
+  "simplifiedDesign": "Design semplificato",
+  "simplifiedDesignHelp": "Colori neutri e tipi di post compatti. Disattiva per tornare al design blu con descrizioni.",
+  "uiScale": "Scala dell’interfaccia",
+  "uiScaleHelp": "Ridimensiona insieme testo, controlli e larghezza della finestra. Scorri in verticale se necessario.",
   "toggleTheme": "Cambia tema",
   "changeLang": "Cambia lingua",
   "tabHome": "Home",

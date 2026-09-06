@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "设计",
+  "simplifiedDesign": "简洁设计",
+  "simplifiedDesignHelp": "中性色彩和紧凑的帖子类型。关闭后恢复带说明的蓝色设计。",
+  "uiScale": "界面缩放",
+  "uiScaleHelp": "同时调整文字、控件和窗口宽度。需要时请纵向滚动。",
   "toggleTheme": "切换主题",
   "changeLang": "更改语言",
   "tabHome": "首页",

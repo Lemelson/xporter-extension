@@ -34,3 +34,34 @@ function toggleTheme(themeIconEl) {
     themeIconEl.innerHTML = isLight ? ICONS.moon : ICONS.sun;
     return isLight ? 'light' : 'dark';
 }
+
+// Appearance owns only its two keys; it never saves a stale export-settings form.
+function mountAppearanceSettings({ currentSettings, t, showToast }) {
+    const simplified = document.getElementById('simplifiedDesign');
+    const scale = document.getElementById('uiScale');
+    function render() {
+        const appearance = XPorterUIAppearance.apply(document.body, currentSettings);
+        simplified.checked = appearance.simplifiedDesign;
+        scale.value = String(appearance.uiScale);
+    }
+    render();
+    async function save(event) {
+        const control = event.currentTarget;
+        const previousTop = control.getBoundingClientRect().top;
+        simplified.disabled = true;
+        scale.disabled = true;
+        const patch = control === simplified
+            ? { simplifiedDesign: simplified.checked }
+            : { uiScale: Number(scale.value) };
+        const result = await persistSettingsPatch(currentSettings, patch);
+        render();
+        simplified.disabled = false;
+        scale.disabled = false;
+        window.scrollBy(0, control.getBoundingClientRect().top - previousTop);
+        if (result?.success !== true) {
+            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+        }
+    }
+    simplified.addEventListener('change', save);
+    scale.addEventListener('change', save);
+}

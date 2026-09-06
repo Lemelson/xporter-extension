@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Diseño",
+  "simplifiedDesign": "Diseño simplificado",
+  "simplifiedDesignHelp": "Colores neutros y tipos de publicación compactos. Desactívalo para volver al diseño azul con descripciones.",
+  "uiScale": "Escala de la interfaz",
+  "uiScaleHelp": "Ajusta a la vez el texto, los controles y el ancho de la ventana. Desplázate verticalmente cuando sea necesario.",
   "toggleTheme": "Alternar tema",
   "changeLang": "Cambiar idioma",
   "tabHome": "Inicio",

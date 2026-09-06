@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Desain",
+  "simplifiedDesign": "Desain sederhana",
+  "simplifiedDesignHelp": "Warna netral dan jenis postingan ringkas. Nonaktifkan untuk kembali ke desain biru dengan deskripsi.",
+  "uiScale": "Skala antarmuka",
+  "uiScaleHelp": "Mengubah ukuran teks, kontrol, dan lebar jendela sekaligus. Gulir vertikal jika diperlukan.",
   "toggleTheme": "Ganti tema",
   "changeLang": "Ganti bahasa",
   "tabHome": "Beranda",

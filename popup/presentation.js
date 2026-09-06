@@ -5,63 +5,85 @@
     function mount({ popup, t }) {
         const tabs = document.querySelectorAll('.tab');
         const tabContents = document.querySelectorAll('.tab-content');
-        // Long localized help must use the visible popup area below the tabs.
-        // Recalculate on every open because Chromium can scroll the popup between
-        // interactions, which changes whether the header, tabs, and footer are visible.
+        // All help targets share the same placement and keyboard behavior.
+        // Geometry is measured in viewport pixels, then converted to the trigger's
+        // CSS coordinates so user zoom and scrolled/transformed tabs stay aligned.
+        let openHelp = null;
+        let helpCloseTimer = null;
         function positionViewportHelp(trigger) {
             const tooltip = trigger.querySelector(':scope > .help-pop');
             if (!tooltip) return;
-            const tabsRect = document.querySelector('.tabs')?.getBoundingClientRect();
-            const tabsAreVisible = tabsRect &&
-                tabsRect.bottom > 0 &&
-                tabsRect.top < window.innerHeight;
-            const safeTop = tabsAreVisible ? Math.max(8, tabsRect.bottom + 8) : 8;
-            const footerRect = document.querySelector('.footer')?.getBoundingClientRect();
-            const safeBottom = footerRect && footerRect.top > 0 && footerRect.top < window.innerHeight
-                ? footerRect.top - 8
-                : window.innerHeight - 8;
             const triggerRect = trigger.getBoundingClientRect();
-            // The active tab briefly animates with transform, so a fixed child can
-            // unexpectedly become relative to that tab. Position explicitly from
-            // the tooltip's actual offset parent to keep viewport geometry stable.
-            const parentRect = tooltip.offsetParent?.getBoundingClientRect() ||
-                trigger.parentElement.getBoundingClientRect();
-            trigger.style.setProperty('--help-pop-left', `${16 - parentRect.left}px`);
-            trigger.style.setProperty('--help-pop-width', `${window.innerWidth - 32}px`);
-            const safeAreaTop = safeTop + 4;
-            let tooltipTop = safeAreaTop;
-            let maxHeight = Math.max(0, safeBottom - safeAreaTop);
-
-            if (trigger.classList.contains('help-below')) {
-                const belowTop = Math.max(safeAreaTop, triggerRect.bottom + 8);
-                const availableBelow = Math.max(0, safeBottom - belowTop);
-                const aboveBottom = triggerRect.top - 8;
-                const availableAbove = Math.max(0, aboveBottom - safeAreaTop);
-                const borderHeight = parseFloat(getComputedStyle(tooltip).borderTopWidth) +
-                    parseFloat(getComputedStyle(tooltip).borderBottomWidth);
-                const naturalHeight = tooltip.scrollHeight + borderHeight;
-
-                if (naturalHeight <= availableBelow ||
-                    (naturalHeight > availableAbove && availableBelow >= availableAbove)) {
-                    tooltipTop = belowTop;
-                    maxHeight = availableBelow;
-                } else {
-                    maxHeight = availableAbove;
-                    tooltipTop = Math.max(
-                        safeAreaTop,
-                        aboveBottom - Math.min(naturalHeight, availableAbove)
-                    );
-                }
-            }
-
-            trigger.style.setProperty('--help-pop-safe-top', `${tooltipTop - parentRect.top}px`);
-            trigger.style.setProperty('--help-pop-max-height', `${maxHeight}px`);
+            const zoom = triggerRect.width / trigger.offsetWidth || 1;
+            const tabsRect = document.querySelector('.tabs')?.getBoundingClientRect();
+            const safeTop = tabsRect && tabsRect.bottom > 0 && tabsRect.top < innerHeight
+                ? Math.max(8, tabsRect.bottom + 8) : 8;
+            const footerRect = document.querySelector('.footer')?.getBoundingClientRect();
+            const safeBottom = footerRect && footerRect.top > 0 && footerRect.top < innerHeight
+                ? footerRect.top - 8 : innerHeight - 8;
+            const width = Math.max(0, Math.min(360 * zoom, innerWidth - 32));
+            const left = Math.max(16, Math.min(triggerRect.left, innerWidth - width - 16));
+            trigger.style.setProperty('--help-pop-width', `${width / zoom}px`);
+            trigger.style.setProperty('--help-pop-max-height', 'none');
+            const border = getComputedStyle(tooltip);
+            const naturalHeight = (tooltip.scrollHeight + parseFloat(border.borderTopWidth) +
+                parseFloat(border.borderBottomWidth)) * zoom;
+            const belowTop = Math.max(safeTop, triggerRect.bottom + 8);
+            const aboveBottom = Math.min(safeBottom, triggerRect.top - 8);
+            const below = Math.max(0, safeBottom - belowTop);
+            const above = Math.max(0, aboveBottom - safeTop);
+            const placeBelow = naturalHeight <= below || (naturalHeight > above && below >= above);
+            const maxHeight = placeBelow ? below : above;
+            const top = placeBelow ? belowTop : Math.max(safeTop, aboveBottom - Math.min(naturalHeight, above));
+            trigger.style.setProperty('--help-pop-left', `${(left - triggerRect.left) / zoom - trigger.clientLeft}px`);
+            trigger.style.setProperty('--help-pop-safe-top', `${(top - triggerRect.top) / zoom - trigger.clientTop}px`);
+            trigger.style.setProperty('--help-pop-max-height', `${maxHeight / zoom}px`);
         }
-
-        document.querySelectorAll('.help-viewport').forEach((trigger) => {
-            trigger.addEventListener('pointerenter', () => positionViewportHelp(trigger));
-            trigger.addEventListener('pointermove', () => positionViewportHelp(trigger));
-            trigger.addEventListener('focus', () => positionViewportHelp(trigger));
+        function closeHelp() {
+            clearTimeout(helpCloseTimer);
+            openHelp?.classList.remove('help-open');
+            openHelp = null;
+        }
+        function showHelp(trigger) {
+            clearTimeout(helpCloseTimer);
+            if (openHelp !== trigger) closeHelp();
+            openHelp = trigger;
+            trigger.classList.remove('help-dismissed');
+            trigger.classList.add('help-open');
+            positionViewportHelp(trigger);
+        }
+        document.querySelectorAll('[data-i18n-tooltip]').forEach(trigger => {
+            trigger.addEventListener('pointerenter', () => showHelp(trigger));
+            trigger.addEventListener('focus', () => showHelp(trigger));
+            trigger.addEventListener('pointerleave', () => {
+                // Allows crossing the small gap into a long scrollable tooltip.
+                helpCloseTimer = setTimeout(() => {
+                    if (document.activeElement !== trigger) closeHelp();
+                }, 160);
+            });
+            trigger.addEventListener('focusout', () => { if (!trigger.matches(':hover')) closeHelp(); });
+            trigger.addEventListener('click', () => showHelp(trigger));
+            trigger.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    closeHelp();
+                    trigger.classList.add('help-dismissed');
+                    event.preventDefault();
+                }
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    showHelp(trigger);
+                }
+            });
+        });
+        function repositionHelp() {
+            if (openHelp) positionViewportHelp(openHelp);
+        }
+        window.addEventListener('resize', repositionHelp);
+        document.addEventListener('scroll', event => {
+            if (!openHelp?.contains(event.target)) repositionHelp();
+        }, true);
+        document.addEventListener('pointerdown', event => {
+            if (openHelp && !openHelp.contains(event.target)) closeHelp();
         });
 
         // ==================== Toast Notifications ====================
@@ -89,6 +111,7 @@
 
         // ==================== Tabs ====================
         function activateTab(tab, focus = false) {
+            closeHelp();
             tabs.forEach(t => {
                 const selected = t === tab;
                 t.classList.toggle('active', selected);

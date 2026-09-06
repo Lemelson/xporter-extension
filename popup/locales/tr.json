@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Tasarım",
+  "simplifiedDesign": "Sade tasarım",
+  "simplifiedDesignHelp": "Nötr renkler ve kompakt gönderi türleri. Açıklamalı mavi tasarıma dönmek için kapatın.",
+  "uiScale": "Arayüz ölçeği",
+  "uiScaleHelp": "Metni, denetimleri ve pencere genişliğini birlikte boyutlandırır. Gerektiğinde dikey kaydırın.",
   "toggleTheme": "Tema değiştir",
   "changeLang": "Dili değiştir",
   "tabHome": "Ana Sayfa",

@@ -374,19 +374,27 @@ function ensureXporterCaptureOverlay() {
     style.id = 'xporter-capture-overlay-style';
     style.textContent = `
         #xporter-capture-overlay {
+            --xp-surface: linear-gradient(135deg, #203655, #303e62);
+            --xp-text: #f1f6ff;
+            --xp-muted: #c4d3e8;
+            --xp-accent: #78c5ff;
+            --xp-track: #516582;
+            --xp-border: #5a7190;
+            --xp-scale: 1;
             position: fixed;
             inset-inline-end: 20px;
             bottom: 88px;
             z-index: 2147483647;
             box-sizing: border-box;
-            width: min(360px, calc(100vw - 32px));
-            max-height: calc(100dvh - 104px);
+            width: min(380px, calc(100vw / var(--xp-scale) - 32px));
+            zoom: var(--xp-scale);
+            max-height: calc(100dvh / var(--xp-scale) - 104px);
             overflow-y: auto;
             padding: 16px;
-            border: 1px solid #36414f;
+            border: 1px solid var(--xp-border);
             border-radius: 14px;
-            background: #181e26;
-            color: #eef2f7;
+            background: var(--xp-surface);
+            color: var(--xp-text);
             box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-variant-numeric: tabular-nums;
@@ -406,15 +414,15 @@ function ensureXporterCaptureOverlay() {
             border: 1px solid transparent;
             border-radius: 7px;
             background: transparent;
-            color: #a9b4c2;
+            color: var(--xp-muted);
             cursor: pointer;
             font: 18px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
         #xporter-capture-overlay .xporter-capture-toggle:hover { background: #293341; color: #fff; }
-        #xporter-capture-overlay button:focus-visible { outline: 2px solid #78bcff; outline-offset: 3px; }
+        #xporter-capture-overlay button:focus-visible { outline: 2px solid var(--xp-accent); outline-offset: 3px; }
         #xporter-capture-overlay .xporter-capture-title {
             padding-inline-end: 26px;
-            color: #eef2f7;
+            color: var(--xp-text);
             font-size: 13px;
             font-weight: 650;
             line-height: 1.4;
@@ -423,7 +431,7 @@ function ensureXporterCaptureOverlay() {
         #xporter-capture-overlay .xporter-capture-subtitle {
             margin-top: 5px;
             padding-inline-end: 20px;
-            color: #a9b4c2;
+            color: var(--xp-muted);
             font-size: 12px;
             line-height: 1.45;
         }
@@ -440,7 +448,7 @@ function ensureXporterCaptureOverlay() {
         }
         #xporter-capture-overlay .xporter-capture-pct {
             flex-shrink: 0;
-            color: #78bcff;
+            color: var(--xp-accent);
             font-size: 12px;
             letter-spacing: 0;
         }
@@ -449,14 +457,14 @@ function ensureXporterCaptureOverlay() {
             margin-top: 12px;
             overflow: hidden;
             border-radius: 3px;
-            background: #343d49;
+            background: var(--xp-track);
         }
         #xporter-capture-overlay .xporter-capture-bar span {
             display: block;
             width: 34%;
             height: 100%;
             border-radius: inherit;
-            background: #78bcff;
+            background: var(--xp-accent);
             animation: xporter-capture-bar-sweep 1.8s ease-in-out infinite alternate;
         }
         #xporter-capture-overlay.xporter-capture-determinate .xporter-capture-bar span {
@@ -480,7 +488,7 @@ function ensureXporterCaptureOverlay() {
             justify-content: space-between;
             gap: 4px 12px;
             margin-top: 9px;
-            color: #a9b4c2;
+            color: var(--xp-muted);
             font-size: 11px;
             line-height: 1.4;
         }
@@ -491,11 +499,11 @@ function ensureXporterCaptureOverlay() {
             gap: 12px;
             margin-top: 14px;
             padding-top: 12px;
-            border-top: 1px solid #303946;
+            border-top: 1px solid var(--xp-border);
         }
         #xporter-capture-overlay .xporter-capture-note {
             flex: 1;
-            color: #a9b4c2;
+            color: var(--xp-muted);
             font-size: 11px;
             line-height: 1.45;
         }
@@ -504,17 +512,17 @@ function ensureXporterCaptureOverlay() {
             max-width: 46%;
             min-height: 40px;
             padding: 7px 10px;
-            border: 1px solid #465366;
+            border: 1px solid var(--xp-border);
             border-radius: 7px;
             background: transparent;
-            color: #d9e1ec;
+            color: var(--xp-text);
             cursor: pointer;
             font: 550 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             transition: background .15s ease, color .15s ease;
         }
         #xporter-capture-overlay .xporter-capture-stop:hover { background: #3b242c; color: #ff8b95; border-color: #c34e5c; }
         #xporter-capture-overlay .xporter-capture-stop:disabled { cursor: default; opacity: .6; }
-        #xporter-capture-overlay.xporter-capture-collapsed { width: min(260px, calc(100vw - 32px)); padding: 12px 14px; }
+        #xporter-capture-overlay.xporter-capture-collapsed { width: min(280px, calc(100vw / var(--xp-scale) - 32px)); padding: 12px 14px; }
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-subtitle,
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-details,
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-footer { display: none; }
@@ -522,7 +530,22 @@ function ensureXporterCaptureOverlay() {
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-toggle { top: 8px; width: 24px; height: 24px; }
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-meta { font-size: 16px; margin-top: 10px; }
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-bar { margin-top: 9px; height: 3px; }
-        @media (max-width: 420px) { #xporter-capture-overlay { inset-inline-end: 16px; bottom: 16px; max-height: calc(100dvh - 32px); } }
+        #xporter-capture-overlay.xporter-capture-light {
+            --xp-surface: linear-gradient(135deg, #d2e6ff, #e3dff5);
+            --xp-text: #182b43; --xp-muted: #405975;
+            --xp-accent: #0869b4; --xp-track: #b5c9df; --xp-border: #9ab1cd;
+        }
+        #xporter-capture-overlay.xporter-capture-simple {
+            --xp-surface: #181e26; --xp-text: #eef2f7; --xp-muted: #a9b4c2;
+            --xp-accent: #78bcff; --xp-track: #343d49; --xp-border: #36414f;
+        }
+        #xporter-capture-overlay.xporter-capture-light.xporter-capture-simple {
+            --xp-surface: #f8fafc; --xp-text: #1d2735; --xp-muted: #536278;
+            --xp-accent: #1268bc; --xp-track: #cbd4e0; --xp-border: #cbd4e0;
+        }
+        #xporter-capture-overlay.xporter-capture-light.xporter-capture-paused [data-xporter-subtitle],
+        #xporter-capture-overlay.xporter-capture-light.xporter-capture-paused .xporter-capture-pct { color: #865308; }
+        @media (max-width: 420px) { #xporter-capture-overlay { inset-inline-end: 16px; bottom: 16px; max-height: calc(100dvh / var(--xp-scale) - 32px); } }
         @media (prefers-reduced-motion: reduce) {
             #xporter-capture-overlay .xporter-capture-bar span { animation: none; transition: none; }
         }
@@ -628,6 +651,11 @@ function updateXporterCaptureOverlay(status) {
     const overlay = ensureXporterCaptureOverlay();
     const i = status.i18n || {};
     overlay._xporterI18n = i;
+    const appearance = i.appearance || {};
+    overlay.classList.toggle('xporter-capture-simple', appearance.simplifiedDesign === true);
+    overlay.classList.toggle('xporter-capture-light', appearance.theme === 'light');
+    const scale = [85, 100, 115, 130].includes(Number(appearance.uiScale)) ? Number(appearance.uiScale) / 100 : 1;
+    overlay.style.setProperty('--xp-scale', String(scale));
     if (i.lang) overlay.setAttribute('lang', i.lang);
     if (i.dir) overlay.setAttribute('dir', i.dir);
     const count = Number(status.tweetCount || 0);

@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Design",
+  "simplifiedDesign": "Simplified design",
+  "simplifiedDesignHelp": "Neutral colors and compact post types. Turn off for the blue design with descriptions.",
+  "uiScale": "Interface scale",
+  "uiScaleHelp": "Resizes text, controls and window width together. Scroll vertically when needed.",
   "toggleTheme": "Toggle theme",
   "changeLang": "Change language",
   "tabHome": "Home",

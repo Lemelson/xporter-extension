@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "Apparence",
+  "simplifiedDesign": "Design simplifié",
+  "simplifiedDesignHelp": "Couleurs neutres et types de posts compacts. Désactivez cette option pour retrouver le design bleu avec les descriptions.",
+  "uiScale": "Échelle de l’interface",
+  "uiScaleHelp": "Ajuste ensemble le texte, les commandes et la largeur de la fenêtre. Faites défiler verticalement si nécessaire.",
   "toggleTheme": "Basculer le thème",
   "changeLang": "Changer la langue",
   "tabHome": "Accueil",

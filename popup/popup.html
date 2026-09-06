@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=350">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>XPorter</title>
   <link rel="stylesheet" href="popup.css">
   <link rel="stylesheet" href="rate-prompt.css">
@@ -304,6 +304,7 @@
           <div class="post-selection-list">
             <!-- Tabler Icons outline (MIT): pencil, quote, message-reply, repeat, article.
                  https://github.com/tabler/tabler-icons/tree/main/icons/outline -->
+            <div class="post-type-row">
             <label class="post-choice post-type-choice">
               <input type="checkbox" id="includeOriginalPosts" aria-describedby="helpincludeOriginalPosts" checked>
               <span class="post-type-icon post-type-icon--original" data-post-type-icon="original" aria-hidden="true">
@@ -316,10 +317,14 @@
               </span>
               <span class="post-choice-copy">
                 <strong data-i18n="postTypeOriginals">Original posts</strong>
-
+                <span class="post-type-description" id="helpincludeOriginalPosts" data-i18n="postTypeOriginalsHelp">Regular posts written by this account.</span>
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
+              <button type="button" class="date-help post-type-help" aria-label="Regular posts written by this account."
+                data-i18n-aria-label="postTypeOriginalsHelp" data-i18n-tooltip="postTypeOriginalsHelp">i</button>
+            </div>
+            <div class="post-type-row">
             <label class="post-choice post-type-choice">
               <input type="checkbox" id="includeQuotes" aria-describedby="helpincludeQuotes" checked>
               <span class="post-type-icon post-type-icon--quote" data-post-type-icon="quote" aria-hidden="true">
@@ -332,10 +337,14 @@
               </span>
               <span class="post-choice-copy">
                 <strong data-i18n="postTypeQuotes">Quotes</strong>
-
+                <span class="post-type-description" id="helpincludeQuotes" data-i18n="postTypeQuotesHelp">Posts that quote another post and add a comment.</span>
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
+              <button type="button" class="date-help post-type-help" aria-label="Posts that quote another post and add a comment."
+                data-i18n-aria-label="postTypeQuotesHelp" data-i18n-tooltip="postTypeQuotesHelp">i</button>
+            </div>
+            <div class="post-type-row">
             <label class="post-choice post-type-choice">
               <input type="checkbox" id="includeReplies" aria-describedby="helpincludeReplies" checked>
               <span class="post-type-icon post-type-icon--reply" data-post-type-icon="reply" aria-hidden="true">
@@ -349,10 +358,14 @@
               </span>
               <span class="post-choice-copy">
                 <strong data-i18n="postTypeReplies">Replies</strong>
-
+                <span class="post-type-description" id="helpincludeReplies" data-i18n="postTypeRepliesHelp">Replies by this account, including replies to other people.</span>
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
+              <button type="button" class="date-help post-type-help" aria-label="Replies by this account, including replies to other people."
+                data-i18n-aria-label="postTypeRepliesHelp" data-i18n-tooltip="postTypeRepliesHelp">i</button>
+            </div>
+            <div class="post-type-row">
             <label class="post-choice post-type-choice">
               <input type="checkbox" id="includeRetweets" aria-describedby="helpincludeRetweets" checked>
               <span class="post-type-icon post-type-icon--repost" data-post-type-icon="repost" aria-hidden="true">
@@ -365,10 +378,14 @@
               </span>
               <span class="post-choice-copy">
                 <strong data-i18n="postTypeReposts">Reposts</strong>
-
+                <span class="post-type-description" id="helpincludeRetweets" data-i18n="postTypeRepostsHelp">Posts reshared without an added comment.</span>
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
+              <button type="button" class="date-help post-type-help" aria-label="Posts reshared without an added comment."
+                data-i18n-aria-label="postTypeRepostsHelp" data-i18n-tooltip="postTypeRepostsHelp">i</button>
+            </div>
+            <div class="post-type-row">
             <label class="post-choice post-type-choice">
               <input type="checkbox" id="includeArticles" aria-describedby="helpincludeArticles" checked>
               <span class="post-type-icon post-type-icon--article" data-post-type-icon="article" aria-hidden="true">
@@ -383,30 +400,17 @@
               </span>
               <span class="post-choice-copy">
                 <strong data-i18n="postTypeArticles">Articles</strong>
-
+                <span class="post-type-description" id="helpincludeArticles" data-i18n="postTypeArticlesHelp">Long-form X articles, with text when X provides it.</span>
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
+              <button type="button" class="date-help post-type-help" aria-label="Long-form X articles, with text when X provides it."
+                data-i18n-aria-label="postTypeArticlesHelp" data-i18n-tooltip="postTypeArticlesHelp">i</button>
+            </div>
           </div>
-          <details class="post-type-details">
-            <summary data-i18n="postTypeDetails">About post types</summary>
-              <p data-i18n="whatToExportHelp">Choose any combination. Only selected types are included in the file.</p>
-            <dl>
-              <dt data-i18n="postTypeOriginals">Original posts</dt>
-              <dd id="helpincludeOriginalPosts" data-i18n="postTypeOriginalsHelp">Regular posts written by this account.</dd>
-              <dt data-i18n="postTypeQuotes">Quotes</dt>
-              <dd id="helpincludeQuotes" data-i18n="postTypeQuotesHelp">Posts that quote another post and add a comment.</dd>
-              <dt data-i18n="postTypeReplies">Replies</dt>
-              <dd id="helpincludeReplies" data-i18n="postTypeRepliesHelp">Replies by this account, including replies to other people.</dd>
-              <dt data-i18n="postTypeReposts">Reposts</dt>
-              <dd id="helpincludeRetweets" data-i18n="postTypeRepostsHelp">Posts reshared without an added comment.</dd>
-              <dt data-i18n="postTypeArticles">Articles</dt>
-              <dd id="helpincludeArticles" data-i18n="postTypeArticlesHelp">Long-form X articles, with text when X provides it.</dd>
-            </dl>
           <p class="post-selection-note" id="postSelectionNote" data-i18n="postSelectionMultiFeed">
             Replies and other selected types use one combined X feed to reduce requests. Only selected types are saved.
           </p>
-          </details>
           <p class="post-selection-error hidden" id="postSelectionError" role="alert"
             data-i18n="postSelectionRequired">Choose at least one type of post.</p>
         </section>
@@ -500,6 +504,31 @@
 
     <!-- SETTINGS TAB -->
     <div class="tab-content" id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings">
+      <section class="appearance-settings" aria-labelledby="appearanceTitle">
+        <h2 class="mode-settings-heading" id="appearanceTitle" data-i18n="appearanceTitle">Design</h2>
+        <div class="field">
+          <div class="date-toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="simplifiedDesign" class="toggle-input">
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
+              <span data-i18n="simplifiedDesign">Simplified design</span>
+            </label>
+            <button type="button" class="date-help" data-i18n-tooltip="simplifiedDesignHelp"
+              data-i18n-aria-label="simplifiedDesignHelp" aria-label="Neutral colors and compact post types. Turn off for the blue design with descriptions.">i</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label-row">
+            <label for="uiScale" class="field-label" data-i18n="uiScale">Interface scale</label>
+            <button type="button" class="date-help" data-i18n-tooltip="uiScaleHelp"
+              data-i18n-aria-label="uiScaleHelp" aria-label="Resizes text, controls and window width together. Scroll vertically when needed.">i</button>
+          </div>
+          <select id="uiScale" class="select">
+            <option value="85">85%</option><option value="100" selected>100%</option>
+            <option value="115">115%</option><option value="130">130%</option>
+          </select>
+        </div>
+      </section>
       <div class="mode-settings-group hidden" id="settingsBookmarksOnly">
         <div class="mode-settings-heading" data-i18n="bookmarksSettingsHeading">Bookmarks</div>
         <div class="field">

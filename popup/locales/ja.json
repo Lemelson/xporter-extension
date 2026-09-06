@@ -1,4 +1,9 @@
 {
+  "appearanceTitle": "デザイン",
+  "simplifiedDesign": "シンプルなデザイン",
+  "simplifiedDesignHelp": "落ち着いた色とコンパクトなポストの種類表示。オフにすると説明付きの青いデザインに戻ります。",
+  "uiScale": "表示倍率",
+  "uiScaleHelp": "文字、操作部品、ウィンドウの幅をまとめて拡大・縮小します。必要に応じて縦にスクロールしてください。",
   "toggleTheme": "テーマ切替",
   "changeLang": "言語を変更",
   "tabHome": "ホーム",

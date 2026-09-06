@@ -223,6 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Theme & Design ====================
     initTheme(currentSettings.theme, themeIcon);
+    mountAppearanceSettings({ currentSettings, t, showToast });
 
     themeToggle.addEventListener('click', async () => {
         const previousTheme = currentSettings.theme || 'dark';

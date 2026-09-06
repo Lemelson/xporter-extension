@@ -108,8 +108,10 @@ let _overlayI18n = null;
 async function getOverlayI18n() {
     if (_overlayI18n) return _overlayI18n;
     let lang = 'en';
+    let appearance = {};
     try {
         const settings = await XPorterStorage.loadSettings();
+        appearance = { theme: settings.theme, simplifiedDesign: settings.simplifiedDesign, uiScale: settings.uiScale };
         lang = settings.language || (typeof detectBrowserLanguage === 'function' ? detectBrowserLanguage() : 'en');
     } catch (_) { /* default en */ }
     let tr = {};
@@ -119,6 +121,7 @@ async function getOverlayI18n() {
     const g = (k, fallback) => (tr[k] !== undefined ? tr[k] : fallback);
     const dir = ['ar', 'fa', 'he', 'ur'].includes(lang) ? 'rtl' : 'ltr';
     const strings = {
+        appearance,
         lang,
         dir,
         title: g('ovTitle', 'XPorter date range export'),

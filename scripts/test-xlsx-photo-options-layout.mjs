@@ -234,8 +234,8 @@ async function main() {
         ['pencil', 'quote', 'message-reply', 'repeat', 'article'],
         `${language}: post-type cards must use the approved official Tabler icon set`
       );
-      assert.equal(new Set(postLayout.iconColors).size, 1,
-        `${language}: post types share one accent while distinct glyphs and labels identify their meaning`);
+      assert.equal(new Set(postLayout.iconColors).size, 5,
+        `${language}: the default blue design keeps distinct post-type icon colors`);
       assert.equal(postLayout.focusedChoiceOutline, '2px',
         `${language}: keyboard focus must outline the full post-type card`);
       assert.equal(postLayout.focusedCheckOutline, '2px',

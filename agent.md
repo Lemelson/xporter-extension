@@ -331,9 +331,11 @@ Constructed regression examples live in `scripts/fixtures/search-endings.synthet
 
 ### Export workspace layout
 
-The popup uses neutral dark/light surfaces. Active status, Download/Copy, Resume and New Export precede the setup form. Mode and output format share a row, and post-type explanations live in native `details` with the localized `postTypeDetails` summary; each checkbox references its explanation through `aria-describedby`. Start stays in a sticky action row. The date-export overlay sits at the trailing bottom corner, retains count/progress when collapsed, exposes `aria-expanded`, and disables animation under reduced motion.
+The default popup retains blue glass surfaces in dark and light themes. The optional Settings → Design section selects `simplifiedDesign` (default false) and `uiScale` (85, 100, 115, 130; default 100). Both styles use one DOM and the same export controllers. `theme-init.js` applies the shared appearance policy before content renders; `theme.js` persists each appearance key independently, preserving other settings and restoring controls after failed saves. The base width is 400px, scaled together with text and controls; narrow windows wrap the header and use vertical scrolling.
 
-`scripts/test-ui-refresh.mjs` exercises the real popup and content-script UI against synthetic worker state and a locally served X-page fixture. It covers 14 locales, dark/light popup themes, 320/350px popup widths, desktop/mobile overlays, disclosure and collapse keyboard behavior, terminal actions, unknown progress, waiting, and Stop. No real export or authenticated request is performed.
+Status, Download/Copy, Resume and New Export precede setup. Mode and output format share a row. Post descriptions are visible by default; each post row also has a separate information button, so reading help cannot toggle the checkbox. `presentation.js` positions all help relative to visible viewport space, converts measured coordinates for CSS zoom, supports Escape and scrolling long explanations. The worker includes appearance in the cached overlay presentation; SAVE_SETTINGS invalidates that cache. The overlay applies blue/simplified, dark/light and the same scale presets.
+
+`scripts/test-popup-appearance.mjs` covers persistence, independent settings patches, all four scales, both designs/themes, 14 languages, normal/320px widths, descriptions and bottom-edge help. `scripts/test-ui-refresh.mjs` covers real popup/content-script rendering with synthetic worker data, export actions, overlay collapse, progress, waiting and Stop. No authenticated export is started by either test.
 
 ### 6.2. Easter Egg: the Ladybug (`popup/ladybug.js`)
 A ladybug wanders the "Questions or found a bug?" contact card on the **About** tab.

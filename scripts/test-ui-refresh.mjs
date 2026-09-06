@@ -57,14 +57,14 @@ try {
         await worker.evaluate(() => { currentExport = null; });
         await page.reload();
         await page.waitForFunction(lang => document.documentElement.lang === lang && document.getElementById('postSelectionCount').textContent.includes('5'), language);
-        const details = page.locator('.post-type-details');
-        assert.equal(await details.getAttribute('open'), null);
-        const summaries = details.locator('summary');
-        await summaries.focus();
+        const helpers = page.locator('.post-type-help');
+        assert.equal(await helpers.count(), 5);
+        await helpers.first().focus();
         await page.keyboard.press('Enter');
-        assert.notEqual(await details.getAttribute('open'), null, 'post type help must open with keyboard');
-        assert.equal(await details.locator('dd').count(), 5);
-        await page.keyboard.press('Enter');
+        assert.equal(await helpers.first().locator('.help-pop').isVisible(), true);
+        assert.equal(await page.locator('#includeOriginalPosts').isChecked(), true);
+        await page.keyboard.press('Escape');
+        assert.equal(await helpers.first().locator('.help-pop').isVisible(), false);
         await page.locator('label:has(#includeQuotes)').click();
         assert.equal(await page.locator('#includeQuotes').isChecked(), false);
         await page.locator('label:has(#includeQuotes)').click();
@@ -100,7 +100,7 @@ try {
       }
     }
   }
-  console.log(`PASS compact setup, keyboard help, selection, dates and active status: ${languages.length} locales × 2 themes × 2 widths`);
+  console.log(`PASS setup, per-type keyboard help, selection, dates and active status: ${languages.length} locales × 2 themes × 2 widths`);
 
   for (const status of ['stopped', 'complete', 'error']) {
     await showStatus({
@@ -160,6 +160,20 @@ try {
       await surface.emulateMedia({ reducedMotion: 'no-preference' });
       await sendOverlay({ ...payload, pauseUntil: Date.now() + 60_000 });
       assert.equal(await overlay.locator('[data-xporter-bar]').evaluate(el => getComputedStyle(el).animationName), 'none');
+    }
+  }
+  // User appearance settings also apply to the real in-page overlay.
+  for (const theme of ['dark','light']) for (const simplifiedDesign of [false,true]) for (const uiScale of [85,100,115,130]) {
+    for (const width of [320,1440]) {
+      await surface.setViewportSize({ width, height: 600 });
+      await sendOverlay({ tweetCount: 208, progressPct: 17, phase: 'Waiting for X…',
+        dateFrom:'2025-04-29',dateTo:'2025-11-29', i18n:{lang:'en',dir:'ltr',appearance:{theme,simplifiedDesign,uiScale}} });
+      const rect = await overlay.boundingBox();
+      assert(rect.x >= -1 && rect.x+rect.width <= width+1 && rect.y >= -1 && rect.y+rect.height <= 601,
+        `overlay ${theme}/${simplifiedDesign}/${uiScale}/${width}: ${JSON.stringify(rect)}`);
+      assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-simple')), simplifiedDesign);
+      assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-light')), theme === 'light');
+      if (width===1440 && uiScale===100) await overlay.screenshot({path:path.join(output,`overlay-${theme}-${simplifiedDesign?'simple':'blue'}.png`)});
     }
   }
   await overlay.locator('[data-xporter-stop]').click();
