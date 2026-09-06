@@ -1862,7 +1862,7 @@ function getResumeBlockedReason(state) {
 async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}) {
     const savedState = await XPorterStorage.loadExportState();
     if (!savedState) {
-        return { error: 'No export to resume' };
+        return { error: 'NO_EXPORT_TO_RESUME' };
     }
     // Neither re-interpret UTC-era bounds nor append differently filtered rows.
     // Keep old batches available to Download; only a new export adopts v1.

@@ -38,6 +38,7 @@ assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
 
 const requiredDeterministicSuites = [
     'scripts/test-static-contracts.js',
+    'scripts/test-i18n-runtime.js',
     'scripts/test-extension-core.js',
     'scripts/test-rate-limit.js',
     'scripts/test-feed-capture.js',
@@ -162,8 +163,8 @@ assert.deepEqual(
 );
 assert.match(
     quantitySelectHtml,
-    /<option value=["']0["'][^>]*data-i18n=["']unlimited["']>[^<]*Unlimited[^<]*<\/option>/,
-    'quantity select must expose Unlimited'
+    /<option value=["']0["'][^>]*data-i18n=["']unlimited["']>[^<]*No limit[^<]*3,200[^<]*<\/option>/,
+    'quantity select must show no custom limit and the approximate post count'
 );
 for (const id of [
     'customDelaySec',

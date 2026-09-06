@@ -369,11 +369,11 @@ function testPostsTxtIsAiFriendly() {
         'AI-friendly TXT must state the exact content menu that produced the rows'
     );
     assert.match(text,
-        /1\. POST\nPost: "First line\nSecond line"\nPost metrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quotes, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
+        /1\. POST\nPost: "First line\nSecond line"\nPost metrics: 1200 views, 47 likes, 3 reposts, 2 replies, 1 quote, 9 bookmarks\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/1/);
     assert.match(text,
         /2\. REPLY\nPost: "A direct continuation"\nReply to: post #1 — https:\/\/x\.com\/MediaKing\/status\/1\nReply chain: #1 → #2\nDate: 2026-07-07T12:05:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/2/);
     assert.match(text,
-        /3\. ARTICLE\nPost: "My introduction to the article"\nArticle title: How durable businesses are built\nArticle: \(The complete article body\.\nIt keeps every paragraph\.\)\nArticle URL: https:\/\/x\.com\/MediaKing\/article\/99\nDate: 2026-07-07T13:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/3/);
+        /3\. ARTICLE\nPost: "My introduction to the article"\nArticle title: How durable businesses are built\nArticle text: The complete article body\.\nIt keeps every paragraph\.\nArticle URL: https:\/\/x\.com\/MediaKing\/article\/99\nDate: 2026-07-07T13:00:00\.000Z\nPost URL: https:\/\/x\.com\/MediaKing\/status\/3/);
     assert.match(text,
         /4\. REPLY\nPost: "A reply to a post outside this export"\nReply to: https:\/\/x\.com\/another_writer\/status\/900\nPost URL: https:\/\/x\.com\/MediaKing\/status\/4/);
     assert.match(text,
@@ -516,7 +516,7 @@ function testPostsTxtIncludesQuotedPostContextFromTimelinePayload() {
     assert.match(text,
         /  Post URL: https:\/\/x\.com\/original_author\/status\/100\nDate: 2026-07-07T12:00:00\.000Z\nPost URL: https:\/\/x\.com\/profile_owner\/status\/200/);
     assert.match(text,
-        /Post: "My comment above the quoted post"\nPost metrics: 500 views, 10 likes, 2 reposts, 1 replies, 0 quotes, 3 bookmarks\nQuoted post:/);
+        /Post: "My comment above the quoted post"\nPost metrics: 500 views, 10 likes, 2 reposts, 1 reply, 0 quotes, 3 bookmarks\nQuoted post:/);
 }
 
 function testQuotedPostContextOmitsMetricsMissingFromTimelinePayload() {

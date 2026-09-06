@@ -21,6 +21,8 @@ const INTRO_KEY = 'xporter_photo_permission_intro_seen';
 const LOCALES = ['en', 'ru', 'es', 'de', 'fr', 'pt', 'it', 'tr', 'id', 'hi', 'ja', 'ko', 'zh', 'ar'];
 
 async function togglePhotoEmbedding(popup, checked) {
+  await popup.waitForFunction(() => document.getElementById('outputFormat').value === 'xlsx' &&
+    document.getElementById('postSelectionCount').textContent.includes('/5'));
   const selector = checked ? '#xlsxPhotoEmbed' : '#xlsxPhotoLinks';
   await popup.locator(selector).evaluate((control) => {
     control.checked = true;

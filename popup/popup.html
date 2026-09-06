@@ -127,7 +127,7 @@
               <span class="status-phase-icon hidden" id="statusPhaseIcon" aria-hidden="true"></span>
               <span class="status-text" id="statusText" data-i18n="exporting">Exporting...</span>
               <span class="date-help status-phase-help hidden" id="statusPhaseHelp" tabindex="0"
-                aria-label="X temporarily paused requests. Your export is safe and will retry automatically."
+                aria-label="X has temporarily limited requests. Your collected data is saved. XPorter will retry when the countdown ends. If this happens often, try a slower export speed."
                 data-i18n-aria-label="statusRateLimitHelp"
                 data-i18n-tooltip="statusRateLimitHelp">!</span>
             </div>
@@ -175,10 +175,10 @@
         <div class="actions result-actions">
           <div class="replies-fallback-actions hidden" id="repliesFallbackActions">
             <button class="btn btn-primary" id="continuePostsOnlyBtn">
-              <span data-i18n="continuePostsOnly">Continue with Posts only</span>
+              <span data-i18n="continuePostsOnly">Continue without replies</span>
             </button>
             <button class="btn btn-secondary" id="retryRepliesBtn">
-              <span data-i18n="retryReplies">Retry Replies</span>
+              <span data-i18n="retryReplies">Try loading replies again</span>
             </button>
           </div>
           <div class="resume-row hidden" id="resumeRow">
@@ -204,7 +204,7 @@
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
               <path d="M8 16H3v5" />
             </svg>
-            <span data-i18n="newExport">New Export</span>
+            <span data-i18n="newExport">New export</span>
           </button>
         </div>
       </div>
@@ -214,39 +214,37 @@
       <!-- Export Mode -->
       <div class="field">
         <div class="field-label-row">
-          <label class="field-label" for="exportMode" data-i18n="exportMode">Export Mode</label>
+          <label class="field-label" for="exportMode" data-i18n="exportMode">Export mode</label>
           <span class="date-help help-viewport" tabindex="0"
-            aria-label="What each export mode collects." data-i18n-aria-label="exportModeHelp"
+            aria-label="What each mode exports: 📝 Posts — the post types selected on Home, with available metrics and context. 🔖 Bookmarks — posts saved by the X account you are currently using. XPorter opens that account’s Bookmarks page. You cannot choose a different account in this mode. Some data may be unavailable. 👥 Followers — accounts that follow the selected profile. ➡️ Following — accounts the selected profile follows. ✓ Verified Followers — followers returned by X’s verified-follower list." data-i18n-aria-label="exportModeHelp"
             data-i18n-tooltip="exportModeHelp">!</span>
         </div>
         <select id="exportMode" class="select">
           <option value="posts" data-i18n="modePosts">📝 Posts</option>
           <option value="followers" data-i18n="modeFollowers">👥 Followers</option>
           <option value="following" data-i18n="modeFollowing">➡️ Following</option>
-          <option value="verified_followers" data-i18n="modeVerifiedFollowers">✓ Verified Followers</option>
+          <option value="verified_followers" data-i18n="modeVerifiedFollowers">✓ Verified followers</option>
           <option value="bookmarks" data-i18n="modeBookmarks">🔖 Bookmarks</option>
         </select>
       </div>
 
       <!-- Output Format -->
       <div class="field">
-        <label class="field-label" for="outputFormat" data-i18n="outputFormat">Output Format</label>
+        <label class="field-label" for="outputFormat" data-i18n="outputFormat">File format</label>
         <select id="outputFormat" class="select">
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
           <option value="xlsx">Excel (XLSX)</option>
           <option value="txt" data-i18n="formatTxt">TXT</option>
         </select>
-        <p class="output-format-note hidden" id="outputFormatHint" data-i18n="txtFormatHelp">
-          AI-ready: clear post types, reply and quote context, metrics, dates, and URLs — without raw ID columns.
-        </p>
+        <p class="output-format-note hidden" id="outputFormatHint" data-i18n="txtFormatHelp">Plain text for reading or using with AI tools. Includes post types, reply and quote context, metrics, dates, and links.</p>
       </div>
       </div>
 
       <!-- Username input -->
       <div class="field" id="usernameField">
         <label class="field-label" id="usernameLabel" for="usernameInput"
-          data-i18n="fieldUsername">Twitter Username</label>
+          data-i18n="fieldUsername">X username</label>
         <div class="account-card account-card--editable" id="targetAccountCard">
           <div class="account-avatar">
             <img id="targetAccountAvatar" alt="" class="hidden">
@@ -270,7 +268,7 @@
             </div>
           </div>
         </div>
-        <span class="field-error hidden" id="usernameError" data-i18n="errEnterUsername">Enter a valid X username.</span>
+        <span class="field-error hidden" id="usernameError" data-i18n="errEnterUsername">Enter an X username, or open a profile on x.com and reopen XPorter</span>
       </div>
 
       <div class="field hidden" id="bookmarksAccountField">
@@ -320,7 +318,7 @@
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
-              <button type="button" class="date-help post-type-help" aria-label="Standalone posts written by this account. Replies, quotes, reposts and articles have separate switches."
+              <button type="button" class="date-help post-type-help" aria-label="Posts published by this account that are not replies, quote posts, reposts, or articles. Select those types separately."
                 data-i18n-aria-label="postTypeOriginalsHelp" data-i18n-tooltip="postTypeOriginalsHelp">!</button>
             </div>
             <div class="post-type-row">
@@ -339,7 +337,7 @@
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
-              <button type="button" class="date-help post-type-help" aria-label="Posts that quote another post and add a comment. A simple reshare without an added comment belongs to Reposts."
+              <button type="button" class="date-help post-type-help" aria-label="Posts that include another post with the author’s own comment. Sharing a post without a comment counts as a repost."
                 data-i18n-aria-label="postTypeQuotesHelp" data-i18n-tooltip="postTypeQuotesHelp">!</button>
             </div>
             <div class="post-type-row">
@@ -359,7 +357,7 @@
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
-              <button type="button" class="date-help post-type-help" aria-label="Replies written by this account. Includes replies to other people and to its own posts. This selects the account’s replies, not the entire conversation."
+              <button type="button" class="date-help post-type-help" aria-label="Replies by this account, including replies to other accounts and to its own posts. Replies by other people are not included."
                 data-i18n-aria-label="postTypeRepliesHelp" data-i18n-tooltip="postTypeRepliesHelp">!</button>
             </div>
             <div class="post-type-row">
@@ -378,7 +376,7 @@
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
-              <button type="button" class="date-help post-type-help" aria-label="Posts this account reshared without adding a comment. The original author may be someone else. Reshares with a comment belong to Quotes."
+              <button type="button" class="date-help post-type-help" aria-label="Posts shared by this account without an added comment. Posts shared with a comment count as quote posts."
                 data-i18n-aria-label="postTypeRepostsHelp" data-i18n-tooltip="postTypeRepostsHelp">!</button>
             </div>
             <div class="post-type-row">
@@ -399,13 +397,11 @@
               </span>
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
-              <button type="button" class="date-help post-type-help" aria-label="Long-form X articles. Full text is exported when X provides it. Ordinary long posts are a separate post type."
+              <button type="button" class="date-help post-type-help" aria-label="Posts published as X articles. XPorter exports the full article text when X makes it available. The length of an ordinary post does not make it an article."
                 data-i18n-aria-label="postTypeArticlesHelp" data-i18n-tooltip="postTypeArticlesHelp">!</button>
             </div>
           </div>
-          <p class="post-selection-note" id="postSelectionNote" data-i18n="postSelectionMultiFeed">
-            Replies and other selected types use one combined X feed to reduce requests. Only selected types are saved.
-          </p>
+          <p class="post-selection-note" id="postSelectionNote" data-i18n="postSelectionMultiFeed">Only the post types you selected will be saved.</p>
           <p class="post-selection-error hidden" id="postSelectionError" role="alert"
             data-i18n="postSelectionRequired">Choose at least one type of post.</p>
         </section>
@@ -416,9 +412,9 @@
             <label class="toggle-label">
               <input type="checkbox" id="dateCheck" class="toggle-input">
               <span class="toggle-track"><span class="toggle-knob"></span></span>
-              <span data-i18n="dateRange">Date Range</span>
+              <span data-i18n="dateRange">Date range</span>
             </label>
-            <span class="date-help" tabindex="0" aria-label="Filters the export to a date range. XPorter opens an X search tab and scrolls it to collect the posts — keep that tab open until the export finishes." data-i18n-aria-label="dateRangeHelp" data-i18n-tooltip="dateRangeHelp">!</span>
+            <span class="date-help" tabindex="0" aria-label="Dates use your browser’s time zone. The start and end dates are included. If you select today, only posts published before the export started are included; Resume keeps that same cutoff. X search may show posts from nearby dates, but XPorter saves only posts within your selected period. Keep the search tab open." data-i18n-aria-label="dateRangeHelp" data-i18n-tooltip="dateRangeHelp">!</span>
           </div>
           <div class="date-fields hidden" id="dateFields">
             <div class="date-row">
@@ -438,7 +434,7 @@
         <div class="post-selection-heading">
           <div>
             <h2 id="xlsxPhotosTitle" data-i18n="xlsxPhotosTitle">Photos in Excel</h2>
-            <p id="xlsxPhotosHelp" data-i18n="xlsxPhotosHelp">Choose how photos are included in this workbook.</p>
+            <p id="xlsxPhotosHelp" data-i18n="xlsxPhotosHelp">Choose how to include photos in this Excel file.</p>
           </div>
         </div>
         <div class="post-selection-list">
@@ -459,7 +455,7 @@
                 <strong data-i18n="xlsxPhotoLinks">Keep photo links</strong>
                 <span class="xlsx-photo-recommended-badge" data-i18n="xlsxPhotoRecommended">Recommended</span>
               </span>
-              <span data-i18n="xlsxPhotoLinksHelp">Fastest and smallest. Photos stay available by URL.</span>
+              <span data-i18n="xlsxPhotoLinksHelp">Creates the file faster and keeps it smaller. Photos are included as links.</span>
             </span>
             <span class="post-choice-check" aria-hidden="true"></span>
           </label>
@@ -477,7 +473,7 @@
             </span>
             <span class="post-choice-copy">
               <strong data-i18n="xlsxPhotoEmbed">Embed photo previews</strong>
-              <span data-i18n="xlsxPhotoEmbedHelp">Adds optimized previews to a separate Media sheet.</span>
+              <span data-i18n="xlsxPhotoEmbedHelp">Adds smaller copies of photos to a separate sheet named Media.</span>
             </span>
             <span class="post-choice-check" aria-hidden="true"></span>
           </label>
@@ -491,7 +487,7 @@
             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
           </svg>
-          <span data-i18n="startExporting">Start Exporting</span>
+          <span data-i18n="startExporting">Start exporting</span>
         </button>
 
       </div>
@@ -500,7 +496,7 @@
     <!-- SETTINGS TAB -->
     <div class="tab-content" id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings">
       <section class="appearance-settings" aria-labelledby="appearanceTitle">
-        <h2 class="sr-only" id="appearanceTitle" data-i18n="appearanceTitle">Design</h2>
+        <h2 class="sr-only" id="appearanceTitle" data-i18n="appearanceTitle">Appearance</h2>
         <div class="field">
           <div class="date-toggle-row">
             <label class="toggle-label">
@@ -509,14 +505,14 @@
               <span data-i18n="simplifiedDesign">Simplified design</span>
             </label>
             <button type="button" class="date-help" data-i18n-tooltip="simplifiedDesignHelp"
-              data-i18n-aria-label="simplifiedDesignHelp" aria-label="Neutral colors and flatter controls. Turn off to restore the blue glass appearance. Export options stay the same.">!</button>
+              data-i18n-aria-label="simplifiedDesignHelp" aria-label="Uses neutral colors and flat controls. Turn this off to return to the blue glass effect.">!</button>
           </div>
         </div>
         <div class="field">
           <div class="field-label-row">
             <label for="uiScale" class="field-label" data-i18n="uiScale">Interface scale</label>
             <button type="button" class="date-help" data-i18n-tooltip="uiScaleHelp"
-              data-i18n-aria-label="uiScaleHelp" aria-label="Resizes text, controls and window width together. Scroll vertically when needed.">!</button>
+              data-i18n-aria-label="uiScaleHelp" aria-label="Changes the size of text and controls and the width of the popup.">!</button>
           </div>
           <select id="uiScale" class="select">
             <option value="85">85%</option><option value="100" selected>100%</option>
@@ -531,10 +527,10 @@
             <label class="toggle-label">
               <input type="checkbox" id="includeBookmarkReplyContext" class="toggle-input" checked>
               <span class="toggle-track"><span class="toggle-knob"></span></span>
-              <span data-i18n="includeBookmarkReplyContext">Include replied-to posts</span>
+              <span data-i18n="includeBookmarkReplyContext">Include the posts that bookmarked replies respond to</span>
             </label>
             <span class="date-help help-viewport help-below" tabindex="0"
-              aria-label="For saved replies, fetches the post being answered and stores it inside the same bookmark record. Parent posts do not increase the bookmark count. XPorter batches IDs, but pages containing replies still need extra X requests. Deleted, private, or blocked posts may remain unavailable."
+              aria-label="If a bookmark is a reply, includes the post it responds to in the same export record. This does not increase the bookmark count, but requires extra requests to X. Some posts may be unavailable because they were deleted or access is restricted."
               data-i18n-aria-label="includeBookmarkReplyContextHelp"
               data-i18n-tooltip="includeBookmarkReplyContextHelp">!</span>
           </div>
@@ -544,10 +540,10 @@
             <label class="toggle-label">
               <input type="checkbox" id="includeBookmarkArticles" class="toggle-input" checked>
               <span class="toggle-track"><span class="toggle-knob"></span></span>
-              <span data-i18n="includeBookmarkArticles">Include Article text</span>
+              <span data-i18n="includeBookmarkArticles">Include article text</span>
             </label>
             <span class="date-help help-long" tabindex="0"
-              aria-label="Keeps the title, URL, and all Article text returned by X, including Articles inside quoted or replied-to posts. Some Articles expose only a preview; XPorter preserves exactly what X returns."
+              aria-label="Includes article titles, links, and the article text available from X. This also applies to articles in quoted posts and posts that a bookmarked reply responds to. If X provides only a preview, only that preview is saved."
               data-i18n-aria-label="includeBookmarkArticlesHelp"
               data-i18n-tooltip="includeBookmarkArticlesHelp">!</span>
           </div>
@@ -556,11 +552,11 @@
       <section class="settings-control-group quantity-control-group" data-settings-scope="quantity">
         <div class="field">
           <div class="field-label-row">
-            <label class="field-label" id="quantityLimitLabel" for="quantityLimit" data-i18n="exportQuantityLimit">Export Quantity Limit</label>
-            <span class="date-help" tabindex="0" aria-label="How many posts (or users) to collect before the export stops. Example: 500 stops at 500 posts. For Posts, X usually exposes only about 3,200 of the most recent items, even when a profile shows more. XPorter cannot bypass this X availability limit. Followers and Following have different limits." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
+            <label class="field-label" id="quantityLimitLabel" for="quantityLimit" data-i18n="exportQuantityLimit">Export limit</label>
+            <span class="date-help" tabindex="0" aria-label="The maximum number of posts or accounts to collect. For example, 500 stops the export after 500 items. Without a date filter, X usually makes about 3,200 recent posts available, even if the profile shows more. Choosing no limit does not remove this restriction. Date-filtered exports use X search, whose results may also be incomplete. Availability varies for follower and following lists." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
           </div>
           <select id="quantityLimit" class="select">
-            <option value="0" data-i18n="unlimited">Unlimited (Posts: ≈3,200)</option>
+            <option value="0" data-i18n="unlimited">No limit (posts: about 3,200)</option>
             <option value="100">100 posts</option>
             <option value="500">500 posts</option>
             <option value="1000">1,000 posts</option>
@@ -568,23 +564,23 @@
           </select>
           <div class="custom-quantity hidden" id="customQuantityRow">
             <input type="number" id="customQuantity" class="input-small custom-quantity-input" min="1" max="100000"
-              placeholder="e.g. 2500" aria-labelledby="quantityLimitLabel">
+              data-i18n-placeholder="placeholderQuantity" placeholder="e.g. 2500" aria-labelledby="quantityLimitLabel">
           </div>
         </div>
       </section>
       <section class="settings-control-group pacing-control-group" data-settings-scope="posts">
         <div class="field">
         <div class="field-label-row">
-          <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="postsExportSpeed">Posts &amp; Bookmarks Export Speed</label>
-          <span class="date-help" tabindex="0" aria-label="Sets the pause between requests. For Posts and Bookmarks, you can choose about 2, 3, 4, 7, or 12 seconds. Standard uses 4 seconds and is recommended. Custom lets you enter an exact pause. If X temporarily limits requests, XPorter saves your progress and continues automatically." data-i18n-aria-label="postsExportSpeedHelp" data-i18n-tooltip="postsExportSpeedHelp">!</span>
+          <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="postsExportSpeed">Post and bookmark export speed</label>
+          <span class="date-help" tabindex="0" aria-label="Sets the interval between requests for posts and bookmarks: about 2, 3, 4, 7, or 12 seconds. Standard uses 4 seconds. Choose Custom to enter another interval. If X limits requests, XPorter saves progress and retries automatically. If retries are exhausted, it pauses until you resume." data-i18n-aria-label="postsExportSpeedHelp" data-i18n-tooltip="postsExportSpeedHelp">!</span>
         </div>
         <select id="exportSpeed" class="select">
-          <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ~2 seconds between requests</option>
-          <option value="fast" data-i18n="speedFast">Fast — ~3 seconds between requests</option>
-          <option value="standard" data-i18n="speedStandard">Standard — ~4 seconds (recommended)</option>
-          <option value="careful" data-i18n="speedCareful">Careful — ~7 seconds between requests</option>
-          <option value="turtle" data-i18n="speedTurtle">🐢 Turtle — ~12 seconds between requests</option>
-          <option value="custom" data-i18n="speedCustom">⚠️ Custom — exact delay</option>
+          <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ≈2 sec.</option>
+          <option value="fast" data-i18n="speedFast">Fast — ≈3 sec.</option>
+          <option value="standard" data-i18n="speedStandard">Standard — ≈4 sec.</option>
+          <option value="careful" data-i18n="speedCareful">Careful — ≈7 sec.</option>
+          <option value="turtle" data-i18n="speedTurtle">🐢 Turtle — ≈12 sec.</option>
+          <option value="custom" data-i18n="speedCustom">⚠️ Custom interval</option>
         </select>
         <div class="custom-speed hidden" id="customSpeedRows">
           <div class="cooldown-row">
@@ -603,20 +599,22 @@
               <span data-i18n="postSafetyBreaks">Scheduled breaks</span>
             </label>
             <span class="date-help help-local" tabindex="0"
-              aria-label="Adds regular pauses during long exports. After the selected number of requests, XPorter takes a break and then continues automatically. Useful when speed is not important. X's own limits work independently of this setting."
+              aria-label="Pauses the export after a set number of requests, then resumes automatically. These breaks are optional and do not replace X’s request limits."
               data-i18n-aria-label="safetyBreakHelp"
               data-i18n-tooltip="safetyBreakHelp">!</span>
           </div>
           <div class="custom-speed safety-break-rows hidden" id="postSafetyBreakRows">
-            <div class="cooldown-row">
+            <label class="safety-break-field" for="postSafetyBreakMin">
+              <span id="postSafetyBreakMinutesLabel" data-i18n="safetyBreakMinutes">Break (min)</span>
               <input type="text" inputmode="decimal" id="postSafetyBreakMin" value="3"
                 data-min="0.1" data-max="30" class="input-small"
                 aria-labelledby="postSafetyBreakMinutesLabel">
-              <span id="postSafetyBreakMinutesLabel" data-i18n="safetyBreakMinutes">minutes after every</span>
+            </label>
+            <label class="safety-break-field" for="postSafetyBreakEvery">
+              <span id="postSafetyBreakRequestsLabel" data-i18n="safetyBreakEvery">Requests between breaks</span>
               <input type="number" id="postSafetyBreakEvery" value="20" min="5" max="100" class="input-small"
                 aria-labelledby="postSafetyBreakRequestsLabel">
-              <span id="postSafetyBreakRequestsLabel" data-i18n="safetyBreakRequests">requests</span>
-            </div>
+            </label>
           </div>
         </div>
         </div>
@@ -624,8 +622,8 @@
       <section class="settings-control-group pacing-control-group" data-settings-scope="users">
         <div class="field">
         <div class="field-label-row">
-          <label class="field-label" id="userExportSpeedLabel" for="userExportSpeed" data-i18n="userListsExportSpeed">User Lists Export Speed</label>
-          <span class="date-help" tabindex="0" aria-label="Sets the pause between requests. This applies to Followers, Following, and Verified Followers. Standard is recommended. Custom lets you enter an exact pause. X may limit each type of list differently; if that happens, XPorter saves your progress and continues automatically." data-i18n-aria-label="userListsExportSpeedHelp" data-i18n-tooltip="userListsExportSpeedHelp">!</span>
+          <label class="field-label" id="userExportSpeedLabel" for="userExportSpeed" data-i18n="userListsExportSpeed">User list export speed</label>
+          <span class="date-help" tabindex="0" aria-label="Sets the interval between requests for followers, following, and verified followers. Start with Standard, or choose Custom to enter another interval. X may apply different limits to each list. XPorter saves progress and retries automatically; if retries are exhausted, you can resume later." data-i18n-aria-label="userListsExportSpeedHelp" data-i18n-tooltip="userListsExportSpeedHelp">!</span>
         </div>
         <select id="userExportSpeed" class="select">
           <option value="turbo" data-i18n="listSpeedTurbo">🚀 Turbo — fastest</option>
@@ -633,7 +631,7 @@
           <option value="standard" data-i18n="listSpeedStandard">Standard — recommended</option>
           <option value="careful" data-i18n="listSpeedCareful">Careful — slower</option>
           <option value="turtle" data-i18n="listSpeedTurtle">🐢 Turtle — slowest</option>
-          <option value="custom" data-i18n="listSpeedCustom">⚠️ Custom — exact delay</option>
+          <option value="custom" data-i18n="listSpeedCustom">⚠️ Custom interval</option>
         </select>
         <div class="custom-speed hidden" id="userCustomSpeedRows">
           <div class="cooldown-row">
@@ -652,20 +650,22 @@
               <span data-i18n="userSafetyBreaks">Scheduled breaks</span>
             </label>
             <span class="date-help help-local" tabindex="0"
-              aria-label="Adds regular pauses during long exports. After the selected number of requests, XPorter takes a break and then continues automatically. Useful when speed is not important. X's own limits work independently of this setting."
+              aria-label="Pauses the export after a set number of requests, then resumes automatically. These breaks are optional and do not replace X’s request limits."
               data-i18n-aria-label="safetyBreakHelp"
               data-i18n-tooltip="safetyBreakHelp">!</span>
           </div>
           <div class="custom-speed safety-break-rows hidden" id="userSafetyBreakRows">
-            <div class="cooldown-row">
+            <label class="safety-break-field" for="userSafetyBreakMin">
+              <span id="userSafetyBreakMinutesLabel" data-i18n="safetyBreakMinutes">Break (min)</span>
               <input type="text" inputmode="decimal" id="userSafetyBreakMin" value="3"
                 data-min="0.1" data-max="30" class="input-small"
                 aria-labelledby="userSafetyBreakMinutesLabel">
-              <span id="userSafetyBreakMinutesLabel" data-i18n="safetyBreakMinutes">minutes after every</span>
+            </label>
+            <label class="safety-break-field" for="userSafetyBreakEvery">
+              <span id="userSafetyBreakRequestsLabel" data-i18n="safetyBreakEvery">Requests between breaks</span>
               <input type="number" id="userSafetyBreakEvery" value="20" min="5" max="100" class="input-small"
                 aria-labelledby="userSafetyBreakRequestsLabel">
-              <span id="userSafetyBreakRequestsLabel" data-i18n="safetyBreakRequests">requests</span>
-            </div>
+            </label>
           </div>
         </div>
         </div>
@@ -679,7 +679,7 @@
               <span data-i18n="includeAboutAccountDetails">Include “About this Account” details</span>
             </label>
             <span class="date-help help-local help-tall" tabindex="0"
-              aria-label="Adds public About this Account data: account location, Premium date, connection source, affiliated account, and username-change history. This feature is much more demanding: XPorter makes up to one extra request for every user, so exports can be much slower. 500 users can mean up to 500 extra requests and may hit X rate limits or temporary restrictions. Enable it only when needed and use a slower speed."
+              aria-label="Adds the available “About this Account” fields: country or region, Premium date, connection source, affiliated account, number of username changes, and date of the last change. This requires extra requests: exporting 500 accounts can add up to 500 requests. It takes longer and may trigger X request limits or temporary account restrictions. Enable it only if you need these fields."
               data-i18n-aria-label="includeAboutAccountDetailsHelp"
               data-i18n-tooltip="includeAboutAccountDetailsHelp">!</span>
           </div>
@@ -688,34 +688,34 @@
           <div class="field" id="aboutAccountSpeedField">
             <div class="field-label-row">
               <label class="field-label" id="aboutAccountSpeedLabel" for="aboutAccountSpeed"
-                data-i18n="aboutAccountSpeed">About Details Speed</label>
+                data-i18n="aboutAccountSpeed">“About this Account” request speed</label>
               <span class="date-help help-long" tabindex="0"
-                aria-label="Controls how many About this Account requests run at the same time. Standard uses 5 accounts per batch. Higher values are faster but more likely to hit X rate limits or a temporary restriction. Turtle is safest. Custom accepts 1 to 50."
+                aria-label="Sets how many “About this Account” requests run at once. Standard uses 5 simultaneous requests; Turtle uses 1. More simultaneous requests can be faster but may reach X’s limits sooner. Custom allows 1 to 50 simultaneous requests."
                 data-i18n-aria-label="aboutAccountSpeedHelp"
                 data-i18n-tooltip="aboutAccountSpeedHelp">!</span>
             </div>
             <select id="aboutAccountSpeed" class="select">
-              <option value="turbo" data-i18n="aboutSpeedTurbo">🚀 Turbo — 20 at once</option>
-              <option value="fast" data-i18n="aboutSpeedFast">Fast — 10 at once</option>
-              <option value="standard" data-i18n="aboutSpeedStandard">Standard — 5 at once (recommended)</option>
-              <option value="careful" data-i18n="aboutSpeedCareful">Careful — 3 at once</option>
-              <option value="turtle" data-i18n="aboutSpeedTurtle">🐢 Turtle — 1 at a time</option>
-              <option value="custom" data-i18n="aboutSpeedCustom">⚠️ Custom — choose a batch size</option>
+              <option value="turbo" data-i18n="aboutSpeedTurbo">🚀 Turbo — 20 requests</option>
+              <option value="fast" data-i18n="aboutSpeedFast">Fast — 10 requests</option>
+              <option value="standard" data-i18n="aboutSpeedStandard">Standard — 5 requests</option>
+              <option value="careful" data-i18n="aboutSpeedCareful">Careful — 3 requests</option>
+              <option value="turtle" data-i18n="aboutSpeedTurtle">🐢 Turtle — 1 request</option>
+              <option value="custom" data-i18n="aboutSpeedCustom">⚠️ Custom request count</option>
             </select>
             <div class="custom-speed hidden" id="aboutAccountCustomRows">
               <div class="cooldown-row">
                 <input type="number" id="aboutAccountCustomBatchSize" value="5" min="1" max="50"
                   class="input-small" aria-labelledby="aboutAccountsPerBatchLabel">
-                <span id="aboutAccountsPerBatchLabel" data-i18n="aboutAccountsPerBatch">accounts per batch</span>
+                <span id="aboutAccountsPerBatchLabel" data-i18n="aboutAccountsPerBatch">simultaneous requests</span>
               </div>
             </div>
           </div>
           <div class="field" id="aboutAccountRetriesField">
             <div class="field-label-row">
               <label class="field-label" id="aboutAccountRetriesLabel" for="aboutAccountMaxRetries"
-                data-i18n="aboutAccountRetries">Rate-limit retries</label>
+                data-i18n="aboutAccountRetries">Retries after X limits requests</label>
               <span class="date-help help-long" tabindex="0"
-                aria-label="How many one-minute retries XPorter makes after X rejects an About request. A successful request resets the count. Choose up to 1,440 for up to one day of retrying."
+                aria-label="Sets how many times to retry an “About this Account” request after X rejects it, with one minute between attempts. A successful request resets the counter. The maximum is 1,440 retries, or roughly 24 hours of waiting if requests keep failing."
                 data-i18n-aria-label="aboutAccountRetriesHelp"
                 data-i18n-tooltip="aboutAccountRetriesHelp">!</span>
             </div>
@@ -733,9 +733,9 @@
           <label class="toggle-label">
             <input type="checkbox" id="autoExpireEnabled" class="toggle-input" checked>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
-            <span data-i18n="autoExpireState">Auto-clear old exports</span>
+            <span data-i18n="autoExpireState">Automatically delete saved export data</span>
           </label>
-          <span class="date-help" tabindex="0" aria-label="Auto-deletes saved export data after the set number of hours to free space. Your past exports stay in the history list, but old ones may no longer be downloadable." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp">!</span>
+          <span class="date-help" tabindex="0" aria-label="Deletes locally saved export data after the selected number of hours to free space. Entries remain in export history, but their deleted data can no longer be downloaded from XPorter. Files you have already downloaded are not affected." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp">!</span>
         </div>
         <div class="cooldown-row" id="autoExpireRow">
           <span id="autoExpireLabel" data-i18n="autoExpireAfter">Clear after</span>
@@ -750,9 +750,9 @@
           <label class="toggle-label">
             <input type="checkbox" id="localizeExportHeaders" class="toggle-input">
             <span class="toggle-track"><span class="toggle-knob"></span></span>
-            <span data-i18n="localizeHeaders">Localize column titles</span>
+            <span data-i18n="localizeHeaders">Translate column headers</span>
           </label>
-          <span class="date-help" tabindex="0" aria-label="Translates the column headers in CSV and XLSX files to your language. Turn it off to keep the original English headers (best for scripts and spreadsheets). JSON keys always stay in English." data-i18n-aria-label="localizeHeadersHelp" data-i18n-tooltip="localizeHeadersHelp">!</span>
+          <span class="date-help" tabindex="0" aria-label="Uses the interface language for supported CSV and XLSX column headers. Turn this off to keep the original field names, which can be useful for scripts and spreadsheet templates. JSON keys and TXT labels remain in English." data-i18n-aria-label="localizeHeadersHelp" data-i18n-tooltip="localizeHeadersHelp">!</span>
         </div>
       </div>
       <!-- Ladybug Easter-egg toggle -->
@@ -772,7 +772,7 @@
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span data-i18n="exportHistory">Export History</span>
+            <span data-i18n="exportHistory">Export history</span>
           </span>
           <svg class="icon history-chevron" id="historyChevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -796,7 +796,7 @@
               <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            <span data-i18n="feedStatsTitle">Seen posts dataset</span>
+            <span data-i18n="feedStatsTitle">Posts collected while browsing</span>
             <span class="feed-db-live" id="feedDbCount">0</span>
           </span>
           <svg class="icon history-chevron" id="feedDbChevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -805,12 +805,12 @@
           </svg>
         </button>
         <div class="feed-db-body hidden" id="feedDbBody">
-          <p class="feed-db-description" data-i18n="feedStatsDescription">Quietly saves the posts you scroll past on X, so you can export them later. Stays on your device, sends no extra requests.</p>
-          <div class="feed-db-summary" id="feedDbSummary" data-i18n="feedStatsEmpty">No posts collected yet</div>
+          <p class="feed-db-description" data-i18n="feedStatsDescription">Saves posts from supported X feeds as they load while you browse. You can export the collection later. Data stays on your device, and collection adds no requests to X.</p>
+          <div class="feed-db-summary" id="feedDbSummary" data-i18n="feedStatsEmpty">No posts collected yet. Browse X to start collecting.</div>
           <div class="feed-db-actions">
             <button type="button" class="btn btn-secondary" id="downloadFeedCsv" data-i18n="downloadSeenCsv">CSV</button>
             <button type="button" class="btn btn-secondary" id="downloadFeedJson" data-i18n="downloadSeenJson">JSON</button>
-            <button type="button" class="btn btn-ghost feed-db-clear" id="clearFeedDb" data-i18n="clearSeenData">Clear</button>
+            <button type="button" class="btn btn-ghost feed-db-clear" id="clearFeedDb" data-i18n="clearSeenData">Clear collected posts</button>
           </div>
         </div>
       </div>
@@ -826,7 +826,7 @@
           </svg>
         </div>
         <h2>XPorter</h2>
-        <p class="about-desc" data-i18n="aboutDesc">Free & unlimited export of X (Twitter) data to CSV, JSON, or XLSX.</p>
+        <p class="about-desc" data-i18n="aboutDesc">Free export of X (Twitter) data to CSV, JSON, XLSX, or TXT.</p>
 
         <!-- Prominent, always-available way to rate the extension -->
         <button type="button" class="about-rate-cta" id="rateAboutBtn">
@@ -887,10 +887,9 @@
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <span data-i18n="contactTitle">Questions or found a bug?</span>
+            <span data-i18n="contactTitle">Have a question or found a bug?</span>
           </div>
-          <p class="contact-lead" data-i18n="contactLead">Bug reports, ideas, improvements, or collaboration — message me
-            on Telegram. I read every message and reply there personally.</p>
+          <p class="contact-lead" data-i18n="contactLead">Have a bug report, an idea, or a collaboration proposal? Message me on Telegram. I read every message and reply.</p>
 
           <a href="https://t.me/Lemelson" target="_blank" rel="noopener" class="contact-btn contact-btn--telegram">
             <span class="contact-tg-logo">
@@ -902,9 +901,9 @@
             <span class="contact-btn-text">
               <span class="contact-btn-titlerow">
                 <span class="contact-btn-title" data-i18n="contactTelegram">Message on Telegram</span>
-                <span class="contact-pill" data-i18n="contactPreferred">Preferred</span>
+                <span class="contact-pill" data-i18n="contactPreferred">Preferred contact</span>
               </span>
-              <span class="contact-btn-sub" data-i18n="contactTelegramSub">Fastest reply — I answer personally</span>
+              <span class="contact-btn-sub" data-i18n="contactTelegramSub">Fastest reply</span>
             </span>
           </a>
 
@@ -920,7 +919,7 @@
               </span>
               <div class="contact-email-info">
                 <span class="contact-email-addr">art.lemelson@gmail.com</span>
-                <span class="contact-email-note" data-i18n="contactEmailSub">I don't always check email</span>
+                <span class="contact-email-note" data-i18n="contactEmailSub">I check email less often and may miss your message.</span>
               </div>
             </div>
             <div class="contact-email-actions">
@@ -966,7 +965,7 @@
                   <path d="m9 12 2 2 4-4" />
                 </svg>
               </span>
-              <span class="detail-title" data-i18n="aboutSafetyTitle">Safe for your account</span>
+              <span class="detail-title" data-i18n="aboutSafetyTitle">Read-only access to your account</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 9 6 6 6-6" />
@@ -974,10 +973,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="aboutSafetySub">To X, an export looks like you reading the page: XPorter uses your own
-                  logged-in session, only reads data you can already see, and paces its requests like normal
-                  browsing — with built-in pauses that respect X's limits. It never posts, follows, likes, or changes
-                  anything on your account.</p>
+                <p data-i18n="aboutSafetySub">XPorter uses your signed-in X account to read data. It does not publish posts, like posts, follow accounts, or change account settings. Requests include pauses, but X may still limit requests or temporarily restrict your account.</p>
               </div>
             </div>
           </div>
@@ -991,7 +987,7 @@
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </span>
-              <span class="detail-title" data-i18n="detailLocalTitle">100% local &amp; private</span>
+              <span class="detail-title" data-i18n="detailLocalTitle">Export files stay on your device</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 9 6 6 6-6" />
@@ -999,9 +995,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="detailLocalBody">Everything runs inside your browser. There are no XPorter servers, no
-                  account, and no analytics or tracking. Your data goes straight from X into the file you download — it
-                  never passes through us.</p>
+                <p data-i18n="detailLocalBody">Export files are created in your browser. Their contents are not sent to the developer, and you do not need a separate XPorter account. XPorter also keeps usage counters locally. When the uninstall feedback page opens, it sends usage statistics separately from your exported data.</p>
               </div>
             </div>
           </div>
@@ -1016,7 +1010,7 @@
                   <circle cx="7.5" cy="15.5" r="5.5" />
                 </svg>
               </span>
-              <span class="detail-title" data-i18n="detailSessionTitle">Uses your own X session</span>
+              <span class="detail-title" data-i18n="detailSessionTitle">Uses your signed-in X account</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 9 6 6 6-6" />
@@ -1024,9 +1018,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="detailSessionBody">XPorter reads the same public data you already see when you're logged
-                  in, using the X session that's already in your browser. It never asks for your password and never
-                  stores your login.</p>
+                <p data-i18n="detailSessionBody">XPorter uses the X account you are already signed in to in this browser. It can export data available to that account, including your own bookmarks. You do not need to enter your X password in XPorter.</p>
               </div>
             </div>
           </div>
@@ -1049,9 +1041,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="detailExportsBody">Posts, followers, following, and verified followers. Post exports
-                  include the full engagement metrics — views, likes, reposts, replies, quotes, and bookmarks — plus
-                  dates, links, media, and hashtags.</p>
+                <p data-i18n="detailExportsBody">Export posts, your bookmarks, followers, following, and verified followers. Post files can include views, likes, reposts, replies, quotes, bookmark counts, dates, links, media information, and hashtags, when X provides them.</p>
               </div>
             </div>
           </div>
@@ -1065,7 +1055,7 @@
                   <path d="M14 2v4a2 2 0 0 0 2 2h4" />
                 </svg>
               </span>
-              <span class="detail-title" data-i18n="detailFormatsTitle">CSV, JSON &amp; XLSX</span>
+              <span class="detail-title" data-i18n="detailFormatsTitle">CSV, JSON, XLSX &amp; TXT</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 9 6 6 6-6" />
@@ -1073,8 +1063,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="detailFormatsBody">Pick the format that fits your workflow: CSV for any spreadsheet, XLSX
-                  for Excel, or JSON for developers. Files are built locally and download straight to your device.</p>
+                <p data-i18n="detailFormatsBody">Choose CSV for spreadsheets, XLSX for Excel with optional photo previews, JSON for structured data, or TXT for reading and working with AI tools. Files are created in your browser.</p>
               </div>
             </div>
           </div>
@@ -1098,9 +1087,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="detailDatesBody">Export posts from a specific time window. Date-range exports open an X
-                  search tab and scroll it automatically to gather matching posts — just keep that tab open until it
-                  finishes.</p>
+                <p data-i18n="detailDatesBody">Export posts from a specific time window. Date-range exports open an X search tab and scroll it automatically to gather matching posts — just keep that tab open until it finishes.</p>
               </div>
             </div>
           </div>
@@ -1116,7 +1103,7 @@
                   <path d="M8 16H3v5" />
                 </svg>
               </span>
-              <span class="detail-title" data-i18n="detailResumeTitle">Auto-resume &amp; rate limiting</span>
+              <span class="detail-title" data-i18n="detailResumeTitle">Saved progress and request limits</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 9 6 6 6-6" />
@@ -1124,9 +1111,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner">
-                <p data-i18n="detailResumeBody">Progress is saved as the export runs, so you can pause, close the popup,
-                  or even restart your browser and continue where you left off. XPorter also paces its requests to
-                  respect X's limits and avoid temporary blocks.</p>
+                <p data-i18n="detailResumeBody">XPorter saves progress during an export. Closing the popup does not stop collection. After stopping an export or restarting the browser, use Resume while its saved data is still available. Request-limit pauses are retried automatically; if retries are exhausted, you can try Resume later.</p>
               </div>
             </div>
           </div>
@@ -1134,7 +1119,7 @@
 
         <!-- Current build plus the two most recent public releases -->
         <div class="about-details about-updates">
-          <div class="details-heading" data-i18n="updatesHeading">Last updates</div>
+          <div class="details-heading" data-i18n="updatesHeading">Latest updates</div>
 
           <div class="detail-item update-item">
             <button type="button" class="detail-head" aria-expanded="false">
@@ -1154,7 +1139,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner update-body">
-                <p data-i18n="update165Body">Date exports now finish correctly, keep partial results, and resume without missing or duplicate posts. Selected dates stay correct in filenames.</p>
+                <p data-i18n="update165Body">Fixed date-range exports that could stop incorrectly. Collected results are kept, and exports can resume without skipping or duplicating posts. Filenames now use the selected dates.</p>
                 <div class="update-meta">
                   <span data-i18n="updateReleased">Released</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
@@ -1176,7 +1161,7 @@
                   <path d="M12 7v5l3 2" />
                 </svg>
               </span>
-              <span class="detail-title update-title" data-i18n="update164Title">Cleaner export status actions</span>
+              <span class="detail-title update-title" data-i18n="update164Title">Clearer export controls</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
@@ -1184,9 +1169,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner update-body">
-                <p data-i18n="update164Body">Export status cards now keep progress and counts full-width. Stop is a
-                  compact trailing action, Download uses a clear horizontal row, and TXT places equal Download and
-                  Copy actions side by side without square tiles or wasted space.</p>
+                <p data-i18n="update164Body">The progress indicator and item count are easier to read. The Stop button takes less space, and TXT exports show Download and Copy side by side.</p>
                 <div class="update-meta">
                   <span data-i18n="updateReleased">Released</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
@@ -1208,7 +1191,7 @@
                   <path d="M12 7v5l3 2" />
                 </svg>
               </span>
-              <span class="detail-title update-title" data-i18n="update151Title">Bookmarks and cleaner exports</span>
+              <span class="detail-title update-title" data-i18n="update151Title">Bookmark export and files without empty fields</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
@@ -1216,10 +1199,7 @@
             </button>
             <div class="detail-body">
               <div class="detail-body-inner update-body">
-                <p data-i18n="update151Body">Export personal Bookmarks to CSV, JSON, XLSX, or TXT with quoted posts,
-                  replied-to context, Articles, metrics, and optional embedded photos. Files now omit columns or
-                  fields that are empty throughout, while TXT labels make every metric's owner clear. Pacing,
-                  retries, resume handling, and popup help and layout are also more reliable.</p>
+                <p data-i18n="update151Body">You can now export your bookmarks to CSV, JSON, XLSX, or TXT, with quoted posts, replied-to posts, article text, metrics, and optional photo previews. Empty fields and columns are omitted. TXT files identify which post each metric belongs to. Export retries, resuming, and popup help were also improved.</p>
                 <div class="update-meta">
                   <span data-i18n="updateReleased">Released</span>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
@@ -1244,8 +1224,7 @@
           </span>
           <span class="about-source-text">
             <span class="about-source-title" data-i18n="aboutSourceTitle">Open source</span>
-            <span class="about-source-sub" data-i18n="aboutSourceSub">The full source code is on GitHub — read exactly
-              what runs in your browser. Questions, ideas and pull requests are always welcome: help XPorter grow.</span>
+            <span class="about-source-sub" data-i18n="aboutSourceSub">XPorter’s source code is available on GitHub. You can read the code, report issues, suggest improvements, or contribute changes.</span>
           </span>
           <svg class="about-source-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

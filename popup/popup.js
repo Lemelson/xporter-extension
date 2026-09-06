@@ -205,6 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ]);
 
     const currentSettings = settingsResult?.settings || {};
+    let currentLang = currentSettings.language || detectBrowserLanguage();
     let photoPermissionIntroSeen =
         photoPermissionIntroState?.[PHOTO_PERMISSION_INTRO_KEY] === true;
     const activeTabSupportsAccountContext = Boolean(
@@ -275,6 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isPostsMode = (mode === 'posts');
         const isBookmarksMode = (mode === 'bookmarks');
         const isPostRows = isPostsMode || isBookmarksMode;
+        refreshQuantityLabels();
         // Show/hide posts-only options in Home tab
         postsOnlyOptions.classList.toggle('hidden', !isPostsMode);
         if (settingsBookmarksOnly) {
@@ -293,6 +295,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             'hidden',
             !isPostRows || outputFormat.value !== 'txt'
         );
+    }
+
+    function refreshQuantityLabels() {
+        localizeQuantityOptions(document.getElementById('quantityLimit'), currentLang,
+            currentTranslations, exportMode.value === 'posts' && !dateCheck.checked);
     }
 
     // Apply saved mode or default
@@ -346,7 +353,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ==================== Language Selector ====================
-    let currentLang = currentSettings.language || detectBrowserLanguage();
 
     if (!currentSettings.language) {
         await persistSettingsPatch(currentSettings, { language: currentLang });
@@ -449,7 +455,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         applyI18nToDOM(t);
 
         // Update quantity limit options (shared: locale-aware number grouping)
-        localizeQuantityOptions(document.getElementById('quantityLimit'), code, t);
+        localizeQuantityOptions(document.getElementById('quantityLimit'), code, t,
+            exportMode.value === 'posts' && !dateCheck.checked);
 
         document.documentElement.lang = code;
         formatReleaseDates(code);
@@ -690,6 +697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Date Range Toggle ====================
     dateCheck.addEventListener('change', () => {
         dateFields.classList.toggle('hidden', !dateCheck.checked);
+        refreshQuantityLabels();
     });
 
     // ==================== Apply Auth Result ====================

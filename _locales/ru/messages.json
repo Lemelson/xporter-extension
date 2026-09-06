@@ -4,7 +4,7 @@
     "description": "Extension name for CWS"
   },
   "extDescription": {
-    "message": "Экспорт постов, подписчиков и подписок из любого профиля X (Twitter) в CSV, JSON, Excel. Бесплатно, безлимитно, приватно.",
+    "message": "Экспорт постов, закладок и списков аккаунтов X в CSV, JSON, XLSX и TXT. Бесплатно. Файлы создаются в браузере.",
     "description": "Extension description for CWS"
   }
 }

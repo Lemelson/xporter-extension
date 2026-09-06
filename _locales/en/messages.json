@@ -4,7 +4,7 @@
     "description": "Extension name for CWS"
   },
   "extDescription": {
-    "message": "Export posts, followers & following from any X (Twitter) profile to CSV, JSON, Excel. Free, unlimited, 100% private.",
+    "message": "Export X posts, bookmarks, and account lists to CSV, JSON, XLSX, or TXT. Free. Files are created in your browser.",
     "description": "Extension description for CWS"
   }
 }

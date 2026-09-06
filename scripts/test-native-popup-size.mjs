@@ -6,10 +6,12 @@ import os from 'node:os';
 import path from 'node:path';
 import toolingPolicy from './tooling-policy.js';
 toolingPolicy.assertBrowserSmokeCanLaunch();
-const { chromium } = await import('playwright');
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = process.env.XPORTER_NATIVE_ROOT || process.cwd();
 const baseWidth = Number(process.env.XPORTER_NATIVE_BASE_WIDTH || 350);
 const scales = (process.env.XPORTER_NATIVE_SCALES || '85,100,115,130').split(',').map(Number);
+const languages = (process.env.XPORTER_NATIVE_LOCALES || 'en').split(',');
+const appearances = process.env.XPORTER_NATIVE_CLASSIC_ONLY ? [false] : [false, true];
 const helium = '/Applications/Helium.app/Contents/MacOS/Helium';
 const executablePath = process.env.XPORTER_BROWSER_EXECUTABLE ||
     (fs.existsSync(helium) ? helium : chromium.executablePath());
@@ -18,8 +20,9 @@ const context = await chromium.launchPersistentContext(profile, {
     executablePath, headless: false, viewport: null,
     args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`]
 });
+const footerProblems = [];
 try {
-    const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+    const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: 15000 });
     const page = context.pages()[0];
     const cdp = await context.newCDPSession(page);
     let nextId = 0;
@@ -50,17 +53,27 @@ try {
             expression, returnByValue: true, awaitPromise: true
         })).result.value;
     }
-    for (const simplifiedDesign of [false, true]) for (const theme of ['dark', 'light']) {
+    for (const language of languages) for (const simplifiedDesign of appearances) for (const theme of ['dark', 'light']) {
         for (const uiScale of scales) {
-            const tag = `${theme}/${simplifiedDesign ? 'simple' : 'blue'}/${uiScale}%`;
+            const tag = `${language}/${theme}/${simplifiedDesign ? 'simple' : 'blue'}/${uiScale}%`;
             const expectedWidth = Math.floor(baseWidth * uiScale / 100);
             await page.bringToFront();
             await worker.evaluate(async settings => {
-                await chrome.storage.local.set({ xporter_settings: { ...settings, language: 'en' } });
+                await chrome.storage.local.set({ xporter_settings: settings });
                 const [window] = await chrome.windows.getAll({ windowTypes: ['normal'] });
-                await chrome.windows.update(window.id, { focused: true });
-                await chrome.action.openPopup({ windowId: window.id });
-            }, { simplifiedDesign, theme, uiScale });
+                // macOS can acknowledge the focus request before the previous
+                // action window has finished closing. Retry only that focus race.
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    await chrome.windows.update(window.id, { focused: true });
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    try {
+                        await chrome.action.openPopup({ windowId: window.id });
+                        break;
+                    } catch (error) {
+                        if (attempt === 4 || !error.message.includes('inactive window')) throw error;
+                    }
+                }
+            }, { simplifiedDesign, theme, uiScale, language });
             let target;
             for (let attempt = 0; attempt < 50 && !target; attempt++) {
                 target = (await cdp.send('Target.getTargets')).targetInfos.find(t => t.url.endsWith('/popup/popup.html'));
@@ -127,13 +140,14 @@ try {
             await new Promise(resolve => setTimeout(resolve, 400));
             const footer = await run("document.querySelector('.footer').getBoundingClientRect().toJSON()");
             const frames = await run('window.__popupTrace');
-            assert(footer.bottom <= 601, `${tag}: bottom of About is unreachable: ${JSON.stringify(footer)}`);
+            if (footer.bottom > 601) footerProblems.push({ tag, footer });
             assert(frames.every((f, i) => !i || f.y >= frames[i - 1].y - 1), `${tag}: downward wheel must not move content back up`);
-            console.log(`PASS native ${tag}: ${geometry.width}px, stationary hover and reachable About footer`);
+            console.log(`${footer.bottom <= 601 ? 'PASS' : 'FAIL footer'} native ${tag}: ${geometry.width}px, stationary hover and reachable About footer`);
             await run('setTimeout(() => window.close(), 0); true');
             await new Promise(resolve => setTimeout(resolve, 120));
         }
     }
+    assert.deepEqual(footerProblems, [], 'All native popup footers must be reachable');
 } finally {
     await context.close();
     fs.rmSync(profile, { recursive: true, force: true });

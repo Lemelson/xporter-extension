@@ -5,7 +5,7 @@
 <h1 align="center">XPorter</h1>
 
 <p align="center">
-  Free, unlimited export of X (Twitter) posts, followers, and following to CSV, JSON, XLSX, or AI-friendly TXT.<br/>
+  Free export of X (Twitter) posts, followers, and following to CSV, JSON, XLSX, or AI-friendly TXT.<br/>
   A Chrome extension — no servers or subscriptions; your exported data stays local.
 </p>
 
@@ -184,7 +184,7 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 | Selection UI | — | Post types, XLSX photo modes, and stopped/resumable states use official Tabler outline SVGs while keeping native keyboard-accessible controls |
 | Export mode | Posts | Data type to export: posts, personal bookmarks, followers, following, or verified followers |
 | Output format | CSV | File format: CSV, JSON, XLSX, or AI-friendly TXT for post-shaped exports |
-| Quantity limit | 500 | Maximum posts or users per export (0 = unlimited); changing it retargets an ordinary active export |
+| Quantity limit | 500 | Maximum posts or users per export (0 = no custom limit); changing it retargets an ordinary active export |
 | Export Speed | Standard | Turbo, Fast, Standard, Careful, Turtle, or Custom request pacing |
 | Custom pacing | 5 seconds | Exact delay between requests; seconds may be fractional with `.` or `,` |
 | Scheduled breaks | Off | Optional independent break after every N requests; separate controls for Posts & Bookmarks and User Lists |
@@ -194,7 +194,7 @@ All settings are persisted in Chrome storage and reused across popup sessions.
 | Auto-clear old exports | On / 4 hours | Removes old downloadable payloads while keeping history metadata |
 | Localize column titles | On | Translate CSV/XLSX headers; JSON keys always remain English |
 
-Preset quantity options: 100, 500, 1,000, unlimited, or a custom value.
+Preset quantity options: 100, 500, 1,000, no custom limit, or a custom value. For posts without a date range, X typically makes about 3,200 recent posts available. Date filtering uses X search, whose available results may differ.
 
 ## Supported Languages
 
@@ -261,12 +261,12 @@ xporter/
 
 ## Privacy
 
-- All exported data stays local — your X data never leaves your browser
+- Export files are generated locally. XPorter does not automatically upload their contents to a separate service.
 - The seen-post dataset is stored only in local IndexedDB and can be exported or cleared from Settings
 - No third-party analytics, advertising, or tracking SDKs
 - No extension-owned backend; normal export traffic goes only to X.com
-- Authentication uses your existing X session cookies — XPorter never stores or transmits credentials
-- **One exception:** when you uninstall XPorter, an anonymous usage summary (no X data, no usernames, nothing that identifies you) is sent once to help improve the extension — see the [live privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html) for exactly what it contains
+- Export requests use your existing X session to communicate with X. XPorter does not send your credentials to a separate extension service.
+- Opening the uninstall feedback page sends usage statistics. Exported X content is not included automatically; any text or contact details you submit are sent with your feedback. See the [live privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html) for details.
 
 ## Contributing
 
@@ -282,6 +282,8 @@ git diff --check
 ```
 
 Opening generated XLSX files in LibreOffice is checked separately with `node scripts/test-xlsx-libreoffice.js`. This requires LibreOffice and fails explicitly if it is missing or cannot complete the conversion. Release packaging runs both checks. CI tests four timezones and has a separate LibreOffice compatibility job. See [Testing](scripts/TESTING.md).
+
+Localized runtime checks cover all 14 languages. Browser copy checks (`scripts/test-popup-localized-copy.mjs` and `scripts/test-feedback-localized-copy.mjs`) separately check clipped text, dropdown labels, help, and conditional states at 100% scale. Run these outside the sandbox; see [Testing](scripts/TESTING.md) for browser configuration.
 
 For focused iteration, the individual `scripts/test-*.js` files remain directly runnable; `test-all.js` is the required complete gate and the source of truth for their order.
 

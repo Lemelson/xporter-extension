@@ -104,6 +104,10 @@ function formatError(error, t) {
         'SEARCH_STALLED': 'errSearchStalled',
         'SEARCH_END_UNCONFIRMED': 'errSearchEndUnconfirmed',
         'DATE_EXPORT_RESTART_REQUIRED': 'errDateExportRestart',
+        'TIMEOUT': 'errExtensionTimeout',
+        'MESSAGING_ERROR': 'errExtensionConnection',
+        'NO_EXPORT_TO_RESUME': 'errNoResume',
+        'No export to resume': 'errNoResume',
         // Timed-out fetch — same user guidance as a failed connection
         'NETWORK_TIMEOUT': 'errEndpointFailed'
     };
@@ -111,41 +115,43 @@ function formatError(error, t) {
     // English fallbacks for when no i18n `t` function is available
     const fallbacks = {
         'NOT_LOGGED_IN': 'Please log in to x.com first',
-        'USER_NOT_FOUND': 'User not found — check the username',
+        'USER_NOT_FOUND': 'Account not found. Check the username.',
         'USER_SUSPENDED': 'This account is suspended',
         'USER_UNAVAILABLE': 'This account is unavailable',
         'ACCOUNT_PRIVATE': 'This account is private',
-        'INVALID_DATE_RANGE': 'Date range is invalid — "From" must be earlier than "To"',
-        'NO_POST_TYPES_SELECTED': 'Choose at least one type of post to export',
-        'AUTH_ERROR': 'Authentication failed — please refresh x.com and try again',
-        'RATE_LIMITED': 'Routine pause — progress saved, please wait',
-        'STALE_QUERY_ID': 'X API changed — retrying with fresh data...',
+        'INVALID_DATE_RANGE': 'Choose an end date on or after the start date.',
+        'NO_POST_TYPES_SELECTED': 'Choose at least one type of post.',
+        'AUTH_ERROR': 'Could not verify your X login. Refresh x.com and try again.',
+        'RATE_LIMITED': 'X rate limit — export paused. Progress is saved.',
+        'STALE_QUERY_ID': 'Updating the request to X and trying again…',
         'REPLIES_UNAVAILABLE': 'The Replies tab is temporarily unavailable',
-        'ENDPOINT_DISCOVERY_FAILED': 'Could not connect to X API — make sure x.com is accessible',
-        'MAX_RETRIES_EXCEEDED': 'Maximum retries exceeded — please try again later',
+        'ENDPOINT_DISCOVERY_FAILED': 'Could not connect to X. Check that x.com opens, then try again.',
+        'MAX_RETRIES_EXCEEDED': 'All retry attempts failed. Try again later.',
         'ALREADY_RUNNING': 'An export is already running — stop it first',
         'NO_DATA': 'No data to download',
-        'HISTORY_NOT_FOUND': 'History entry not found',
-        'HISTORY_DATA_GONE': 'The saved data for this export has expired and can no longer be downloaded',
+        'HISTORY_NOT_FOUND': 'This export is no longer in history.',
+        'HISTORY_DATA_GONE': 'The saved data for this export is no longer available. Start a new export to download it again.',
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
         'DOWNLOAD_IN_PROGRESS': 'A download is already in progress',
         'COPY_TOO_LARGE': 'This export is too large to copy — download the numbered files instead',
-        'SEARCH_CAPTURE_TIMEOUT': 'Could not read X\'s search results. Resume opens a new search tab.',
+        'SEARCH_CAPTURE_TIMEOUT': 'Could not read the search results.',
         'SEARCH_TAB_UNAVAILABLE': 'Search tab could not load.',
-        'SEARCH_PAGE_CHANGED': 'The search tab was changed.',
+        'SEARCH_PAGE_CHANGED': 'The search page changed during export.',
         'SEARCH_BRIDGE_UNAVAILABLE': 'Could not connect to the search tab.',
-        'SEARCH_NO_RESPONSE': 'X returned no search response.',
-        'SEARCH_RESPONSE_ERROR': 'X returned a search error.',
-        'SEARCH_INVALID_RESPONSE': 'Could not read the search response.',
-        'SEARCH_RESPONSE_TOO_LARGE': 'The search response was too large.',
-        'SEARCH_NETWORK_ERROR': 'The search connection failed.',
-        'SEARCH_STALLED': 'Search stopped before the end was confirmed.',
-        'SEARCH_END_UNCONFIRMED': 'X did not confirm the end of the results.',
-        'DATE_EXPORT_RESTART_REQUIRED': 'This date export uses an older or unsupported format. Download any saved rows, then start a new export.',
-        'NETWORK_TIMEOUT': 'Could not connect to X API — make sure x.com is accessible',
-        'TIMEOUT': 'No response from the extension — please try again',
-        'MESSAGING_ERROR': 'Could not reach the extension — please try again'
+        'SEARCH_NO_RESPONSE': 'X did not respond to the search request.',
+        'SEARCH_RESPONSE_ERROR': 'X could not complete the search request.',
+        'SEARCH_INVALID_RESPONSE': 'XPorter could not read the search data returned by X.',
+        'SEARCH_RESPONSE_TOO_LARGE': 'X returned more search data than XPorter can process in one response.',
+        'SEARCH_NETWORK_ERROR': 'The connection to X was interrupted during search.',
+        'SEARCH_STALLED': 'XPorter could not confirm that all search results were collected.',
+        'SEARCH_END_UNCONFIRMED': 'XPorter could not confirm that all search results were collected.',
+        'DATE_EXPORT_RESTART_REQUIRED': 'This saved date-range export cannot be resumed with the current version. Download any saved data, then start a new export.',
+        'NETWORK_TIMEOUT': 'Could not connect to X. Check that x.com opens, then try again.',
+        'TIMEOUT': 'XPorter did not respond. Reopen the extension and try again.',
+        'MESSAGING_ERROR': 'Could not connect to XPorter. Reopen the extension and try again.',
+        'NO_EXPORT_TO_RESUME': 'No saved export to resume. Start a new export.',
+        'No export to resume': 'No saved export to resume. Start a new export.',
     };
 
     const i18nKey = errorMap[error];
@@ -335,17 +341,18 @@ function bidiIsolate(value) {
  * translated "Unlimited"/"Custom" labels, and locale-aware number grouping
  * for every numeric preset (including a dynamically inserted custom value).
  */
-function localizeQuantityOptions(select, langCode, translations) {
+function localizeQuantityOptions(select, langCode, translations, showPostAvailability = true) {
     if (!select) return;
-    const posts = translations?.posts || 'posts';
     select.querySelectorAll('option').forEach(opt => {
         if (opt.value === '0') {
-            opt.textContent = translations?.unlimited || 'Unlimited';
+            opt.textContent = showPostAvailability
+                ? (translations?.unlimited || 'No limit (posts: about 3,200)')
+                : (translations?.noCustomLimit || 'No custom limit');
         } else if (opt.value === 'custom') {
             opt.textContent = translations?.custom || 'Custom';
         } else {
             const n = parseInt(opt.value, 10);
-            if (n > 0) opt.textContent = `${formatNumber(n, langCode)} ${posts}`;
+            if (n > 0) opt.textContent = formatNumber(n, langCode);
         }
     });
 }
@@ -467,6 +474,9 @@ function collectedLabel(count, mode, langCode, translations) {
 }
 
 function formatCollectedCount(count, mode, langCode, translations) {
+    if (mode !== 'posts' && mode !== 'bookmarks' && translations?.accountsCollected) {
+        return translations.accountsCollected.replace('{count}', formatNumber(count, langCode));
+    }
     return `${formatNumber(count, langCode)} ${collectedLabel(count, mode, langCode, translations)}`;
 }
 

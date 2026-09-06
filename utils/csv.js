@@ -215,7 +215,7 @@ function generatePostsText(items, profile = {}, opts = {}) {
             lines.push(`Article title: ${cleanTxtValue(item.article_title)}`);
         }
         if (cleanTxtValue(item.article_text)) {
-            lines.push(`Article: (${cleanTxtValue(item.article_text)})`);
+            lines.push(`Article text: ${cleanTxtValue(item.article_text)}`);
         }
         if (item.article_url) lines.push(`Article URL: ${item.article_url}`);
         const createdAt = formatTxtDate(item.created_at);
@@ -370,7 +370,7 @@ function appendContextPost(lines, label, post, indent = '') {
     const articleTitle = cleanTxtValue(post.article_title);
     const articleText = cleanTxtValue(post.article_text);
     if (articleTitle) lines.push(`${detailIndent}Article title: ${articleTitle}`);
-    if (articleText) lines.push(`${detailIndent}Article: (${articleText})`);
+    if (articleText) lines.push(`${detailIndent}Article text: ${articleText}`);
     if (post.article_url) lines.push(`${detailIndent}Article URL: ${post.article_url}`);
     const createdAt = formatTxtDate(post.created_at);
     if (createdAt) lines.push(`${detailIndent}Date: ${createdAt}`);
@@ -404,7 +404,8 @@ function formatTxtDate(value) {
 
 function addMetric(target, value, label) {
     if (value === undefined || value === null || value === '') return;
-    target.push(`${value} ${label}`);
+    const singular = { views: 'view', likes: 'like', reposts: 'repost', replies: 'reply', quotes: 'quote', bookmarks: 'bookmark' };
+    target.push(`${value} ${Number(value) === 1 ? (singular[label] || label) : label}`);
 }
 
 function exportValue(item, key, isUsers = false) {

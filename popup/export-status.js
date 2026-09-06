@@ -212,7 +212,9 @@
                 case 'error':
                     if (state.retryIn) {
                         setDotColor('red');
-                        statusMessage.textContent = `${formatError(state.error, t)} — ${t('retryIn')} ${Math.round(state.retryIn / 1000)}s`;
+                        const retryMessage = t('retryInSeconds').replace('{seconds}',
+                            formatNumber(Math.round(state.retryIn / 1000), currentLang));
+                        statusMessage.textContent = `${formatError(state.error, t)} — ${retryMessage}`;
                     } else {
                         statusText.textContent = `${t('errorTitle')}: ${formatError(state.error, t)}`;
                         setDotColor('red');
