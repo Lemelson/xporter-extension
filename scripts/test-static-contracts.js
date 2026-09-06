@@ -457,28 +457,28 @@ assert.match(
 assert.equal(
     mainDevelopmentVersion,
     manifest.version,
-    'README must identify the manifest version as the current development version'
+    'README must identify the manifest version as the current packaged version'
 );
 assert.match(
     updateEntries[0],
-    new RegExp(`<span class="update-meta-version">v${chromeWebStoreRelease.replace(/\./g, '\\.')}</span>`),
-    'the first About update must describe the Chrome Web Store release'
+    new RegExp(`<span class="update-meta-version">v${manifest.version.replace(/\./g, '\\.')}</span>`),
+    'the first About update must describe the packaged manifest version'
 );
 assert.match(updateEntries[0], /data-i18n=["']updateReleased["']/,
-    'the Chrome Web Store version must be labelled Released');
+    'the packaged version must be labelled Released');
 assert.match(updateEntries[1], /data-i18n=["']updateReleased["']/,
     'the previous public version must be labelled Released');
 assert.match(
     updateEntries[1],
-    /<span class="update-meta-version">v1\.6\.1<\/span>/,
-    'the most recent public release must be v1.6.1'
+    /<span class="update-meta-version">v1\.6\.4<\/span>/,
+    'the most recent Store release must be v1.6.4'
 );
 assert.match(updateEntries[2], /data-i18n=["']updateReleased["']/,
     'the older public version must be labelled Released');
 assert.match(
     updateEntries[2],
-    /<span class="update-meta-version">v1\.5\.8<\/span>/,
-    'the older public release must be v1.5.8'
+    /<span class="update-meta-version">v1\.6\.1<\/span>/,
+    'the older public release must be v1.6.1'
 );
 const currentBuildDate = /<time data-release-date datetime="([^"]+)"/.exec(updateEntries[0])?.[1];
 const footerBuildDate = /footer-build-date">([^<]+)</.exec(popupHtml)?.[1];

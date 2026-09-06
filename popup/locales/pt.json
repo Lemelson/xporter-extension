@@ -224,6 +224,8 @@
   "updatesHeading": "Últimas atualizações",
   "updateReleased": "Lançado",
   "updateBuilt": "Build",
+  "update165Title": "Exportação por datas confiável",
+  "update165Body": "As exportações por datas terminam corretamente, preservam resultados parciais e continuam sem publicações ausentes ou duplicadas. Os nomes dos arquivos mantêm as datas selecionadas.",
   "update164Title": "Ações de status da exportação mais claras",
   "update164Body": "O progresso e a contagem agora ocupam toda a largura do cartão. Parar virou uma ação compacta na borda, Baixar usa uma linha horizontal clara e, em TXT, ações iguais de baixar e copiar ficam lado a lado, sem blocos quadrados nem espaço desperdiçado.",
   "update151Title": "Itens salvos e exportações mais limpas",

@@ -25,8 +25,9 @@
 ## Release status
 
 The `v1.6.4` tag matches the package released through the Chrome Web Store.
-The `main` branch now reports version `1.6.5` and contains subsequent
-development work that is not part of the 1.6.4 release archive.
+The `main` branch now reports version `1.6.5`, packaged on September 6, 2026,
+with verified date-range capture, completion, partial downloads and Resume fixes.
+This package is separate from the 1.6.4 Store release; Store publication is not implied.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. When you first select **Embed photo previews**,

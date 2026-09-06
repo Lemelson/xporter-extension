@@ -224,6 +224,8 @@
   "updatesHeading": "Son güncellemeler",
   "updateReleased": "Yayınlandı",
   "updateBuilt": "Derleme",
+  "update165Title": "Güvenilir tarih aralığı dışa aktarımı",
+  "update165Body": "Tarih aralığı dışa aktarımları doğru şekilde tamamlanır, kısmi sonuçları korur ve eksik veya yinelenen gönderiler olmadan devam eder. Dosya adlarında seçilen tarihler korunur.",
   "update164Title": "Daha düzenli dışa aktarma durumu işlemleri",
   "update164Body": "İlerleme ve sayaç artık durum kartının tüm genişliğini kullanır. Durdur kenarda kompakt bir işlem, İndir net bir yatay düğmedir; TXT’de eşit İndir ve Kopyala işlemleri kare kutular ve boş alan olmadan yan yana durur.",
   "update151Title": "Yer işaretleri ve daha temiz dışa aktarımlar",

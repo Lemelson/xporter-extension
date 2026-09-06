@@ -224,6 +224,8 @@
   "updatesHeading": "Pembaruan terbaru",
   "updateReleased": "Dirilis",
   "updateBuilt": "Build",
+  "update165Title": "Ekspor tanggal yang andal",
+  "update165Body": "Ekspor berdasarkan tanggal kini selesai dengan benar, menyimpan hasil sebagian, dan dilanjutkan tanpa postingan hilang atau duplikat. Nama file tetap memakai tanggal yang dipilih.",
   "update164Title": "Tindakan status ekspor lebih rapi",
   "update164Body": "Progres dan jumlah kini memakai seluruh lebar kartu status. Hentikan menjadi tindakan ringkas di tepi, Unduh memakai baris horizontal yang jelas, dan TXT menempatkan tindakan Unduh dan Salin yang sama besar berdampingan tanpa kotak persegi atau ruang terbuang.",
   "update151Title": "Markah dan ekspor yang lebih rapi",

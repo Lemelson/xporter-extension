@@ -224,6 +224,8 @@
   "updatesHeading": "Dernières mises à jour",
   "updateReleased": "Publication",
   "updateBuilt": "Version",
+  "update165Title": "Export fiable par dates",
+  "update165Body": "Les exports par dates se terminent correctement, conservent les résultats partiels et reprennent sans publications manquantes ni doublons. Les noms de fichiers gardent les dates choisies.",
   "update164Title": "Actions d’état d’export plus claires",
   "update164Body": "La progression et le compteur occupent désormais toute la largeur de la carte. Arrêter devient une action compacte au bord, Télécharger une rangée horizontale claire, et le format TXT place côte à côte des actions égales de téléchargement et de copie, sans tuiles carrées ni espace perdu.",
   "update151Title": "Signets et exports plus propres",

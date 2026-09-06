@@ -224,6 +224,8 @@
   "updatesHeading": "Last updates",
   "updateReleased": "Released",
   "updateBuilt": "Build",
+  "update165Title": "Reliable date exports",
+  "update165Body": "Date exports now finish correctly, keep partial results, and resume without missing or duplicate posts. Selected dates stay correct in filenames.",
   "update164Title": "Cleaner export status actions",
   "update164Body": "Export status cards now keep progress and counts full-width. Stop is a compact trailing action, Download uses a clear horizontal row, and TXT places equal Download and Copy actions side by side without square tiles or wasted space.",
   "update151Title": "Bookmarks and cleaner exports",

@@ -224,6 +224,8 @@
   "updatesHeading": "Ultimi aggiornamenti",
   "updateReleased": "Pubblicato",
   "updateBuilt": "Build",
+  "update165Title": "Esportazioni per data affidabili",
+  "update165Body": "Le esportazioni per data terminano correttamente, conservano i risultati parziali e riprendono senza post mancanti o duplicati. I nomi dei file mantengono le date selezionate.",
   "update164Title": "Azioni di stato dell’esportazione più chiare",
   "update164Body": "Avanzamento e conteggio ora occupano tutta la larghezza della scheda. Interrompi è un’azione compatta sul bordo, Scarica usa una chiara riga orizzontale e per TXT le azioni uguali di download e copia sono affiancate, senza riquadri quadrati né spazio sprecato.",
   "update151Title": "Segnalibri ed esportazioni più pulite",

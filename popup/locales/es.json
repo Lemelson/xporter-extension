@@ -224,6 +224,8 @@
   "updatesHeading": "Últimas actualizaciones",
   "updateReleased": "Publicado",
   "updateBuilt": "Compilación",
+  "update165Title": "Exportación por fechas fiable",
+  "update165Body": "Las exportaciones por fechas finalizan correctamente, conservan los resultados parciales y se reanudan sin publicaciones perdidas ni duplicadas. Los nombres de archivo mantienen las fechas seleccionadas.",
   "update164Title": "Acciones de estado de exportación más claras",
   "update164Body": "El progreso y el contador ahora ocupan todo el ancho de la tarjeta. Detener es una acción compacta al borde, Descargar usa una fila horizontal clara y TXT coloca acciones iguales de descarga y copia una junto a otra, sin mosaicos cuadrados ni espacio desperdiciado.",
   "update151Title": "Marcadores y exportaciones más limpias",
