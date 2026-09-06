@@ -3989,8 +3989,6 @@ html {
 /* Shared workspace layout and user-controlled scale. */
 body { --ui-scale: 1; width: calc(350px * var(--ui-scale)); max-width: 100vw; }
 html.action-popup body { max-width: none; }
-/* Keep the footer clear of native action-window scroll-end clipping. */
-html.action-popup .popup { padding-bottom: 32px; }
 .popup { width: 100%; zoom: var(--ui-scale); }
 .header { flex-wrap: wrap; gap: 8px; }
 .header-right { margin-inline-start: auto; }
