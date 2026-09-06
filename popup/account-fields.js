@@ -21,6 +21,7 @@
         const bookmarksAccountAvatarFallback =
             document.getElementById('bookmarksAccountAvatarFallback');
         let bookmarksUsernameBackup = '';
+        let exportAccount = null;
 
         function renderAccountAvatar(image, fallback, avatarUrl) {
             const showFallback = () => {
@@ -40,11 +41,12 @@
 
         function renderTargetAccount() {
             const username = extractUsernameFromInput(usernameInput.value);
-            const account = (
-                username &&
-                String(detectedTargetAccount?.username || '').toLowerCase() ===
-                    username.toLowerCase()
-            ) ? detectedTargetAccount : null;
+            const matches = account => username &&
+                String(account?.username || '').toLowerCase() === username.toLowerCase();
+            const live = matches(detectedTargetAccount) ? detectedTargetAccount : null;
+            const saved = matches(exportAccount) ? exportAccount : null;
+            const account = { name: live?.name || saved?.name || '',
+                avatarUrl: live?.avatarUrl || saved?.avatarUrl || '' };
             const name = String(account?.name || '').trim();
             targetAccountName.textContent = name;
             targetAccountName.classList.toggle('hidden', !name);
@@ -92,6 +94,13 @@
         });
 
         return Object.freeze({
+            updateExportAccount(state) {
+                if (state.userInfo && state.exportMode !== 'bookmarks') {
+                    const info = state.userInfo;
+                    exportAccount = { username: info.screenName || state.username,
+                        name: info.name || '', avatarUrl: info.profileImageUrl || '' };
+                }
+            },
             applyMode(mode) {
                 const isBookmarksMode = mode === 'bookmarks';
                 if (isBookmarksMode) {

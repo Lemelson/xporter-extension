@@ -233,6 +233,11 @@ body.light .account-card {
 .account-avatar {
   width: 38px;
   height: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  aspect-ratio: 1;
   flex: 0 0 38px;
   display: grid;
   place-items: center;
@@ -515,11 +520,9 @@ body.light .input-small {
   min-width: 0;
 }
 
-/* Stop is intentionally compact and aligned to the trailing edge. It remains
-   easy to reach without competing with the live export count and progress. */
+/* A single action fills its row, without a vacant leading column. */
 .status-action-stack.running-actions {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
 }
 
 .status-action-stack.txt-actions {
@@ -545,7 +548,7 @@ body.light .input-small {
 }
 
 .status-action-stack.running-actions .btn-status-action {
-  width: auto;
+  width: 100%;
   min-width: 104px;
   max-width: 100%;
 }
@@ -4148,3 +4151,52 @@ body.simplified .progress-fill::after { display: none; }
 .progress-fill.indeterminate { width: 34% !important; background: var(--accent); animation: activitySweep 1.8s ease-in-out infinite alternate; }
 @keyframes activitySweep { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 @media (prefers-reduced-motion: reduce) { .progress-fill.indeterminate { animation: none; transform: translateX(100%); } }
+
+/* Export controls share geometry and remain outlined before hover. */
+.export-status #downloadBtn,
+.export-status #resumeBtn,
+.export-status #newExportBtn {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1.25;
+  gap: 8px;
+}
+.export-status #newExportBtn,
+.export-status #resumeBtn {
+  border: 1px solid var(--glass-border-strong);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  box-shadow: var(--glass-inner-glow);
+}
+.export-status #newExportBtn:hover,
+.export-status #resumeBtn:hover { background: var(--bg-hover); border-color: var(--accent); }
+.export-status #downloadBtn {
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, var(--glass-bg));
+}
+.export-status #downloadBtn:hover { background: color-mix(in srgb, var(--accent) 32%, var(--glass-bg)); }
+.export-status .btn svg { width: 20px; height: 20px; flex: 0 0 20px; }
+.export-status .btn:active { scale: .96; }
+.export-status:not(.is-running) .progress-fill,
+.export-status:not(.is-running) .progress-fill::after { animation: none; }
+.export-status.is-running .progress-fill { overflow: hidden; }
+.export-status.is-running .progress-fill.indeterminate {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--accent), color-mix(in srgb, var(--accent) 30%, transparent));
+  box-shadow: 0 0 12px var(--accent-glow);
+  animation: activitySweep 2.2s cubic-bezier(.45,0,.55,1) infinite alternate;
+}
+.export-status.is-running .progress-fill::after {
+  display: block;
+  background: linear-gradient(90deg, transparent, #ffffff70, transparent);
+  animation: counterBarGlint 2.4s ease-in-out infinite;
+}
+@keyframes counterBarGlint { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .export-status.is-running .progress-fill,
+  .export-status.is-running .progress-fill.indeterminate,
+  .export-status.is-running .progress-fill::after { animation: none; transition: none; }
+  .export-status .btn:active { scale: 1; }
+}

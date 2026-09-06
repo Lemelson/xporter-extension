@@ -62,6 +62,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Dark and light themes** — blue styling with a one-click toggle; optional simplified styling and 85–130% interface scale in Settings → Design
 - **14 languages** — auto-detects Chrome's UI language on first launch
 - **Dynamic API discovery** — extracts fresh GraphQL query IDs from X's JS bundles at runtime; gracefully falls back to hardcoded IDs
+- **Clear export status** — animated collected counts, a full-width Stop button, and matching result controls. The date-export panel shows a percentage only against your selected post limit; without a limit it shows activity. Animations respect reduced-motion preferences.
 - **Crash-resilient** — export progress is persisted to Chrome storage and survives browser restarts
 - **Zero dependencies** — no npm packages, no build step, pure vanilla JavaScript
 

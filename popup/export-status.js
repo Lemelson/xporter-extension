@@ -116,9 +116,11 @@
             // Measured progress remains useful for paused/error states. While an
             // export is active, the bar instead communicates activity: blue while
             // fetching and a timed amber fill between requests.
-            const hasTarget = state.quantityLimit > 0 || state.expectedTweets > 0;
-            const target = (state.quantityLimit > 0) ? state.quantityLimit : (state.expectedTweets || 1);
+            const hasTarget = state.quantityLimit > 0;
+            const target = state.quantityLimit || 1;
             const progressPct = Math.min(100, Math.round(itemCount / target * 100));
+            progressFill.parentElement.classList.toggle('hidden',
+                !isRunning && status !== 'complete' && !hasTarget);
 
             // `live` adds a pulsing animation to the status dot while the export is
             // actively working (fetching / cooling down / retrying).
@@ -135,8 +137,8 @@
                     progressFill.classList.remove('indeterminate');
                     progressFill.style.width = progressPct + '%';
                 } else {
-                    progressFill.classList.add('indeterminate');
-                    progressFill.style.width = '100%';
+                    progressFill.classList.remove('indeterminate');
+                    progressFill.style.width = '0%';
                 }
             }
 
@@ -286,7 +288,10 @@
             }
 
             // Update count display
-            tweetCountEl.textContent = formatCollectedCount(itemCount, mode, currentLang, currentTranslations);
+            exportStatus.classList.toggle('is-running', isRunning);
+            XPorterRollingCounter.render(tweetCountEl,
+                formatCollectedCount(itemCount, mode, currentLang, currentTranslations),
+                { animate: isRunning });
 
             return { resumeAddsItems };
         }

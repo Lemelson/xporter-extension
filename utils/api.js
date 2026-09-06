@@ -996,7 +996,7 @@ async function getUserByScreenName(screenName) {
     location: core.location || legacy.location || '',
     url: expandedProfileUrl || legacy.url || '',
     createdAt: core.created_at || legacy.created_at || '',
-    profileImageUrl: (legacy.profile_image_url_https || '').replace('_normal', '_200x200'),
+    profileImageUrl: (userResult.avatar?.image_url || legacy.profile_image_url_https || '').replace('_normal', '_200x200'),
     isProtected: legacy.protected || false,
     isVerified: userResult.is_blue_verified || legacy.verified || false,
     tweetCount: legacy.statuses_count ?? null,

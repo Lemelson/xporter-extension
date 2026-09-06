@@ -1382,25 +1382,14 @@ async function requestNextSearchCapturePayload() {
     return null;
 }
 
-// How far through the date-range export we are, in percent (null = unknown).
-// Two independent signals, whichever is further along wins: items vs the
-// quantity limit, and — since the live search feed runs newest → oldest —
-// how deep into the requested date window the oldest collected post sits.
+// Only a user-selected quantity has a known denominator. Calendar coverage
+// cannot predict the share of posts collected: posting density varies by date.
 function computeSearchCaptureProgress() {
     if (!currentExport) return null;
-    let pct = null;
-
     const limit = Number(currentExport.settings?.quantityLimit || 0);
-    if (limit > 0) {
-        pct = Math.min(100, ((currentExport.tweetCount || 0) / limit) * 100);
-    }
-
-    const datePct = computeDateCoveragePct();
-    if (datePct !== null) {
-        pct = (pct === null) ? datePct : Math.max(pct, datePct);
-    }
-
-    return pct === null ? null : Math.min(99, Math.round(pct));
+    return limit > 0
+        ? Math.min(100, Math.round((currentExport.tweetCount || 0) / limit * 100))
+        : null;
 }
 
 function toEpochMs(value) {

@@ -137,12 +137,12 @@ try {
     for (const width of [320, 1440]) {
       await surface.setViewportSize({ width, height: 900 });
       const payload = { tweetCount: 208, dateFrom: '2025-04-29', dateTo: '2025-11-29',
-        phase: tr.searchWaiting, progressPct: 17, i18n };
+        phase: tr.searchWaiting, quantityLimit: 1200, progressPct: 17, i18n };
       await sendOverlay(payload);
       const box = await overlay.boundingBox();
       assert(box.x >= 0 && box.x + box.width <= width && box.y >= 0 && box.y + box.height <= 900,
         `${language}/${width}: overlay stays within viewport`);
-      assert.equal(await overlay.locator('[data-xporter-pct]').textContent(), '≈17%');
+      assert.equal(await overlay.locator('[data-xporter-pct]').textContent(), '17%');
       const toggle = overlay.locator('.xporter-capture-toggle');
       await toggle.focus();
       await surface.keyboard.press('Enter');
@@ -153,7 +153,7 @@ try {
       await surface.keyboard.press('Enter');
       assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
       if (['en', 'ru'].includes(language) && width === 1440) await overlay.screenshot({ path: path.join(output, `overlay-${language}.png`) });
-      await sendOverlay({ ...payload, progressPct: null });
+      await sendOverlay({ ...payload, quantityLimit: 0, progressPct: null });
       assert.equal(await overlay.locator('[data-xporter-pct]').textContent(), '');
       await surface.emulateMedia({ reducedMotion: 'reduce' });
       assert.equal(await overlay.locator('[data-xporter-bar]').evaluate(el => getComputedStyle(el).animationName), 'none');
@@ -163,17 +163,21 @@ try {
     }
   }
   // User appearance settings also apply to the real in-page overlay.
+  const en=JSON.parse(fs.readFileSync(path.join(root,'popup/locales/en.json')));
   for (const theme of ['dark','light']) for (const simplifiedDesign of [false,true]) for (const uiScale of [85,100,115,130]) {
     for (const width of [320,1440]) {
       await surface.setViewportSize({ width, height: 600 });
       await sendOverlay({ tweetCount: 208, progressPct: 17, phase: 'Waiting for X…',
-        dateFrom:'2025-04-29',dateTo:'2025-11-29', i18n:{lang:'en',dir:'ltr',appearance:{theme,simplifiedDesign,uiScale}} });
+        dateFrom:'2025-04-29',dateTo:'2025-11-29', i18n:{lang:'en',dir:'ltr',title:en.ovTitle,note:en.ovNote,stop:en.ovStop,collapse:en.ovCollapse,expand:en.ovExpand,appearance:{theme,simplifiedDesign,uiScale}} });
       const rect = await overlay.boundingBox();
       assert(rect.x >= -1 && rect.x+rect.width <= width+1 && rect.y >= -1 && rect.y+rect.height <= 601,
         `overlay ${theme}/${simplifiedDesign}/${uiScale}/${width}: ${JSON.stringify(rect)}`);
       assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-simple')), simplifiedDesign);
       assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-light')), theme === 'light');
-      if (width===1440 && uiScale===100) await overlay.screenshot({path:path.join(output,`overlay-${theme}-${simplifiedDesign?'simple':'blue'}.png`)});
+      if (width===1440 && uiScale===100) {
+        await overlay.screenshot({path:path.join(output,`overlay-${theme}-${simplifiedDesign?'simple':'blue'}.png`)});
+        if(theme==='dark' && !simplifiedDesign) fs.writeFileSync(path.join(output,'overlay.html'),await surface.evaluate(()=>document.getElementById('xporter-capture-overlay-style').outerHTML+document.getElementById('xporter-capture-overlay').outerHTML));
+      }
     }
   }
   await overlay.locator('[data-xporter-stop]').click();

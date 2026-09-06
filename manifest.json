@@ -52,6 +52,7 @@
       ],
       "js": [
         "content/capture-prerequisites.js",
+        "utils/rolling-counter.js",
         "content/content.js"
       ],
       "run_at": "document_start"

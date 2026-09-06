@@ -453,10 +453,10 @@ function ensureXporterCaptureOverlay() {
             letter-spacing: 0;
         }
         #xporter-capture-overlay .xporter-capture-bar {
-            height: 5px;
+            height: 7px;
             margin-top: 12px;
             overflow: hidden;
-            border-radius: 3px;
+            border-radius: 8px;
             background: var(--xp-track);
         }
         #xporter-capture-overlay .xporter-capture-bar span {
@@ -464,9 +464,19 @@ function ensureXporterCaptureOverlay() {
             width: 34%;
             height: 100%;
             border-radius: inherit;
-            background: var(--xp-accent);
-            animation: xporter-capture-bar-sweep 1.8s ease-in-out infinite alternate;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(90deg, color-mix(in srgb, var(--xp-accent) 40%, transparent), var(--xp-accent));
+            box-shadow: 0 0 12px color-mix(in srgb, var(--xp-accent) 40%, transparent);
+            animation: xporter-capture-bar-sweep 2.2s cubic-bezier(.45,0,.55,1) infinite alternate;
         }
+        #xporter-capture-overlay .xporter-capture-bar span::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, #ffffff80, transparent);
+            animation: xporter-capture-glint 2.4s ease-in-out infinite;
+        }
+        @keyframes xporter-capture-glint { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+        #xporter-capture-overlay.xporter-capture-paused .xporter-capture-bar span::after { animation: none; opacity: 0; }
         #xporter-capture-overlay.xporter-capture-determinate .xporter-capture-bar span {
             animation: none;
             transform: none;
@@ -547,7 +557,8 @@ function ensureXporterCaptureOverlay() {
         #xporter-capture-overlay.xporter-capture-light.xporter-capture-paused .xporter-capture-pct { color: #865308; }
         @media (max-width: 420px) { #xporter-capture-overlay { inset-inline-end: 16px; bottom: 16px; max-height: calc(100dvh / var(--xp-scale) - 32px); } }
         @media (prefers-reduced-motion: reduce) {
-            #xporter-capture-overlay .xporter-capture-bar span { animation: none; transition: none; }
+            #xporter-capture-overlay .xporter-capture-bar span,
+            #xporter-capture-overlay .xporter-capture-bar span::after { animation: none; transition: none; }
         }
     `;
 
@@ -682,8 +693,8 @@ function updateXporterCaptureOverlay(status) {
         }
     }
 
-    overlay.querySelector('[data-xporter-count]').textContent =
-        `${count.toLocaleString(locale)} ${capturePluralLabel('postsCollected', count, i)}`;
+    XPorterRollingCounter.render(overlay.querySelector('[data-xporter-count]'),
+        `${count.toLocaleString(locale)} ${capturePluralLabel('postsCollected', count, i)}`);
     overlay.querySelector('[data-xporter-range]').textContent = range;
     overlay.querySelector('[data-xporter-limit]').textContent = limitText;
 
@@ -691,10 +702,9 @@ function updateXporterCaptureOverlay(status) {
     const stopBtn = overlay.querySelector('[data-xporter-stop]');
     if (stopBtn && !stopBtn.disabled) stopBtn.textContent = i.stop || 'Stop export';
 
-    // Real progress when the SW can compute it (quantity limit and/or how far
-    // back into the date range we've collected); sweeping bar otherwise.
-    // NB: null must stay indeterminate — Number(null) is 0, so gate on != null.
-    const pct = (status.progressPct != null) ? Number(status.progressPct) : NaN;
+    // A limit supplies an exact denominator. The span of dates already visited
+    // does not tell us how many posts remain; use activity without a percentage.
+    const pct = limit > 0 ? count / limit * 100 : NaN;
     const barFill = overlay.querySelector('[data-xporter-bar]');
     const pctEl = overlay.querySelector('[data-xporter-pct]');
     if (Number.isFinite(pct) && pct >= 0) {
@@ -702,7 +712,7 @@ function updateXporterCaptureOverlay(status) {
         const clamped = Math.max(0, Math.min(100, pct));
         // Never a fully empty track while running — keep a visible sliver.
         if (barFill) barFill.style.width = Math.max(2, clamped) + '%';
-        if (pctEl) pctEl.textContent = '≈' + Math.round(clamped) + '%';
+        if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
     } else {
         overlay.classList.remove('xporter-capture-determinate');
         if (barFill) barFill.style.width = '';

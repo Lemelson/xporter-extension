@@ -967,6 +967,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportMode.disabled = state.running || downloadInProgress;
         outputFormat.disabled = state.running || downloadInProgress;
         if (state.username && mode !== 'bookmarks') usernameInput.value = state.username;
+        accountFields.updateExportAccount(state);
         applyModeUI(mode);
         const view = exportStatusView.render({
             ...state,

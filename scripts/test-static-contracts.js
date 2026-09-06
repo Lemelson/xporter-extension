@@ -598,13 +598,13 @@ assert.match(
 );
 assert.match(
     read('popup/popup.css'),
-    /\.export-status\s*\{[\s\S]*display:\s*grid[\s\S]*\.status-action-stack\.running-actions\s*\{[\s\S]*justify-content:\s*flex-end[\s\S]*\.status-action-stack\.txt-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)[\s\S]*\.btn\.btn-status-action\s*\{[\s\S]*min-height:\s*44px/,
+    /\.export-status\s*\{[\s\S]*display:\s*grid[\s\S]*\.status-action-stack\.running-actions\s*\{[\s\S]*display:\s*grid[\s\S]*\.status-action-stack\.txt-actions\s*\{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)[\s\S]*\.btn\.btn-status-action\s*\{[\s\S]*min-height:\s*44px/,
     'status actions must use compact responsive rows for running, terminal, and TXT states'
 );
 assert.match(
     popupRuntime,
     /statusActionStack\.classList\.toggle\(['"]running-actions['"],\s*isRunning\)/,
-    'running status must activate the compact trailing Stop layout'
+    'running status must activate the full-width Stop layout'
 );
 for (const key of ['postSafetyBreakEnabled', 'userSafetyBreakEnabled']) {
     assert.match(

@@ -1050,6 +1050,7 @@ async function testMissingProfileCountsRemainUnknown() {
                             created_at: 'Fri Feb 14 13:12:38 +0000 2025'
                         },
                         legacy: {},
+                        avatar: { image_url: 'https://pbs.twimg.com/profile_images/1/avatar_normal.jpg' },
                         is_blue_verified: true
                     }
                 }
@@ -1065,6 +1066,8 @@ async function testMissingProfileCountsRemainUnknown() {
     assert.equal(user.followersCount, null);
     assert.equal(user.followingCount, null);
     assert.equal(user.tweetCount, null);
+    assert.equal(user.profileImageUrl, 'https://pbs.twimg.com/profile_images/1/avatar_200x200.jpg',
+        'modern profile avatar must survive absence of legacy.profile_image_url_https');
 }
 
 async function testProfileFeedSelectsMatchingTimeline() {
