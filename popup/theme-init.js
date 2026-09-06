@@ -20,6 +20,11 @@
 
 // Early theme apply — read storage directly (no IPC) to prevent FOUC.
 // Must run before body content renders.
+// Native action windows measure their own preferred size. Constraining that
+// size to their initial viewport creates a shrinking feedback loop. Ordinary
+// tabs/previews still need responsive viewport bounds.
+document.documentElement.classList.toggle('action-popup',
+    chrome.extension.getViews({ type: 'popup' }).includes(window));
 XPorterUIAppearance.apply(document.body, {});
 chrome.storage.local.get('xporter_settings', (r) => {
   XPorterUIAppearance.apply(document.body, r.xporter_settings || {});

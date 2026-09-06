@@ -21,20 +21,34 @@ try {
   await page.setViewportSize({ width: 400, height: 600 });
   await page.goto(`chrome-extension://${new URL(worker.url()).host}/popup/popup.html`);
   await page.waitForFunction(() => document.getElementById('postSelectionCount').textContent.includes('5'));
+  const earlyHover = await page.locator('[data-i18n-tooltip="exportModeHelp"]').evaluate(trigger => {
+    const pop = trigger.querySelector('.help-pop');
+    pop.remove();
+    trigger.dispatchEvent(new Event('pointerenter'));
+    const openedWithoutContent = trigger.classList.contains('help-open');
+    trigger.append(pop);
+    return openedWithoutContent;
+  });
+  assert.equal(earlyHover, false, 'hover before localized tooltip insertion must not expose unmeasured content');
   await page.locator('[data-tab="settings"]').click();
   const help = page.locator('[data-i18n-tooltip="autoExpireHelp"]');
   assert.equal(await help.count(), 1);
-  await help.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 520));
+  await page.setViewportSize({ width: 400, height: 300 });
+  await help.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 220));
   await help.hover();
+  // Hover may scroll the trigger into view; position the bottom-edge fixture afterwards.
+  await help.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 220));
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const tooltip = help.locator('.help-pop');
   await tooltip.waitFor({ state: 'visible' });
   const bounds = await tooltip.boundingBox();
-  console.log('Auto-clear tooltip:', bounds);
-  assert(bounds.y >= 0 && bounds.y + bounds.height <= 600,
+  console.log('Auto-clear tooltip:', bounds, 'trigger:', await help.boundingBox());
+  assert(bounds.y >= 0 && bounds.y + bounds.height <= 300,
     'Auto-clear help near the bottom must fit the viewport and use free space above');
   assert(bounds.y + bounds.height <= (await help.boundingBox()).y,
     'Auto-clear help must open above when below has insufficient room');
 
+  await page.setViewportSize({ width: 400, height: 600 });
   const output = process.env.XPORTER_APPEARANCE_OUTPUT || '/private/tmp/xporter-appearance-qa';
   fs.mkdirSync(output, { recursive: true });
   const readSettings = () => page.evaluate(async () => (await chrome.storage.local.get('xporter_settings')).xporter_settings);
@@ -107,6 +121,17 @@ try {
       }
       await page.setViewportSize({width,height:600});
       await page.locator('#tabBtnSettings').click();
+      if (language === 'en') {
+        for (const localHelp of await page.locator('.help-local').all()) {
+          await localHelp.scrollIntoViewIfNeeded();
+          await localHelp.focus();
+          await page.keyboard.press('Enter');
+          const localRect = await localHelp.locator('.help-pop').boundingBox();
+          assert(localRect && localRect.x >= -1 && localRect.x + localRect.width <= width + 1,
+            `${tag}: legacy local help must use measured viewport positioning`);
+          await page.keyboard.press('Escape');
+        }
+      }
       const autoHelp = page.locator('[data-i18n-tooltip="autoExpireHelp"]');
       await autoHelp.evaluate(el=>window.scrollBy(0,el.getBoundingClientRect().top-520));
       await autoHelp.focus();
@@ -116,7 +141,7 @@ try {
       assert(autoRect.y >= -1 && autoRect.y+autoRect.height <= 600+1, `${tag}: Auto-clear help must fit at scale`);
       await page.keyboard.press('Escape');
       if (language === 'ru' && [100,130].includes(uiScale)) {
-        await page.locator('#appearanceTitle').scrollIntoViewIfNeeded();
+        await page.locator('#simplifiedDesign').scrollIntoViewIfNeeded();
         await page.screenshot({path:path.join(output,`settings-${tag}.png`)});
         await page.locator('#tabBtnHome').click();
         await page.locator('#authWarning').evaluate(el=>el.classList.add('hidden'));

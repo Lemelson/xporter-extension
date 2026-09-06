@@ -494,3 +494,5 @@ In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-p
 
 ## 14. How to Update This File
 Update `agent.md` (and `CLAUDE.md`) whenever you add/rename a file, change the message protocol or storage schema, add export modes/formats/settings, update feature flags or queryIds, or change the data flow. Keep sections numbered; update §2's diagram for architectural changes.
+
+Native action popup sizing: `theme-init.js` detects action views with `chrome.extension.getViews` before layout. Only action windows bypass `max-width: 100vw`, which otherwise traps the initial preferred size; normal tabs remain responsive. Navigation retains the original icon-only tabs and spacing, with localized screen-reader labels. Tooltips stay hidden until their localized content exists and their viewport position has been measured; legacy local help uses the same positioned trigger. `scripts/test-native-popup-size.mjs` opens actual action windows in disposable Helium profiles and verifies 340/400/460/520px widths across both styles and themes.

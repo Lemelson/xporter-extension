@@ -45,6 +45,8 @@
             openHelp = null;
         }
         function showHelp(trigger) {
+            // Localization may still be inserting the popover during initial hover.
+            if (!trigger.querySelector(':scope > .help-pop')) return;
             clearTimeout(helpCloseTimer);
             if (openHelp !== trigger) closeHelp();
             openHelp = trigger;
