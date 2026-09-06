@@ -24,6 +24,7 @@
   "preparing": "準備中...",
   "downloadStagePhotos": "写真をダウンロード中 {current}/{total}",
   "downloadStageBuildingXlsx": "Excelファイルを作成中...",
+  "postTypeDetails": "ポストの種類について",
   "whatToExport": "何をエクスポートしますか？",
   "whatToExportHelp": "任意の組み合わせを選べます。選択した種類だけがファイルに出力されます。",
   "postTypeOriginals": "オリジナルポスト",

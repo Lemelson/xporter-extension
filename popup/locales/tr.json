@@ -24,6 +24,7 @@
   "preparing": "Hazırlanıyor...",
   "downloadStagePhotos": "Fotoğraflar indiriliyor {current}/{total}",
   "downloadStageBuildingXlsx": "Excel dosyası oluşturuluyor...",
+  "postTypeDetails": "Gönderi türleri hakkında",
   "whatToExport": "Neyi dışa aktarmak istiyorsunuz?",
   "whatToExportHelp": "İstediğiniz kombinasyonu seçin. Dosyaya yalnızca işaretli türler eklenir.",
   "postTypeOriginals": "Özgün gönderiler",

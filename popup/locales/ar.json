@@ -24,6 +24,7 @@
   "preparing": "جاري التحضير...",
   "downloadStagePhotos": "جارٍ تنزيل الصور {current}/{total}",
   "downloadStageBuildingXlsx": "جارٍ إنشاء ملف Excel...",
+  "postTypeDetails": "حول أنواع المنشورات",
   "whatToExport": "ما الذي تريد تصديره؟",
   "whatToExportHelp": "يمكنك اختيار أي مجموعة من الأنواع. لن يظهر في الملف إلا ما تحدده.",
   "postTypeOriginals": "المنشورات الأصلية",

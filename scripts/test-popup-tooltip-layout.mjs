@@ -44,6 +44,7 @@ async function main() {
       waitUntil: 'domcontentloaded',
       timeout: 30_000
     });
+    await popup.waitForFunction(() => document.getElementById('postSelectionCount').textContent.includes('5'));
     await popup.evaluate(async () => {
       const stored = await chrome.storage.local.get('xporter_settings');
       await chrome.storage.local.set({
@@ -55,6 +56,7 @@ async function main() {
       });
     });
     await popup.reload({ waitUntil: 'domcontentloaded' });
+    await popup.waitForFunction(() => document.getElementById('exportMode').value === 'bookmarks');
     await popup.locator('[data-tab="settings"]').click();
 
     const trigger = popup.locator('#settingsBookmarksOnly .help-viewport.help-below');

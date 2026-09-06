@@ -24,6 +24,7 @@
   "preparing": "준비 중...",
   "downloadStagePhotos": "사진 다운로드 중 {current}/{total}",
   "downloadStageBuildingXlsx": "Excel 파일 만드는 중...",
+  "postTypeDetails": "게시물 유형 안내",
   "whatToExport": "무엇을 내보낼까요?",
   "whatToExportHelp": "원하는 조합을 선택하세요. 선택한 유형만 파일에 포함됩니다.",
   "postTypeOriginals": "원본 게시물",

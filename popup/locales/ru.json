@@ -24,6 +24,7 @@
   "preparing": "Подготовка...",
   "downloadStagePhotos": "Загрузка фотографий {current}/{total}",
   "downloadStageBuildingXlsx": "Сборка файла Excel...",
+  "postTypeDetails": "Что входит в каждый тип",
   "whatToExport": "Что вы хотите экспортировать?",
   "whatToExportHelp": "Выберите нужные типы в любой комбинации. В файл попадут только отмеченные типы.",
   "postTypeOriginals": "Оригинальные посты",

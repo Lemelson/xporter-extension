@@ -24,6 +24,7 @@
   "preparing": "Preparando...",
   "downloadStagePhotos": "Descargando fotos {current}/{total}",
   "downloadStageBuildingXlsx": "Creando el archivo de Excel...",
+  "postTypeDetails": "Acerca de los tipos de publicación",
   "whatToExport": "¿Qué quieres exportar?",
   "whatToExportHelp": "Elige cualquier combinación. Solo los tipos seleccionados se incluyen en el archivo.",
   "postTypeOriginals": "Publicaciones originales",

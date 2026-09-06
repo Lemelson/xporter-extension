@@ -329,6 +329,12 @@ Constructed regression examples live in `scripts/fixtures/search-endings.synthet
 - A user-stopped export uses `.phase-stopped` plus a static `.progress-fill.stopped`, separate from active pacing, Scheduled-break, and X-rate-limit animations. Its Resume play glyph may breathe only inside `prefers-reduced-motion: no-preference`.
 - The export-status card keeps status text, progress, detail, and count full-width. `statusActionStack` renders a compact trailing Stop row while running, one horizontal Download row for ordinary terminal exports, or equal Download/Copy columns for terminal TXT exports; never restore fixed square action tiles.
 
+### Export workspace layout
+
+The popup uses neutral dark/light surfaces. Active status, Download/Copy, Resume and New Export precede the setup form. Mode and output format share a row, and post-type explanations live in native `details` with the localized `postTypeDetails` summary; each checkbox references its explanation through `aria-describedby`. Start stays in a sticky action row. The date-export overlay sits at the trailing bottom corner, retains count/progress when collapsed, exposes `aria-expanded`, and disables animation under reduced motion.
+
+`scripts/test-ui-refresh.mjs` exercises the real popup and content-script UI against synthetic worker state and a locally served X-page fixture. It covers 14 locales, dark/light popup themes, 320/350px popup widths, desktop/mobile overlays, disclosure and collapse keyboard behavior, terminal actions, unknown progress, waiting, and Stop. No real export or authenticated request is performed.
+
 ### 6.2. Easter Egg: the Ladybug (`popup/ladybug.js`)
 A ladybug wanders the "Questions or found a bug?" contact card on the **About** tab.
 - **Behaviour**: spawns at a random spot above the Telegram button, wanders with a steering algorithm (biased away from pure-horizontal so it doesn't sit on a word), turns in place for big turns, pauses occasionally. Legs are CSS-animated; their gait is driven from JS state (`--gait-dur` + `.gait-paused`): legs freeze when it stops, shuffle while turning, step faster/slower with speed.

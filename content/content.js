@@ -352,20 +352,22 @@ function ensureXporterCaptureOverlay() {
     overlay = document.createElement('div');
     overlay.id = 'xporter-capture-overlay';
     overlay.innerHTML = `
-        <button class="xporter-capture-toggle" type="button" aria-label="Collapse XPorter status">−</button>
+        <button class="xporter-capture-toggle" type="button" aria-label="Collapse XPorter status" aria-expanded="true">−</button>
         <div class="xporter-capture-title">XPorter date range export</div>
         <div class="xporter-capture-subtitle" data-xporter-subtitle>Preparing search page...</div>
-        <div class="xporter-capture-bar"><span data-xporter-bar></span></div>
         <div class="xporter-capture-meta">
             <span data-xporter-count>0 posts collected</span>
-            <span class="xporter-capture-meta-right">
-                <span class="xporter-capture-pct" data-xporter-pct></span>
-                <span class="xporter-capture-range" data-xporter-range></span>
-            </span>
+            <span class="xporter-capture-pct" data-xporter-pct></span>
         </div>
-        <div class="xporter-capture-limit" data-xporter-limit>No post limit</div>
-        <div class="xporter-capture-note">Keep this tab open. XPorter is scrolling it to collect posts.</div>
-        <button class="xporter-capture-stop" type="button" data-xporter-stop>Stop export</button>
+        <div class="xporter-capture-bar"><span data-xporter-bar></span></div>
+        <div class="xporter-capture-details">
+            <span class="xporter-capture-range" data-xporter-range></span>
+            <span class="xporter-capture-limit" data-xporter-limit>No post limit</span>
+        </div>
+        <div class="xporter-capture-footer">
+            <div class="xporter-capture-note">Keep this tab open. XPorter is scrolling it to collect posts.</div>
+            <button class="xporter-capture-stop" type="button" data-xporter-stop>Stop export</button>
+        </div>
     `;
 
     const style = document.createElement('style');
@@ -373,157 +375,156 @@ function ensureXporterCaptureOverlay() {
     style.textContent = `
         #xporter-capture-overlay {
             position: fixed;
-            left: 50%;
-            top: 112px;
+            inset-inline-end: 20px;
+            bottom: 88px;
             z-index: 2147483647;
             box-sizing: border-box;
-            width: min(560px, calc(100vw - 32px));
-            transform: translateX(-50%);
-            padding: 14px 16px;
-            border: 1px solid rgba(96, 184, 255, 0.28);
+            width: min(360px, calc(100vw - 32px));
+            max-height: calc(100dvh - 104px);
+            overflow-y: auto;
+            padding: 16px;
+            border: 1px solid #36414f;
             border-radius: 14px;
-            background: linear-gradient(150deg, rgba(13, 21, 34, 0.97), rgba(28, 39, 69, 0.97));
-            color: #fff;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
+            background: #181e26;
+            color: #eef2f7;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-variant-numeric: tabular-nums;
+            text-align: start;
             pointer-events: auto;
-            transition: width 0.2s ease, top 0.2s ease, right 0.2s ease, bottom 0.2s ease, left 0.2s ease, transform 0.2s ease;
         }
+        #xporter-capture-overlay * { box-sizing: border-box; }
         #xporter-capture-overlay .xporter-capture-toggle {
             position: absolute;
             top: 10px;
-            right: 10px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 24px;
-            height: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.24);
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.9);
+            inset-inline-end: 10px;
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            color: #a9b4c2;
             cursor: pointer;
-            font: inherit;
-            font-size: 15px;
-            line-height: 1;
+            font: 18px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
+        #xporter-capture-overlay .xporter-capture-toggle:hover { background: #293341; color: #fff; }
+        #xporter-capture-overlay button:focus-visible { outline: 2px solid #78bcff; outline-offset: 3px; }
         #xporter-capture-overlay .xporter-capture-title {
-            padding-right: 28px;
-            font-size: 15px;
-            font-weight: 750;
-            line-height: 1.25;
+            padding-inline-end: 26px;
+            color: #eef2f7;
+            font-size: 13px;
+            font-weight: 650;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
         }
-        #xporter-capture-overlay .xporter-capture-subtitle,
-        #xporter-capture-overlay .xporter-capture-note,
-        #xporter-capture-overlay .xporter-capture-limit {
-            margin-top: 4px;
-            color: rgba(255, 255, 255, 0.78);
+        #xporter-capture-overlay .xporter-capture-subtitle {
+            margin-top: 5px;
+            padding-inline-end: 20px;
+            color: #a9b4c2;
             font-size: 12px;
-            line-height: 1.35;
-        }
-        #xporter-capture-overlay .xporter-capture-bar {
-            height: 7px;
-            margin-top: 10px;
-            overflow: hidden;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.16);
-        }
-        #xporter-capture-overlay .xporter-capture-bar span {
-            display: block;
-            width: 42%;
-            height: 100%;
-            border-radius: inherit;
-            background: linear-gradient(90deg, #60B8FF, #00BA7C);
-            animation: xporter-capture-bar-sweep 1.35s ease-in-out infinite alternate;
-        }
-        /* Determinate mode: real progress is known — freeze the sweep and
-           show a width-driven fill instead. */
-        #xporter-capture-overlay.xporter-capture-determinate .xporter-capture-bar span {
-            animation: none;
-            transform: none;
-            transition: width 0.35s ease;
-        }
-        /* Paused on a rate limit: amber fill, no motion. */
-        #xporter-capture-overlay.xporter-capture-paused .xporter-capture-bar span {
-            animation: none;
-            background: linear-gradient(90deg, #FFD400, #FFAD1F);
-        }
-        @keyframes xporter-capture-bar-sweep {
-            from { transform: translateX(-75%); }
-            to { transform: translateX(220%); }
+            line-height: 1.45;
         }
         #xporter-capture-overlay .xporter-capture-meta {
             display: flex;
             justify-content: space-between;
-            gap: 12px;
-            margin-top: 8px;
-            color: rgba(255, 255, 255, 0.88);
-            font-size: 12px;
-            font-weight: 650;
-        }
-        #xporter-capture-overlay .xporter-capture-meta-right {
-            display: inline-flex;
-            gap: 10px;
             align-items: baseline;
+            gap: 12px;
+            margin-top: 16px;
+            font-size: 22px;
+            font-weight: 650;
+            letter-spacing: -.5px;
+            line-height: 1.2;
         }
         #xporter-capture-overlay .xporter-capture-pct {
-            color: #7CD4A8;
-            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+            color: #78bcff;
+            font-size: 12px;
+            letter-spacing: 0;
+        }
+        #xporter-capture-overlay .xporter-capture-bar {
+            height: 5px;
+            margin-top: 12px;
+            overflow: hidden;
+            border-radius: 3px;
+            background: #343d49;
+        }
+        #xporter-capture-overlay .xporter-capture-bar span {
+            display: block;
+            width: 34%;
+            height: 100%;
+            border-radius: inherit;
+            background: #78bcff;
+            animation: xporter-capture-bar-sweep 1.8s ease-in-out infinite alternate;
+        }
+        #xporter-capture-overlay.xporter-capture-determinate .xporter-capture-bar span {
+            animation: none;
+            transform: none;
+            transition: width .35s ease;
+        }
+        #xporter-capture-overlay.xporter-capture-paused .xporter-capture-bar span {
+            animation: none;
+            background: #e5b967;
         }
         #xporter-capture-overlay.xporter-capture-paused .xporter-capture-pct,
-        #xporter-capture-overlay.xporter-capture-paused [data-xporter-subtitle] {
-            color: #FFD400;
+        #xporter-capture-overlay.xporter-capture-paused [data-xporter-subtitle] { color: #e5b967; }
+        @keyframes xporter-capture-bar-sweep {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(300%); }
+        }
+        #xporter-capture-overlay .xporter-capture-details {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 4px 12px;
+            margin-top: 9px;
+            color: #a9b4c2;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        #xporter-capture-overlay .xporter-capture-range { direction: ltr; unicode-bidi: isolate; }
+        #xporter-capture-overlay .xporter-capture-footer {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #303946;
+        }
+        #xporter-capture-overlay .xporter-capture-note {
+            flex: 1;
+            color: #a9b4c2;
+            font-size: 11px;
+            line-height: 1.45;
         }
         #xporter-capture-overlay .xporter-capture-stop {
-            display: block;
-            box-sizing: border-box;
-            width: 100%;
-            margin-top: 12px;
-            padding: 8px 12px;
-            border: 1px solid rgba(244, 33, 46, 0.55);
-            border-radius: 9px;
-            background: rgba(244, 33, 46, 0.14);
-            color: #FF6B72;
+            flex: 0 1 auto;
+            max-width: 46%;
+            min-height: 40px;
+            padding: 7px 10px;
+            border: 1px solid #465366;
+            border-radius: 7px;
+            background: transparent;
+            color: #d9e1ec;
             cursor: pointer;
-            font: inherit;
-            font-size: 13px;
-            font-weight: 700;
-            line-height: 1.2;
-            transition: background 0.15s ease, color 0.15s ease;
+            font: 550 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            transition: background .15s ease, color .15s ease;
         }
-        #xporter-capture-overlay .xporter-capture-stop:hover {
-            background: rgba(244, 33, 46, 0.28);
-            color: #fff;
-        }
-        #xporter-capture-overlay .xporter-capture-stop:disabled {
-            cursor: default;
-            opacity: 0.6;
-        }
-        #xporter-capture-overlay.xporter-capture-collapsed {
-            left: auto;
-            top: auto;
-            right: 22px;
-            bottom: 88px;
-            width: min(260px, calc(100vw - 32px));
-            transform: none;
-            padding: 12px 44px 12px 14px;
-        }
+        #xporter-capture-overlay .xporter-capture-stop:hover { background: #3b242c; color: #ff8b95; border-color: #c34e5c; }
+        #xporter-capture-overlay .xporter-capture-stop:disabled { cursor: default; opacity: .6; }
+        #xporter-capture-overlay.xporter-capture-collapsed { width: min(260px, calc(100vw - 32px)); padding: 12px 14px; }
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-subtitle,
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-bar,
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-range,
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-limit,
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-note,
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-stop {
-            display: none;
-        }
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-title {
-            padding-right: 0;
-            font-size: 13px;
-        }
-        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-meta {
-            margin-top: 4px;
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-details,
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-footer { display: none; }
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-title { font-size: 11px; }
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-toggle { top: 8px; width: 24px; height: 24px; }
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-meta { font-size: 16px; margin-top: 10px; }
+        #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-bar { margin-top: 9px; height: 3px; }
+        @media (max-width: 420px) { #xporter-capture-overlay { inset-inline-end: 16px; bottom: 16px; max-height: calc(100dvh - 32px); } }
+        @media (prefers-reduced-motion: reduce) {
+            #xporter-capture-overlay .xporter-capture-bar span { animation: none; transition: none; }
         }
     `;
 
@@ -535,6 +536,7 @@ function ensureXporterCaptureOverlay() {
         const button = overlay.querySelector('.xporter-capture-toggle');
         const i = overlay._xporterI18n || {};
         button.textContent = collapsed ? '+' : '−';
+        button.setAttribute('aria-expanded', String(!collapsed));
         button.setAttribute('aria-label', collapsed
             ? (i.expand || 'Expand XPorter status')
             : (i.collapse || 'Collapse XPorter status'));

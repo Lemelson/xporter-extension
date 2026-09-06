@@ -59,7 +59,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
 - **100% local processing** — everything happens in your browser; your exported data is never transmitted anywhere
-- **Dark and light themes** — glassmorphism UI with a one-click toggle
+- **Dark and light themes** — compact, high-contrast UI with a one-click toggle
 - **14 languages** — auto-detects Chrome's UI language on first launch
 - **Dynamic API discovery** — extracts fresh GraphQL query IDs from X's JS bundles at runtime; gracefully falls back to hardcoded IDs
 - **Crash-resilient** — export progress is persisted to Chrome storage and survives browser restarts
@@ -224,7 +224,7 @@ xporter/
 │   ├── content.js            # Username detection from the active X tab
 │   └── interceptor.js        # Page-context hook for GraphQL IDs and seen-post capture
 ├── popup/                    # Compact popup UI
-│   ├── popup.html/.css/.js   # Markup, glassmorphism styles (dark + light), logic
+│   ├── popup.html/.css/.js   # Markup, dark + light styles, logic
 │   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + toggle
 │   ├── i18n.js               # In-app translation engine
 │   ├── rate-prompt.js/.css   # "Rate XPorter" prompt

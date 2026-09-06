@@ -24,6 +24,7 @@
   "preparing": "Vorbereitung...",
   "downloadStagePhotos": "Fotos werden geladen {current}/{total}",
   "downloadStageBuildingXlsx": "Excel-Datei wird erstellt...",
+  "postTypeDetails": "Über die Beitragstypen",
   "whatToExport": "Was möchten Sie exportieren?",
   "whatToExportHelp": "Wählen Sie eine beliebige Kombination. Nur markierte Typen werden in die Datei aufgenommen.",
   "postTypeOriginals": "Originalbeiträge",

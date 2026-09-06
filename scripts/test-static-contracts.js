@@ -311,8 +311,12 @@ for (const postTypeControl of [
 }
 const postSelectionIndex = popupHtml.indexOf('id="postSelectionPanel"');
 const outputFormatIndex = popupHtml.indexOf('id="outputFormat"');
-assert(postSelectionIndex >= 0 && postSelectionIndex < outputFormatIndex,
-    'post-type choices must appear on Home before Output Format');
+assert(outputFormatIndex > popupHtml.indexOf('id="exportMode"') && outputFormatIndex < postSelectionIndex,
+    'mode and output format must appear together before post-type choices');
+assert(postSelectionIndex < popupHtml.indexOf('id="startBtn"'),
+    'post-type choices must precede Start in the form');
+assert(popupHtml.indexOf('id="exportStatus"') < outputFormatIndex,
+    'active status must precede setup controls');
 const tablerPostTypeIcons = {
     original: {
         name: 'pencil',

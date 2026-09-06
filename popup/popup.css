@@ -1,44 +1,44 @@
 /* XPorter Popup — Styles */
-/* Glassmorphism design: dark theme by default, light theme via .light class */
+/* Neutral utility surfaces; dark by default, light via .light. */
 
 :root {
-  /* Dark glass theme (default) */
-  --bg-primary: rgba(255, 255, 255, 0.08);
-  --bg-secondary: rgba(255, 255, 255, 0.06);
-  --bg-secondary-rgb: 25, 39, 52;
-  --bg-tertiary: rgba(255, 255, 255, 0.04);
-  --bg-hover: rgba(255, 255, 255, 0.12);
-  --text-primary: #FFFFFF;
-  --text-secondary: rgba(255, 255, 255, 0.74);
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --accent: #60B8FF;
-  --accent-hover: #8DCFFF;
+  /* Dark utility theme (default) */
+  --bg-primary: #191d24;
+  --bg-secondary: #15191f;
+  --bg-secondary-rgb: 21, 25, 31;
+  --bg-tertiary: #111419;
+  --bg-hover: #242b35;
+  --text-primary: #eef2f7;
+  --text-secondary: #a9b4c2;
+  --text-muted: #8794a5;
+  --accent: #78bcff;
+  --accent-hover: #a0d0ff;
   --accent-glow: rgba(96, 184, 255, 0.2);
   --success: #00BA7C;
   --warning: #FFD166;
   --danger: #F4212E;
-  --border: rgba(255, 255, 255, 0.18);
-  --input-bg: rgba(255, 255, 255, 0.07);
+  --border: #343d49;
+  --input-bg: #191f27;
   /* Shadows tinted with the deep-navy backdrop instead of pure black — reads
      more like real glass casting onto a colored surface. */
   --shadow: rgba(7, 11, 30, 0.35);
   --radius: 12px;
   --radius-sm: 8px;
 
-  /* Glass-specific tokens */
-  --glass-bg: rgba(255, 255, 255, 0.06);
-  --glass-border: rgba(255, 255, 255, 0.20);
-  --glass-border-strong: rgba(255, 255, 255, 0.34);
-  --glass-blur: 24px;
+  /* Surface tokens; legacy glass names keep existing components compatible. */
+  --glass-bg: #181e26;
+  --glass-border: #303946;
+  --glass-border-strong: #526176;
+  --glass-blur: 0px;
   /* Edge refraction: bright top hairline + faint dark bottom hairline so glass
      panels catch light on one edge and fall into shadow on the other. */
-  --glass-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
-  --glass-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 0 rgba(7, 11, 30, 0.22);
-  --glass-shadow: 0 10px 34px rgba(6, 10, 28, 0.46), 0 2px 8px rgba(6, 10, 28, 0.30);
+  --glass-inner-glow: none;
+  --glass-edge: none;
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   /* Contained shadow for in-flow cards (e.g. the export-status panel): a tight
      ambient shadow that stays close to the card instead of bleeding down onto
      the action buttons that sit right below it. */
-  --card-shadow: 0 2px 8px rgba(6, 10, 28, 0.30);
+  --card-shadow: none;
 
   /* Per-topic icon accents (About "How XPorter works" rows) */
   --ic-green: #00BA7C;
@@ -52,32 +52,32 @@
 
 /* ========== LIGHT THEME ========== */
 body.light {
-  --bg-primary: rgba(255, 255, 255, 0.45);
-  --bg-secondary: rgba(255, 255, 255, 0.32);
-  --bg-secondary-rgb: 247, 249, 250;
-  --bg-tertiary: rgba(255, 255, 255, 0.20);
-  --bg-hover: rgba(255, 255, 255, 0.55);
-  --text-primary: rgba(0, 0, 0, 0.90);
-  --text-secondary: rgba(0, 0, 0, 0.66);
-  --text-muted: rgba(0, 0, 0, 0.50);
-  --accent: #0A6FDB;
-  --accent-hover: #0860C0;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f5f8;
+  --bg-secondary-rgb: 243, 245, 248;
+  --bg-tertiary: #f8fafc;
+  --bg-hover: #eaf0f7;
+  --text-primary: #1d2735;
+  --text-secondary: #536278;
+  --text-muted: #627187;
+  --accent: #1268bc;
+  --accent-hover: #0d5499;
   --accent-glow: rgba(10, 111, 219, 0.22);
   --success: #00BA7C;
   --warning: #F59E0B;
   --danger: #F4212E;
-  --border: rgba(0, 0, 0, 0.18);
-  --input-bg: rgba(255, 255, 255, 0.60);
+  --border: #cbd4e0;
+  --input-bg: #ffffff;
   --shadow: rgba(30, 41, 89, 0.16);
 
-  --glass-bg: rgba(255, 255, 255, 0.32);
-  --glass-border: rgba(0, 0, 0, 0.16);
-  --glass-border-strong: rgba(0, 0, 0, 0.26);
-  --glass-blur: 28px;
-  --glass-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.70);
-  --glass-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.75), inset 0 -1px 0 0 rgba(30, 41, 89, 0.10);
-  --glass-shadow: 0 10px 34px rgba(30, 41, 89, 0.16), 0 2px 8px rgba(30, 41, 89, 0.10);
-  --card-shadow: 0 2px 8px rgba(30, 41, 89, 0.12);
+  --glass-bg: #ffffff;
+  --glass-border: #d7dfe9;
+  --glass-border-strong: #92a3b9;
+  --glass-blur: 0px;
+  --glass-inner-glow: none;
+  --glass-edge: none;
+  --glass-shadow: 0 8px 24px rgba(34, 47, 65, 0.08);
+  --card-shadow: none;
 
   /* Per-topic icon accents — darker fills for light backgrounds */
   --ic-green: #059669;
@@ -1450,28 +1450,18 @@ body.light .date-row input[type="date"]:focus {
   box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inner-glow);
 }
 
-/* ========== Gradient background ========== */
+/* Popup canvas */
 body {
-  background:
-    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
-    linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  background: #111419;
   width: 350px;
+  max-width: 100vw;
   min-height: 200px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
   color: var(--text-primary);
   overflow-x: hidden;
 }
-
-body.light {
-  background:
-    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.22) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.18) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.14) 0%, transparent 70%),
-    linear-gradient(135deg, #7fa8dc 0%, #a88bc4 50%, #85b3d8 100%) !important;
-}
+body.light { background: #f5f7fa; }
 
 /* ========== END GLASS MODE ========== */
 
@@ -3964,3 +3954,86 @@ html {
     scroll-behavior: auto !important;
   }
 }
+
+/* Compact export workspace. Existing state colors remain on pause/error fills. */
+.popup { background: var(--bg-tertiary) !important; box-shadow: none; backdrop-filter: none; }
+.header, body.light .header, .tabs, body.light .tabs { background: var(--bg-tertiary); backdrop-filter: none; }
+.header { padding: 12px 16px; }
+.header::before { display: none; }
+.brand { color: var(--text-primary); background: none; -webkit-text-fill-color: currentColor; letter-spacing: -.6px; }
+.logo, body.light .logo { color: var(--accent); filter: none; animation: none; }
+.tabs { padding: 0 8px 6px; gap: 4px; }
+.tab { gap: 6px; padding: 9px 5px; border-radius: 7px; font-size: 11px; font-weight: 600; min-width: 0; }
+.tab .icon { width: 15px; height: 15px; flex-shrink: 0; }
+.tab span { overflow-wrap: anywhere; }
+.tab.active, body.light .tab.active { background: var(--bg-hover); color: var(--accent); }
+.tab.active::after { display: none; }
+.tab-content { padding: 12px 16px; }
+.field { margin-bottom: 10px; }
+.select, body.light .select, .input-small, body.light .input-small {
+  background-color: var(--input-bg); border-color: var(--border); box-shadow: none; backdrop-filter: none;
+}
+.select { min-height: 38px; padding-block: 8px; font-size: 13px; }
+.account-card, body.light .account-card { background: var(--input-bg); border-color: var(--border); box-shadow: none; min-height: 46px; padding: 5px 10px; }
+.account-avatar, body.light .account-avatar { width: 30px; height: 30px; background: var(--bg-hover); border: 0; }
+.account-meta--input, body.light .account-meta--input { background: var(--bg-secondary); border-color: transparent; box-shadow: none; }
+.post-selection-panel, body.light .post-selection-panel { padding: 0; margin-bottom: 8px; background: transparent; border: 0; box-shadow: none; }
+.post-selection-panel.is-empty { outline: 2px solid var(--danger); outline-offset: 4px; }
+.post-selection-heading { margin-bottom: 8px; gap: 8px; }
+.post-selection-heading h2 { font-size: 13px; font-weight: 600; }
+.post-selection-heading p { font-size: 11px; line-height: 1.45; }
+.post-selection-count { padding: 2px 6px; border: 0; border-radius: 5px; background: var(--bg-hover); font-variant-numeric: tabular-nums; }
+.post-selection-panel > .post-selection-list { gap: 0; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.post-type-choice, body.light .post-type-choice,
+.post-type-choice:has(input:checked), body.light .post-type-choice:has(input:checked) {
+  grid-template-columns: 20px minmax(0, 1fr) 18px;
+  min-height: 34px; padding: 7px 10px; gap: 9px;
+  border: 0; border-radius: 0; background: var(--input-bg);
+}
+.post-type-choice + .post-type-choice { border-top: 1px solid var(--glass-border); }
+.post-type-choice:hover, body.light .post-type-choice:hover { background: var(--bg-hover); }
+.post-type-choice:has(input:focus-visible) { outline-offset: -2px; }
+.post-type-icon, body.light .post-type-icon { width: 20px; height: 20px; color: var(--text-secondary); }
+.post-type-icon svg { width: 18px; height: 18px; }
+.post-type-choice input:checked ~ .post-type-icon { color: var(--accent); }
+.post-type-choice input:checked ~ .post-choice-check { box-shadow: none; }
+.post-type-choice input:not(:checked) ~ .post-choice-copy { opacity: 1; }
+.post-choice-copy strong { font-size: 12px; font-weight: 550; }
+.post-type-details { margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.post-type-details summary { cursor: pointer; padding: 4px 0; width: fit-content; }
+.post-type-details summary:hover { color: var(--accent); }
+.post-type-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.post-type-details dl { padding: 8px 0; }
+.post-type-details dt { color: var(--text-primary); font-weight: 600; margin-top: 7px; }
+.post-type-details dd { margin: 2px 0 0; }
+.export-status { background: var(--glass-bg); padding: 14px; margin-bottom: 16px; gap: 10px; border-radius: 10px; box-shadow: none; backdrop-filter: none; }
+.status-header { margin-bottom: 6px; }
+.status-text { font-size: 13px; overflow-wrap: anywhere; }
+.tweet-count { font-size: 22px; font-weight: 650; letter-spacing: -.5px; line-height: 1.2; margin: 10px 0 12px; font-variant-numeric: tabular-nums; }
+.status-detail { font-size: 12px; line-height: 1.4; }
+.status-subtitle { margin-inline-start: 0; }
+.progress-bar, body.light .progress-bar { height: 5px; background: var(--border); margin-bottom: 10px; }
+.progress-fill { box-shadow: none; }
+.progress-fill:not(.indeterminate):not(.cooldown):not(.rate-limit):not(.safety-break):not(.stopped) { background: var(--accent); animation: none; }
+.progress-fill::after { display: none; }
+.progress-fill.indeterminate { width: 34% !important; background: var(--accent); animation: activitySweep 1.8s ease-in-out infinite alternate; }
+@keyframes activitySweep { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.status-dot { box-shadow: none; }
+.status-action-stack.running-actions { padding-top: 10px; border-top: 1px solid var(--glass-border); }
+.status-action-stack.running-actions .btn-status-action { min-width: 80px; min-height: 40px; padding: 7px 10px; font-size: 12px; }
+.btn-primary, body.light .btn-primary { background: var(--accent); color: var(--bg-tertiary); border-color: transparent; box-shadow: none; text-shadow: none; }
+.btn-primary:hover, body.light .btn-primary:hover { background: var(--accent-hover); box-shadow: none; transform: none; }
+body.light .btn-primary { color: #fff; }
+.btn-secondary, body.light .btn-secondary { background: var(--input-bg); box-shadow: none; }
+.btn-status-action.btn-danger, body.light .btn-status-action.btn-danger { background: transparent; color: var(--text-secondary); border-color: var(--border); box-shadow: none; }
+.btn-status-action.btn-danger:hover { color: #ff8b95; background: rgba(244,33,46,.1); border-color: #c34e5c; }
+body.light .btn-status-action.btn-danger:hover { color: #b52538; }
+.result-actions:not(:has(> :not(.hidden))) { display: none; }
+#tab-home > .actions:has(#startBtn:not(.hidden)) { position: sticky; bottom: 0; z-index: 2; padding: 6px 0 2px; background: var(--bg-tertiary); }
+@media (prefers-reduced-motion: reduce) { .progress-fill.indeterminate { animation: none; transform: translateX(100%); } }
+
+.export-format-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; }
+.export-format-row .field { min-width: 0; }
+.post-type-details > p { margin-top: 8px; }
+
+.post-type-choice:has(input:not(:checked)), body.light .post-type-choice:has(input:not(:checked)) { background: var(--bg-tertiary); }

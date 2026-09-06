@@ -24,6 +24,7 @@
   "preparing": "Mempersiapkan...",
   "downloadStagePhotos": "Mengunduh foto {current}/{total}",
   "downloadStageBuildingXlsx": "Membuat file Excel...",
+  "postTypeDetails": "Tentang jenis postingan",
   "whatToExport": "Apa yang ingin Anda ekspor?",
   "whatToExportHelp": "Pilih kombinasi apa pun. Hanya jenis yang dipilih yang disertakan dalam file.",
   "postTypeOriginals": "Postingan asli",

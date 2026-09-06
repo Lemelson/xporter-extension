@@ -234,8 +234,8 @@ async function main() {
         ['pencil', 'quote', 'message-reply', 'repeat', 'article'],
         `${language}: post-type cards must use the approved official Tabler icon set`
       );
-      assert.equal(new Set(postLayout.iconColors).size, 5,
-        `${language}: every post type must keep its own identifying color`);
+      assert.equal(new Set(postLayout.iconColors).size, 1,
+        `${language}: post types share one accent while distinct glyphs and labels identify their meaning`);
       assert.equal(postLayout.focusedChoiceOutline, '2px',
         `${language}: keyboard focus must outline the full post-type card`);
       assert.equal(postLayout.focusedCheckOutline, '2px',
@@ -253,8 +253,8 @@ async function main() {
       }
       for (const [index, icon] of postLayout.icons.entries()) {
         assert.equal(icon.hasSvg, true, `${language}: icon ${index + 1} must be inline SVG`);
-        assert(icon.width >= 24 && icon.height >= 24,
-          `${language}: icon ${index + 1} must be large enough to identify`);
+        assert(icon.width >= 18 && icon.height >= 18,
+          `${language}: compact icon ${index + 1} must remain legible`);
         assert.equal(icon.background, 'rgba(0, 0, 0, 0)',
           `${language}: icon ${index + 1} must not sit inside a colored square`);
         assert.equal(icon.borderStyle, 'none',

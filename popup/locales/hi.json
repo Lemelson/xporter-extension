@@ -24,6 +24,7 @@
   "preparing": "तैयारी हो रही है...",
   "downloadStagePhotos": "फोटो डाउनलोड हो रही हैं {current}/{total}",
   "downloadStageBuildingXlsx": "Excel फ़ाइल बनाई जा रही है...",
+  "postTypeDetails": "पोस्ट के प्रकारों के बारे में",
   "whatToExport": "आप क्या एक्सपोर्ट करना चाहते हैं?",
   "whatToExportHelp": "कोई भी विकल्प एक साथ चुन सकते हैं। फ़ाइल में सिर्फ़ चुने हुए प्रकार शामिल होंगे।",
   "postTypeOriginals": "मूल पोस्ट",

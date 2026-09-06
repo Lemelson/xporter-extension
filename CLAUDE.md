@@ -31,6 +31,12 @@
 | Public site | `docs/` only (`index.html`, `privacy-policy.html`, `feedback.html`, `assets/`); root site copies were removed |
 | Tests and packaging | `node scripts/test-all.js` runs the 12 deterministic suites; the 101-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the deterministic and explicit LibreOffice gates before atomically replacing an allowlist ZIP |
 
+## Export interface
+
+The Home tab places active status and all result actions before setup. Mode and format share one row; the five native post-type checkboxes use a compact list with explanations in a localized `postTypeDetails` disclosure. The Start button remains in a sticky form action row. The in-page date-export overlay sits at the trailing bottom corner; collapsing it retains the count, approximate percentage and activity bar. Its toggle exposes `aria-expanded` and respects reduced motion.
+
+`node scripts/test-ui-refresh.mjs` checks the loaded popup and content script with synthetic state in an isolated browser profile: 14 locales, both popup themes, 320/350px popup widths, 320px/desktop overlays, keyboard controls and result actions. It serves a local X-page fixture and does not start an export or prove live-X compatibility.
+
 ## Gotchas that bite
 
 1. **Two i18n systems:** `popup/locales/` = in-app strings; `_locales/` = Chrome Store metadata. Don't confuse them.

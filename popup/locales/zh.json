@@ -24,6 +24,7 @@
   "preparing": "准备中...",
   "downloadStagePhotos": "正在下载照片 {current}/{total}",
   "downloadStageBuildingXlsx": "正在创建 Excel 文件...",
+  "postTypeDetails": "关于帖子类型",
   "whatToExport": "您想导出什么？",
   "whatToExportHelp": "可任意组合选择。文件中只会包含勾选类型的帖子。",
   "postTypeOriginals": "原创帖子",
