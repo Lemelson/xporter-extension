@@ -112,9 +112,28 @@ async function testSearchResumeDedupAndFailureRecovery() {
     await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
     assert.deepEqual(harness.getSavedBatches().flat().map(row=>row.id),['saved','new']);
     assert.equal(vm.runInContext('searchCapture.resumeScanned',harness.context),1);
-    const retry=createSearchHarness([{url:'same',status:200,bodyText:'{'},searchPage([{id:'ok',date:'2026-09-05T02:00:00Z'}])]);
+    const recovered=searchPage([{id:'ok',date:'2026-09-05T02:00:00Z'}]);
+    recovered.url='same';
+    const retry=createSearchHarness([{url:'same',status:200,bodyText:'{'},recovered]);
     await vm.runInContext('_fetchPostsByDateRangeLoop()',retry.context);
     assert.equal(retry.getSavedState().tweetCount,1);
+}
+
+
+async function testSearchRetryCannotSkipFailedPage() {
+    const failed = searchPage([{id:'lost',date:'2026-09-05T01:00:00Z'}], 'page-a');
+    const body = JSON.parse(failed.bodyText);
+    body.errors = [{message:'partial response'}];
+    failed.bodyText = JSON.stringify(body);
+    const later = searchPage([{id:'later',date:'2026-09-05T02:00:00Z'}]);
+    const gap = createSearchHarness([failed, later]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', gap.context), /SEARCH_RESPONSE_ERROR/);
+    assert.equal(vm.runInContext('currentExport.completionReason', gap.context), null);
+    const repaired = searchPage([{id:'repaired',date:'2026-09-05T01:00:00Z'}]);
+    repaired.url = failed.url;
+    const retry = createSearchHarness([failed, repaired]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', retry.context);
+    assert.deepEqual(retry.getSavedBatches().flat().map(row => row.id), ['repaired']);
 }
 
 
@@ -146,6 +165,11 @@ function testSearchCaptureRejectsOtherQueriesAndReportsTransportErrors() {
         assert.equal(result.success===true,accepted);
     }
     assert.equal(vm.runInContext('searchCapture.queue[0].error',harness.context),'SEARCH_NETWORK_ERROR');
+    assert.equal(vm.runInContext('searchCapture.queue[0].requestCursor',harness.context),null);
+    harness.context.__message.url='https://x.com/i/api/graphql/query/SearchTimeline?variables='+
+        encodeURIComponent(JSON.stringify({rawQuery:'(from:test)',product:'Latest',cursor:'bottom'}));
+    vm.runInContext('handlePageGraphqlResponse(__message,{tab:{id:42}})',harness.context);
+    assert.equal(vm.runInContext('searchCapture.queue[1].requestCursor',harness.context),'bottom');
 }
 
 function testDateBoundariesUseLocalCalendarAndRejectInvalidDays() {
@@ -233,12 +257,16 @@ async function testVersionedDateResumePreservesBoundsAndSnapshot() {
     assert.equal(result.success, true);
     const initial = {...harness.getSavedState(), userId:'1', running:false, status:'stopped'};
     assert.equal(initial.schemaVersion, harness.context.XPORTER_CONFIG.EXPORT_STATE_SCHEMA_VERSION);
+    assert.equal(initial.dateFromCalendar, '2026-09-05');
+    assert.equal(initial.dateToCalendar, '2026-09-05');
     assert.equal(initial.dateFrom, new Date('2026-09-05T00:00:00').toISOString());
     assert.equal(initial.dateTo, new Date('2026-09-05T23:59:59.999').toISOString());
     harness.setSavedState(initial);
     vm.runInContext('currentExport=null', harness.context);
     const resumed = await vm.runInContext('_resumeExportInner()', harness.context);
     assert.equal(resumed.success, true);
+    assert.equal(harness.getSavedState().dateFromCalendar, '2026-09-05');
+    assert.equal(harness.getSavedState().dateToCalendar, '2026-09-05');
     for (const key of ['schemaVersion','dateFrom','dateTo','dateSnapshotAt','startedAt']) {
         assert.equal(harness.getSavedState()[key], initial[key], key + ' must survive Resume unchanged');
     }
@@ -247,7 +275,8 @@ async function testVersionedDateResumePreservesBoundsAndSnapshot() {
 async function testSearchNetworkErrorsHaveBoundedCancellableRetries() {
     const networkError = {url:'same-request', status:200, bodyText:'', error:'SEARCH_NETWORK_ERROR'};
     const goodRow = {id:'saved', date:'2026-09-05T01:00:00Z'};
-    const recovered = createSearchHarness([networkError, searchPage([goodRow], 'next'), networkError, searchPage([])]);
+    const recovered = createSearchHarness([networkError, {...searchPage([goodRow], 'next'),url:networkError.url},
+        networkError, {...searchPage([]),url:networkError.url}]);
     await vm.runInContext('_fetchPostsByDateRangeLoop()', recovered.context);
     assert.equal(recovered.getSavedState().completionReason, 'source_exhausted');
     assert.equal(recovered.getSavedState().tweetCount, 1, 'a valid page resets the consecutive-failure budget');
@@ -409,7 +438,76 @@ async function testDateLifecyclePersistsItsActualOutcome() {
     assert.equal(stopped.getSavedState().completionReason, null);
 }
 
+async function testSearchRestoresVerifiedAuthorFields() {
+    const page=searchPage([{id:'target',date:'2026-09-05T01:00:00Z'},
+        {id:'foreign',date:'2026-09-05T01:00:00Z',authorId:'2'}]);
+    const body=JSON.parse(page.bodyText);
+    for(const entry of body.data.search_by_raw_query.search_timeline.timeline.instructions[0].entries) {
+        delete entry.content.itemContent.tweet_results.result.core.user_results.result.core;
+    }
+    page.bodyText=JSON.stringify(body);
+    const harness=createSearchHarness([page]);
+    vm.runInContext("currentExport.userInfo={name:'Target Name',screenName:'test'}",harness.context);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
+    const rows=harness.getSavedBatches().flat();
+    assert.equal(rows.length,1);
+    assert.equal(rows[0].author_name,'Target Name');
+    assert.equal(rows[0].author_username,'test');
+}
+
+async function testSearchCapturedCursorOnlyEnding() {
+    const data=JSON.parse(source('scripts/fixtures/search-empty.live.json'));
+    const payload={url:'empty',status:200,bodyText:JSON.stringify(data)};
+    const empty=createSearchHarness([payload]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',empty.context);
+    assert.equal(empty.getSavedState().completionReason,'no_matches');
+    const nonempty=JSON.parse(searchPage([{id:'row',date:'2026-09-05T01:00:00Z'}]).bodyText);
+    nonempty.data.search_by_raw_query.search_timeline.timeline.instructions.pop();
+    nonempty.data.search_by_raw_query.search_timeline.timeline.instructions[0].entries.push(
+        ...data.data.search_by_raw_query.search_timeline.timeline.instructions[0].entries);
+    const page=createSearchHarness([{url:'first',status:200,bodyText:JSON.stringify(nonempty)},payload]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',page.context);
+    assert.equal(page.context.__pages.length,0,'a bottom-0 cursor with rows is not terminal');
+    assert.equal(page.getSavedState().tweetCount,1);
+    assert.equal(page.getSavedState().completionReason,'source_exhausted');
+    const ambiguous=JSON.parse(payload.bodyText);
+    delete ambiguous.data.search_by_raw_query.search_timeline.timeline.instructions[0].entries[0].content.cursorType;
+    const invalid=createSearchHarness([{...payload,bodyText:JSON.stringify(ambiguous)}]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',invalid.context),/SEARCH_STALLED/);
+}
+
+async function testOverlayRetainsSelectedCalendarLabels() {
+    const harness=createWorkerHarness();
+    const messages=[];
+    harness.context.chrome.tabs.sendMessage=async(_id,message)=>{messages.push(message);return {};};
+    vm.runInContext(`
+        currentExport={running:true,username:'test',settings:{},tweetCount:0,
+            dateFrom:new Date('2026-09-03T10:00:00Z'),dateTo:new Date('2026-09-04T09:59:59Z'),
+            dateFromCalendar:'2026-09-04',dateToCalendar:'2026-09-04'};
+        searchCapture={tabId:42}; getOverlayI18n=async()=>({});
+    `,harness.context);
+    await vm.runInContext('sendSearchCaptureStatus()',harness.context);
+    assert.equal(messages[0].dateFrom,'2026-09-04');
+    assert.equal(messages[0].dateTo,'2026-09-04');
+}
+
+async function testBottomPaginationIgnoresTopEmptyResponse() {
+    const ending={url:'bottom-page',status:200,requestCursor:'bottom',
+        bodyText:source('scripts/fixtures/search-empty-pagination.live.json')};
+    const first={...searchPage([{id:'first',date:'2026-09-05T01:00:00Z'}],'bottom'),requestCursor:null};
+    const harness=createSearchHarness([first, {...ending,url:'top-page',requestCursor:'top'}, ending]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context);
+    assert.equal(harness.context.__pages.length,0,'a top response must not terminate downward pagination');
+    assert.equal(harness.getSavedState().completionReason,'source_exhausted');
+    assert.equal(harness.getSavedState().tweetCount,1);
+}
+
 const tests = [
+    { name: "bottom pagination ignores top empty response", run: testBottomPaginationIgnoresTopEmptyResponse, order: 98 },
+    { name: "overlay retains selected calendar labels", run: testOverlayRetainsSelectedCalendarLabels, order: 97 },
+    { name: "search captured cursor-only ending", run: testSearchCapturedCursorOnlyEnding, order: 96 },
+    { name: "search restores verified author fields", run: testSearchRestoresVerifiedAuthorFields, order: 95 },
+    { name: "search retry cannot skip failed page", run: testSearchRetryCannotSkipFailedPage, order: 94 },
     { name: "calendar bounds match independent UTC instants", run: testCalendarBoundariesAgainstIndependentUtcOracles, order: 92 },
     { name: "date lifecycle persists real terminal outcomes", run: testDateLifecyclePersistsItsActualOutcome, order: 93 },
     { name: "legacy date Resume is explicit and nondestructive", run: testLegacyDateResumeRequiresRestartWithoutChangingRows, order: 87 },

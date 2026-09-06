@@ -193,10 +193,24 @@
     const result = parseTimelineByInstructions(timeline.instructions, 'search_timeline');
     const terminated = timeline.instructions.some(instruction =>
       instruction.type === 'TimelineTerminateTimeline' && instruction.direction === 'Bottom');
-    // Missing pagination metadata is ambiguous. Only an explicit bottom
-    // termination is accepted; other endings need captured live fixtures
-    // before a protocol-specific completion rule can safely be added.
-    return { ...result, sourceExhausted: terminated };
+    // Native Latest search returns an empty page as one AddEntries or two
+    // ReplaceEntry instructions with only explicit Top and Bottom cursors.
+    // The same bottom-0 ID occurs on nonterminal pages, so neither its value,
+    // a short page, nor a page whose rows were filtered out proves exhaustion.
+    const replacements = timeline.instructions.length === 2 && timeline.instructions.every(instruction =>
+      instruction.type === 'TimelineReplaceEntry' &&
+      instruction.entry_id_to_replace === instruction.entry?.entryId);
+    const entries = timeline.instructions.length === 1 &&
+      timeline.instructions[0].type === 'TimelineAddEntries'
+      ? timeline.instructions[0].entries : (replacements ? timeline.instructions.map(i => i.entry) : []);
+    const cursorOnly = entries.length === 2 && ['Top', 'Bottom'].every(direction =>
+      entries.filter(entry => entry?.content?.entryType === 'TimelineTimelineCursor' &&
+        entry.content.__typename === 'TimelineTimelineCursor' &&
+        entry.content.cursorType === direction &&
+        typeof entry.content.value === 'string' && entry.content.value.length > 0 &&
+        entry.entryId === (direction === 'Top' ? 'cursor-top-9223372036854775807' : 'cursor-bottom-0') &&
+        entry.sortIndex === (direction === 'Top' ? '9223372036854775807' : '0')).length === 1);
+    return { ...result, sourceExhausted: terminated || cursorOnly };
   }
 
   function parseBookmarksResponse(data) {

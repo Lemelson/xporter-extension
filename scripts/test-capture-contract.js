@@ -66,17 +66,21 @@ function testManifestOrderAndConsumerOwnership() {
     assert.equal(manifest.minimum_chrome_version, '111');
     const main = manifest.content_scripts.find(entry => entry.world === 'MAIN');
     const isolated = manifest.content_scripts.find(entry => !entry.world);
+    // Chromium deduplicates script paths per extension, across execution worlds.
+    const injected = new Set();
     for (const [entry, consumer] of [
-        [main, 'content/interceptor.js'],
-        [isolated, 'content/content.js']
+        [main, 'content/interceptor.js'], [isolated, 'content/content.js']
     ]) {
-        const contractIndex = entry.js.indexOf(CONTRACT_FILE);
-        const nativeTemplateIndex = entry.js.indexOf('utils/native-request-template.js');
-        const consumerIndex = entry.js.indexOf(consumer);
-        assert(contractIndex >= 0, `${CONTRACT_FILE} must load in both worlds`);
-        assert(contractIndex < consumerIndex, `${CONTRACT_FILE} must load before ${consumer}`);
-        assert(nativeTemplateIndex < consumerIndex,
-            `native request template validation must still load before ${consumer}`);
+        const context = vm.createContext({ globalThis: {} });
+        for (const file of entry.js) {
+            if (file === consumer || file === 'content/feed-parser.js') continue;
+            if (injected.has(file)) continue;
+            injected.add(file);
+            load(file, context);
+        }
+        assert.equal(typeof context.globalThis.XPorterCaptureContract?.isTrackedOperation, 'function',
+            `capture contract must survive cross-world path deduplication before ${consumer}`);
+        assert.equal(typeof context.globalThis.XPorterNativeTemplate?.parseRequestUrl, 'function');
     }
 
     const interceptor = read('content/interceptor.js');

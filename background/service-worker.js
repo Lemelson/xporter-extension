@@ -420,6 +420,10 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
         outputFormat: outputFormat || 'csv',
         dateFrom: normalizedDateFrom,
         dateTo: normalizedDateTo,
+        // Preserve the selected calendar labels independently of UTC bounds
+        // and of the timezone at a later Resume or history download.
+        dateFromCalendar: normalizedDateFrom ? dateFrom : null,
+        dateToCalendar: normalizedDateTo ? dateTo : null,
         settings: settings,
         tweetCount: 0, // used for both tweets and users (item count)
         itemsRecordedBase: 0,
@@ -625,6 +629,8 @@ async function saveCompletedExportHistory() {
             currentExport.settings?.includeAboutAccountDetails === true,
         dateFrom: currentExport.dateFrom?.toISOString() || null,
         dateTo: currentExport.dateTo?.toISOString() || null,
+        dateFromCalendar: currentExport.dateFromCalendar || null,
+        dateToCalendar: currentExport.dateToCalendar || null,
         partialReason: currentExport.partialReason || null,
         completionReason: currentExport.completionReason || null,
         completedAt: currentExport.completedAt || Date.now(),
@@ -1038,6 +1044,7 @@ async function _fetchPostsByDateRangeLoop() {
     let previousCursor = null;
     let stalledPages = 0;
     let badPages = 0;
+    let failedPage = null;
     await openSearchCaptureTab(rawQuery);
     try {
         await setSearchPhase('loading');
@@ -1046,11 +1053,21 @@ async function _fetchPostsByDateRangeLoop() {
         if (!payload && currentExport.running) throw new Error('SEARCH_NO_RESPONSE');
 
         while (payload && currentExport.running) {
+            // X also requests the Top cursor when its UI scrolls upward.
+            // Only the initial response or the expected Bottom request can
+            // advance this export or prove the downward source is exhausted.
+            if (payload.requestCursor !== undefined && payload.requestCursor !== previousCursor) {
+                payload = await requestNextSearchCapturePayload();
+                continue;
+            }
             if (payload.error && payload.error !== 'SEARCH_NETWORK_ERROR') throw new Error(payload.error);
             if (quantityLimitReached()) {
                 currentExport.completionReason = 'limit_reached';
                 break;
             }
+            // A later native response cannot repair a missing page. Resume
+            // restarts the query and deduplicates the rows already saved.
+            if (failedPage && payload.url !== failedPage.url) throw new Error(failedPage.error);
             let parsed;
             let failure = payload.error || null;
             if (!failure && (payload.status === 401 || payload.status === 403)) throw new Error('AUTH_ERROR');
@@ -1065,6 +1082,7 @@ async function _fetchPostsByDateRangeLoop() {
                 }
             }
             if (failure) {
+                failedPage ||= { url: payload.url, error: failure };
                 searchCapture?.seenUrls.delete(payload.url);
                 if (++badPages >= XPORTER_CONFIG.SEARCH_CAPTURE.maxConsecutiveFailures) throw new Error(failure);
                 if (failure === 'RATE_LIMITED') {
@@ -1085,11 +1103,15 @@ async function _fetchPostsByDateRangeLoop() {
                 continue;
             }
             badPages = 0;
+            failedPage = null;
             await setSearchPhase('collecting');
             const countBefore = currentExport.tweetCount;
             for (const tweet of parsed.tweets || []) {
                 if (!currentExport.running) break;
                 if (!dateExportAllowsTweet(tweet)) continue;
+                // Only fill display fields after author identity has been verified.
+                tweet.author_name ||= currentExport.userInfo?.name || '';
+                tweet.author_username ||= currentExport.userInfo?.screenName || currentExport.username || '';
                 noteSearchTimelineCoverage(tweet);
                 if (!postSelectionAllowsTweet(currentExport.settings, tweet)) continue;
                 if (seenIds.has(tweet.id)) {
@@ -1398,8 +1420,8 @@ async function sendSearchCaptureStatus(overrides = {}, attempts = 1) {
         username: currentExport.username,
         tweetCount: currentExport.tweetCount || 0,
         quantityLimit: currentExport.settings?.quantityLimit || 0,
-        dateFrom: currentExport.dateFrom ? formatLocalDate(currentExport.dateFrom) : '',
-        dateTo: currentExport.dateTo ? formatLocalDate(currentExport.dateTo) : '',
+        dateFrom: currentExport.dateFromCalendar || (currentExport.dateFrom ? formatLocalDate(currentExport.dateFrom) : ''),
+        dateTo: currentExport.dateToCalendar || (currentExport.dateTo ? formatLocalDate(currentExport.dateTo) : ''),
         progressPct: computeSearchCaptureProgress(),
         i18n,
         ...rest
@@ -1442,12 +1464,15 @@ function handlePageGraphqlResponse(message, sender) {
         return { ignored: true };
     }
 
+    let requestCursor = null;
     try {
         const url = new URL(message.url);
         const variables = JSON.parse(url.searchParams.get('variables') || 'null');
         if (url.protocol !== 'https:' || !['x.com', 'twitter.com'].includes(url.hostname) ||
             !url.pathname.endsWith('/SearchTimeline') || variables?.rawQuery !== searchCapture.rawQuery ||
             variables?.product !== 'Latest') return { ignored: true };
+        if (variables.cursor != null && typeof variables.cursor !== 'string') return { ignored: true };
+        requestCursor = variables.cursor || null;
     } catch (_) { return { ignored: true }; }
     const captureError = ['SEARCH_RESPONSE_TOO_LARGE', 'SEARCH_NETWORK_ERROR'].includes(message.error)
         ? message.error : null;
@@ -1464,6 +1489,7 @@ function handlePageGraphqlResponse(message, sender) {
 
     const payload = {
         url: message.url,
+        requestCursor,
         bodyText: message.bodyText,
         status,
         ...(captureError ? { error: captureError } : {})
@@ -1897,6 +1923,8 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
         outputFormat: savedState.outputFormat || 'csv',
         dateFrom: savedState.dateFrom ? new Date(savedState.dateFrom) : null,
         dateTo: savedState.dateTo ? new Date(savedState.dateTo) : null,
+        dateFromCalendar: savedState.dateFromCalendar || null,
+        dateToCalendar: savedState.dateToCalendar || null,
         settings: settings,
         tweetCount: savedState.tweetCount || 0,
         itemsRecordedBase: savedState.tweetCount || 0,
@@ -2066,6 +2094,8 @@ async function saveCurrentState({ bestEffort = false } = {}) {
         totalBatches: currentExport.totalBatches,
         dateFrom: currentExport.dateFrom?.toISOString() || null,
         dateTo: currentExport.dateTo?.toISOString() || null,
+        dateFromCalendar: currentExport.dateFromCalendar || null,
+        dateToCalendar: currentExport.dateToCalendar || null,
         exportMode: currentExport.exportMode,
         outputFormat: currentExport.outputFormat,
         status: currentExport.status,

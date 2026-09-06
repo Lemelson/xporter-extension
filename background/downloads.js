@@ -556,8 +556,8 @@
                 postSelection: state.settings || null,
                 includeAboutAccountDetails:
                     state.settings?.includeAboutAccountDetails === true,
-                dateFrom: state.dateFrom,
-                dateTo: state.dateTo,
+                dateFrom: state.dateFromCalendar || state.dateFrom,
+                dateTo: state.dateToCalendar || state.dateTo,
                 exportedAt,
                 partNumber,
                 partCount: plan.partCount,
@@ -704,8 +704,8 @@
             postSelection: entry.postSelection || null,
             includeAboutAccountDetails:
                 entry.includeAboutAccountDetails === true,
-            dateFrom: entry.dateFrom,
-            dateTo: entry.dateTo,
+            dateFrom: entry.dateFromCalendar || entry.dateFrom,
+            dateTo: entry.dateToCalendar || entry.dateTo,
             exportedAt: entry.completedAt || new Date()
         });
         if (result.success) await recordSuccessfulDownload();

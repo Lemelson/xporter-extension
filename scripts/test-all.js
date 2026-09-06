@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const SUITES = [
+    'scripts/check-capture-bundle.js',
     'scripts/test-static-contracts.js',
     'scripts/test-extension-core.js',
     'scripts/test-rate-limit.js',

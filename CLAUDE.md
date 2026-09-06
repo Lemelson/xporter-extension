@@ -12,7 +12,7 @@
 |---|---|
 | Export orchestration, messages, lifecycle | `background/service-worker.js` (~2,300-line coordinator); pure selection/pacing/resume decisions are in `background/export-policy.js` |
 | X GraphQL calls + endpoint discovery | `utils/api.js` (`utils/api-features.js` = flags; `utils/api-parsers.js` = pure response normalization) |
-| Live queryId + seen-post capture / page hooks | `utils/capture-contract.js` (immutable cross-world limits/operations) → `content/feed-parser.js` + `content/interceptor.js` (MAIN world) / `content/content.js` (isolated world), all at `document_start` |
+| Live queryId + seen-post capture / page hooks | `utils/capture-contract.js` (immutable cross-world limits/operations) → `content/feed-parser.js` + `content/interceptor.js` (MAIN world) / generated `content/capture-prerequisites.js` → `content/content.js` (isolated world), all at `document_start` |
 | Rate limiting (cooldowns, retries, abort) | `utils/rateLimit.js`; the worker owns primary, bookmark-context, and About-account limiters as one export lifecycle |
 | Storage, settings + defaults | `utils/storage.js`; partial settings writes and usage-counter mutations each use recoverable promise queues |
 | Passive seen-post database | `utils/post-database.js` (IndexedDB; one row per post ID, 50k-row cap) |
@@ -28,13 +28,13 @@
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Public site | `docs/` only (`index.html`, `privacy-policy.html`, `feedback.html`, `assets/`); root site copies were removed |
-| Tests and packaging | `node scripts/test-all.js` runs the 11 deterministic suites; the 94-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the deterministic and explicit LibreOffice gates before atomically replacing an allowlist ZIP |
+| Tests and packaging | `node scripts/test-all.js` runs the 12 deterministic suites; the 99-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the deterministic and explicit LibreOffice gates before atomically replacing an allowlist ZIP |
 
 ## Gotchas that bite
 
 1. **Two i18n systems:** `popup/locales/` = in-app strings; `_locales/` = Chrome Store metadata. Don't confuse them.
 2. **Adding a setting or string → update ALL 14 `popup/locales/*.json`** (add to `en.json` first). Settings also need a default in `utils/storage.js` + `onInstalled` in the SW.
-3. **Cross-world capture contract:** `utils/capture-contract.js` must load before both manifest consumers. Each world still validates at its own trust boundary.
+3. **Cross-world capture contract:** `utils/capture-contract.js` and `utils/native-request-template.js` load in MAIN; their generated `content/capture-prerequisites.js` bundle loads first in the isolated world. Distinct resource paths avoid Chromium cross-world script deduplication. Run `node scripts/check-capture-bundle.js --write` after canonical prerequisite edits; the deterministic gate rejects stale bundles. Each world still validates at its own trust boundary.
 4. **Single UI:** user-facing export controls live in `popup/`; keep popup status rendering in sync with the worker protocol.
 5. **Help tooltips** (`!` icons) support `**bold**` markup for the "gist" — keep both `**…**` spans when editing/translating; aria-labels are auto-stripped (`renderHelpMarkup` / `stripHelpMarkup` in `utils/shared.js`).
 6. **X API is fragile:** 400s usually = a changed GraphQL **feature flag** (`utils/api-features.js`); queryIds drift (auto-discovered + live-captured, with `FALLBACK_ENDPOINTS` to refresh). Use `encodeURIComponent`, never `URLSearchParams`.

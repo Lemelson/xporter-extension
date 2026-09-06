@@ -191,6 +191,7 @@ function createHarness(options = {}) {
     });
 
     return {
+        context,
         downloads: context.XPorterDownloads,
         generatedLanguages,
         generatedMediaAssets,
@@ -660,7 +661,26 @@ async function testConcurrentStartsReserveDownloadBeforeSnapshotRead() {
     await new Promise(resolve => setImmediate(resolve));
 }
 
+async function testCalendarLabelsSurviveDownloadAndHistory() {
+    const state={username:'test',exportMode:'posts',tweetCount:2,totalBatches:2,settings:{},
+        dateFrom:'2026-09-03T21:00:00.000Z',dateTo:'2026-09-04T20:59:59.999Z',
+        dateFromCalendar:'2026-09-04',dateToCalendar:'2026-09-04'};
+    const harness=createHarness({loadExportState:async()=>state});
+    // Real filename formatter, including multipart and history call sites.
+    const formatter=vm.createContext({});
+    vm.runInContext(fs.readFileSync(path.join(root,'utils/csv.js'),'utf8'),formatter);
+    harness.context.XPorterCSV.generateExportFilename=formatter.XPorterCSV.generateExportFilename;
+    const current=await harness.downloads.downloadCurrent('csv');
+    assert.equal(current.success,true);
+    for(const filename of current.filenames) assert.match(filename,/_from_2026-09-04_to_2026-09-04_/);
+    harness.context.XPorterStorage.loadExportHistoryEntry=async()=>({...state,items:[{id:'1'}]});
+    const history=await harness.downloads.downloadHistory('test','csv');
+    assert.equal(history.success,true);
+    assert.match(history.filename,/_from_2026-09-04_to_2026-09-04_/);
+}
+
 async function main() {
+    await testCalendarLabelsSurviveDownloadAndHistory();
     await testMultipartDownloadUsesOneSettingsSnapshot();
     await testDuplicatePhotoUrlIsFetchedOncePerDownload();
     await testSettledPhotoCacheIsBoundedAcrossParts();

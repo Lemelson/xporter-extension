@@ -51,8 +51,7 @@
         "https://twitter.com/*"
       ],
       "js": [
-        "utils/capture-contract.js",
-        "utils/native-request-template.js",
+        "content/capture-prerequisites.js",
         "content/content.js"
       ],
       "run_at": "document_start"
