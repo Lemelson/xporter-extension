@@ -12,7 +12,8 @@ var STAT_FIELDS = ['schema_version','v','os','days','installed_at','ui_lang','th
   'm_bookmarks','install_v','schema_since','snapshot_at','install_id','browser_family','browser_major',
   's_user_speed','s_user_safety','diag_historical','diag_active_days','diag_first_attempt_ms','diag_first_start_ms',
   'diag_first_item_ms','diag_first_download_ms','diag_attempts','diag_downloads','diag_totals',
-  'transport_omitted_attempts','transport_omitted_downloads','diag_revision','consent_version','transport_summary_only'];
+  'transport_omitted_attempts','transport_omitted_downloads','diag_revision','consent_version','transport_summary_only',
+        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt'];
 var FORM_FIELDS = ['src','page_s','subreasons','subreason_labels','reason_history','subreasons_all',
   'subreason_labels_all','transport_error','form_version','language_source','page_opened_at'];
 var ATTEMPT_FIELDS = ['id','at','version','mode','format','resume','dateRange','settings','phase','result',
@@ -58,7 +59,24 @@ function cleanRecord(value, keys) {
   });
   return result;
 }
+// New preference columns accept only their documented primitive values.
+var CURRENT_BOOL_FIELDS = ['s_colorful','s_ladybug','s_auto_expire','s_originals','s_quotes',
+  's_bookmark_context','s_bookmark_articles','s_post_photos','s_bookmark_photos','s_about'];
+var CURRENT_NUMBER_FIELDS = {
+  s_window_width:[80,150,5],s_window_height:[50,100,5],s_element_size:[80,130,5],s_text_size:[80,130,5],
+  s_auto_expire_hours:[1,48,1],s_about_batch:[1,50,1],s_about_retries:[1,1440,1],f_txt:[0,1e12,1]
+};
+var CURRENT_CHOICE_FIELDS = {
+  s_mode:['posts','bookmarks','followers','following','verified_followers','seen_posts'],
+  s_format:['csv','json','xlsx','txt'],s_about_speed:['turbo','fast','standard','careful','turtle','custom']
+};
 function cleanStat(key, value) {
+  if (CURRENT_BOOL_FIELDS.indexOf(key)>=0) return value===0 || value===1 ? value : '';
+  if (Object.prototype.hasOwnProperty.call(CURRENT_NUMBER_FIELDS,key)) {
+    var range=CURRENT_NUMBER_FIELDS[key];
+    return typeof value==='number' && Number.isFinite(value) && value>=range[0] && value<=range[1] && value%range[2]===0 ? value : '';
+  }
+  if (Object.prototype.hasOwnProperty.call(CURRENT_CHOICE_FIELDS,key)) return CURRENT_CHOICE_FIELDS[key].indexOf(value)>=0 ? value : '';
   if (key === 'diag_attempts' || key === 'diag_downloads') {
     if (!Array.isArray(value)) return '';
     return JSON.stringify(value.slice(-5).map(function(row) {
@@ -227,6 +245,10 @@ function schemaDefinitions() {
     ['detail_receipt','2','Random token acknowledging explicit Send','','The page checks only receipt existence before showing success.'],
     ['language_source','2','How page language was chosen','','extension, browser, manual or fallback.'],
     ['s_safety / s_user_safety','2','Scheduled pause settings for posts / user lists','minutes_requests or off','Settings snapshot at URL refresh; attempt.settings are launch-time settings.'],
+    ['s_colorful / s_ladybug','2','Current colorful appearance and ladybug settings','0/1','Colorful is enabled when the legacy simplifiedDesign storage flag is true.'],
+    ['s_window_width / s_window_height / s_element_size / s_text_size','2','Saved window/content slider choices','percent','Chosen percentages, not measured pixels; text slider is not the rendered font multiplier.'],
+    ['s_auto_expire / s_auto_expire_hours','2','Automatic data deletion toggle and saved duration','0/1 and hours','Duration remains saved when disabled.'],
+    ['s_mode / s_format','2','Current saved mode and format','','May differ from last_attempt_mode/format; no export required.'],
     ['browser_family / browser_major','2','Coarse browser family and main version','','No full User-Agent. Chromium forks may report chromium/chrome.'],
     ['install_id','2','Random ID scoped to browser installation','UUID','Pseudonymous; reset on reinstall. Never a username or device fingerprint.'],
     ['diag_active_days','2','Distinct observed UI-open days since schema_since','UTC days','Activity-only; no background heartbeat on days with no UI activity.'],
@@ -244,7 +266,17 @@ function fieldMeaning(key) {
     ui_lang:'Extension UI language',theme:'Interface theme',opens:'Lifetime UI openings',active_s:'Lifetime focused visible UI seconds',
     m_posts:'Post export starts',m_followers:'Followers export starts',m_following:'Following export starts',m_verified:'Verified followers starts',
     m_dates:'Date-range export starts',m_bookmarks:'Bookmark export starts',resumes:'Resume starts',f_csv:'CSV-selected starts',
-    f_json:'JSON-selected starts',f_xlsx:'XLSX-selected starts',last_days:'Days since last terminal export event',
+    s_colorful:'Current Colorful appearance enabled',s_ladybug:'Current Show ladybug enabled',
+    s_window_width:'Saved window width percent',s_window_height:'Saved window height percent',
+    s_element_size:'Saved element size percent',s_text_size:'Saved text size percent',
+    s_auto_expire:'Automatic deletion enabled',s_auto_expire_hours:'Saved automatic deletion hours',
+    s_mode:'Currently selected export mode',s_format:'Currently selected output format',
+    s_originals:'Current original-post filter',s_quotes:'Current quote-post filter',
+    s_bookmark_context:'Current bookmark reply context',s_bookmark_articles:'Current bookmark Articles',
+    s_post_photos:'Current post photo embedding',s_bookmark_photos:'Current bookmark photo embedding',
+    s_about:'Current About Account details enabled',s_about_speed:'Current About Account speed',
+    s_about_batch:'Current About Account custom batch',s_about_retries:'Current About Account retry limit',
+    f_txt:'TXT-selected starts',f_json:'JSON-selected starts',f_xlsx:'XLSX-selected starts',last_days:'Days since last terminal export event',
     s_retweets:'Include reposts',s_replies:'Include replies',s_articles:'Include Articles',s_limit:'Selected quantity limit',
     s_localize:'Localize export headers',s_speed:'Posts speed',s_user_speed:'User-list speed',s_adaptive:'Adaptive pacing',
     inst_approx:'Install timestamp is approximate',install_v:'First-install version when known',snapshot_at:'Snapshot creation time UTC',

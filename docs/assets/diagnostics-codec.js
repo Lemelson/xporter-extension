@@ -13,7 +13,8 @@
         's_user_speed', 's_user_safety', 'diag_historical', 'diag_active_days', 'diag_first_attempt_ms',
         'diag_first_start_ms', 'diag_first_item_ms', 'diag_first_download_ms', 'diag_attempts',
         'diag_downloads', 'diag_totals', 'transport_omitted_attempts', 'transport_omitted_downloads',
-        'diag_revision', 'consent_version', 'transport_summary_only'
+        'diag_revision', 'consent_version', 'transport_summary_only',
+        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt'
     ];
     const settingFields = ['includeOriginalPosts', 'includeQuotes', 'includeReplies', 'includeRetweets',
         'includeArticles', 'includeBookmarkReplyContext', 'includeBookmarkArticles', 'embedPostPhotos',

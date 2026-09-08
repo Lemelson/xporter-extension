@@ -21,6 +21,14 @@ Legacy `dl` means a download was handed to the browser, not proof of a saved fil
 
 `diag_totals` contains cumulative counters since `schema_since`; `d_*` columns flatten them. `last_attempt_*` and `last_download_*` flatten the last retained record for spreadsheet analysis. `diag_revision` orders snapshots. The random `install_id` links reports from the same local installation; clearing extension storage resets it. This is pseudonymous, not anonymous.
 
+## Current settings (additive schema-2 fields)
+
+`s_colorful` is the current Colorful appearance choice (the legacy storage key `simplifiedDesign=true` now means colorful). `s_ladybug` records Show ladybug. `s_window_width`, `s_window_height`, `s_element_size` and `s_text_size` are the saved slider percentages, not screen pixels or measured rendered text scale. `s_auto_expire` and `s_auto_expire_hours` retain both the toggle and saved duration, including when disabled.
+
+`s_mode` and `s_format` describe the current saved selection, independently of the last attempt. `s_originals`, `s_quotes`, `s_bookmark_context`, `s_bookmark_articles`, `s_post_photos`, `s_bookmark_photos`, `s_about`, `s_about_speed`, `s_about_batch` and `s_about_retries` complement existing current export preferences. `f_txt` counts lifetime TXT-selected starts, matching the existing format counters. No change history or custom background colors are sent. Missing or invalid preferences remain unknown; old rows are not backfilled.
+
+Deploy the updated collector allowlist first, then the website codec/privacy policy, then distribute the extension. The URL field order is append-only; an older website codec cannot decode the longer payload. The page already forwards codec fields, so its recording algorithm is unchanged. New columns are appended on receipt; no migration is required.
+
 ## Transport and consent
 
 The extension collects bounded local diagnostics without uploading them during ordinary use by default. The dedicated Settings control plus optional Google host permission enables usage snapshots. `diagnosticsConsentVersion=1` is required. Disabling sharing aborts pending uploads. Failed attempts are throttled; a sleeping worker may defer an upload until the next activity. Local report download never enables sharing.
