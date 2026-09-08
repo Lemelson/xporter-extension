@@ -477,3 +477,6 @@ In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-p
 
 ## 14. How to Update This File
 Update `agent.md` (and `CLAUDE.md`) whenever you add/rename a file, change the message protocol or storage schema, add export modes/formats/settings, update feature flags or queryIds, or change the data flow. Keep sections numbered; update §2's diagram for architectural changes.
+
+
+Feedback collector schema 2 and deployment: `backend/README.md`, canonical `backend/apps-script.gs`. Website `docs/feedback.html` decodes compressed diagnostics with `docs/assets/diagnostics-codec.js`, normalizes 14 languages via `feedback-language.js`, and confirms submitted feedback with `feedback-receipt.js`. Legacy extension URLs remain supported. Synthetic `?test=1` traffic is reserved for TelemetryTests. Extension-side v2 instrumentation is prepared separately from this site deployment.

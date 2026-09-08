@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>XPorter — Privacy Policy</title>
-  <meta name="description" content="How XPorter handles your data locally and communicates with X-owned services; only an anonymous, non-personal usage summary is sent outside X on uninstall." />
+  <meta name="description" content="How XPorter handles your data locally and communicates with X-owned services; diagnostic sharing during use is optional; uninstall feedback carries limited product diagnostics." />
   <link rel="icon" type="image/png" href="assets/icon128.png" />
   <script>
     (function () {
@@ -133,11 +133,10 @@
   <div class="container">
     <div class="hero-card">
       <h1>Privacy Policy <span class="badge">Plain English</span></h1>
-      <p>Your exported X (Twitter) data never leaves your browser — XPorter has no servers and no account. Normal exports
-        contact only X-owned services (<code>x.com</code> and the public <code>abs.twimg.com</code> client-asset CDN).
-        The only data sent outside X is an anonymous, non-personal usage summary when you uninstall, used solely to
-        understand why people leave and improve the extension. No personal data and none of your exported content is
-        included.</p>
+      <p>Exported X content is processed locally in your browser. Export requests contact X-owned services.
+        XPorter also keeps limited product diagnostics locally. Opening the uninstall feedback page sends a diagnostic
+        summary; sending diagnostics during use is optional and off by default. These reports exclude exported content,
+        usernames, cookies and request URLs. Written feedback includes whatever you choose to submit.</p>
     </div>
 
     <h2>What the extension accesses</h2>
@@ -175,31 +174,30 @@
       <li>Does <strong>not</strong> load any remote code — everything runs from the extension package</li>
     </ul>
 
-    <h2>Anonymous uninstall feedback</h2>
-    <p>When you uninstall XPorter, Chrome opens a short feedback page. To understand why people leave and what to fix,
-      XPorter attaches an <strong>anonymous, non-personal usage summary</strong> to that page. It contains only aggregate
-      product stats:</p>
+    <h2>Diagnostics and uninstall feedback</h2>
+    <p>Chrome opens a feedback page when you remove XPorter. Its URL carries a compressed diagnostic summary,
+      which the page records through Google Apps Script in Google Sheets. Compression is not encryption; the summary
+      can be read from that URL and may remain in browser history.</p>
     <ul>
-      <li>Extension version, your operating system (e.g. Windows / macOS / Linux), and how long it was installed
-        (install date and the time elapsed until uninstall)</li>
-      <li>Interface language and theme (light/dark)</li>
-      <li>How many times you opened the extension and roughly how much time you actively spent in it</li>
-      <li>How many exports you ran, how many succeeded or failed, a short error code for the last failure, the last
-        export phase reached, and the approximate time until the first collected item</li>
-      <li>How much time had passed since your last export</li>
-      <li>Counts per export type (posts, followers, following, verified followers) and per format (CSV / JSON / XLSX)</li>
-      <li>The approximate total number of items exported and a few non-identifying settings (e.g. include
-        retweets/replies, quantity limit)</li>
-      <li>How long the feedback page itself was open</li>
+      <li>Extension and coarse browser version, operating system, installation timing, interface language and theme</li>
+      <li>Popup opens, approximate active time, active days, export counts, collected row counts and selected export settings</li>
+      <li>Up to five recent export attempts: mode, format, timing, result, fixed error code, phase, request/retry/rate-limit counts and pause time</li>
+      <li>Up to five recent save attempts: generation time, file size, part count, browser completion or interruption, and photo-preview counts</li>
+      <li>A random installation identifier, which links reports from the same installation; it is not an X account identifier</li>
+      <li>Feedback language, time on the page, selected reasons and any text or contact details you submit</li>
     </ul>
-    <div class="callout">
-      <p>This summary contains no usernames, no exported content, no X data, and nothing that identifies you. If you
-        choose to leave a written comment on the feedback page, only the text you type is sent.</p>
-    </div>
-    <p>The data is stored in a private spreadsheet via Google Apps Script / Google Sheets (Google acts as the data
-      processor). It is used only to improve XPorter and is never sold or shared. This is the only user or
-      extension-usage data XPorter transmits outside X-owned services. The anonymous summary is recorded when the
-      feedback page loads; any written comment is sent only if you choose to submit one.</p>
+    <p>Recent details may be omitted to fit Chrome's uninstall URL limit. Reports mark omitted records explicitly.
+      No exported content, X identifiers, file names, cookies, request URLs or full browser user-agent string are included automatically.</p>
+    <h3>Optional sharing during use</h3>
+    <p>In Settings you can enable diagnostic sharing and grant access to the Google collector. This is off by default.
+      When enabled, activity can send cumulative snapshots, at most approximately once a minute, updating one row per
+      installation and UTC day. Turning the setting off stops future uploads. A local JSON report can also be saved
+      without enabling sharing. Previously submitted reports are not deleted by turning sharing off or uninstalling.</p>
+    <div class="callout"><p>Diagnostics are pseudonymous, not guaranteed anonymous: the random identifier links reports.
+      Feedback is stored in a Google spreadsheet configured for viewing by anyone with its link. Do not submit secrets
+      or sensitive personal information. If you include contact details, they are stored with your feedback.</p></div>
+    <p>Reports help diagnose failures and improve XPorter. Optional sharing covers only users who choose it;
+      uninstall feedback covers only people whose feedback page loads. Neither is a complete count of users.</p>
 
     <h2>Permissions explained</h2>
     <h3><code>cookies</code></h3>
@@ -209,11 +207,15 @@
     <h3><code>downloads</code></h3>
     <p>Saves the exported CSV, JSON or XLSX file to your Downloads folder when you click download.</p>
     <h3><code>storage</code> &amp; <code>unlimitedStorage</code></h3>
-    <p>Stores preferences, resumable export batches, recent export history, anonymous usage counters, and the
+    <p>Stores preferences, resumable export batches, recent export history, local diagnostic counters, and the
       deduplicated seen-post dataset locally in Chrome. <code>unlimitedStorage</code> prevents larger local datasets and
       exports from being truncated by Chrome's normal storage quota.</p>
     <h3>Host access to x.com</h3>
     <p>Required to make API calls to X.com to retrieve the data you asked to export.</p>
+
+    <h3>Optional Google collector access</h3>
+    <p><code>script.google.com</code> and <code>script.googleusercontent.com</code> are requested only when you enable
+      diagnostic sharing. This permission lets the extension submit reports and read the collector acknowledgement.</p>
 
     <h2>Data storage</h2>
     <ul>
@@ -228,7 +230,7 @@
         <code>storage.local</code> for up to seven days to avoid repeating the same X requests. Failed lookups expire
         after one hour, and the cache is capped at 25,000 accounts</li>
       <li>Settings are stored in Chrome's <code>storage.local</code> and cleared when you uninstall</li>
-      <li>A small anonymous usage counter (including opens, active time, export counts, install date, and last error
+      <li>A bounded local diagnostic record (including opens, active time, export counts, install date, and last error
         code) is kept in
         <code>storage.local</code> to build the uninstall summary, and removed when you uninstall</li>
     </ul>
@@ -236,8 +238,7 @@
     <h2>Third-party services</h2>
     <p>XPorter integrates with no analytics platforms, ad networks or trackers. Normal exports contact X-owned
       <code>x.com</code> APIs and may read a public <code>abs.twimg.com</code> client asset as text; that asset is never
-      executed, and no authentication or export data is sent to the CDN. The only communication outside X-owned
-      services is the anonymous uninstall feedback above, stored via Google (Apps Script / Google Sheets).</p>
+      executed, and no authentication or export data is sent to the CDN. The diagnostic and feedback flows described above use Google Apps Script and Google Sheets.</p>
 
     <h2>Data security</h2>
     <p>All communication with X-owned services uses HTTPS. Authentication tokens are handled in memory, are never

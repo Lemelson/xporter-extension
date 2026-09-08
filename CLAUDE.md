@@ -52,3 +52,6 @@
 
 ## When you change things
 Keep **`agent.md`** and this file in sync (new files, messages, storage keys, settings, export modes, and load order). Run `node scripts/test-all.js` plus `git diff --check`; outside `CODEX_SANDBOX`, run the unpacked smoke and the popup footer, tooltip, XLSX-photo-layout, and permission-rationale browser checks. Record authenticated live-X proof separately. The strict `node scripts/test-xlsx-libreoffice.js` compatibility gate is separate from deterministic tests and mandatory in the packager. See `scripts/TESTING.md` for focused runs, timezone CI and proof boundaries. Bump `version` in `manifest.json` only for releases. Build the CWS ZIP with `scripts/package.sh`.
+
+
+Feedback collector schema 2 and deployment: `backend/README.md`, canonical `backend/apps-script.gs`. Website `docs/feedback.html` decodes compressed diagnostics with `docs/assets/diagnostics-codec.js`, normalizes 14 languages via `feedback-language.js`, and confirms submitted feedback with `feedback-receipt.js`. Legacy extension URLs remain supported. Synthetic `?test=1` traffic is reserved for TelemetryTests. Extension-side v2 instrumentation is prepared separately from this site deployment.
