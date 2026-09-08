@@ -1,6 +1,6 @@
 # Feedback wording audit — 2026-09-08
 
-Reviewed all 8 reasons and 35 subreasons in each of 14 locales. Stable reason/subreason keys are unchanged; labels remain descriptive of user needs, without claiming unsupported features. All locales have the same choices. This is an editorial review, not a native-speaker certification.
+Reviewed all 8 reasons and 34 subreasons in each of 14 locales. Stable reason/subreason keys are unchanged; labels remain descriptive of user needs, without claiming unsupported features. All locales have the same choices. This is an editorial review, not a native-speaker certification.
 
 Language routing normalizes extension locale before browser locale, including zh, zh_CN, zh-CN and case variants; unsupported locales fall back to English. A manual selection is recorded separately.
 
