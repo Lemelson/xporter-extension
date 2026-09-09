@@ -50,3 +50,11 @@ The form prefers normalized extension language, then browser language, then Engl
 The current workbook is viewable by anyone with its link; the privacy policy reflects this. Do not put credentials or sensitive personal data in feedback. Schema changes do not alter workbook sharing.
 
 Deterministic/fixture browser tests do not prove live X API compatibility or that installed store copies contain the update. Ship the extension package separately through the usual store release process.
+# September 10 compatibility fix
+
+The published decoder accepts the 83 positional fields shipped in extension 2.0.0,
+including `ladybug_squashes` and `theme_preset`. Replace the existing bound Apps
+Script code with `apps-script.gs`, then edit the existing web-app deployment and
+select a new version. Keep its URL unchanged. Existing rows are preserved; new
+columns are added when received. The feedback compatibility test covers the
+released 83-field payload, its 81-field predecessor, and legacy query parameters.

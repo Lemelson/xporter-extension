@@ -13,7 +13,7 @@ var STAT_FIELDS = ['schema_version','v','os','days','installed_at','ui_lang','th
   's_user_speed','s_user_safety','diag_historical','diag_active_days','diag_first_attempt_ms','diag_first_start_ms',
   'diag_first_item_ms','diag_first_download_ms','diag_attempts','diag_downloads','diag_totals',
   'transport_omitted_attempts','transport_omitted_downloads','diag_revision','consent_version','transport_summary_only',
-        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt'];
+        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt', 'ladybug_squashes', 'theme_preset'];
 var FORM_FIELDS = ['src','page_s','subreasons','subreason_labels','reason_history','subreasons_all',
   'subreason_labels_all','transport_error','form_version','language_source','page_opened_at'];
 var ATTEMPT_FIELDS = ['id','at','version','mode','format','resume','dateRange','settings','phase','result',
@@ -64,9 +64,10 @@ var CURRENT_BOOL_FIELDS = ['s_colorful','s_ladybug','s_auto_expire','s_originals
   's_bookmark_context','s_bookmark_articles','s_post_photos','s_bookmark_photos','s_about'];
 var CURRENT_NUMBER_FIELDS = {
   s_window_width:[80,150,5],s_window_height:[50,100,5],s_element_size:[80,130,5],s_text_size:[80,130,5],
-  s_auto_expire_hours:[1,48,1],s_about_batch:[1,50,1],s_about_retries:[1,1440,1],f_txt:[0,1e12,1]
+  s_auto_expire_hours:[1,48,1],s_about_batch:[1,50,1],s_about_retries:[1,1440,1],f_txt:[0,1e12,1],ladybug_squashes:[0,1e12,1]
 };
 var CURRENT_CHOICE_FIELDS = {
+  theme_preset:['classic-dark', 'classic-light', 'glass-dark', 'glass-light', 'obsidian', 'signal', 'cobalt', 'forest', 'bordeaux', 'porcelain', 'iris'],
   s_mode:['posts','bookmarks','followers','following','verified_followers','seen_posts'],
   s_format:['csv','json','xlsx','txt'],s_about_speed:['turbo','fast','standard','careful','turtle','custom']
 };
@@ -263,7 +264,7 @@ function schemaDefinitions() {
 }
 function fieldMeaning(key) {
   var labels={v:'Extension version',os:'Operating system',days:'Floored days at snapshot',installed_at:'Installation timestamp',
-    ui_lang:'Extension UI language',theme:'Interface theme',opens:'Lifetime UI openings',active_s:'Lifetime focused visible UI seconds',
+    ui_lang:'Extension UI language',theme:'Light or dark mode',theme_preset:'Selected theme preset ID',opens:'Lifetime UI openings',active_s:'Lifetime focused visible UI seconds',
     m_posts:'Post export starts',m_followers:'Followers export starts',m_following:'Following export starts',m_verified:'Verified followers starts',
     m_dates:'Date-range export starts',m_bookmarks:'Bookmark export starts',resumes:'Resume starts',f_csv:'CSV-selected starts',
     s_colorful:'Current Colorful appearance enabled',s_ladybug:'Current Show ladybug enabled',
@@ -276,7 +277,7 @@ function fieldMeaning(key) {
     s_post_photos:'Current post photo embedding',s_bookmark_photos:'Current bookmark photo embedding',
     s_about:'Current About Account details enabled',s_about_speed:'Current About Account speed',
     s_about_batch:'Current About Account custom batch',s_about_retries:'Current About Account retry limit',
-    f_txt:'TXT-selected starts',f_json:'JSON-selected starts',f_xlsx:'XLSX-selected starts',last_days:'Days since last terminal export event',
+    ladybug_squashes:'Lifetime ladybugs squashed',f_txt:'TXT-selected starts',f_json:'JSON-selected starts',f_xlsx:'XLSX-selected starts',last_days:'Days since last terminal export event',
     s_retweets:'Include reposts',s_replies:'Include replies',s_articles:'Include Articles',s_limit:'Selected quantity limit',
     s_localize:'Localize export headers',s_speed:'Posts speed',s_user_speed:'User-list speed',s_adaptive:'Adaptive pacing',
     inst_approx:'Install timestamp is approximate',install_v:'First-install version when known',snapshot_at:'Snapshot creation time UTC',
