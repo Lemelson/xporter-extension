@@ -52,7 +52,7 @@
       </a>
       <div class="nav-links">
         <a class="minor" href="#features" data-i18n="nav_features">Features</a>
-        <a class="minor" href="#formats">CSV / XLSX / JSON / TXT</a>
+        <a class="minor" href="#formats" data-i18n="nav_formats">Formats</a>
         <a class="minor" href="#how" data-i18n="nav_how">How it works</a>
         <a class="minor" href="#privacy" data-i18n="nav_privacy">Privacy</a>
         <a class="minor" href="#faq" data-i18n="nav_faq">FAQ</a>
@@ -67,7 +67,6 @@
       </div>
     </div>
   </nav>
-  <div class="wrap language-links"><a href="./" lang="en" hreflang="en">English</a><a href="./ru/" lang="ru" hreflang="ru">Русский</a><span data-i18n="release_label">Version 2.0.0 · Released September 9, 2026</span></div>
   <p id="languageNote" class="wrap language-note" data-i18n="language_note" hidden>The detailed product reference is available in English and Russian. Other interface translations are retained; updated sections use English where a translation is not yet available.</p>
 
   <main id="main">
@@ -75,16 +74,16 @@
   <header class="wrap hero" id="top">
     <div class="reveal">
       <span class="pill"><span class="bolt" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> <span data-i18n="hero_pill">Free Chrome extension · No API key</span></span>
-      <h1 data-i18n-html="hero_h1">Export <span class="grad">X data.</span><br />Make it useful.</h1>
-      <p class="lead" data-i18n="hero_lead">Save X (Twitter) posts, your bookmarks and account lists to files you can actually work with. CSV, Excel, JSON or readable TXT, created in your browser.</p>
+      <h1 data-i18n-html="hero_h1">Export from X.<br /><span class="grad">Keep what matters.</span></h1>
+      <p class="lead" data-i18n="hero_lead">Your posts. Your saved reads. Your audience. Turn X (Twitter) data into a file for Excel, your own analysis or your next AI conversation.</p>
       <div class="hero-cta">
         <a class="btn btn-primary" id="heroInstall" href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener">
           <span class="bolt" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
           <span data-i18n="hero_cta1">Add to Chrome — it's free</span>
         </a>
-        <a class="btn btn-ghost" href="https://github.com/Lemelson/xporter-extension" target="_blank" rel="noopener" data-i18n="hero_cta2">View on GitHub</a>
+        <a class="btn btn-ghost" href="#how" data-i18n="hero_cta2">See how it works ↓</a>
       </div>
-      <p class="hero-note" data-i18n="hero_note">Sign in to X in your browser. X controls which data is available and how quickly it can be collected.</p>
+      <p class="hero-note" data-i18n="hero_note">Works with your signed-in X account. No separate registration.</p><p class="release-note" data-i18n="release_label">NEW IN 2.0 · Themes, window size and text controls</p>
       <div class="trust">
         <span><span class="dot">✦</span> <span data-i18n="trust_local">Files stay on your device</span></span>
         <span><span class="dot">✦</span> <span data-i18n="trust_unlimited">No subscription</span></span>
@@ -93,69 +92,36 @@
       </div>
     </div>
 
-    <figure class="export-preview">
-      <div class="preview-top"><span class="preview-bolt" aria-hidden="true">ϟ</span><strong>XPorter</strong><span class="preview-version">2.0.0</span></div>
-      <div class="preview-content">
-        <p class="eyebrow" data-i18n="preview_label">From a timeline to a working file</p>
-        <h2 data-i18n="preview_mode">Choose what to export</h2>
-        <div class="preview-sources"><span data-i18n="preview_posts">Posts &amp; bookmarks</span><span data-i18n="preview_lists">Followers &amp; following</span></div>
-        <div class="preview-path" aria-hidden="true"><span></span>↓<span></span></div>
-        <div class="preview-file"><div class="file-heading"><span class="file-mark" aria-hidden="true">↳</span><strong>xporter_posts.csv</strong><span class="file-extension">.csv</span></div><p data-i18n="preview_fields">Post text · Links · Dates · Engagement</p><div class="file-lines" aria-hidden="true"><i></i><i></i><i></i></div></div>
-        <div class="preview-formats" aria-label="File formats"><span>CSV</span><span>XLSX</span><span>JSON</span><span>TXT</span></div>
-        <p class="preview-result" data-i18n="preview_result">Keep the context. Keep the numbers.</p>
+    <figure class="product-preview">
+      <div class="product-stage">
+        <span class="stage-label" data-i18n="preview_label">THE EXTENSION, UP CLOSE</span>
+        <div class="product-window">
+          <img class="product-dark" src="./assets/xporter-dark.png" width="700" height="1200" alt="XPorter: Posts, Excel (XLSX), @example, post type filters and Start exporting" fetchpriority="high" />
+          <img class="product-light" src="./assets/xporter-light.png" width="700" height="1200" alt="XPorter: Posts, Excel (XLSX), @example, post type filters and Start exporting" fetchpriority="high" />
+        </div>
+        <div class="output-slip"><span class="output-check" aria-hidden="true">↳</span><div><strong>xporter_posts.xlsx</strong><span data-i18n="preview_result">Ready for your spreadsheet</span></div><span class="output-extension">XLSX</span></div>
       </div>
-      <figcaption data-i18n="preview_caption">Illustrative export preview. Available fields depend on the data X returns.</figcaption>
+      <figcaption data-i18n="preview_caption">XPorter interface · example profile. Export illustration.</figcaption>
     </figure>
   </header>
 
-  <!-- FEATURES -->
-  <section id="features" class="wrap">
-    <div class="section-head reveal">
-      <span class="eyebrow" data-i18n="feat_eyebrow">Features</span>
-      <h2 data-i18n="feat_head">Collect once. Work with it your way.</h2>
-      <p data-i18n="feat_sub">Archive your writing, review an audience, compare posts or prepare a dataset for a spreadsheet or an AI tool.</p>
+  <section id="features" class="wrap detail-section">
+    <div class="section-head"><span class="eyebrow" data-i18n="datasets_eyebrow">What you can export</span><h2 data-i18n="datasets_head">Posts, saved reads, people.</h2><p data-i18n="datasets_intro">Choose from five export modes. Save the details behind the timeline, bookmarks and account lists.</p></div>
+    <div id="datasets" class="data-cards">
+      <article><span class="data-index">01 / POSTS</span><h3 data-i18n="dataset_posts">Posts</h3><p data-i18n="dataset_posts_d">Post text, dates, links, authors and available engagement metrics. Include original posts, quotes, replies, reposts and articles.</p><div class="data-fields" aria-hidden="true"><span>text</span><span>date</span><span>likes</span><span>views</span></div></article>
+      <article><span class="data-index">02 / BOOKMARKS</span><h3 data-i18n="dataset_bookmarks">Personal bookmarks</h3><p data-i18n="dataset_bookmarks_d">Keep the posts saved in your current X account, with their text, authors and links. Build a reading archive you can search and reuse.</p><div class="data-fields" aria-hidden="true"><span>text</span><span>author</span><span>url</span></div></article>
+      <article><span class="data-index">03 / PEOPLE</span><h3 data-i18n="dataset_people">Followers &amp; following</h3><p data-i18n="dataset_people_d">Export followers, following or verified followers. Keep usernames, bios, profile links and available account details.</p><div class="data-fields" aria-hidden="true"><span>username</span><span>bio</span><span>followers</span></div></article>
     </div>
-    <div class="bento">
-      <div class="fcard reveal">
-        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-        <h3 data-i18n="f_types_t">Posts, bookmarks and people</h3>
-        <p data-i18n="f_types_d">Export accessible profile posts, your signed-in account’s bookmarks, followers, following and verified followers.</p>
-      </div>
-      <div class="fcard reveal">
-        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg></div>
-        <h3 data-i18n="f_formats_t">A format for the next step</h3>
-        <p data-i18n="f_formats_d">CSV and Excel for spreadsheets, JSON for code, and TXT for post text you can read or copy into an AI tool.</p>
-      </div>
-      <div class="fcard reveal">
-        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
-        <h3 data-i18n="f_dates_t">Filter posts by date</h3>
-        <p data-i18n="f_dates_d">Choose an inclusive date range for posts in your browser’s timezone. Results depend on what X search makes available.</p>
-      </div>
-      <div class="fcard reveal">
-        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
-        <h3 data-i18n="f_resume_t">Progress you can keep</h3>
-        <p data-i18n="f_resume_d">Stop an export, save the rows already collected and resume a compatible saved session. X limits can still pause collection.</p>
-      </div>
-
-    </div>
-  </section>
-
-  <section id="datasets" class="wrap detail-section">
-    <div class="section-head"><span class="eyebrow" data-i18n="datasets_eyebrow">What you can export</span><h2 data-i18n="datasets_head">The data behind the profile</h2><p data-i18n="datasets_intro">Five export modes cover posts and account lists. Exporting bookmarks uses your own signed-in X account.</p></div>
-    <dl class="dataset-list">
-      <div><dt data-i18n="dataset_posts">Posts</dt><dd data-i18n="dataset_posts_d">Text, post URL, timestamp, author, language, available engagement counts, hashtags and media links. Filter post types and, when needed, dates.</dd></div>
-      <div><dt data-i18n="dataset_bookmarks">Personal bookmarks</dt><dd data-i18n="dataset_bookmarks_d">Save the posts bookmarked by the account you are signed in to. Other people’s private bookmarks are not accessible.</dd></div>
-      <div><dt data-i18n="dataset_people">Followers, following &amp; verified followers</dt><dd data-i18n="dataset_people_d">Account IDs, usernames, names, bios, profile URLs, available counts, verification, join dates, locations and websites. Missing values remain missing.</dd></div>
-    </dl>
-    <p class="editorial-note" data-i18n="dataset_note">XPorter does not bypass protected accounts, deleted content or X’s access restrictions. An export is a snapshot of what X returns, not a guarantee of a complete historical archive.</p>
+    <div class="export-controls"><div><h3 data-i18n="f_dates_t">Choose your period</h3><p data-i18n="f_dates_d">Filter posts by type and date range. Dates follow your browser’s time zone; results depend on X search coverage.</p></div><div><h3 data-i18n="f_resume_t">Keep your progress</h3><p data-i18n="f_resume_d">Stop collection, save what you have and resume a compatible saved session.</p></div><div><h3 data-i18n="controls_head">Make it comfortable</h3><p data-i18n="controls_short">14 extension languages, light and dark themes, adjustable window and text sizes.</p></div></div>
+    <p class="editorial-note" data-i18n="dataset_note">X decides which data is available and how fast it can be collected. Deleted posts, access restrictions and rate limits still apply.</p>
   </section>
   <section id="formats" class="wrap detail-section">
-    <div class="section-head"><span class="eyebrow" data-i18n="formats_eyebrow">Choose your file</span><h2 data-i18n="formats_head">A spreadsheet. A script. An AI conversation.</h2></div>
+    <div class="section-head"><span class="eyebrow" data-i18n="formats_eyebrow">Choose your file</span><h2 data-i18n="formats_head">One export. Your next step.</h2></div>
     <div class="format-grid">
-      <article class="format-card"><span class="format-extension">.csv</span><h3 data-i18n="format_csv">Sort, filter and compare</h3><p data-i18n="format_csv_d">Open CSV in Excel or import it into Google Sheets. Useful for post metrics and account lists.</p></article>
-      <article class="format-card"><span class="format-extension">.xlsx</span><h3 data-i18n="format_xlsx">Work directly in Excel</h3><p data-i18n="format_xlsx_d">Save an XLSX workbook. Optional photo previews use a separate Media sheet and require your permission to access X’s image host.</p></article>
-      <article class="format-card"><span class="format-extension">.json</span><h3 data-i18n="format_json">Build your own analysis</h3><p data-i18n="format_json_d">Use structured records in Python, JavaScript or your own data pipeline. Preserve the exported fields for later processing.</p></article>
-      <article class="format-card"><span class="format-extension">.txt</span><h3 data-i18n="format_txt">Read or use with AI</h3><p data-i18n="format_txt_d">For post-based exports, save readable text or copy it to the clipboard. You choose whether to share that text with an AI service.</p></article>
+      <article class="format-card"><span class="format-extension">.csv</span><h3 data-i18n="format_csv">Sort, filter and compare</h3><p data-i18n="format_csv_d">A lightweight table for Excel, Google Sheets and quick comparisons.</p></article>
+      <article class="format-card"><span class="format-extension">.xlsx</span><h3 data-i18n="format_xlsx">Work directly in Excel</h3><p data-i18n="format_xlsx_d">An Excel workbook, with optional photo previews on a separate Media sheet.</p></article>
+      <article class="format-card"><span class="format-extension">.json</span><h3 data-i18n="format_json">Build your own analysis</h3><p data-i18n="format_json_d">Structured records for Python, JavaScript and your own data workflows.</p></article>
+      <article class="format-card"><span class="format-extension">.txt</span><h3 data-i18n="format_txt">Read or use with AI</h3><p data-i18n="format_txt_d">Readable post text for your notes or an AI tool. Available for post-based exports.</p></article>
     </div>
   </section>
   <!-- HOW IT WORKS -->
@@ -187,16 +153,13 @@
     </div>
   </section>
 
-  <section class="wrap controls-section"><h2 data-i18n="controls_head">Make the extension fit your workflow</h2><p data-i18n="controls_d">Version 2.0.0 adds a redesigned interface with theme presets and separate controls for window, element and text size. The extension supports 14 languages. Export speed, custom delays and scheduled breaks let you adjust collection; X’s live rate limits take priority.</p></section>
 
   <!-- PRIVACY -->
   <section id="privacy" class="wrap">
     <div class="privacy-box reveal">
       <div class="shield"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-      <h2 data-i18n="priv_t">Local files. Clear data boundaries.</h2>
-      <p data-i18n="priv_d">XPorter creates export files in your browser and does not upload their contents to a XPorter server. Requests use your signed-in X session. In version 2.0.0, product diagnostics stay local during use. Opening the uninstall feedback page sends limited product diagnostics; optional written feedback includes what you submit. A random installation identifier makes those reports pseudonymous, not guaranteed anonymous.</p>
-      <p data-i18n="priv_extra">The extension also keeps a local dataset of non-reply posts X has already loaded while you browse. It makes no extra collection requests for this dataset; you can export or clear it in Settings. Exported content and X credentials are not included in automatic uninstall diagnostics.</p>
-      <p><a href="./privacy-policy.html" data-i18n="priv_link">Read the full privacy policy →</a></p>
+      <h2 data-i18n="priv_t">Your export stays with you.</h2>
+      <div class="privacy-copy"><p data-i18n="priv_short">Files are created in your browser. XPorter does not upload exported content to its server or send it to an AI service.</p><details class="privacy-detail"><summary data-i18n="priv_details">Local storage and diagnostics</summary><p data-i18n="priv_d">XPorter creates export files in your browser and does not upload their contents to a XPorter server. Requests use your signed-in X session. In version 2.0.0, product diagnostics stay local during use. Opening the uninstall feedback page sends limited product diagnostics; optional written feedback includes what you submit. A random installation identifier makes those reports pseudonymous, not guaranteed anonymous.</p><p data-i18n="priv_extra">The extension also keeps a local dataset of non-reply posts X has already loaded while you browse. It makes no extra collection requests for this dataset; you can export or clear it in Settings. Exported content and X credentials are not included in automatic uninstall diagnostics.</p></details><a href="./privacy-policy.html" data-i18n="priv_link">Read the full privacy policy →</a></div>
     </div>
   </section>
 
@@ -204,18 +167,18 @@
   <section id="faq" class="wrap detail-section">
     <div class="section-head"><span class="eyebrow" data-i18n="faq_eyebrow">Before you start</span><h2 data-i18n="faq_head">A few useful answers</h2></div>
     <div class="faq-grid">
-      <article><h3 data-i18n="faq_free_q">Is XPorter free?</h3><p data-i18n="faq_free_a">Yes. There is no subscription, per-export payment or paid XPorter tier. Free exports still depend on X’s rate limits, search coverage, available timelines and your browser’s resources.</p></article>
-      <article><h3 data-i18n="faq_key_q">Do I need an X API key?</h3><p data-i18n="faq_key_a">No. XPorter uses the X account already signed in to your browser. It does not ask for your X password or require a separate XPorter login.</p></article>
-      <article><h3 data-i18n="faq_all_q">Can it export every post or follower?</h3><p data-i18n="faq_all_a">Completeness is not guaranteed. X may limit timelines or search results, return fewer accounts than a profile counter shows, or stop a request. You can save partial results and resume when the saved session supports it.</p></article>
-      <article><h3 data-i18n="faq_pause_q">Why did collection slow down or pause?</h3><p data-i18n="faq_pause_a">X sets request quotas. XPorter respects available quota headers and retries some temporary failures. Faster presets cannot remove those limits. If collection stalls, save the rows you have and follow the status message before retrying.</p></article>
-      <article><h3 data-i18n="faq_photos_q">Does an export include photos and videos?</h3><p data-i18n="faq_photos_a">Post exports include available media links. XLSX can also embed bounded photo previews in a Media sheet with optional image-host permission. It is not a full-resolution photo or video archive.</p></article>
-      <article><h3 data-i18n="faq_ai_q">Does XPorter send my posts to an AI service?</h3><p data-i18n="faq_ai_a">No. TXT makes post exports easier to read and reuse. Copying or uploading a file to an AI service is a separate action you choose, subject to that service’s data policy.</p></article>
-      <article><h3 data-i18n="faq_browser_q">Which browsers can use it?</h3><p data-i18n="faq_browser_a">XPorter is distributed through the Chrome Web Store for desktop Chrome. Other Chromium browsers may support the extension, but compatibility and installation rules can differ. This is not a mobile X app.</p></article>
-      <article><h3 data-i18n="faq_help_q">Where can I report a problem?</h3><p data-i18n="faq_help_a">Use the Telegram, email or GitHub links below. Include the extension version, export mode and visible error message. Leave out passwords, cookies and any private exported content.</p></article>
+      <details><summary data-i18n="faq_free_q">Is XPorter free?</summary><p data-i18n="faq_free_a">Yes. There is no subscription, per-export payment or paid XPorter tier. Free exports still depend on X’s rate limits, search coverage, available timelines and your browser’s resources.</p></details>
+      <details><summary data-i18n="faq_key_q">Do I need an X API key?</summary><p data-i18n="faq_key_a">No. XPorter uses the X account already signed in to your browser. It does not ask for your X password or require a separate XPorter login.</p></details>
+      <details><summary data-i18n="faq_all_q">Can it export every post or follower?</summary><p data-i18n="faq_all_a">Completeness is not guaranteed. X may limit timelines or search results, return fewer accounts than a profile counter shows, or stop a request. You can save partial results and resume when the saved session supports it.</p></details>
+      <details><summary data-i18n="faq_pause_q">Why did collection slow down or pause?</summary><p data-i18n="faq_pause_a">X sets request quotas. XPorter respects available quota headers and retries some temporary failures. Faster presets cannot remove those limits. If collection stalls, save the rows you have and follow the status message before retrying.</p></details>
+      <details><summary data-i18n="faq_photos_q">Does an export include photos and videos?</summary><p data-i18n="faq_photos_a">Post exports include available media links. XLSX can also embed bounded photo previews in a Media sheet with optional image-host permission. It is not a full-resolution photo or video archive.</p></details>
+      <details><summary data-i18n="faq_ai_q">Does XPorter send my posts to an AI service?</summary><p data-i18n="faq_ai_a">No. TXT makes post exports easier to read and reuse. Copying or uploading a file to an AI service is a separate action you choose, subject to that service’s data policy.</p></details>
+      <details><summary data-i18n="faq_browser_q">Which browsers can use it?</summary><p data-i18n="faq_browser_a">XPorter is distributed through the Chrome Web Store for desktop Chrome. Other Chromium browsers may support the extension, but compatibility and installation rules can differ. This is not a mobile X app.</p></details>
+      <details><summary data-i18n="faq_help_q">Where can I report a problem?</summary><p data-i18n="faq_help_a">Use the Telegram, email or GitHub links below. Include the extension version, export mode and visible error message. Leave out passwords, cookies and any private exported content.</p></details>
     </div>
   </section>
   <!-- PUBLIC GROWTH TRAJECTORY -->
-  <section id="growth" class="wrap">
+  <section id="growth" class="wrap"><details class="growth-archive"><summary data-i18n="growth_archive_label">Project archive · growth data through July 2026</summary><div class="archive-content">
     <div class="growth-intro">
       <div class="section-head reveal">
         <span class="eyebrow" data-i18n="growth_eyebrow">Public growth archive</span>
@@ -266,11 +229,12 @@
     <p class="growth-error" id="growthError" data-i18n="growth_error">The growth data could not be loaded.</p>
     <p class="growth-note reveal" data-i18n="growth_note">This archive is preserved for transparency. The scenario range is not a confidence interval or a promise of future growth.</p>
     <p class="growth-note"><a href="./assets/growth-forecast.json" data-i18n="growth_source">Download the historical data and model results (JSON)</a></p>
+    </div></details>
   </section>
 
   <section class="wrap final reveal">
-    <h2 data-i18n="cta_t">Put your next export to work</h2>
-    <p data-i18n="cta_d">Install XPorter, choose the data you can access and save a file you control.</p>
+    <h2 data-i18n="cta_t">Your X data. A useful file.</h2>
+    <p data-i18n="cta_d">Free to install. No API key. Start with your next export.</p>
     <a class="btn btn-primary" id="finalInstall" href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener">
       <span class="bolt" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
       <span data-i18n="cta_btn">Add XPorter to Chrome</span>
@@ -293,7 +257,7 @@
           <a href="./privacy-policy.html" data-i18n="foot_privacy">Privacy</a>
           <a href="./llms.txt" data-i18n="foot_reference">Product reference for AI tools</a>
           <a href="./sitemap.xml" data-i18n="foot_sitemap">Sitemap</a>
-          <a href="#growth" data-i18n="nav_growth">Growth archive</a>
+          <a href="#growth" data-i18n="nav_growth">Growth archive</a><a href="./" lang="en" hreflang="en">English</a><a href="./ru/" lang="ru" hreflang="ru">Русский</a>
         </div>
       </div>
       <p class="disclaimer" data-i18n="foot_disclaimer">X and Twitter are trademarks of X Corp. XPorter is an independent tool and is not affiliated with, endorsed by, or connected to X Corp. or Twitter, Inc. © 2026 XPorter.</p>

@@ -7,39 +7,39 @@ Store version: 2.0.0 (updated 2026-09-09). The repository main branch may differ
 
 ## English
 
-Save X (Twitter) posts, your bookmarks and account lists to files you can actually work with. CSV, Excel, JSON or readable TXT, created in your browser.
+Your posts. Your saved reads. Your audience. Turn X (Twitter) data into a file for Excel, your own analysis or your next AI conversation.
 
-### The data behind the profile
+### Posts, saved reads, people.
 
-Five export modes cover posts and account lists. Exporting bookmarks uses your own signed-in X account.
+Choose from five export modes. Save the details behind the timeline, bookmarks and account lists.
 
 ### Posts
 
-Text, post URL, timestamp, author, language, available engagement counts, hashtags and media links. Filter post types and, when needed, dates.
+Post text, dates, links, authors and available engagement metrics. Include original posts, quotes, replies, reposts and articles.
 
 ### Personal bookmarks
 
-Save the posts bookmarked by the account you are signed in to. Other people’s private bookmarks are not accessible.
+Keep the posts saved in your current X account, with their text, authors and links. Build a reading archive you can search and reuse.
 
-### Followers, following & verified followers
+### Followers & following
 
-Account IDs, usernames, names, bios, profile URLs, available counts, verification, join dates, locations and websites. Missing values remain missing.
+Export followers, following or verified followers. Keep usernames, bios, profile links and available account details.
 
 ### Sort, filter and compare
 
-Open CSV in Excel or import it into Google Sheets. Useful for post metrics and account lists.
+A lightweight table for Excel, Google Sheets and quick comparisons.
 
 ### Work directly in Excel
 
-Save an XLSX workbook. Optional photo previews use a separate Media sheet and require your permission to access X’s image host.
+An Excel workbook, with optional photo previews on a separate Media sheet.
 
 ### Build your own analysis
 
-Use structured records in Python, JavaScript or your own data pipeline. Preserve the exported fields for later processing.
+Structured records for Python, JavaScript and your own data workflows.
 
 ### Read or use with AI
 
-For post-based exports, save readable text or copy it to the clipboard. You choose whether to share that text with an AI service.
+Readable post text for your notes or an AI tool. Available for post-based exports.
 
 ### From X to your Downloads folder
 
@@ -61,11 +61,11 @@ Select a mode and file format. Adjust post types, a row limit or a date range wh
 
 Start collection, follow the progress and save your file. Keep the search tab open for date exports. Large downloads may arrive in numbered parts.
 
-### Make the extension fit your workflow
+### Make it comfortable
 
 Version 2.0.0 adds a redesigned interface with theme presets and separate controls for window, element and text size. The extension supports 14 languages. Export speed, custom delays and scheduled breaks let you adjust collection; X’s live rate limits take priority.
 
-### Local files. Clear data boundaries.
+### Your export stays with you.
 
 XPorter creates export files in your browser and does not upload their contents to a XPorter server. Requests use your signed-in X session. In version 2.0.0, product diagnostics stay local during use. Opening the uninstall feedback page sends limited product diagnostics; optional written feedback includes what you submit. A random installation identifier makes those reports pseudonymous, not guaranteed anonymous.
 
@@ -105,45 +105,45 @@ Use the Telegram, email or GitHub links below. Include the extension version, ex
 
 Historical Chrome Web Store weekly-user data through July 16, 2026. The model scenarios below were calculated from that snapshot; they are not current user counts.
 
-XPorter does not bypass protected accounts, deleted content or X’s access restrictions. An export is a snapshot of what X returns, not a guarantee of a complete historical archive.
+X decides which data is available and how fast it can be collected. Deleted posts, access restrictions and rate limits still apply.
 
 The extension also keeps a local dataset of non-reply posts X has already loaded while you browse. It makes no extra collection requests for this dataset; you can export or clear it in Settings. Exported content and X credentials are not included in automatic uninstall diagnostics.
 
 ## Русский
 
-Сохрани посты X (Twitter), свои закладки и списки аккаунтов в удобный файл. CSV, Excel, JSON или читаемый TXT — прямо в браузере.
+Твои посты, закладки и аудитория. Сохрани данные X (Twitter) для работы в Excel, собственного анализа или следующего разговора с ИИ.
 
-### Данные за страницей профиля
+### Посты, закладки, люди.
 
-Пять режимов для публикаций и списков аккаунтов. Закладки выгружаются из твоего текущего аккаунта X.
+Пять режимов экспорта: сохрани содержимое ленты, закладки и списки аккаунтов вместе с полезными деталями.
 
 ### Посты
 
-Текст, ссылка, дата публикации, автор, язык, доступные метрики вовлечённости, хештеги и ссылки на медиа. Можно выбрать типы постов и нужный период.
+Текст, даты, ссылки, авторы и доступные метрики. Выбирай оригинальные посты, цитаты, ответы, репосты и статьи.
 
 ### Личные закладки
 
-Сохрани посты из закладок аккаунта, в который ты вошёл. Чужие личные закладки недоступны.
+Сохрани посты из закладок своего аккаунта X вместе с текстом, авторами и ссылками. Собери архив для чтения, поиска и новых идей.
 
-### Подписчики, подписки и верифицированные подписчики
+### Подписчики и подписки
 
-ID, имена и ники, описания, ссылки на профили, доступные счётчики, верификация, даты регистрации, местоположение и сайты. Недоступные значения не заполняются выдуманными данными.
+Выгрузи подписчиков, подписки или верифицированных подписчиков: ники, описания, ссылки на профили и доступные сведения об аккаунтах.
 
 ### Сортируй и сравнивай
 
-Открой CSV в Excel или импортируй в Google Таблицы. Подходит для сравнения метрик постов и списков аккаунтов.
+Лёгкая таблица для Excel, Google Таблиц и быстрого сравнения данных.
 
 ### Работай в Excel
 
-Сохрани книгу XLSX. По желанию добавь превью фотографий на отдельный лист Media: для этого потребуется разрешение на доступ к серверу изображений X.
+Книга Excel. По желанию — превью фотографий на отдельном листе Media.
 
 ### Создай свой анализ
 
-Используй структурированные записи в Python, JavaScript или своём обработчике данных. Сохрани выгруженные поля для дальнейшего анализа.
+Структурированные записи для Python, JavaScript и собственных инструментов анализа.
 
 ### Читай или передавай ИИ
 
-Для выгрузок с постами можно сохранить читаемый текст или скопировать его в буфер обмена. Передавать ли его ИИ-сервису — решаешь ты.
+Читаемый текст для заметок или ИИ-инструмента. Доступен для выгрузок с постами.
 
 ### Из X — в папку загрузок
 
@@ -165,11 +165,11 @@ ID, имена и ники, описания, ссылки на профили, 
 
 Запусти сбор, следи за прогрессом и сохрани файл. Для экспорта по датам оставь вкладку поиска открытой. Большие выгрузки могут сохраняться пронумерованными частями.
 
-### Настрой расширение под себя
+### Настраивай под себя
 
 В версии 2.0.0 обновлён интерфейс: появились темы и отдельные настройки размера окна, элементов и текста. Расширение поддерживает 14 языков. Скорость экспорта, своя задержка и запланированные паузы помогают настроить сбор; действующие лимиты X всегда имеют приоритет.
 
-### Локальные файлы. Понятная приватность.
+### Твоя выгрузка остаётся у тебя.
 
 XPorter создаёт файлы в браузере и не загружает их содержимое на свой сервер. Запросы используют твою сессию X. В версии 2.0.0 диагностика во время работы остаётся локально. При открытии страницы после удаления отправляется ограниченная диагностика продукта; добровольный отзыв содержит то, что ты сам отправишь. Случайный идентификатор установки связывает отчёты, поэтому они псевдонимные, а не гарантированно анонимные.
 
@@ -209,6 +209,6 @@ XPorter распространяется через Chrome Web Store для на
 
 Историческая статистика недельных пользователей Chrome Web Store по 16 июля 2026 года. Сценарии ниже рассчитаны по этому снимку и не отражают текущее число пользователей.
 
-XPorter не обходит защиту закрытых аккаунтов, удаление контента и ограничения доступа X. Экспорт — снимок полученных данных, а не гарантия полного исторического архива.
+Доступность данных и скорость сбора зависят от X. Удалённые посты, ограничения доступа и лимиты запросов по-прежнему учитываются.
 
 Расширение также хранит локальную базу постов без ответов, которые X уже загрузил при просмотре ленты. Для этой базы не выполняются дополнительные запросы сбора; её можно выгрузить или очистить в настройках. Содержимое экспорта и данные авторизации X не входят в автоматическую диагностику при удалении.

@@ -30,9 +30,14 @@ independent of this site update.
 The two homepages have unique titles, descriptions, canonical URLs, reciprocal
 EN/RU/x-default alternates, SoftwareApplication/WebSite/WebPage JSON-LD and a
 1200 × 630 Open Graph/Twitter preview. There are no fabricated ratings or reviews.
-Installation links and all main content work without JavaScript. The historical
-chart is loaded when approached. Manrope is self-hosted under SIL OFL 1.1; the
+Installation links and all main content work without JavaScript. FAQ and privacy details use native disclosures and work without scripts. The
+historical chart remains inside a collapsed archive and loads when approached. Manrope is self-hosted under SIL OFL 1.1; the
 font files and license are in `docs/assets/fonts/`.
+The hero uses local interface screenshots (`assets/xporter-dark.png` and
+`assets/xporter-light.png`) with an example profile, captured during the September
+9 interface review. The caption identifies the example; the file card is an
+illustration, not a live collection result. The screenshot follows the site theme.
+
 The social image has an editable source at `scripts/site/social-preview.svg`.
 After editing it, render `docs/assets/social-preview.png` at 1200 × 630, for
 example with `rsvg-convert -o docs/assets/social-preview.png scripts/site/social-preview.svg`.

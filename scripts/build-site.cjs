@@ -12,6 +12,10 @@ const escape = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').rep
 const copy = JSON.parse(read('translations.json'));
 const updates = JSON.parse(read('content.json'));
 for (const lang of ['en', 'ru']) Object.assign(copy[lang], updates[lang]);
+// The secondary hero action now leads to setup rather than GitHub.
+for (const lang of Object.keys(copy)) {
+  if (lang !== 'en' && lang !== 'ru') delete copy[lang].hero_cta2;
+}
 const generated = new Map();
 function emit(file, content) { generated.set(file, content); }
 const template = read('home.html');
