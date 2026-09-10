@@ -4,8 +4,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://lemelson.github.io/xporter-extension/privacy-policy.html" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
   <title>XPorter — Privacy Policy</title>
-  <meta name="description" content="How XPorter handles your data locally and communicates with X-owned services; diagnostic sharing during use is optional; uninstall feedback carries limited product diagnostics." />
+  <meta name="description" content="How XPorter handles your data locally and communicates with X-owned services; no diagnostic uploads during use; uninstall feedback carries limited product diagnostics." />
   <link rel="icon" type="image/png" href="assets/icon128.png" />
   <script>
     (function () {
@@ -135,7 +138,7 @@
       <h1>Privacy Policy <span class="badge">Plain English</span></h1>
       <p>Exported X content is processed locally in your browser. Export requests contact X-owned services.
         XPorter also keeps limited product diagnostics locally. Opening the uninstall feedback page sends a diagnostic
-        summary; sending diagnostics during use is optional and off by default. These reports exclude exported content,
+        summary; diagnostics are not uploaded during use. These reports exclude exported content,
         usernames, cookies and request URLs. Written feedback includes whatever you choose to submit.</p>
     </div>
 
@@ -179,8 +182,8 @@
       which the page records through Google Apps Script in Google Sheets. Compression is not encryption; the summary
       can be read from that URL and may remain in browser history.</p>
     <ul>
-      <li>Extension and coarse browser version, operating system, installation timing, interface language and theme</li>
-      <li>Popup opens, approximate active time, active days, export counts, collected row counts and selected export settings</li>
+      <li>Extension and coarse browser version, operating system, installation timing, interface language, light/dark mode and selected theme preset</li>
+      <li>Popup opens, number of ladybugs squashed, approximate active time, active days, export counts, collected row counts and selected export settings</li>
       <li>Current colorful appearance and ladybug preferences, window width and height, element and text size percentages,
         automatic deletion and its saved hours, selected export mode and format, content filters and photo options</li>
       <li>Up to five recent export attempts: mode, format, timing, result, fixed error code, phase, request/retry/rate-limit counts and pause time</li>
@@ -190,16 +193,12 @@
     </ul>
     <p>Recent details may be omitted to fit Chrome's uninstall URL limit. Reports mark omitted records explicitly.
       No exported content, X identifiers, file names, cookies, request URLs or full browser user-agent string are included automatically.</p>
-    <h3>Optional sharing during use</h3>
-    <p>In Settings you can enable diagnostic sharing and grant access to the Google collector. This is off by default.
-      When enabled, activity can send cumulative snapshots, at most approximately once a minute, updating one row per
-      installation and UTC day. Turning the setting off stops future uploads. A local JSON report can also be saved
-      without enabling sharing. Previously submitted reports are not deleted by turning sharing off or uninstalling.</p>
+    <h3>During use</h3>
+    <p>Product diagnostics stay local while using the extension. The optional usage-sharing experiment and local report button have been removed.</p>
     <div class="callout"><p>Diagnostics are pseudonymous, not guaranteed anonymous: the random identifier links reports.
       Feedback is stored in a Google spreadsheet configured for viewing by anyone with its link. Do not submit secrets
       or sensitive personal information. If you include contact details, they are stored with your feedback.</p></div>
-    <p>Reports help diagnose failures and improve XPorter. Optional sharing covers only users who choose it;
-      uninstall feedback covers only people whose feedback page loads. Neither is a complete count of users.</p>
+    <p>Reports help diagnose failures and improve XPorter. Uninstall feedback covers only people whose feedback page loads; it is not a complete count of users.</p>
 
     <h2>Permissions explained</h2>
     <h3><code>cookies</code></h3>
@@ -207,7 +206,7 @@
     <h3><code>activeTab</code></h3>
     <p>Detects when you're on an X.com profile and identifies the username being viewed.</p>
     <h3><code>downloads</code></h3>
-    <p>Saves the exported CSV, JSON or XLSX file to your Downloads folder when you click download.</p>
+    <p>Saves the exported CSV, JSON, XLSX or TXT file to your Downloads folder when you click download.</p>
     <h3><code>storage</code> &amp; <code>unlimitedStorage</code></h3>
     <p>Stores preferences, resumable export batches, recent export history, local diagnostic counters, and the
       deduplicated seen-post dataset locally in Chrome. <code>unlimitedStorage</code> prevents larger local datasets and
@@ -215,15 +214,12 @@
     <h3>Host access to x.com</h3>
     <p>Required to make API calls to X.com to retrieve the data you asked to export.</p>
 
-    <h3>Optional Google collector access</h3>
-    <p><code>script.google.com</code> and <code>script.googleusercontent.com</code> are requested only when you enable
-      diagnostic sharing. This permission lets the extension submit reports and read the collector acknowledgement.</p>
 
     <h2>Data storage</h2>
     <ul>
       <li>Export rows are saved in batches to Chrome's <code>storage.local</code> so interrupted exports can be resumed
         without losing already saved rows</li>
-      <li>Downloaded CSV, JSON, or XLSX files are saved to your local Downloads folder</li>
+      <li>Downloaded CSV, JSON, XLSX or TXT files are saved to your local Downloads folder</li>
       <li>The current export and data snapshots for up to five recent history entries may remain locally until they
         expire, you start or clear an export, clear history, or uninstall the extension</li>
       <li>The seen-post dataset keeps one row per post ID, retains the 50,000 most recently seen unique posts, and
@@ -259,7 +255,7 @@
       reply), or email <a href="mailto:art.lemelson@gmail.com">art.lemelson@gmail.com</a> (I check it rarely, so I may be
       slow). You can also find me on <a href="https://github.com/Lemelson/xporter-extension">GitHub</a>.</p>
 
-    <p style="margin-top: 30px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong> July 26, 2026</p>
+    <p style="margin-top: 30px; color: var(--text-muted); font-size: 13px;"><strong>Effective date:</strong> September 10, 2026</p>
   </div>
 
   <footer>

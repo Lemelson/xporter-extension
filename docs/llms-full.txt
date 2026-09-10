@@ -1,0 +1,214 @@
+# XPorter — product reference
+
+Last reviewed: 2026-09-10.
+Official website: https://lemelson.github.io/xporter-extension/
+Chrome Web Store: https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja
+Store version: 2.0.0 (updated 2026-09-09). The repository main branch may differ.
+
+## English
+
+Save X (Twitter) posts, your bookmarks and account lists to files you can actually work with. CSV, Excel, JSON or readable TXT, created in your browser.
+
+### The data behind the profile
+
+Five export modes cover posts and account lists. Exporting bookmarks uses your own signed-in X account.
+
+### Posts
+
+Text, post URL, timestamp, author, language, available engagement counts, hashtags and media links. Filter post types and, when needed, dates.
+
+### Personal bookmarks
+
+Save the posts bookmarked by the account you are signed in to. Other people’s private bookmarks are not accessible.
+
+### Followers, following & verified followers
+
+Account IDs, usernames, names, bios, profile URLs, available counts, verification, join dates, locations and websites. Missing values remain missing.
+
+### Sort, filter and compare
+
+Open CSV in Excel or import it into Google Sheets. Useful for post metrics and account lists.
+
+### Work directly in Excel
+
+Save an XLSX workbook. Optional photo previews use a separate Media sheet and require your permission to access X’s image host.
+
+### Build your own analysis
+
+Use structured records in Python, JavaScript or your own data pipeline. Preserve the exported fields for later processing.
+
+### Read or use with AI
+
+For post-based exports, save readable text or copy it to the clipboard. You choose whether to share that text with an AI service.
+
+### From X to your Downloads folder
+
+Install from the Chrome Web Store, then use your existing X session. No separate XPorter account.
+
+### Install and sign in to X
+
+Add XPorter to Chrome, open x.com and sign in there. Open the extension from your browser toolbar.
+
+### Choose the source
+
+Use a profile handle for posts and account lists. For Bookmarks, use the account currently signed in to X.
+
+### Choose the output
+
+Select a mode and file format. Adjust post types, a row limit or a date range where available.
+
+### Export and save
+
+Start collection, follow the progress and save your file. Keep the search tab open for date exports. Large downloads may arrive in numbered parts.
+
+### Make the extension fit your workflow
+
+Version 2.0.0 adds a redesigned interface with theme presets and separate controls for window, element and text size. The extension supports 14 languages. Export speed, custom delays and scheduled breaks let you adjust collection; X’s live rate limits take priority.
+
+### Local files. Clear data boundaries.
+
+XPorter creates export files in your browser and does not upload their contents to a XPorter server. Requests use your signed-in X session. In version 2.0.0, product diagnostics stay local during use. Opening the uninstall feedback page sends limited product diagnostics; optional written feedback includes what you submit. A random installation identifier makes those reports pseudonymous, not guaranteed anonymous.
+
+### Is XPorter free?
+
+Yes. There is no subscription, per-export payment or paid XPorter tier. Free exports still depend on X’s rate limits, search coverage, available timelines and your browser’s resources.
+
+### Do I need an X API key?
+
+No. XPorter uses the X account already signed in to your browser. It does not ask for your X password or require a separate XPorter login.
+
+### Can it export every post or follower?
+
+Completeness is not guaranteed. X may limit timelines or search results, return fewer accounts than a profile counter shows, or stop a request. You can save partial results and resume when the saved session supports it.
+
+### Why did collection slow down or pause?
+
+X sets request quotas. XPorter respects available quota headers and retries some temporary failures. Faster presets cannot remove those limits. If collection stalls, save the rows you have and follow the status message before retrying.
+
+### Does an export include photos and videos?
+
+Post exports include available media links. XLSX can also embed bounded photo previews in a Media sheet with optional image-host permission. It is not a full-resolution photo or video archive.
+
+### Does XPorter send my posts to an AI service?
+
+No. TXT makes post exports easier to read and reuse. Copying or uploading a file to an AI service is a separate action you choose, subject to that service’s data policy.
+
+### Which browsers can use it?
+
+XPorter is distributed through the Chrome Web Store for desktop Chrome. Other Chromium browsers may support the extension, but compatibility and installation rules can differ. This is not a mobile X app.
+
+### Where can I report a problem?
+
+Use the Telegram, email or GitHub links below. Include the extension version, export mode and visible error message. Leave out passwords, cookies and any private exported content.
+
+### An open look at an earlier snapshot
+
+Historical Chrome Web Store weekly-user data through July 16, 2026. The model scenarios below were calculated from that snapshot; they are not current user counts.
+
+XPorter does not bypass protected accounts, deleted content or X’s access restrictions. An export is a snapshot of what X returns, not a guarantee of a complete historical archive.
+
+The extension also keeps a local dataset of non-reply posts X has already loaded while you browse. It makes no extra collection requests for this dataset; you can export or clear it in Settings. Exported content and X credentials are not included in automatic uninstall diagnostics.
+
+## Русский
+
+Сохрани посты X (Twitter), свои закладки и списки аккаунтов в удобный файл. CSV, Excel, JSON или читаемый TXT — прямо в браузере.
+
+### Данные за страницей профиля
+
+Пять режимов для публикаций и списков аккаунтов. Закладки выгружаются из твоего текущего аккаунта X.
+
+### Посты
+
+Текст, ссылка, дата публикации, автор, язык, доступные метрики вовлечённости, хештеги и ссылки на медиа. Можно выбрать типы постов и нужный период.
+
+### Личные закладки
+
+Сохрани посты из закладок аккаунта, в который ты вошёл. Чужие личные закладки недоступны.
+
+### Подписчики, подписки и верифицированные подписчики
+
+ID, имена и ники, описания, ссылки на профили, доступные счётчики, верификация, даты регистрации, местоположение и сайты. Недоступные значения не заполняются выдуманными данными.
+
+### Сортируй и сравнивай
+
+Открой CSV в Excel или импортируй в Google Таблицы. Подходит для сравнения метрик постов и списков аккаунтов.
+
+### Работай в Excel
+
+Сохрани книгу XLSX. По желанию добавь превью фотографий на отдельный лист Media: для этого потребуется разрешение на доступ к серверу изображений X.
+
+### Создай свой анализ
+
+Используй структурированные записи в Python, JavaScript или своём обработчике данных. Сохрани выгруженные поля для дальнейшего анализа.
+
+### Читай или передавай ИИ
+
+Для выгрузок с постами можно сохранить читаемый текст или скопировать его в буфер обмена. Передавать ли его ИИ-сервису — решаешь ты.
+
+### Из X — в папку загрузок
+
+Установи расширение из Chrome Web Store и используй свой текущий аккаунт X. Отдельный аккаунт XPorter не нужен.
+
+### Установи и войди в X
+
+Добавь XPorter в Chrome, открой x.com и войди в аккаунт там. Открой расширение на панели браузера.
+
+### Выбери источник
+
+Укажи ник профиля для постов и списков аккаунтов. В режиме закладок используется текущий аккаунт X.
+
+### Настрой результат
+
+Выбери режим и формат. При необходимости задай типы постов, лимит строк или диапазон дат, если режим это поддерживает.
+
+### Выгрузи и сохрани
+
+Запусти сбор, следи за прогрессом и сохрани файл. Для экспорта по датам оставь вкладку поиска открытой. Большие выгрузки могут сохраняться пронумерованными частями.
+
+### Настрой расширение под себя
+
+В версии 2.0.0 обновлён интерфейс: появились темы и отдельные настройки размера окна, элементов и текста. Расширение поддерживает 14 языков. Скорость экспорта, своя задержка и запланированные паузы помогают настроить сбор; действующие лимиты X всегда имеют приоритет.
+
+### Локальные файлы. Понятная приватность.
+
+XPorter создаёт файлы в браузере и не загружает их содержимое на свой сервер. Запросы используют твою сессию X. В версии 2.0.0 диагностика во время работы остаётся локально. При открытии страницы после удаления отправляется ограниченная диагностика продукта; добровольный отзыв содержит то, что ты сам отправишь. Случайный идентификатор установки связывает отчёты, поэтому они псевдонимные, а не гарантированно анонимные.
+
+### XPorter бесплатный?
+
+Да. Нет подписки, оплаты за экспорт или платного тарифа XPorter. При этом остаются лимиты запросов X, ограничения поиска и лент, а также ресурсы браузера.
+
+### Нужен API-ключ X?
+
+Нет. XPorter использует аккаунт X, в который ты уже вошёл в браузере. Расширение не просит пароль от X и не требует отдельной регистрации.
+
+### Получится выгрузить все посты или всех подписчиков?
+
+Полнота не гарантируется. X может ограничить ленту и поиск, вернуть меньше аккаунтов, чем указано в профиле, или прервать запрос. Можно сохранить частичный результат и продолжить сбор, если сохранённая сессия поддерживает возобновление.
+
+### Почему сбор замедлился или встал на паузу?
+
+X ограничивает количество запросов. XPorter учитывает доступные сведения о квоте и повторяет часть временно неудачных запросов. Быстрый режим не снимает эти ограничения. При остановке сохрани собранные строки и посмотри сообщение статуса перед повтором.
+
+### В файле будут фотографии и видео?
+
+Выгрузки постов содержат доступные ссылки на медиа. В XLSX можно добавить ограниченные превью фотографий на лист Media, разрешив доступ к серверу изображений. Это не полный архив фото и видео в исходном качестве.
+
+### XPorter отправляет мои посты в ИИ-сервис?
+
+Нет. TXT упрощает чтение и повторное использование выгрузки. Копирование или загрузка файла в ИИ-сервис — отдельное действие по твоему выбору, с учётом политики этого сервиса.
+
+### В каких браузерах работает расширение?
+
+XPorter распространяется через Chrome Web Store для настольного Chrome. Другие браузеры на Chromium могут поддерживать расширение, но совместимость и правила установки различаются. Это не мобильное приложение X.
+
+### Куда сообщить о проблеме?
+
+Напиши через Telegram, email или GitHub по ссылкам внизу. Укажи версию расширения, режим экспорта и видимую ошибку. Не отправляй пароли, cookies и приватное содержимое выгрузки.
+
+### Снимок раннего этапа проекта
+
+Историческая статистика недельных пользователей Chrome Web Store по 16 июля 2026 года. Сценарии ниже рассчитаны по этому снимку и не отражают текущее число пользователей.
+
+XPorter не обходит защиту закрытых аккаунтов, удаление контента и ограничения доступа X. Экспорт — снимок полученных данных, а не гарантия полного исторического архива.
+
+Расширение также хранит локальную базу постов без ответов, которые X уже загрузил при просмотре ленты. Для этой базы не выполняются дополнительные запросы сбора; её можно выгрузить или очистить в настройках. Содержимое экспорта и данные авторизации X не входят в автоматическую диагностику при удалении.

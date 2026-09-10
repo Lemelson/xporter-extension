@@ -1,0 +1,3 @@
+# Append this directive to https://lemelson.github.io/robots.txt.
+# Do not replace rules belonging to other projects on this shared host.
+Sitemap: https://lemelson.github.io/xporter-extension/sitemap.xml

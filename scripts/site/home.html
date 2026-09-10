@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+
+<head>
+{{HEAD}}
+</head>
+
+<body>
+  <a class="skip-link" href="#main" data-i18n="skip"></a>
+
+  <!-- NAV -->
+  <nav aria-label="{{NAV_LABEL}}">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top">
+        <span class="bolt" aria-hidden="true">
+          <svg width="23" height="23" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>
+        </span>
+        XPorter
+      </a>
+      <div class="nav-links">
+        <a class="minor" href="#features" data-i18n="nav_features"></a>
+        <a class="minor" href="#formats">CSV / XLSX / JSON / TXT</a>
+        <a class="minor" href="#how" data-i18n="nav_how"></a>
+        <a class="minor" href="#privacy" data-i18n="nav_privacy"></a>
+        <a class="minor" href="#faq" data-i18n="nav_faq"></a>
+      </div>
+      <div class="nav-tools">
+        <span class="lang-wrap" data-js hidden><select class="lang-select" id="langSelect" aria-label="Language"><option value="{{LANG}}">{{LANG_NAME}}</option></select></span>
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle theme" data-js hidden>
+          <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <a class="btn btn-primary" id="navInstall" href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener" data-i18n="nav_install"></a>
+      </div>
+    </div>
+  </nav>
+  <div class="wrap language-links"><a href="{{ROOT}}" lang="en" hreflang="en">English</a><a href="{{ROOT}}ru/" lang="ru" hreflang="ru">Русский</a><span data-i18n="release_label"></span></div>
+  <p id="languageNote" class="wrap language-note" data-i18n="language_note" hidden></p>
+
+  <main id="main">
+  <!-- HERO -->
+  <header class="wrap hero" id="top">
+    <div class="reveal">
+      <span class="pill"><span class="bolt" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> <span data-i18n="hero_pill"></span></span>
+      <h1 data-i18n-html="hero_h1"></h1>
+      <p class="lead" data-i18n="hero_lead"></p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" id="heroInstall" href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener">
+          <span class="bolt" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
+          <span data-i18n="hero_cta1"></span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/Lemelson/xporter-extension" target="_blank" rel="noopener" data-i18n="hero_cta2"></a>
+      </div>
+      <p class="hero-note" data-i18n="hero_note"></p>
+      <div class="trust">
+        <span><span class="dot">✦</span> <span data-i18n="trust_local"></span></span>
+        <span><span class="dot">✦</span> <span data-i18n="trust_unlimited"></span></span>
+        <span><span class="dot">✦</span> CSV · JSON · XLSX · TXT</span>
+        <span><span class="dot">✦</span> <span data-i18n="trust_langs"></span></span>
+      </div>
+    </div>
+
+    <figure class="export-preview">
+      <div class="preview-top"><span class="preview-bolt" aria-hidden="true">ϟ</span><strong>XPorter</strong><span class="preview-version">2.0.0</span></div>
+      <div class="preview-content">
+        <p class="eyebrow" data-i18n="preview_label"></p>
+        <h2 data-i18n="preview_mode"></h2>
+        <div class="preview-sources"><span data-i18n="preview_posts"></span><span data-i18n="preview_lists"></span></div>
+        <div class="preview-path" aria-hidden="true"><span></span>↓<span></span></div>
+        <div class="preview-file"><div class="file-heading"><span class="file-mark" aria-hidden="true">↳</span><strong>xporter_posts.csv</strong><span class="file-extension">.csv</span></div><p data-i18n="preview_fields"></p><div class="file-lines" aria-hidden="true"><i></i><i></i><i></i></div></div>
+        <div class="preview-formats" aria-label="File formats"><span>CSV</span><span>XLSX</span><span>JSON</span><span>TXT</span></div>
+        <p class="preview-result" data-i18n="preview_result"></p>
+      </div>
+      <figcaption data-i18n="preview_caption"></figcaption>
+    </figure>
+  </header>
+
+  <!-- FEATURES -->
+  <section id="features" class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="feat_eyebrow"></span>
+      <h2 data-i18n="feat_head"></h2>
+      <p data-i18n="feat_sub"></p>
+    </div>
+    <div class="bento">
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <h3 data-i18n="f_types_t"></h3>
+        <p data-i18n="f_types_d"></p>
+      </div>
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg></div>
+        <h3 data-i18n="f_formats_t"></h3>
+        <p data-i18n="f_formats_d"></p>
+      </div>
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+        <h3 data-i18n="f_dates_t"></h3>
+        <p data-i18n="f_dates_d"></p>
+      </div>
+      <div class="fcard reveal">
+        <div class="ftile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></div>
+        <h3 data-i18n="f_resume_t"></h3>
+        <p data-i18n="f_resume_d"></p>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="datasets" class="wrap detail-section">
+    <div class="section-head"><span class="eyebrow" data-i18n="datasets_eyebrow"></span><h2 data-i18n="datasets_head"></h2><p data-i18n="datasets_intro"></p></div>
+    <dl class="dataset-list">
+      <div><dt data-i18n="dataset_posts"></dt><dd data-i18n="dataset_posts_d"></dd></div>
+      <div><dt data-i18n="dataset_bookmarks"></dt><dd data-i18n="dataset_bookmarks_d"></dd></div>
+      <div><dt data-i18n="dataset_people"></dt><dd data-i18n="dataset_people_d"></dd></div>
+    </dl>
+    <p class="editorial-note" data-i18n="dataset_note"></p>
+  </section>
+  <section id="formats" class="wrap detail-section">
+    <div class="section-head"><span class="eyebrow" data-i18n="formats_eyebrow"></span><h2 data-i18n="formats_head"></h2></div>
+    <div class="format-grid">
+      <article class="format-card"><span class="format-extension">.csv</span><h3 data-i18n="format_csv"></h3><p data-i18n="format_csv_d"></p></article>
+      <article class="format-card"><span class="format-extension">.xlsx</span><h3 data-i18n="format_xlsx"></h3><p data-i18n="format_xlsx_d"></p></article>
+      <article class="format-card"><span class="format-extension">.json</span><h3 data-i18n="format_json"></h3><p data-i18n="format_json_d"></p></article>
+      <article class="format-card"><span class="format-extension">.txt</span><h3 data-i18n="format_txt"></h3><p data-i18n="format_txt_d"></p></article>
+    </div>
+  </section>
+  <!-- HOW IT WORKS -->
+  <section id="how" class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow" data-i18n="how_eyebrow"></span>
+      <h2 data-i18n="how_head"></h2>
+      <p data-i18n="how_sub"></p>
+    </div>
+    <div class="steps-wrap">
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg></span></div>
+          <h3 data-i18n="s1_t"></h3><p data-i18n="s1_d"></p>
+        </div>
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span></div>
+          <h3 data-i18n="s2_t"></h3><p data-i18n="s2_d"></p>
+        </div>
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span></div>
+          <h3 data-i18n="s3_t"></h3><p data-i18n="s3_d"></p>
+        </div>
+        <div class="step reveal">
+          <div class="step-top"><span class="num"></span><span class="step-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+          <h3 data-i18n="s4_t"></h3><p data-i18n="s4_d"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap controls-section"><h2 data-i18n="controls_head"></h2><p data-i18n="controls_d"></p></section>
+
+  <!-- PRIVACY -->
+  <section id="privacy" class="wrap">
+    <div class="privacy-box reveal">
+      <div class="shield"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <h2 data-i18n="priv_t"></h2>
+      <p data-i18n="priv_d"></p>
+      <p data-i18n="priv_extra"></p>
+      <p><a href="{{ROOT}}privacy-policy.html" data-i18n="priv_link"></a></p>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section id="faq" class="wrap detail-section">
+    <div class="section-head"><span class="eyebrow" data-i18n="faq_eyebrow"></span><h2 data-i18n="faq_head"></h2></div>
+    <div class="faq-grid">
+      <article><h3 data-i18n="faq_free_q"></h3><p data-i18n="faq_free_a"></p></article>
+      <article><h3 data-i18n="faq_key_q"></h3><p data-i18n="faq_key_a"></p></article>
+      <article><h3 data-i18n="faq_all_q"></h3><p data-i18n="faq_all_a"></p></article>
+      <article><h3 data-i18n="faq_pause_q"></h3><p data-i18n="faq_pause_a"></p></article>
+      <article><h3 data-i18n="faq_photos_q"></h3><p data-i18n="faq_photos_a"></p></article>
+      <article><h3 data-i18n="faq_ai_q"></h3><p data-i18n="faq_ai_a"></p></article>
+      <article><h3 data-i18n="faq_browser_q"></h3><p data-i18n="faq_browser_a"></p></article>
+      <article><h3 data-i18n="faq_help_q"></h3><p data-i18n="faq_help_a"></p></article>
+    </div>
+  </section>
+  <!-- PUBLIC GROWTH TRAJECTORY -->
+  <section id="growth" class="wrap">
+    <div class="growth-intro">
+      <div class="section-head reveal">
+        <span class="eyebrow" data-i18n="growth_eyebrow"></span>
+        <h2 data-i18n="growth_head"></h2>
+        <p data-i18n="growth_sub"></p>
+      </div>
+      <p class="growth-disclosure reveal" data-i18n-html="growth_disclosure"></p>
+    </div>
+
+    <p class="growth-note" data-i18n="growth_fallback"></p>
+    <div id="growthInteractive" hidden>
+    <div class="growth-kpis reveal" aria-live="polite">
+      <div class="growth-kpi"><span data-i18n="growth_now"></span><strong id="growthNow">511</strong><small id="growthNowDate">2026-07-16</small></div>
+      <div class="growth-kpi"><span data-i18n="growth_year"></span><strong id="growthYear">—</strong><small data-i18n="growth_weighted"></small></div>
+      <div class="growth-kpi"><span data-i18n="growth_two_year"></span><strong id="growthTwoYear">—</strong><small data-i18n="growth_weighted"></small></div>
+      <div class="growth-kpi"><span data-i18n="growth_range"></span><strong id="growthRange">—</strong><small data-i18n="growth_scenarios"></small></div>
+    </div>
+
+    <div class="growth-panel reveal">
+      <div class="growth-toolbar">
+        <div>
+          <h3 data-i18n="growth_chart_title"></h3>
+          <p id="growthChartMeta" data-i18n="growth_fallback"></p>
+        </div>
+        <div class="horizon-switch" aria-label="Forecast horizon">
+          <button type="button" data-horizon="365" aria-pressed="true" data-i18n="growth_1y"></button>
+          <button type="button" data-horizon="730" aria-pressed="false" data-i18n="growth_2y"></button>
+        </div>
+      </div>
+      <div class="growth-chart-wrap">
+        <svg id="growthChart" viewBox="0 0 1000 430" role="img" aria-labelledby="growthChartTitle growthChartDesc">
+          <title id="growthChartTitle">XPorter weekly users and forecast</title>
+          <desc id="growthChartDesc">Historical Chrome Web Store weekly-user counts and a scenario forecast.</desc>
+        </svg>
+      </div>
+      <div class="growth-legend">
+        <span class="legend-item"><span class="legend-line"></span><span data-i18n="growth_actual"></span></span>
+        <span class="legend-item"><span class="legend-line forecast"></span><span data-i18n="growth_ensemble"></span></span>
+        <span class="legend-item"><span class="legend-band"></span><span data-i18n="growth_band"></span></span>
+        <button class="model-toggle" type="button" data-model="linear" aria-pressed="false" data-i18n="growth_linear"></button>
+        <button class="model-toggle" type="button" data-model="power" aria-pressed="false" data-i18n="growth_power"></button>
+        <button class="model-toggle" type="button" data-model="gompertz" aria-pressed="false" data-i18n="growth_gompertz"></button>
+      </div>
+    </div>
+
+    <div class="growth-methods reveal" id="growthMethods" aria-label="Forecast methods"></div>
+    </div>
+    <p class="growth-error" id="growthError" data-i18n="growth_error"></p>
+    <p class="growth-note reveal" data-i18n="growth_note"></p>
+    <p class="growth-note"><a href="{{ROOT}}assets/growth-forecast.json" data-i18n="growth_source"></a></p>
+  </section>
+
+  <section class="wrap final reveal">
+    <h2 data-i18n="cta_t"></h2>
+    <p data-i18n="cta_d"></p>
+    <a class="btn btn-primary" id="finalInstall" href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener">
+      <span class="bolt" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span>
+      <span data-i18n="cta_btn"></span>
+    </a>
+  </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="wrap">
+      <div class="foot-inner">
+        <a class="brand" href="#top">
+          <span class="bolt" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg></span> XPorter
+        </a>
+        <div class="foot-links">
+          <a href="https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja" target="_blank" rel="noopener">Chrome Web Store</a>
+          <a href="https://t.me/Lemelson" target="_blank" rel="noopener">Telegram</a>
+          <a href="mailto:art.lemelson@gmail.com">Email</a>
+          <a href="https://github.com/Lemelson/xporter-extension" target="_blank" rel="noopener">GitHub</a>
+          <a href="{{ROOT}}privacy-policy.html" data-i18n="foot_privacy"></a>
+          <a href="{{ROOT}}llms.txt" data-i18n="foot_reference"></a>
+          <a href="{{ROOT}}sitemap.xml" data-i18n="foot_sitemap"></a>
+          <a href="#growth" data-i18n="nav_growth"></a>
+        </div>
+      </div>
+      <p class="disclaimer" data-i18n="foot_disclaimer"></p>
+    </div>
+  </footer>
+
+
+  <script src="{{ROOT}}assets/site-copy.js" defer></script>
+  <script src="{{ROOT}}assets/site.js" defer></script>
+</body>
+
+</html>

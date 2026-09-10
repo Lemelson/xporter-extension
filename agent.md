@@ -480,3 +480,5 @@ Update `agent.md` (and `CLAUDE.md`) whenever you add/rename a file, change the m
 
 
 Feedback collector schema 2 and deployment: `backend/README.md`, canonical `backend/apps-script.gs`. Website `docs/feedback.html` decodes compressed diagnostics with `docs/assets/diagnostics-codec.js`, normalizes 14 languages via `feedback-language.js`, and confirms submitted feedback with `feedback-receipt.js`. Legacy extension URLs remain supported. Synthetic `?test=1` traffic is reserved for TelemetryTests. Extension-side v2 instrumentation is prepared separately from this site deployment.
+
+Public homepage: edit `scripts/site/` and run `node scripts/build-site.cjs`. Commit generated `docs/index.html`, `docs/ru/index.html`, shared site assets, sitemap and AI references together. `node scripts/build-site.cjs --check` verifies freshness; `node scripts/test-site.cjs` checks crawlable pages. Hosting constraints and external follow-ups are in `deployment/SEO.md`.

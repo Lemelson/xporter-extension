@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a111d"/>
+  <path d="M0 112H1200M0 526H1200M718 0V630" stroke="#243042"/>
+  <g transform="translate(58 37) scale(1.5)" fill="#ffd43b"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="108" y="68" fill="#f7f9fc" font-size="29" font-weight="700">XPorter</text>
+    <text x="1137" y="65" fill="#a8b4c5" font-size="19" text-anchor="end">Free Chrome extension</text>
+    <text x="60" y="226" fill="#f7f9fc" font-size="71" font-weight="700" letter-spacing="-3">Export <tspan fill="#75aff8">X data.</tspan></text>
+    <text x="60" y="310" fill="#f7f9fc" font-size="71" font-weight="700" letter-spacing="-3">Make it useful.</text>
+    <text x="63" y="377" fill="#b6c2d3" font-size="24">Posts. Bookmarks. Followers. Following.</text>
+    <text x="63" y="420" fill="#b6c2d3" font-size="24">Files created in your browser.</text>
+    <text x="63" y="584" fill="#a8b4c5" font-size="21">X (Twitter) exports · No API key · No subscription</text>
+    <rect x="770" y="169" width="370" height="282" rx="16" fill="#151f30" stroke="#39485e"/>
+    <path d="M770 238H1140" stroke="#39485e"/>
+    <text x="798" y="211" fill="#eff3f9" font-family="monospace" font-size="21">xporter_posts.csv</text>
+    <text x="798" y="279" fill="#93bff9" font-size="16">Text</text>
+    <text x="916" y="279" fill="#93bff9" font-size="16">Date</text>
+    <text x="1029" y="279" fill="#93bff9" font-size="16">Metrics</text>
+    <g fill="#3e5069"><rect x="798" y="303" width="90" height="8" rx="3"/><rect x="916" y="303" width="77" height="8" rx="3"/><rect x="1029" y="303" width="79" height="8" rx="3"/><rect x="798" y="337" width="77" height="8" rx="3"/><rect x="916" y="337" width="77" height="8" rx="3"/><rect x="1029" y="337" width="61" height="8" rx="3"/><rect x="798" y="371" width="90" height="8" rx="3"/><rect x="916" y="371" width="77" height="8" rx="3"/><rect x="1029" y="371" width="70" height="8" rx="3"/></g>
+    <text x="955" y="419" text-anchor="middle" fill="#a8b4c5" font-size="15">Illustrative export preview</text>
+    <text x="956" y="583" text-anchor="middle" fill="#75aff8" font-family="monospace" font-weight="700" font-size="23">CSV · XLSX · JSON · TXT</text>
+  </g>
+</svg>
