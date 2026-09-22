@@ -28,15 +28,65 @@ function extractUsername() {
     return match[1]; // Return original case
 }
 
+// ==================== Extension-context lifetime ====================
+// After the extension is reloaded or updated, this script keeps running in
+// already-open X tabs, but its extension context is gone: chrome.runtime.id
+// becomes undefined and sendMessage throws synchronously ("Extension context
+// invalidated"). Such an orphan must go quiet instead of throwing on every
+// DOM change and page message.
+let contextInvalidated = false;
+const contextTeardowns = [];
+
+function isContextAlive() {
+    if (contextInvalidated) return false;
+    try {
+        const runtime = typeof chrome !== 'undefined' ? chrome.runtime : null;
+        if (!runtime || typeof runtime.sendMessage !== 'function') return false;
+        // Chrome keeps the `id` property and clears its value on invalidation.
+        return !('id' in runtime) || Boolean(runtime.id);
+    } catch (_) {
+        return false;
+    }
+}
+
+function onContextTeardown(callback) {
+    contextTeardowns.push(callback);
+}
+
+function handleContextInvalidated() {
+    if (contextInvalidated) return;
+    contextInvalidated = true;
+    for (const teardown of contextTeardowns.splice(0)) {
+        try { teardown(); } catch (_) { /* best-effort cleanup */ }
+    }
+}
+
+function isInvalidationError(error) {
+    return /context invalidated/i.test(String(error?.message || error || ''));
+}
+
+// Every runtime message from this script goes through here.
+function safeSendMessage(message) {
+    if (!isContextAlive()) {
+        handleContextInvalidated();
+        return;
+    }
+    try {
+        const pending = chrome.runtime.sendMessage(message);
+        pending?.catch?.((error) => {
+            if (isInvalidationError(error)) handleContextInvalidated();
+            // Otherwise the worker may simply be busy/asleep: best-effort.
+        });
+    } catch (error) {
+        handleContextInvalidated();
+    }
+}
+
 function sendUsername(username) {
     if (username) {
-        // Guard: chrome.runtime may be undefined after extension update/reload
-        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
-        chrome.runtime.sendMessage({
+        safeSendMessage({
             type: 'SET_USERNAME',
             username: username
-        }).catch(() => {
-            // Extension context may not be available
         });
     }
 }
@@ -171,25 +221,49 @@ function extractTargetAccount(currentAccount = null) {
 
 let lastCurrentAccountKey = '';
 let currentAccountTimer = null;
+let currentAccountAttemptsLeft = 0;
+// X renders the account switcher lazily, so detection retries briefly after
+// the initial load and after each SPA navigation, then stops. extractCurrentAccount
+// reads innerText (forces layout), so it must never run on every DOM mutation.
+const CURRENT_ACCOUNT_RETRY_DELAY_MS = 500;
+const CURRENT_ACCOUNT_MAX_ATTEMPTS = 10;
 
 function detectCurrentAccount() {
     currentAccountTimer = null;
+    if (!isContextAlive()) {
+        handleContextInvalidated();
+        return;
+    }
+    currentAccountAttemptsLeft = Math.max(0, currentAccountAttemptsLeft - 1);
     const account = extractCurrentAccount();
-    if (!account) return;
+    if (!account) {
+        if (currentAccountAttemptsLeft > 0) {
+            currentAccountTimer = setTimeout(detectCurrentAccount, CURRENT_ACCOUNT_RETRY_DELAY_MS);
+        }
+        return;
+    }
+    currentAccountAttemptsLeft = 0;
     const key = JSON.stringify(account);
     if (key === lastCurrentAccountKey) return;
     lastCurrentAccountKey = key;
-    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
-    chrome.runtime.sendMessage({
+    safeSendMessage({
         type: 'SET_CURRENT_ACCOUNT',
         account
-    }).catch(() => {});
+    });
 }
 
 function scheduleCurrentAccountDetection() {
+    if (contextInvalidated) return;
+    currentAccountAttemptsLeft = CURRENT_ACCOUNT_MAX_ATTEMPTS;
     if (currentAccountTimer !== null) return;
     currentAccountTimer = setTimeout(detectCurrentAccount, 250);
 }
+
+onContextTeardown(() => {
+    if (currentAccountTimer !== null) clearTimeout(currentAccountTimer);
+    currentAccountTimer = null;
+    currentAccountAttemptsLeft = 0;
+});
 
 // Detect on initial page load
 const initialUsername = extractUsername();
@@ -197,42 +271,35 @@ if (initialUsername) {
     sendUsername(initialUsername);
 }
 
-// Detect on SPA navigation (X is a single-page app)
+// Detect on SPA navigation (X is a single-page app). The Navigation API
+// (Chrome 102+, below the manifest minimum) reports pushState/replaceState
+// navigations to this isolated world too; popstate covers back/forward.
 let lastUrl = window.location.href;
 
-// Use MutationObserver to detect URL changes in SPA.
-// We run at document_start, where document.body is still null —
-// observe document.documentElement instead (it exists at document_start),
-// and fall back to DOMContentLoaded just in case.
-const observer = new MutationObserver(() => {
-    scheduleCurrentAccountDetection();
+function handleLocationChange() {
+    if (contextInvalidated) return;
     if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
-        const username = extractUsername();
-        sendUsername(username);
+        sendUsername(extractUsername());
     }
-});
-
-function startUrlObserver() {
-    const root = document.documentElement || document.body;
-    if (!root) return false;
-    observer.observe(root, {
-        childList: true,
-        subtree: true
-    });
     scheduleCurrentAccountDetection();
-    return true;
 }
 
-if (!startUrlObserver()) {
-    document.addEventListener('DOMContentLoaded', startUrlObserver, { once: true });
+const navigationApi = window.navigation;
+if (navigationApi && typeof navigationApi.addEventListener === 'function') {
+    navigationApi.addEventListener('currententrychange', handleLocationChange);
+    onContextTeardown(() => navigationApi.removeEventListener('currententrychange', handleLocationChange));
 }
+window.addEventListener('popstate', handleLocationChange);
+onContextTeardown(() => window.removeEventListener?.('popstate', handleLocationChange));
 
-// Also listen for popstate events (back/forward navigation)
-window.addEventListener('popstate', () => {
-    const username = extractUsername();
-    sendUsername(username);
-});
+// document_start: the switcher is not rendered yet. Start the bounded retry
+// now and once more when the DOM is parsed (slow first loads).
+scheduleCurrentAccountDetection();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scheduleCurrentAccountDetection, { once: true });
+}
+window.addEventListener('load', scheduleCurrentAccountDetection, { once: true });
 
 // ==================== GraphQL QueryId Discovery via Fetch Interception ====================
 // X.com makes GraphQL requests with the correct queryIds.
@@ -244,7 +311,6 @@ window.addEventListener('popstate', () => {
 
 const CAPTURE_CONTRACT = globalThis.XPorterCaptureContract;
 const RELAY_POST_ID_PATTERN = /^\d{5,30}$/;
-const RELAY_POST_OPERATION_PATTERN = /(Timeline|Tweets|TweetDetail|Bookmarks|Likes|Community|ListLatest|UserMedia)/i;
 
 function sanitizeSeenPost(post) {
     const text = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
@@ -281,7 +347,8 @@ let captureProbeNonce = '';
 let captureHookReady = false;
 
 // Listen for messages from the MAIN-world interceptor
-window.addEventListener('message', (event) => {
+function handlePageMessage(event) {
+    if (contextInvalidated) return;
     if (event.source !== window) return;
     if (event.origin !== window.location.origin) return;
     if (event.data?.type === '__XPORTER_CAPTURE_READY__' &&
@@ -296,15 +363,17 @@ window.addEventListener('message', (event) => {
         const template = globalThis.XPorterNativeTemplate
             ?.sanitizeWireTemplate(event.data.template);
         if (!template) return;
-        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
-        chrome.runtime.sendMessage({
+        safeSendMessage({
             type: 'DISCOVERED_REQUEST_TEMPLATE',
             template
-        }).catch(() => { });
+        });
     }
     if (event.data?.type === '__XPORTER_GRAPHQL_RESPONSE__') {
         const { operationName, bodyText } = event.data;
         if (!CAPTURE_CONTRACT.isTrackedOperation(operationName)) return;
+        // Only XPorter's date-range search tab (/search) consumes these;
+        // do not ship multi-MB search bodies from any other X tab.
+        if (operationName === 'SearchTimeline' && window.location.pathname !== '/search') return;
         // Cap relayed body size — oversized payloads are dropped, not truncated.
         if (typeof bodyText !== 'string' ||
             bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) return;
@@ -313,21 +382,26 @@ window.addEventListener('message', (event) => {
         if (typeof event.data.url !== 'string' || !event.data.url.includes('/i/api/graphql/')) return;
         const captureError = ['SEARCH_RESPONSE_TOO_LARGE', 'SEARCH_NETWORK_ERROR'].includes(event.data.error)
             ? event.data.error : null;
-        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
-        chrome.runtime.sendMessage({
+        // Relay X's 429 reset time (unix seconds) only as a plain positive
+        // integer; the worker applies its own plausibility window.
+        const rateLimitReset = status === 429 &&
+            Number.isSafeInteger(event.data.rateLimitReset) && event.data.rateLimitReset > 0
+            ? event.data.rateLimitReset : null;
+        safeSendMessage({
             type: 'PAGE_GRAPHQL_RESPONSE',
             operationName: operationName,
             url: event.data.url,
             status: status,
             bodyText: bodyText,
+            ...(rateLimitReset ? { rateLimitReset } : {}),
             ...(captureError ? { error: captureError } : {})
-        }).catch(() => { });
+        });
     }
     if (event.data?.type === '__XPORTER_SEEN_POSTS__') {
         const { operationName, posts } = event.data;
         if (typeof operationName !== 'string' ||
             !/^[A-Za-z0-9_]{1,80}$/.test(operationName) ||
-            !RELAY_POST_OPERATION_PATTERN.test(operationName)) return;
+            !CAPTURE_CONTRACT.isPostOperation(operationName)) return;
         if (!Array.isArray(posts) || posts.length === 0 ||
             posts.length > CAPTURE_CONTRACT.MAX_POSTS_PER_MESSAGE) return;
         if (!posts.every(post => (
@@ -336,14 +410,15 @@ window.addEventListener('message', (event) => {
             typeof post.text === 'string' &&
             post.text.length <= CAPTURE_CONTRACT.MAX_POST_TEXT_CHARS
         ))) return;
-        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
-        chrome.runtime.sendMessage({
+        safeSendMessage({
             type: 'CAPTURE_FEED_POSTS',
             operationName,
             posts: posts.map(sanitizeSeenPost)
-        }).catch(() => { });
+        });
     }
-});
+}
+window.addEventListener('message', handlePageMessage);
+onContextTeardown(() => window.removeEventListener?.('message', handlePageMessage));
 
 function ensureXporterCaptureOverlay() {
     let overlay = document.getElementById('xporter-capture-overlay');
@@ -588,13 +663,19 @@ function ensureXporterCaptureOverlay() {
         const i = overlay._xporterI18n || {};
         button.disabled = true;
         button.textContent = i.stopping || 'Stopping…';
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-            chrome.runtime.sendMessage({ type: 'STOP_EXPORT' }).catch(() => { });
-        }
+        safeSendMessage({ type: 'STOP_EXPORT' });
     });
 
     return overlay;
 }
+
+onContextTeardown(() => {
+    const overlay = document.getElementById?.('xporter-capture-overlay');
+    if (overlay?._xporterPauseTicker) {
+        clearInterval(overlay._xporterPauseTicker);
+        overlay._xporterPauseTicker = null;
+    }
+});
 
 const CAPTURE_POST_LABELS = {
     en: {

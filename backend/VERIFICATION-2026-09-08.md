@@ -1,9 +1,9 @@
 # Telemetry deployment verification — 2026-09-08
 
 - Google account and workbook binding checked in browser by opening Apps Script from the target spreadsheet.
-- Bound spreadsheet ID: `1P-X_y88WQQb5vU7BIL5uR_477G6BiLWMtWxf7P0clss`.
+- Bound workbook confirmed (its ID is intentionally not recorded in the repository).
 - Existing deployment ID retained: `AKfycby70Cfxrt-lHWoKHUrtOdaiz5eG4gDQYCuM9TpmaV6OvH8qh1dcn0YBY3-pnxFc7XiFJg`.
-- Apps Script reports successful update to deployment **version 3, 2026-09-08**. Saved editor code was copied back and exactly matched the canonical collector (21,919 characters). Health returns `collector_version:2` and the exact workbook ID.
+- Apps Script reports successful update to deployment **version 3, 2026-09-08**. Saved editor code was copied back and exactly matched the canonical collector (21,919 characters). Health returned `collector_version:2` and the bound workbook's ID (the 2026-09-22 collector no longer returns it).
 - A subsequent final read also observed one new non-synthetic uninstall feedback row through collector 2; Sheet1 grew to 356 records and 61 columns. All original 355 rows retained every original cell value (new columns are blank for old rows).
 - `setupTelemetrySchema` completed. `TelemetrySchema` has 147 definitions. Compared all 355 existing Sheet1 rows and their 53 columns before/after deployment: unchanged.
 - Synthetic open/reason/detail/delayed-reason requests were acknowledged in `TelemetryTests`. Readback confirmed Chinese locale, 17 partial rows, blank unknown latency, immutable first timestamp, and preservation of the newer selected reason. The detail receipt was verified against the real server.

@@ -17,6 +17,7 @@ vm.runInContext(fs.readFileSync('utils/diagnostics-codec.js','utf8'),codecContex
 const codec=codecContext.XPorterDiagnosticsCodec;
 const browser=await chromium.launch({headless:true,executablePath:process.env.XPORTER_BROWSER_EXECUTABLE});
 const failures=[],packets=[];
+let receiptResponse = null;
 const langs=['en','ru','de','fr','es','it','pt','tr','ar','hi','ja','ko','zh','id'];
 try {
   const context=await browser.newContext({locale:'en-US',reducedMotion:'reduce'});
@@ -25,7 +26,7 @@ try {
     if(url.hostname==='localhost') {
       if(request.isNavigationRequest()) return route.fulfill({contentType:'text/html',body:fs.readFileSync('docs/feedback.html','utf8')});
       const asset=url.pathname.slice(1);
-      if(['assets/diagnostics-codec.js','assets/feedback-language.js','assets/feedback-receipt.js','vendor/canvas-confetti.browser.js'].includes(asset))
+      if(['assets/emoji-platform.js','assets/diagnostics-codec.js','assets/feedback-language.js','assets/feedback-receipt.js','vendor/canvas-confetti.browser.js'].includes(asset))
         return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join('docs',asset),'utf8')});
       return route.abort();
     }
@@ -36,13 +37,51 @@ try {
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(result)});
       }
       if(url.searchParams.has('callback')) {
-        const result=collector.ctx.findReceipt(url.searchParams.get('sessionId'),url.searchParams.get('receipt_id'));
+        const result=receiptResponse ? await receiptResponse()
+          : collector.ctx.findReceipt(url.searchParams.get('sessionId'),url.searchParams.get('receipt_id'));
         return route.fulfill({contentType:'application/javascript',body:url.searchParams.get('callback')+'('+JSON.stringify(result)+');'});
       }
     }
     return route.abort();
   });
+  await context.exposeBinding('recordCspViolation',(_,violation)=>failures.push('CSP: '+violation));
+  await context.addInitScript(()=>document.addEventListener('securitypolicyviolation',event=>{
+    window.recordCspViolation(event.violatedDirective+' '+event.blockedURI);
+  }));
   const page=await context.newPage();page.on('pageerror',error=>failures.push(error.message));
+  // A slow receipt must never become success solely because 1.2 seconds passed.
+  for (const accepted of [false,true]) {
+    const receiptStarted=Promise.withResolvers(),receiptGate=Promise.withResolvers();
+    receiptResponse=()=>{receiptStarted.resolve();return receiptGate.promise;};
+    await page.goto('http://localhost/feedback.html?live=1&receipt-case='+accepted);
+    await page.locator('[data-reason="r_other"]').click();
+    await page.locator('#detail').fill('Synthetic delayed receipt');
+    await page.locator('#submitBtn').click();
+    await receiptStarted.promise;
+    await page.waitForTimeout(1400);
+    assert.equal(await page.locator('#thanks.show').count(),0,'success waits for persistence receipt');
+    assert.equal(await page.locator('#submitBtn').isDisabled(),true,'Send stays pending during receipt check');
+    receiptGate.resolve({ok:accepted});
+    if (accepted) await page.locator('#thanks.show').waitFor();
+    else {
+      await page.waitForFunction(()=>!document.querySelector('#submitBtn').disabled);
+      assert.equal(await page.locator('#thanks.show').count(),0,'failed receipt keeps feedback editable');
+      assert.equal(await page.locator('#detail').inputValue(),'Synthetic delayed receipt');
+    }
+  }
+  receiptResponse=null;
+  console.log('PASS delayed success and failure receipts: no optimistic acknowledgement');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.locator('#backToFeedback').click();
+  await page.locator('#detail').fill('');
+  await page.locator('#submitBtn').click();
+  await page.locator('#thanks.show').waitFor();
+  const cleared=packets.filter(item=>item.type==='detail').at(-1);
+  const sheetRows=collector.sheets.Sheet1.rows;
+  const clearedRow=sheetRows.find(row=>row[sheetRows[0].indexOf('sessionId')]===cleared.sessionId);
+  assert.equal(clearedRow[sheetRows[0].indexOf('detail')],'','Back and empty Send clears the saved comment');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  console.log('PASS clear-and-resubmit with normal-motion success screen');
   for(const lang of langs) {
     const stats={schema_version:2,v:'1.6.5',ui_lang:lang,install_id:'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       s_colorful:1,s_ladybug:0,s_window_width:125,s_window_height:75,s_element_size:110,s_text_size:120,

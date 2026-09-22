@@ -44,11 +44,13 @@ const queueUsageMutation = createMutationQueue();
  */
 async function checkStorageQuota() {
     try {
-        const bytesInUse = await chrome.storage.local.getBytesInUse(null);
+        // With unlimitedStorage there is no quota to approach; skip the
+        // getBytesInUse(null) walk over every stored key.
         const hasUnlimitedStorage = chrome.runtime?.getManifest?.().permissions?.includes('unlimitedStorage');
         if (hasUnlimitedStorage) {
-            return { bytesInUse, quota: Infinity, percentUsed: 0, isWarning: false };
+            return { bytesInUse: null, quota: Infinity, percentUsed: 0, isWarning: false };
         }
+        const bytesInUse = await chrome.storage.local.getBytesInUse(null);
         const quota = chrome.storage.local.QUOTA_BYTES || 10485760; // 10 MB default
         const threshold = (typeof XPORTER_CONFIG !== 'undefined')
             ? XPORTER_CONFIG.STORAGE_WARN_THRESHOLD
@@ -94,6 +96,18 @@ async function safeGet(keys) {
     }
 }
 
+// Reads that control data export or retention must distinguish a failed read
+// from a missing key. Only optional display/cache values may use safeGet.
+async function requiredGet(keys) {
+    try {
+        return await chrome.storage.local.get(keys);
+    } catch (e) {
+        const log = (typeof XLog !== 'undefined') ? XLog : console;
+        log.error('Storage read failed:', e.message);
+        throw new Error('STORAGE_READ_FAILED');
+    }
+}
+
 // ==================== Export State ====================
 
 /**
@@ -109,10 +123,11 @@ async function saveExportState(state) {
 }
 
 /**
- * Load current export state
+ * Load current export state. Missing state is null; a failed read must abort
+ * callers before they treat saved data as absent or replace a resumable export.
  */
 async function loadExportState() {
-    const result = await safeGet(STORAGE_KEYS.EXPORT_STATE);
+    const result = await requiredGet(STORAGE_KEYS.EXPORT_STATE);
     return result[STORAGE_KEYS.EXPORT_STATE] || null;
 }
 
@@ -135,24 +150,37 @@ async function saveTweetBatch(batchIndex, tweets) {
 }
 
 /**
- * Load all tweet batches
+ * Read saved batches by index. Batch data must never degrade to an empty
+ * batch: a rejected read, or a missing key inside the saved range (batches are
+ * written contiguously), rejects with STORAGE_READ_FAILED so callers cannot
+ * turn it into a short file or history entry reported as complete.
+ */
+async function readTweetBatches(indices) {
+    const keys = indices.map(index => STORAGE_KEYS.TWEETS_PREFIX + index);
+    const result = await requiredGet(keys);
+    return keys.map(key => {
+        const batch = result?.[key];
+        if (!Array.isArray(batch)) {
+            const log = (typeof XLog !== 'undefined') ? XLog : console;
+            log.error(`Saved batch ${key} is missing`);
+            throw new Error('STORAGE_READ_FAILED');
+        }
+        return batch;
+    });
+}
+
+/**
+ * Load all tweet batches (rejects with STORAGE_READ_FAILED on a failed read)
  */
 async function loadAllTweets() {
     const state = await loadExportState();
     if (!state || !state.totalBatches) return [];
 
-    const keys = [];
-    for (let i = 0; i < state.totalBatches; i++) {
-        keys.push(STORAGE_KEYS.TWEETS_PREFIX + i);
-    }
-
-    const result = await safeGet(keys);
+    const indices = Array.from({ length: state.totalBatches }, (_, index) => index);
     const allTweets = [];
-    for (let i = 0; i < state.totalBatches; i++) {
-        const batch = result[STORAGE_KEYS.TWEETS_PREFIX + i] || [];
+    for (const batch of await readTweetBatches(indices)) {
         allTweets.push(...batch);
     }
-
     return allTweets;
 }
 
@@ -188,12 +216,11 @@ async function saveAboutAccountCache(cache) {
 }
 
 /**
- * Load one saved export batch.
+ * Load one saved export batch (rejects with STORAGE_READ_FAILED).
  */
 async function loadTweetBatch(batchIndex) {
-    const key = STORAGE_KEYS.TWEETS_PREFIX + batchIndex;
-    const result = await safeGet(key);
-    return result[key] || [];
+    const [batch] = await readTweetBatches([batchIndex]);
+    return batch;
 }
 
 /**
@@ -206,12 +233,7 @@ async function loadTweetBatches(startBatch, count) {
     const size = Math.max(0, Number(count) || 0);
     if (size === 0) return [];
 
-    const keys = [];
-    for (let i = start; i < start + size; i++) {
-        keys.push(STORAGE_KEYS.TWEETS_PREFIX + i);
-    }
-    const result = await safeGet(keys);
-    return keys.map(key => result[key] || []);
+    return readTweetBatches(Array.from({ length: size }, (_, offset) => start + offset));
 }
 
 // ==================== Cleanup ====================
@@ -227,8 +249,11 @@ async function clearExportState() {
     // older, larger one — otherwise strands unreachable batch keys that eat
     // quota forever.
     try {
-        const all = await chrome.storage.local.get(null);
-        for (const key of Object.keys(all)) {
+        // getKeys (Chrome 130+) lists keys without loading every saved batch.
+        const keys = typeof chrome.storage.local.getKeys === 'function'
+            ? await chrome.storage.local.getKeys()
+            : Object.keys(await chrome.storage.local.get(null));
+        for (const key of keys) {
             if (key.startsWith(STORAGE_KEYS.TWEETS_PREFIX)) {
                 keysToRemove.push(key);
             }
@@ -457,11 +482,12 @@ function normalizePostSelection(saved = {}) {
 }
 
 /**
- * Load settings with defaults
+ * Load settings with defaults only for absent values. A failed read must not
+ * replace a disabled expiry preference with the enabled-by-default value.
  */
 async function loadSettings() {
     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
-    const result = await safeGet(STORAGE_KEYS.SETTINGS);
+    const result = await requiredGet(STORAGE_KEYS.SETTINGS);
     const saved = result[STORAGE_KEYS.SETTINGS] || {};
     const postSelection = normalizePostSelection(saved);
     // Convert the two previous post-filter models at the read boundary. New
@@ -639,10 +665,14 @@ function recordOpen() {
     });
 }
 
+// The popup flushes about every 10 s; one message can never legitimately
+// carry more than a few minutes (e.g. a laptop waking from sleep mid-interval).
+const MAX_ACTIVE_MS_PER_TICK = 5 * 60 * 1000;
+
 /** Accumulate active (visible) time spent in the extension UI, in ms. */
 function addActiveMs(ms) {
-    const n = Number(ms) || 0;
-    if (n <= 0) return Promise.resolve();
+    if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return Promise.resolve();
+    const n = Math.min(ms, MAX_ACTIVE_MS_PER_TICK);
     return mutateUsage(usage => {
         usage.activeMs = (usage.activeMs || 0) + n;
     });

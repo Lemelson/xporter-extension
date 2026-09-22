@@ -2,12 +2,17 @@
 // Owns history loading, rendering, downloads, and deletion UI.
 
 (function () {
-    function mount({ t, showToast, modeLabel, getLanguage }) {
+    // Building an XLSX with embedded photos can take minutes; the worker only
+    // answers after the file is handed to Chrome's downloads.
+    const HISTORY_DOWNLOAD_TIMEOUT = 180000;
+
+    function mount({ t, showToast, modeLabel, confirmAction, getLanguage }) {
         const toggle = document.getElementById('historyToggle');
         const chevron = document.getElementById('historyChevron');
         const list = document.getElementById('historyList');
         const empty = document.getElementById('historyEmpty');
-        if (!toggle || !chevron || !list || !empty) return;
+        if (!toggle || !chevron || !list || !empty) return { refreshLanguage() {} };
+        let lastHistory = null;
 
         toggle.addEventListener('click', async () => {
             const isOpen = !list.classList.contains('hidden');
@@ -27,6 +32,7 @@
         }
 
         function render(history) {
+            lastHistory = history;
             list.querySelectorAll('.history-card, .history-clear-btn').forEach(element => element.remove());
             if (history.length === 0) {
                 empty.classList.remove('hidden');
@@ -73,7 +79,9 @@
             const fallback = () => {
                 const placeholder = document.createElement('div');
                 placeholder.className = 'history-avatar-placeholder';
-                placeholder.textContent = (entry.displayName || entry.username || '?')[0].toUpperCase();
+                // Array.from keeps an emoji or other astral first character whole.
+                const initial = Array.from(String(entry.displayName || entry.username || '?'))[0] || '?';
+                placeholder.textContent = initial.toUpperCase();
                 return placeholder;
             };
             if (!entry.profileImageUrl || !String(entry.profileImageUrl).startsWith('https://')) {
@@ -130,7 +138,7 @@
                     type: 'DOWNLOAD_HISTORY_ENTRY',
                     id: entry.id,
                     outputFormat: entry.outputFormat || 'csv'
-                }, XPORTER_CONFIG.DOWNLOAD_MESSAGE_TIMEOUT || 30000);
+                }, HISTORY_DOWNLOAD_TIMEOUT);
                 button.disabled = false;
                 showToast(
                     result?.success === true ? t('downloadStarted') : formatError(result?.error || 'DOWNLOAD_FAILED', t),
@@ -157,6 +165,9 @@
                     showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
                     return;
                 }
+                // Language refresh re-renders from this cache, including while
+                // the removal animation is still playing.
+                lastHistory = (lastHistory || []).filter(item => item.id !== entry.id);
                 card.style.opacity = '0';
                 card.style.transform = 'translateX(20px)';
                 card.style.transition = 'opacity 0.25s, transform 0.25s';
@@ -177,6 +188,13 @@
             button.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> ';
             button.appendChild(document.createTextNode(t('clearAll')));
             button.addEventListener('click', async () => {
+                const confirmed = await confirmAction({
+                    title: t('clearHistoryTitle'),
+                    body: t('clearHistoryBody'),
+                    confirm: t('clearAll'),
+                    trigger: button
+                });
+                if (!confirmed) return;
                 button.disabled = true;
                 const result = await sendMessage({ type: 'CLEAR_HISTORY' });
                 button.disabled = false;
@@ -185,6 +203,13 @@
             });
             return button;
         }
+
+        return {
+            // Re-render labels, badges and dates of an open list in the new language.
+            refreshLanguage() {
+                if (lastHistory && !list.classList.contains('hidden')) render(lastHistory);
+            }
+        };
     }
 
     globalThis.XPorterHistory = { mount };

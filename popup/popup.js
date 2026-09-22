@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     mountHomeSizing();
     // ==================== Elements ====================
     const popup = document.getElementById('popup');
-    const themeIcon = document.getElementById('themeIcon');
     const usernameInput = document.getElementById('usernameInput');
     const usernameError = document.getElementById('usernameError');
     const targetAccountCard = document.getElementById('targetAccountCard');
@@ -48,6 +47,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
     const PHOTO_PERMISSION_INTRO_KEY = 'xporter_photo_permission_intro_seen';
     const PHOTO_PERMISSION_INTRO_SECONDS = 5;
+    const SETTINGS_LOAD_ATTEMPTS = 3;
+    // Start/Resume/Stop can wait for the worker to abort in-flight requests
+    // and flush saved progress (up to ~8 s); the default 5 s timeout is too short.
+    const EXPORT_COMMAND_TIMEOUT = 15000;
+    const dateRangeError = document.getElementById('dateRangeError');
 
     // Settings tab — posts-only elements
     const settingsBookmarksOnly = document.getElementById('settingsBookmarksOnly');
@@ -69,9 +73,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastQuantityLimit = 0;
     let lastExportState = null; // cached state for language switch re-apply
     let seenPostsView = null;
+    let historyView = null;
     let lastDownloadPlan = null;
     let downloadPlanRequest = 0;
     let downloadInProgress = false;
+    // Unknown saved state is not idle: starting a new export clears its rows.
+    let statusAvailable = false;
+    startBtn.disabled = true;
+    exportMode.disabled = true;
+    outputFormat.disabled = true;
+    newExportBtn.disabled = true;
     let pendingXlsxPhotoChoice = Promise.resolve({ success: true });
     let resumeAddsItems = false;
     let currentTranslations = {};
@@ -105,6 +116,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // A12: after a local Stop render, ignore stale `running:true` broadcasts
     // (already in flight from the SW) for a short grace period.
     let ignoreRunningUntil = 0;
+    // Set while a Stop request is unanswered; running renders then say
+    // "Stopping…" instead of flipping back to an active-looking status.
+    let stopPending = false;
 
     function handleStatusUpdate(state) {
         if (state.running && Date.now() < ignoreRunningUntil) return;
@@ -115,34 +129,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUI(state);
     }
 
+    // Busy-label source for re-rendering after a language switch: the latest
+    // current-export progress event, or null while the request is preparing.
+    let lastDownloadProgress = null;
+
+    function renderDownloadProgress(message = lastDownloadProgress) {
+        const downloadLabel = downloadBtn.querySelector('[data-i18n="download"]');
+        if (!message) {
+            downloadLabel.textContent = t('preparing');
+            return;
+        }
+        if (message.stage === 'photos') {
+            const current = formatNumber(message.photoCurrent || 0, currentLang);
+            const total = formatNumber(message.photoTotal || 0, currentLang);
+            downloadLabel.textContent = `${current} / ${total}`;
+            statusMessage.textContent = templateText(
+                'downloadStagePhotos',
+                { current, total }
+            );
+        } else if (message.stage === 'building_xlsx') {
+            downloadLabel.textContent = t('preparing');
+            statusMessage.textContent = t('downloadStageBuildingXlsx');
+        } else {
+            downloadLabel.textContent =
+                `${message.partNumber} / ${message.partCount}`;
+            statusMessage.textContent = templateText(
+                'downloadingPart',
+                { current: message.partNumber, total: message.partCount }
+            );
+        }
+    }
+
     function handleDownloadUpdate(message) {
+        // History downloads report their own progress; they must never lock
+        // or relabel the current export's Home controls. Missing = current.
+        if (message.source === 'history') return;
         if (!uiReady) {
             bufferedDownloadUpdate = message;
             return;
         }
         if (message.type === 'DOWNLOAD_PROGRESS') {
             setDownloadBusy(true);
-            const downloadLabel = downloadBtn.querySelector('[data-i18n="download"]');
-            if (message.stage === 'photos') {
-                const current = formatNumber(message.photoCurrent || 0, currentLang);
-                const total = formatNumber(message.photoTotal || 0, currentLang);
-                downloadLabel.textContent = `${current} / ${total}`;
-                statusMessage.textContent = templateText(
-                    'downloadStagePhotos',
-                    { current, total }
-                );
-            } else if (message.stage === 'building_xlsx') {
-                downloadLabel.textContent = t('preparing');
-                statusMessage.textContent = t('downloadStageBuildingXlsx');
-            } else {
-                downloadLabel.textContent =
-                    `${message.partNumber} / ${message.partCount}`;
-                statusMessage.textContent = templateText(
-                    'downloadingPart',
-                    { current: message.partNumber, total: message.partCount }
-                );
-            }
+            lastDownloadProgress = message;
+            renderDownloadProgress(message);
         } else if (message.type === 'DOWNLOAD_COMPLETE') {
+            lastDownloadProgress = null;
             setDownloadBusy(false);
             if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
             renderDownloadPlan(lastDownloadPlan);
@@ -155,11 +186,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => {
                 window.XPorterRatePrompt?.maybeShow({
                     translations: currentTranslations,
-                    lang: currentLang,
-                    onReportBug: openAboutTab
+                    lang: currentLang
                 });
             }, 800);
         } else if (message.type === 'DOWNLOAD_ERROR') {
+            lastDownloadProgress = null;
             setDownloadBusy(false);
             if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
             renderDownloadPlan(lastDownloadPlan);
@@ -193,9 +224,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             return null;
         }
     });
-    const [settingsResult, authResult, status, activeTabs, currentAccountResult,
+    // The worker applies defaults on read, so a loaded object is complete. A
+    // failed read is retried; if it still fails the popup must not persist its
+    // display fallbacks (or the browser language) over the user's real choices.
+    async function loadSettingsWithRetry() {
+        for (let attempt = 0; attempt < SETTINGS_LOAD_ATTEMPTS; attempt++) {
+            if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+            const result = await sendMessage({ type: 'GET_SETTINGS' });
+            if (result?.settings && typeof result.settings === 'object') return result.settings;
+        }
+        return null;
+    }
+
+    const [loadedSettings, authResult, status, activeTabs, currentAccountResult,
         liveAccountContext, photoPermissionIntroState] = await Promise.all([
-        sendMessage({ type: 'GET_SETTINGS' }),
+        loadSettingsWithRetry(),
         checkAuth().catch(() => null),
         sendMessage({ type: 'GET_STATUS' }),
         activeTabsPromise,
@@ -204,7 +247,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.storage.local.get(PHOTO_PERMISSION_INTRO_KEY).catch(() => ({}))
     ]);
 
-    const currentSettings = settingsResult?.settings || {};
+    const settingsLoaded = loadedSettings !== null;
+    const currentSettings = settingsLoaded
+        ? loadedSettings
+        : markSettingsUnavailable({});
     let currentLang = currentSettings.language || detectBrowserLanguage();
     let photoPermissionIntroSeen =
         photoPermissionIntroState?.[PHOTO_PERMISSION_INTRO_KEY] === true;
@@ -241,7 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ==================== Theme & Design ====================
-    initTheme(XPorterThemes.resolve(currentSettings).mode, themeIcon);
+    initTheme(XPorterThemes.resolve(currentSettings).mode);
     mountAppearanceSettings({ currentSettings, t, showToast });
     mountThemePicker({ currentSettings, t, showToast });
 
@@ -313,33 +359,82 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentSettings.exportMode) {
         exportMode.value = currentSettings.exportMode;
     }
-    applyModeUI(exportMode.value);
+    // The mode actually shown and accepted; a cancelled switch reverts to it.
+    let committedMode = exportMode.value;
 
-    exportMode.addEventListener('change', async () => {
-        const previousMode = currentSettings.exportMode || 'posts';
-        const previousFormat = currentSettings.outputFormat || 'csv';
-        applyModeUI(exportMode.value);
-        const patch = { exportMode: exportMode.value };
+    // Switching modes clears the current export. Rows that exist only in the
+    // current export (not stopped/error resumable state, nor a completed export
+    // too large for the history payload) must not vanish behind a keypress —
+    // arrow keys on a focused select fire `change` on Windows.
+    function switchingModeLosesRows(state) {
+        if (!state || state.running || !((state.tweetCount ?? 0) > 0)) return false;
+        if (state.status === 'stopped' || state.status === 'error') return true;
+        if (state.status !== 'complete') return false;
+        const historyLimit = Number(XPORTER_CONFIG.EXPORT_HISTORY_DATA_LIMIT) || 5000;
+        return state.tweetCount > historyLimit;
+    }
+
+    async function commitModeChange(nextMode) {
+        const previousMode = committedMode;
+        const previousFormat = currentSettings.outputFormat || outputFormat.value;
+        exportMode.value = nextMode;
+        applyModeUI(nextMode);
+        const patch = { exportMode: nextMode };
         if (currentSettings.outputFormat !== outputFormat.value) patch.outputFormat = outputFormat.value;
         const result = await persistSettingsPatch(currentSettings, patch);
         if (result?.success !== true) {
-            exportMode.value = previousMode;
+            exportMode.value = committedMode;
             outputFormat.value = previousFormat;
-            applyModeUI(previousMode);
+            applyModeUI(committedMode);
             showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
             return;
         }
-
-        // If there's an active/stopped/completed export, auto-reset (like New Export)
+        // A stopped/completed/failed export belongs to the previous mode;
+        // reset it like New Export (after confirmation when rows are at stake).
         const currentStatus = lastExportState?.status;
         if (currentStatus === 'stopped' || currentStatus === 'complete' || currentStatus === 'error') {
             const cleared = await sendMessage({ type: 'CLEAR_EXPORT' });
             if (cleared?.success !== true) {
+                // Keep the existing rows and their controls together when the
+                // worker refuses to clear (quota, active download, etc.).
+                const rollback = await persistSettingsPatch(currentSettings, {
+                    exportMode: previousMode,
+                    outputFormat: previousFormat
+                });
+                exportMode.value = previousMode;
+                outputFormat.value = previousFormat;
+                applyModeUI(previousMode);
+                if (rollback?.success !== true) {
+                    showToast(formatError(rollback?.error || 'STORAGE_FULL', t), 'error');
+                }
                 showToast(formatError(cleared?.error || 'STORAGE_FULL', t), 'error');
                 return;
             }
             updateUI({ running: false, status: 'idle' });
         }
+        committedMode = nextMode;
+    }
+
+    exportMode.addEventListener('change', async () => {
+        if (!statusAvailable) {
+            exportMode.value = committedMode;
+            return;
+        }
+        const nextMode = exportMode.value;
+        if (nextMode === committedMode) return;
+        if (switchingModeLosesRows(lastExportState)) {
+            // Keep showing the current mode until the user explicitly agrees.
+            exportMode.value = committedMode;
+            const confirmed = await confirmAction({
+                title: t('modeChangeTitle'),
+                body: t('modeChangeBody'),
+                confirm: t('modeChangeConfirm'),
+                cancel: t('modeChangeCancel'),
+                trigger: exportMode
+            });
+            if (!confirmed || exportMode.disabled) return;
+        }
+        await commitModeChange(nextMode);
     });
 
     // Apply saved output format
@@ -361,7 +456,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Language Selector ====================
 
-    if (!currentSettings.language) {
+    // Persist the detected language only over a successfully loaded settings
+    // object; after a failed read it could overwrite the user's saved choice.
+    if (settingsLoaded && !currentSettings.language) {
         await persistSettingsPatch(currentSettings, { language: currentLang });
     }
 
@@ -370,12 +467,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     function buildLangDropdown() {
         langDropdown.innerHTML = '';
         LANGUAGES.forEach(lang => {
+            const selected = lang.code === currentLang;
             const opt = document.createElement('button');
-            opt.className = 'lang-option' + (lang.code === currentLang ? ' active' : '');
+            opt.type = 'button';
+            opt.className = 'lang-option' + (selected ? ' active' : '');
+            opt.setAttribute('role', 'menuitemradio');
+            opt.setAttribute('aria-checked', selected ? 'true' : 'false');
+            opt.lang = lang.code;
+            opt.tabIndex = -1;
             opt.innerHTML = `
-                <span class="lang-option-flag">${lang.flag}</span>
+                <span class="lang-option-flag" aria-hidden="true">${lang.flag}</span>
                 <span class="lang-option-name">${lang.name}</span>
-                <svg class="lang-option-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+                <svg class="lang-option-check" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
             `;
             opt.addEventListener('click', () => selectLanguage(lang.code));
             langDropdown.appendChild(opt);
@@ -387,14 +490,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const lang = LANGUAGES.find(l => l.code === code) || LANGUAGES.find(l => l.code === 'en');
         langFlag.textContent = lang.flag;
         langCode.textContent = code.toUpperCase();
+        // The visible flag + code is not a usable accessible name.
+        langBtn.setAttribute('aria-label', templateText('languageButtonLabel', { language: lang.name }));
     }
 
     function templateText(key, values = {}) {
-        let text = t(key);
-        for (const [name, value] of Object.entries(values)) {
-            text = text.replaceAll(`{${name}}`, String(value));
-        }
-        return text;
+        return formatTemplate(t(key), values);
     }
 
     function setDownloadBusy(busy) {
@@ -402,9 +503,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         downloadBtn.disabled = busy;
         xlsxPhotoLinks.disabled = busy;
         xlsxPhotoEmbed.disabled = busy;
-        outputFormat.disabled = busy || !!lastExportState?.running;
-        exportMode.disabled = busy || !!lastExportState?.running;
-        newExportBtn.disabled = busy;
+        outputFormat.disabled = !statusAvailable || busy || !!lastExportState?.running;
+        exportMode.disabled = !statusAvailable || busy || !!lastExportState?.running;
+        newExportBtn.disabled = !statusAvailable || busy;
         resumeBtn.disabled = busy;
     }
 
@@ -468,55 +569,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.documentElement.lang = code;
         formatReleaseDates(code);
         applyLanguageDirection(code); // RTL for Arabic, LTR otherwise
+        updateLangButton(code);
         applyModeUI(exportMode.value);
         updateResumeQuantityLabel();
     }
 
     function formatReleaseDates(code) {
-        const formatter = new Intl.DateTimeFormat(code, {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            timeZone: 'UTC'
-        });
+        const formatters = {
+            long: new Intl.DateTimeFormat(code, {
+                year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'
+            }),
+            short: new Intl.DateTimeFormat(code, {
+                year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'
+            })
+        };
 
         document.querySelectorAll('time[data-release-date]').forEach((time) => {
             const [year, month, day] = time.dateTime.split('-').map(Number);
+            const formatter = formatters[time.dataset.dateStyle] || formatters.long;
             time.textContent = formatter.format(new Date(Date.UTC(year, month - 1, day)));
         });
     }
 
-    async function selectLanguage(code) {
-        const previousLang = currentLang;
-        currentLang = code;
+    // Re-render every language-dependent surface for the current language.
+    async function renderLanguage(code) {
         updateLangButton(code);
         await applyLanguage(code);
         if (lastExportState) {
             updateUI(lastExportState);
         }
-        buildLangDropdown();
-        closeLangDropdown();
+        // applyI18nToDOM resets the Download label; restore an active download.
+        if (downloadInProgress) renderDownloadProgress();
+        if (dropdownBuilt) buildLangDropdown();
+        historyView?.refreshLanguage();
+        seenPostsView?.refreshLanguage();
+    }
+
+    async function selectLanguage(code) {
+        const previousLang = currentLang;
+        const returnFocus = langDropdown.contains(document.activeElement);
+        closeLangDropdown({ returnFocus });
+        if (code === previousLang) return;
+        currentLang = code;
+        await renderLanguage(code);
 
         const result = await persistSettingsPatch(currentSettings, { language: code });
         if (result?.success !== true) {
             currentLang = previousLang;
-            updateLangButton(previousLang);
-            await applyLanguage(previousLang);
+            await renderLanguage(previousLang);
             showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
         }
-        seenPostsView?.refreshLanguage();
     }
 
-    function toggleLangDropdown() {
-        const isOpen = !langDropdown.classList.contains('hidden');
-        if (isOpen) {
-            closeLangDropdown();
-        } else {
-            openLangDropdown();
-        }
+    function langOptions() {
+        return Array.from(langDropdown.querySelectorAll('.lang-option'));
     }
 
-    function openLangDropdown() {
+    function focusLangOption(index) {
+        const options = langOptions();
+        if (options.length === 0) return;
+        options[(index + options.length) % options.length].focus();
+    }
+
+    function openLangDropdown({ focusLast = false } = {}) {
         if (!dropdownBuilt) {
             buildLangDropdown();
         }
@@ -525,17 +640,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         langBtn.setAttribute('aria-expanded', 'true');
         // The menu scrolls within the fixed workspace height (workspace.css).
         // Growing the native action window here would clip its bottom controls.
+        const options = langOptions();
+        const selected = options.findIndex(option => option.classList.contains('active'));
+        focusLangOption(focusLast ? options.length - 1 : Math.max(0, selected));
     }
 
-    function closeLangDropdown() {
+    function closeLangDropdown({ returnFocus = false } = {}) {
+        if (langDropdown.classList.contains('hidden')) return;
         langDropdown.classList.add('hidden');
         langBtn.classList.remove('active');
         langBtn.setAttribute('aria-expanded', 'false');
+        if (returnFocus) langBtn.focus();
     }
 
     langBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        toggleLangDropdown();
+        if (langDropdown.classList.contains('hidden')) openLangDropdown();
+        else closeLangDropdown({ returnFocus: true });
+    });
+
+    langBtn.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        openLangDropdown({ focusLast: event.key === 'ArrowUp' });
+    });
+
+    langDropdown.addEventListener('keydown', (event) => {
+        const options = langOptions();
+        const index = options.indexOf(document.activeElement);
+        if (event.key === 'ArrowDown') focusLangOption(index + 1);
+        else if (event.key === 'ArrowUp') focusLangOption(index - 1);
+        else if (event.key === 'Home') focusLangOption(0);
+        else if (event.key === 'End') focusLangOption(options.length - 1);
+        else if (event.key === 'Escape') closeLangDropdown({ returnFocus: true });
+        else if (event.key === 'Tab') {
+            // Close and continue the normal tab order from the menu button.
+            closeLangDropdown({ returnFocus: true });
+            return;
+        } else return;
+        event.preventDefault();
+        event.stopPropagation();
     });
 
     document.addEventListener('click', (e) => {
@@ -544,11 +688,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    updateLangButton(currentLang);
     await applyLanguage(currentLang);
+    if (!settingsLoaded) showToast(t('errSettingsUnavailable'), 'error');
 
     function t(key) {
-        return currentTranslations[key] || key;
+        return translateKey(currentTranslations, key);
     }
 
     const aboutDialog = XPorterGuardedDialog.mount({
@@ -562,6 +706,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         countdownStatus: photoPermissionCountdownStatus
     });
     let photoPermissionSelectionVersion = 0;
+
+    // Destructive confirmations reuse the guarded risk dialog without the
+    // five-second lock: the consequence is data loss, not an expensive request.
+    function confirmAction({ title, body, confirm, cancel, trigger }) {
+        return new Promise((resolve) => {
+            aboutRiskTitle.textContent = title;
+            aboutRiskBody.textContent = body;
+            aboutRiskCancel.textContent = cancel || t('confirmCancel');
+            aboutRiskConfirm.textContent = confirm;
+            aboutDialog.open({
+                trigger,
+                seconds: 0,
+                onConfirm: () => resolve(true),
+                onCancel: () => resolve(false)
+            });
+        });
+    }
 
     function openAboutRiskDialog(kind, { trigger, onConfirm, onCancel }) {
         const isRetryRisk = kind === 'retries';
@@ -695,10 +856,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     resumeQuantity.addEventListener('input', updateResumeQuantityLabel);
 
     // ==================== Date Range Toggle ====================
+    function setDateRangeInvalid(invalid) {
+        dateRangeError.classList.toggle('hidden', !invalid);
+        for (const input of [dateFrom, dateTo]) {
+            if (invalid) input.setAttribute('aria-invalid', 'true');
+            else input.removeAttribute('aria-invalid');
+        }
+    }
+
+    // An enabled date filter needs at least one complete date. Otherwise the
+    // worker would silently run an ordinary feed export instead.
+    function dateRangeIsUsable() {
+        const complete = input => Boolean(input.value) && !input.validity.badInput;
+        const partial = input => input.validity.badInput;
+        return !partial(dateFrom) && !partial(dateTo) && (complete(dateFrom) || complete(dateTo));
+    }
+
     dateCheck.addEventListener('change', () => {
         dateFields.classList.toggle('hidden', !dateCheck.checked);
+        setDateRangeInvalid(false);
         refreshQuantityLabels();
     });
+    for (const input of [dateFrom, dateTo]) {
+        input.addEventListener('input', () => setDateRangeInvalid(false));
+    }
 
     // ==================== Apply Auth Result ====================
     if (!authResult) {
@@ -715,6 +896,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         handleStatusUpdate(buffered);
     } else if (status?.status) {
         updateUI(status);
+    } else {
+        showToast(formatError(status?.error || 'MESSAGING_ERROR', t), 'error');
     }
     if (bufferedDownloadUpdate) {
         const buffered = bufferedDownloadUpdate;
@@ -729,9 +912,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Safety poll: broadcasts can be dropped (SW restart, closed port). Poll
-    // only while the last-known state is running and the popup is visible.
+    // while running or waiting for a readable initial state, and visible.
     setInterval(async () => {
-        if (!lastExportState?.running || document.visibilityState !== 'visible') return;
+        if ((statusAvailable && !lastExportState?.running) || document.visibilityState !== 'visible') return;
         const fresh = await sendMessage({ type: 'GET_STATUS' });
         if (fresh?.status) handleStatusUpdate(fresh);
     }, 2000);
@@ -755,6 +938,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     applyModeUI(exportMode.value);
+
+    // "+N more" input: never send 0, negatives or more than the input allows.
+    function resumeExtraItems() {
+        const parsed = parseInt(resumeQuantity.value, 10);
+        const min = Math.max(1, parseInt(resumeQuantity.min, 10) || 1);
+        const max = parseInt(resumeQuantity.max, 10);
+        const value = Math.max(min, Math.min(Number.isFinite(max) ? max : Infinity,
+            Number.isFinite(parsed) ? parsed : 100));
+        resumeQuantity.value = String(value);
+        return value;
+    }
+
     function updateResumeQuantityLabel() {
         if (!resumeLabel) return;
         const count = parseInt(resumeQuantity.value, 10) || 0;
@@ -779,13 +974,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Start Export ====================
     startBtn.addEventListener('click', async () => {
+        if (startBtn.disabled) return;
         const rejectedStart = error => sendMessage({ type:'DIAGNOSTIC_START_REJECTED',
             error, mode:exportMode.value, format:outputFormat.value,
             dateRange:exportMode.value === 'posts' && dateCheck.checked });
+        // One request at a time: a second click would otherwise be rejected
+        // by the worker as ALREADY_RUNNING and shown as a false error.
+        startBtn.disabled = true;
         try {
             const mode = exportMode.value;
             if (mode === 'posts' && !settingsForm.validatePostSelection()) {
                 rejectedStart('NO_POST_TYPES_SELECTED'); return;
+            }
+            if (mode === 'posts' && dateCheck.checked && !dateRangeIsUsable()) {
+                setDateRangeInvalid(true);
+                (dateFrom.value && !dateFrom.validity.badInput ? dateTo : dateFrom).focus();
+                showToast(t('errDateRangeRequired'), 'error');
+                rejectedStart('INVALID_DATE_RANGE');
+                return;
             }
             // extractUsernameFromInput returns '' for anything that is not a
             // valid username or X profile URL — never submit garbage.
@@ -827,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dateTo: (mode === 'posts' && dateCheck.checked) ? dateTo.value : null
             };
 
-            const result = await sendMessage(params);
+            const result = await sendMessage(params, EXPORT_COMMAND_TIMEOUT);
             if (result?.error) {
                 showToast(formatError(result.error, t), 'error');
                 return;
@@ -836,18 +1042,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateUI({ running: true, status: 'resolving_user', username, tweetCount: 0, exportMode: mode });
         } catch (err) {
             showToast(`${t('exportError')}: ${err.message}`, 'error');
+        } finally {
+            startBtn.disabled = false;
         }
     });
 
     // ==================== Stop Export ====================
     stopBtn.addEventListener('click', async () => {
+        if (stopBtn.disabled) return;
+        stopPending = true;
+        stopBtn.disabled = true;
+        statusMessage.textContent = t('ovStopping');
         // In-flight `running:true` broadcasts must not flip the UI back
         // after the local stopped render below.
         ignoreRunningUntil = Date.now() + 1500;
-        const result = await sendMessage({ type: 'STOP_EXPORT' });
+        const result = await sendMessage({ type: 'STOP_EXPORT' }, EXPORT_COMMAND_TIMEOUT);
+        if (result?.error === 'TIMEOUT') {
+            // The worker may still be aborting and saving. Keep "Stopping…"
+            // and let the status poll/broadcast report the real outcome.
+            ignoreRunningUntil = 0;
+            stopBtn.disabled = false; // a repeated Stop is harmless
+            const fresh = await sendMessage({ type: 'GET_STATUS' });
+            if (fresh?.status) handleStatusUpdate(fresh);
+            return;
+        }
+        stopPending = false;
+        stopBtn.disabled = false;
         if (result?.success !== true) {
             ignoreRunningUntil = 0;
             showToast(formatError(result?.error || 'MESSAGING_ERROR', t), 'error');
+            if (lastExportState) updateUI(lastExportState);
             return;
         }
         updateUI({
@@ -856,12 +1080,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             status: 'stopped',
             tweetCount: lastItemCount || 0
         });
+        // The worker may have saved a different terminal state (e.g. complete).
+        const fresh = await sendMessage({ type: 'GET_STATUS' });
+        if (fresh?.status && !fresh.running) handleStatusUpdate(fresh);
     });
 
     // ==================== Download ====================
     downloadBtn.addEventListener('click', async () => {
         setDownloadBusy(true);
-        downloadBtn.querySelector('[data-i18n="download"]').textContent = t('preparing');
+        lastDownloadProgress = null;
+        renderDownloadProgress();
         await pendingXlsxPhotoChoice;
         const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: outputFormat.value });
         if (result?.success === true) {
@@ -894,17 +1122,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Resume ====================
     resumeBtn.addEventListener('click', async () => {
-        const extraPosts = parseInt(resumeQuantity.value) || 100;
+        if (resumeBtn.disabled) return;
         const message = { type: 'RESUME_EXPORT' };
         // "+N more" belongs only to a completed export. Stopped/error Resume
         // must preserve the original target instead of silently replacing,
         // for example, a 500-item export with the input's default 100.
-        if (resumeAddsItems) message.extraItems = extraPosts;
-        const result = await sendMessage(message);
+        if (resumeAddsItems) message.extraItems = resumeExtraItems();
+        resumeBtn.disabled = true;
+        let result;
+        try {
+            result = await sendMessage(message, EXPORT_COMMAND_TIMEOUT);
+        } finally {
+            resumeBtn.disabled = downloadInProgress;
+        }
         if (result?.error) {
             showToast(formatError(result.error, t), 'error');
             return;
         }
+        if (await renderRefusedResume(result)) return;
         updateUI({
             ...lastExportState,
             running: true,
@@ -915,16 +1150,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // A successful Resume reply can carry a terminal status instead of a
+    // running export (for example `complete` when the source was already
+    // exhausted). Render the worker's saved state, never a fake "running".
+    async function renderRefusedResume(result) {
+        // An accepted Resume answers status 'resumed'.
+        if (!['complete', 'stopped', 'error', 'idle'].includes(result?.status)) return false;
+        const fresh = await sendMessage({ type: 'GET_STATUS' });
+        updateUI(fresh?.status
+            ? fresh
+            : { ...lastExportState, ...result, running: false });
+        return true;
+    }
+
     async function resumeFromRepliesError(type) {
         continuePostsOnlyBtn.disabled = true;
         retryRepliesBtn.disabled = true;
-        const result = await sendMessage({ type });
+        const result = await sendMessage({ type }, EXPORT_COMMAND_TIMEOUT);
         continuePostsOnlyBtn.disabled = false;
         retryRepliesBtn.disabled = false;
         if (result?.error) {
             showToast(formatError(result.error, t), 'error');
             return;
         }
+        if (await renderRefusedResume(result)) return;
         updateUI({
             running: true,
             status: 'fetching',
@@ -940,6 +1189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== New Export ====================
     newExportBtn.addEventListener('click', async () => {
+        if (!statusAvailable || newExportBtn.disabled) return;
         const cleared = await sendMessage({ type: 'CLEAR_EXPORT' });
         if (cleared?.success !== true) {
             showToast(formatError(cleared?.error || 'STORAGE_FULL', t), 'error');
@@ -963,9 +1213,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ==================== Rate Prompt ====================
-    // "Report a problem" in the prompt → jump to the About tab (Telegram/email).
-    const openAboutTab = () => document.querySelector('.tab[data-tab="about"]')?.click();
-
     // About: low-pressure, always-available link straight to the store.
     if (rateAboutBtn) {
         rateAboutBtn.addEventListener('click', () => {
@@ -975,6 +1222,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== UI Update Function ====================
     function updateUI(state) {
+        if (!state?.status) return;
+        if (!statusAvailable) {
+            statusAvailable = true;
+            startBtn.disabled = false;
+            newExportBtn.disabled = downloadInProgress;
+        }
         lastExportState = { ...state };
         if (state.tweetCount != null) lastItemCount = state.tweetCount;
         if (state.expectedTweets != null) lastExpectedItems = state.expectedTweets;
@@ -984,6 +1237,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         outputFormat.disabled = state.running || downloadInProgress;
         if (state.username && mode !== 'bookmarks') usernameInput.value = state.username;
         accountFields.updateExportAccount(state);
+        if (!state.running && stopPending) {
+            stopPending = false;
+            stopBtn.disabled = false;
+        }
         applyModeUI(mode);
         const view = exportStatusView.render({
             ...state,
@@ -994,6 +1251,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             quantityLimit: lastQuantityLimit
         }, { username: usernameInput.value });
         resumeAddsItems = view.resumeAddsItems;
+        // A Stop request is still settling: never show an active status line.
+        if (state.running && stopPending) statusMessage.textContent = t('ovStopping');
         if (state.status === 'complete' && !ratePromptCounted) {
             ratePromptCounted = true;
             window.XPorterRatePrompt?.incrementExports(ratePromptExportKey(state));
@@ -1003,15 +1262,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==================== Export History ====================
-    XPorterHistory.mount({
+    historyView = XPorterHistory.mount({
         t,
         showToast,
         modeLabel,
+        confirmAction,
         getLanguage: () => currentLang
     });
     seenPostsView = XPorterSeenPosts.mount({
         t,
         showToast,
+        confirmAction,
         getLanguage: () => currentLang
     });
 

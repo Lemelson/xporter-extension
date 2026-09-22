@@ -156,7 +156,7 @@
             // Status-specific display
             switch (status) {
                 case 'resolving_user':
-                    statusText.textContent = `${t('lookingUp')} ${subject}`;
+                    statusText.textContent = formatTemplate(t('lookingUpSubject'), { subject });
                     setDotColor('green', true);
                     statusMessage.textContent = t('resolvingUser');
                     progressFill.classList.add('indeterminate');
@@ -164,12 +164,13 @@
                     break;
 
                 case 'fetching':
-                    statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
+                    statusText.textContent = formatTemplate(t('exportingSubject'), { subject });
                     setDotColor('green', true);
                     const searchPhaseKey = { loading: 'searchLoading', connecting: 'searchConnecting', waiting: 'searchWaiting', collecting: 'searchCollecting', retrying: 'searchRetrying' }[state.searchPhase];
+                    const batch = formatNumber(state.batch || 1, currentLang);
                     statusMessage.textContent = searchPhaseKey ? t(searchPhaseKey) : state.partialReason === 'replies_unavailable'
-                        ? `${t('postsOnlyFallbackActive')} · ${t('batch')} ${state.batch || 1}`
-                        : `${t('fetching')} (${t('batch')} ${state.batch || 1})`;
+                        ? `${t('postsOnlyFallbackActive')} · ${formatTemplate(t('batchNumber'), { batch })}`
+                        : formatTemplate(t('fetchingBatch'), { batch });
                     progressFill.classList.add('indeterminate');
                     progressFill.style.width = '100%';
                     break;
@@ -185,8 +186,7 @@
                         cooldownLabelKey = 'retryIn';
                         progressFill.classList.add('rate-limit');
                     } else {
-                        statusText.textContent =
-                            `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
+                        statusText.textContent = formatTemplate(t('exportingSubject'), { subject });
                         cooldownLabelKey = 'statusPacing';
                         progressFill.classList.add('cooldown');
                     }
@@ -222,16 +222,13 @@
                         // tell the user the truth: progress is saved, come back and Resume.
                         if (state.error === 'NOT_LOGGED_IN') {
                             // Dead-end text loses first-run users — give them the
-                            // actual login link using strings present in all locales.
-                            statusMessage.textContent = '';
-                            statusMessage.append(`${t('authWarning')} `);
+                            // actual login link inside one localized sentence.
                             const loginLink = document.createElement('a');
                             loginLink.href = 'https://x.com/login';
                             loginLink.target = '_blank';
+                            loginLink.rel = 'noopener';
                             loginLink.textContent = t('authLink');
-                            statusMessage.append(loginLink);
-                            const suffix = t('authSuffix');
-                            statusMessage.append(`${suffix ? ' ' + suffix : ''}, ${t('thenTryAgain')}`);
+                            renderTemplateInto(statusMessage, t('authRequiredRetry'), { link: loginLink });
                         } else if (state.error === 'SEARCH_END_UNCONFIRMED') {
                             // Resume restarts the same search; do not promise that it fixes this.
                             statusMessage.textContent = `${itemCount > 0 ? t('partialSaved') + ' ' : ''}${formatError(state.error, t)}`;
@@ -249,9 +246,11 @@
                     break;
 
                 case 'retrying':
-                    statusText.textContent = `${t('exporting').replace(/[.…\s]+$/, '')} ${subject}`;
+                    statusText.textContent = formatTemplate(t('exportingSubject'), { subject });
                     setDotColor('yellow', true);
-                    statusMessage.textContent = `${t('retrying')} (${t('attempt')} ${state.attempt})...`;
+                    statusMessage.textContent = formatTemplate(t('retryingAttempt'), {
+                        attempt: formatNumber(state.attempt || 1, currentLang)
+                    });
                     progressFill.classList.add('indeterminate');
                     progressFill.style.width = '100%';
                     break;

@@ -76,6 +76,19 @@
         return plan;
     }
 
+    // "Continue without replies" swaps the combined posts+replies timeline
+    // for UserTweets. That only makes sense while the selection still names
+    // a non-reply type: a replies-only selection would walk a whole profile
+    // feed and then discard every row as an unselected type.
+    function canDropRepliesFromSelection(settings = {}) {
+        if (postFeedPlanForSettings(settings)[0] !== 'legacy_with_replies') return false;
+        if (!hasExplicitPostSelection(settings)) return true;
+        return settings.includeOriginalPosts === true ||
+            settings.includeQuotes === true ||
+            settings.includeRetweets === true ||
+            settings.includeArticles === true;
+    }
+
     function postSelectionAllowsTweet(settings = {}, tweet = {}) {
         if (!hasExplicitPostSelection(settings)) {
             if (settings.includeRetweets === false && tweet.type === 'retweet') return false;
@@ -248,6 +261,7 @@
         profileFeedAllowsTweet,
         hasExplicitPostSelection,
         postFeedPlanForSettings,
+        canDropRepliesFromSelection,
         postSelectionAllowsTweet,
         rateLimitKeyForMode,
         clampCustomSpeed,

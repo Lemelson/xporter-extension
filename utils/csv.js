@@ -45,13 +45,45 @@ function exportHeaders(isUsers, opts = {}) {
         : USERS_HEADERS;
 }
 
+// Spreadsheet number typing is limited to engagement/profile counters. Any
+// other column (text, names, IDs) stays a string even when it looks numeric,
+// so a post whose text is "1.50" is not rewritten as 1.5.
+const XLSX_NUMERIC_KEYS = new Set(
+    [...POSTS_HEADERS, ...USERS_HEADERS, ...USER_ABOUT_HEADERS]
+        .filter(key => key.endsWith('_count'))
+);
+
 function xlsxHeaders(items, isUsers, opts = {}) {
-    const candidates = exportHeaders(isUsers, opts);
+    const candidates = Array.isArray(opts.candidateHeaders)
+        ? opts.candidateHeaders
+        : exportHeaders(isUsers, opts);
+    if (opts.populatedHeaders) {
+        // Multipart downloads decide columns once for the whole export so
+        // every part has the same layout, even when a column only has values
+        // in a later part.
+        const populated = new Set(opts.populatedHeaders);
+        const keys = candidates.filter(key => populated.has(key));
+        return keys.length > 0 ? keys : [candidates[0] || 'id'];
+    }
     return selectPopulatedHeaders(
         items,
         candidates,
         (item, key) => exportValue(item, key, isUsers)
     );
+}
+
+/**
+ * Add every CSV/XLSX column that has a value in `items` to `into`. Calling it
+ * once per batch builds the union used by `opts.populatedHeaders`.
+ */
+function collectPopulatedHeaders(items, isUsers = false, opts = {}, into = new Set()) {
+    for (const key of exportHeaders(isUsers, opts)) {
+        if (into.has(key)) continue;
+        if ((items || []).some(item => hasExportValue(exportValue(item, key, isUsers)))) {
+            into.add(key);
+        }
+    }
+    return into;
 }
 
 function hasExportValue(value) {
@@ -441,26 +473,97 @@ function headerLabels(keys, opts = {}) {
 
 // ==================== XLSX (OOXML ZIP) ====================
 
+// Characters that XML 1.0 forbids (C0 controls other than tab/LF/CR, the
+// U+FFFE/U+FFFF noncharacters) and UTF-16 code units that are not part of a
+// surrogate pair. A single one in tweet text makes Excel show a repair dialog
+// and LibreOffice silently drop the rest of the sheet, so they are removed.
+const XML_INVALID_TEXT = /[\x00-\x08\x0B\x0C\x0E-\x1F￾￿]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
 /**
- * Escape XML special characters.
- * Also strips control characters that are invalid in XML 1.0 — a single one
- * (e.g. in tweet text) would make the whole XLSX unopenable.
+ * Escape XML special characters and remove code units that are invalid in
+ * XML 1.0. Every text value written into an XLSX part goes through here.
  */
 function escapeXml(str) {
-    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    return String(str ?? '').replace(XML_INVALID_TEXT, '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Excel's hard per-cell limit is 32,767 characters. CSV/JSON keep the full
+// value; XLSX must stay within the format contract so one unusually long
+// article cannot make the workbook unreadable. The cut is marked visibly.
+const XLSX_CELL_MAX_CHARS = 32767;
+const XLSX_TRUNCATION_MARKER = '…[truncated]';
+
+function xlsxCellText(value) {
+    let text = String(value ?? '');
+    if (text.length <= XLSX_CELL_MAX_CHARS) return text;
+    text = text.slice(0, XLSX_CELL_MAX_CHARS - XLSX_TRUNCATION_MARKER.length);
+    // The cut can land mid-emoji; never keep half of a surrogate pair.
+    if (/[\uD800-\uDBFF]$/.test(text)) text = text.slice(0, -1);
+    return text + XLSX_TRUNCATION_MARKER;
+}
+
+function xlsxInlineStringCell(ref, text, styleAttr = '') {
+    const preserve = /^\s|\s$|[\n\r\t]/.test(text) ? ' xml:space="preserve"' : '';
+    return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t${preserve}>${escapeXml(text)}</t></is></c>`;
+}
+
+/**
+ * Build the worksheet rows for one sheet. Empty values produce no cell.
+ * @param {Array<Object>} rows - [{ values, dataKeys?, styles? }]
+ */
+function buildWorksheetRows(rows) {
+    return rows.map(({ values = [], dataKeys = null, styles = null }, rowIndex) => {
+        const rowNumber = rowIndex + 1;
+        const cells = [];
+        values.forEach((value, index) => {
+            if (value === undefined || value === null || value === '') return;
+            const val = xlsxCellText(value);
+            const key = dataKeys?.[index] || '';
+            // Keep identifiers and very long digit strings as text — Excel
+            // stores numbers as IEEE-754 doubles and would corrupt post IDs.
+            const numericColumn = dataKeys ? XLSX_NUMERIC_KEYS.has(key) : typeof value === 'number';
+            const isNumber = numericColumn &&
+                /^-?(0|[1-9]\d*)(\.\d+)?$/.test(val) && val.length <= 15;
+            const ref = `${columnName(index + 1)}${rowNumber}`;
+            const style = Array.isArray(styles) ? styles[index] : styles;
+            const styleAttr = Number.isInteger(style) && style > 0 ? ` s="${style}"` : '';
+            cells.push(isNumber
+                ? `<c r="${ref}"${styleAttr}><v>${val}</v></c>`
+                : xlsxInlineStringCell(ref, val, styleAttr));
+        });
+        return `<row r="${rowNumber}">${cells.join('')}</row>`;
+    }).join('');
+}
+
+const XLSX_XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+const XLSX_MAIN_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const XLSX_REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const XLSX_PACKAGE_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
+const XLSX_WORKSHEET_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
+
 /**
  * Generate a real XLSX workbook (OOXML ZIP) without external dependencies.
- * The ZIP entries use the uncompressed "store" method; spreadsheet data is
- * already text-heavy, and avoiding a bundled compression library keeps the
- * extension dependency-free while producing a standards-compliant workbook.
+ * `generateXLSX` stores entries uncompressed; `generateXLSXAsync` deflates the
+ * XML parts when the platform provides CompressionStream.
  * @param {Array} items - Array of data objects
  * @param {boolean} isUsers - true for followers/following, false for posts
  * @returns {Uint8Array} XLSX bytes
  */
 function generateXLSX(items, isUsers = false, opts = {}) {
+    return createZip(buildXlsxEntries(items, isUsers, opts));
+}
+
+/**
+ * Same workbook as `generateXLSX`, with DEFLATE-compressed XML parts when
+ * CompressionStream('deflate-raw') is available (STORE otherwise).
+ * @returns {Promise<Uint8Array>}
+ */
+function generateXLSXAsync(items, isUsers = false, opts = {}) {
+    return createZipAsync(buildXlsxEntries(items, isUsers, opts));
+}
+
+function buildXlsxEntries(items, isUsers = false, opts = {}) {
     const keys = xlsxHeaders(items, isUsers, opts);
     const labels = headerLabels(keys, opts);
     const mediaAssets = Array.isArray(opts.mediaAssets)
@@ -471,94 +574,61 @@ function generateXLSX(items, isUsers = false, opts = {}) {
         )
         : [];
 
-    const worksheetRows = [];
-    const appendRow = (values, rowNumber, dataKeys = null, styles = null) => {
-        const cells = values.map((value, index) => {
-            // Excel's hard per-cell limit is 32,767 characters. CSV/JSON keep
-            // the full value; XLSX must stay within the format contract so one
-            // unusually long article cannot make the workbook unreadable.
-            let val = String(value ?? '').slice(0, 32767);
-            // The cut can land mid-emoji; a dangling high surrogate would be
-            // encoded as U+FFFD, so drop it.
-            if (/[\uD800-\uDBFF]$/.test(val)) val = val.slice(0, -1);
-            const key = dataKeys?.[index] || '';
-            // Keep identifiers and very long digit strings as text — Excel
-            // stores numbers as IEEE-754 doubles and would corrupt post IDs.
-            const isIdField = key === 'id' || key.endsWith('_id') || key.endsWith('_str');
-            const isNumber = !isIdField && val !== '' && !val.includes(' ') &&
-                /^-?(0|[1-9]\d*)(\.\d+)?$/.test(val) && val.length <= 15;
-            const ref = `${columnName(index + 1)}${rowNumber}`;
-            const style = Array.isArray(styles) ? styles[index] : styles;
-            const styleAttr = Number.isInteger(style) && style > 0 ? ` s="${style}"` : '';
-            if (isNumber) return `<c r="${ref}"${styleAttr}><v>${escapeXml(val)}</v></c>`;
-            const preserve = /^\s|\s$|[\n\r\t]/.test(val) ? ' xml:space="preserve"' : '';
-            return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t${preserve}>${escapeXml(val)}</t></is></c>`;
-        });
-        worksheetRows.push(`<row r="${rowNumber}">${cells.join('')}</row>`);
-    };
+    // The data sheet always starts with its header row so the frozen pane
+    // and filter cover exactly one row. Profile metadata lives on its own
+    // sheet instead of pushing the table (and the frozen area) down.
+    const dataRows = [{ values: labels, styles: 3 }];
+    for (const item of items) {
+        dataRows.push({ values: keys.map(key => exportValue(item, key, isUsers)), dataKeys: keys });
+    }
 
-    let rowNumber = 1;
     const isBookmarks = opts.mode === 'bookmarks';
     const profileRows = (isUsers || isBookmarks) ? [] : profileMetadataRows(opts.profile || {});
+    let profileSheet = null;
     if (profileRows.length > 0) {
-        appendRow(['PROFILE'], rowNumber++, null, 1);
-        for (const row of profileRows) appendRow(row, rowNumber++, null, [2, 4]);
+        const rows = [{ values: ['PROFILE'], styles: 1 }];
+        for (const row of profileRows) rows.push({ values: row, styles: [2, 4] });
         const includedTypes = selectedPostTypeLabels(opts.postSelection);
         if (includedTypes.length > 0) {
-            appendRow(['Included post types', includedTypes.join(', ')], rowNumber++, null, [2, 4]);
+            rows.push({ values: ['Included post types', includedTypes.join(', ')], styles: [2, 4] });
         }
-        appendRow([], rowNumber++);
-        appendRow([`POSTS (${items.length})`], rowNumber++, null, 1);
-        appendRow([], rowNumber++);
-    } else if (isBookmarks) {
-        appendRow([`BOOKMARKS (${items.length})`], rowNumber++, null, 1);
-        appendRow([], rowNumber++);
-    }
-    const headerRowNumber = rowNumber;
-    appendRow(labels, rowNumber++, null, 3);
-    for (const item of items) {
-        appendRow(keys.map(key => exportValue(item, key, isUsers)), rowNumber++, keys);
+        rows.push({ values: [] });
+        rows.push({ values: [`POSTS (${items.length})`], styles: 1 });
+        profileSheet = [
+            XLSX_XML_DECLARATION,
+            `<worksheet xmlns="${XLSX_MAIN_NS}">`,
+            `<dimension ref="A1:B${rows.length}"/>`,
+            '<sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>',
+            '<sheetFormatPr defaultRowHeight="15"/>',
+            '<cols><col min="1" max="1" width="28" customWidth="1"/>',
+            '<col min="2" max="2" width="80" customWidth="1"/></cols>',
+            `<sheetData>${buildWorksheetRows(rows)}</sheetData>`,
+            '</worksheet>'
+        ].join('');
     }
 
-    const lastCell = `${columnName(keys.length)}${Math.max(1, rowNumber - 1)}`;
-    const defaultUserColumnWidths = [
-        [1, 1, 22], [2, 2, 44], [3, 3, 44], [4, 5, 14],
-        [6, 7, 22], [8, 13, 14], [14, 14, 28], [15, 15, 20],
-        [16, 17, 24], [18, 18, 14], [19, 23, 28]
-    ];
-    const detailedUserColumnWidths = [
-        [1, 1, 22], [2, 2, 44], [3, 3, 44], [4, 5, 14],
-        [6, 7, 22], [8, 13, 14], [14, 14, 28], [15, 15, 20],
-        [16, 16, 20], [17, 17, 24], [18, 19, 28], [20, 21, 24], [22, 22, 28]
-    ];
-    const postColumnWidths = keys.map((key, index) => [
-        index + 1,
-        index + 1,
-        postColumnWidth(key)
-    ]);
-    const columnWidths = (
-        !isUsers
-            ? postColumnWidths
-            : (opts.includeAboutAccountDetails ? detailedUserColumnWidths : defaultUserColumnWidths)
-    ).map(([min, max, width]) =>
-        `<col min="${min}" max="${max}" width="${width}" customWidth="1"/>`
-    ).join('');
+    const lastRow = dataRows.length;
+    const lastColumn = columnName(keys.length);
+    const columnWidths = keys.map((key, index) => {
+        const width = isUsers ? userColumnWidth(key) : postColumnWidth(key);
+        return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
+    }).join('');
     const worksheet = [
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
-        `<dimension ref="A1:${lastCell}"/>`,
+        XLSX_XML_DECLARATION,
+        `<worksheet xmlns="${XLSX_MAIN_NS}">`,
+        `<dimension ref="A1:${lastColumn}${lastRow}"/>`,
         '<sheetViews><sheetView showGridLines="0" workbookViewId="0">' +
-            `<pane ySplit="${headerRowNumber}" topLeftCell="A${headerRowNumber + 1}" activePane="bottomLeft" state="frozen"/>` +
+            '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
             '</sheetView></sheetViews>',
         '<sheetFormatPr defaultRowHeight="15"/>',
         `<cols>${columnWidths}</cols>`,
-        `<sheetData>${worksheetRows.join('')}</sheetData>`,
-        `<autoFilter ref="A${headerRowNumber}:${columnName(keys.length)}${Math.max(headerRowNumber, rowNumber - 1)}"/>`,
+        `<sheetData>${buildWorksheetRows(dataRows)}</sheetData>`,
+        `<autoFilter ref="A1:${lastColumn}${lastRow}"/>`,
         '</worksheet>'
     ].join('');
     const styles = [
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
-        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+        XLSX_XML_DECLARATION,
+        `<styleSheet xmlns="${XLSX_MAIN_NS}">`,
         '<fonts count="2">',
         '<font><sz val="11"/><name val="Aptos"/></font>',
         '<font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font>',
@@ -584,7 +654,9 @@ function generateXLSX(items, isUsers = false, opts = {}) {
     ].join('');
 
     const hasMediaSheet = !isUsers && mediaAssets.length > 0;
-    const mediaPackage = hasMediaSheet ? buildXlsxMediaPackage(mediaAssets) : null;
+    const mediaPackage = hasMediaSheet
+        ? buildXlsxMediaPackage(mediaAssets, opts.mediaSkippedCount)
+        : null;
     const imageContentTypes = hasMediaSheet
         ? [...new Map(mediaAssets.map((asset) => [
             String(asset.extension).toLowerCase().replace('jpeg', 'jpg'),
@@ -593,63 +665,69 @@ function generateXLSX(items, isUsers = false, opts = {}) {
             `<Default Extension="${escapeXml(extension)}" ContentType="${escapeXml(contentType)}"/>`
         ).join('')
         : '';
+
+    // Workbook order: data first, then the profile, then photos. Part names
+    // stay stable (sheet2 has always been Media) independent of that order.
+    const sheets = [{ name: 'Export', part: 'worksheets/sheet1.xml' }];
+    if (profileSheet) sheets.push({ name: 'Profile', part: 'worksheets/sheet3.xml' });
+    if (hasMediaSheet) sheets.push({ name: 'Media', part: 'worksheets/sheet2.xml' });
+    const stylesRelationshipId = `rId${sheets.length + 1}`;
+
     const entries = [
         {
             name: '[Content_Types].xml',
-            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            content: XLSX_XML_DECLARATION +
                 '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
                 '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
                 '<Default Extension="xml" ContentType="application/xml"/>' +
                 imageContentTypes +
                 '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-                '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+                sheets.map(sheet =>
+                    `<Override PartName="/xl/${sheet.part}" ContentType="${XLSX_WORKSHEET_TYPE}"/>`
+                ).join('') +
                 (hasMediaSheet
-                    ? '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-                      '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'
+                    ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'
                     : '') +
                 '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
                 '</Types>'
         },
         {
             name: '_rels/.rels',
-            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+            content: XLSX_XML_DECLARATION +
+                `<Relationships xmlns="${XLSX_PACKAGE_REL_NS}">` +
                 '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
                 '</Relationships>'
         },
         {
             name: 'xl/workbook.xml',
-            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-                '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
-                'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-                '<sheets><sheet name="Export" sheetId="1" r:id="rId1"/>' +
-                (hasMediaSheet ? '<sheet name="Media" sheetId="2" r:id="rId2"/>' : '') +
+            content: XLSX_XML_DECLARATION +
+                `<workbook xmlns="${XLSX_MAIN_NS}" xmlns:r="${XLSX_REL_NS}"><sheets>` +
+                sheets.map((sheet, index) =>
+                    `<sheet name="${escapeXml(sheet.name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`
+                ).join('') +
                 '</sheets></workbook>'
         },
         {
             name: 'xl/_rels/workbook.xml.rels',
-            content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
-                (hasMediaSheet
-                    ? '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>' +
-                      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
-                    : '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>') +
+            content: XLSX_XML_DECLARATION +
+                `<Relationships xmlns="${XLSX_PACKAGE_REL_NS}">` +
+                sheets.map((sheet, index) =>
+                    `<Relationship Id="rId${index + 1}" Type="${XLSX_REL_NS}/worksheet" Target="${sheet.part}"/>`
+                ).join('') +
+                `<Relationship Id="${stylesRelationshipId}" Type="${XLSX_REL_NS}/styles" Target="styles.xml"/>` +
                 '</Relationships>'
         },
         { name: 'xl/styles.xml', content: styles },
         { name: 'xl/worksheets/sheet1.xml', content: worksheet }
     ];
+    if (profileSheet) entries.push({ name: 'xl/worksheets/sheet3.xml', content: profileSheet });
     if (mediaPackage) entries.push(...mediaPackage);
-    return createZip(entries);
+    return entries;
 }
 
-function buildXlsxMediaPackage(mediaAssets) {
-    const cell = (ref, value, style = 4) => {
-        const text = String(value ?? '').slice(0, 32767);
-        const preserve = /^\s|\s$|[\n\r\t]/.test(text) ? ' xml:space="preserve"' : '';
-        return `<c r="${ref}" s="${style}" t="inlineStr"><is><t${preserve}>${escapeXml(text)}</t></is></c>`;
-    };
+function buildXlsxMediaPackage(mediaAssets, skippedCount = 0) {
+    const cell = (ref, value, style = 4) =>
+        xlsxInlineStringCell(ref, xlsxCellText(value), ` s="${style}"`);
     const rows = [
         `<row r="1">${[
             cell('A1', 'Export row ID', 3),
@@ -713,11 +791,25 @@ function buildXlsxMediaPackage(mediaAssets) {
     });
 
     const lastRow = mediaAssets.length + 1;
+    const skipped = Math.max(0, Math.floor(Number(skippedCount) || 0));
+    let lastUsedRow = lastRow;
+    if (skipped > 0) {
+        // Per-part caps (photo count / bytes) are silent otherwise; say how
+        // many photos stayed as plain URLs on the Export sheet.
+        lastUsedRow = lastRow + 2;
+        rows.push(
+            `<row r="${lastUsedRow}">` +
+            cell(`A${lastUsedRow}`,
+                `${skipped} more ${skipped === 1 ? 'photo was' : 'photos were'} not embedded ` +
+                'because this file reached its photo limit. Their links remain on the Export sheet.', 2) +
+            '</row>'
+        );
+    }
     const worksheet = [
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ',
         'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">',
-        `<dimension ref="A1:E${lastRow}"/>`,
+        `<dimension ref="A1:E${lastUsedRow}"/>`,
         '<sheetViews><sheetView showGridLines="0" workbookViewId="0">',
         '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>',
         '</sheetView></sheetViews>',
@@ -760,6 +852,16 @@ function buildXlsxMediaPackage(mediaAssets) {
         },
         ...imageEntries
     ];
+}
+
+function userColumnWidth(key) {
+    if (key === 'bio') return 44;
+    if (key === 'profile_image_url' || key === 'profile_url' || key === 'url') return 36;
+    if (key === 'created_at' || key.endsWith('_at') || key === 'premium_since') return 28;
+    if (key.endsWith('_count')) return 14;
+    if (key === 'verified' || key === 'protected' || key === 'account_location_accurate') return 14;
+    if (key === 'name' || key.endsWith('username') || key === 'account_source') return 24;
+    return 22;
 }
 
 function postColumnWidth(key) {
@@ -823,52 +925,128 @@ function concatBytes(parts) {
     return result;
 }
 
+function zipEntryBytes(entry, encoder) {
+    return typeof entry.content === 'string'
+        ? encoder.encode(entry.content)
+        : (entry.content instanceof Uint8Array
+            ? entry.content
+            : new Uint8Array(entry.content));
+}
+
+/**
+ * Store every entry uncompressed (ZIP method 0).
+ */
 function createZip(entries) {
+    const encoder = new TextEncoder();
+    return assembleZip(entries.map(entry => {
+        const content = zipEntryBytes(entry, encoder);
+        return { name: entry.name, content, data: content, method: 0 };
+    }));
+}
+
+function supportsDeflateRaw() {
+    if (typeof CompressionStream !== 'function') return false;
+    try {
+        new CompressionStream('deflate-raw');
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+async function deflateRaw(bytes) {
+    const stream = new CompressionStream('deflate-raw');
+    const writer = stream.writable.getWriter();
+    // Write and read concurrently: awaiting the write first can deadlock on
+    // stream backpressure for large worksheets.
+    const writing = writer.write(bytes).then(() => writer.close());
+    const reader = stream.readable.getReader();
+    const reading = (async () => {
+        const chunks = [];
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value instanceof Uint8Array ? value : new Uint8Array(value));
+        }
+        return concatBytes(chunks);
+    })();
+    // A stream error rejects both sides. Observe them together so a read
+    // failure can fall back to STORE without leaving an unhandled write error.
+    const [, compressed] = await Promise.all([writing, reading]);
+    return compressed;
+}
+
+/**
+ * DEFLATE (method 8) the XML parts when CompressionStream('deflate-raw') is
+ * available; images are already compressed and stay stored. Any compression
+ * failure falls back to the uncompressed archive.
+ */
+async function createZipAsync(entries) {
+    if (!supportsDeflateRaw()) return createZip(entries);
+    const encoder = new TextEncoder();
+    try {
+        const records = [];
+        for (const entry of entries) {
+            const content = zipEntryBytes(entry, encoder);
+            if (typeof entry.content !== 'string' || content.length === 0) {
+                records.push({ name: entry.name, content, data: content, method: 0 });
+                continue;
+            }
+            const compressed = await deflateRaw(content);
+            records.push(compressed.length < content.length
+                ? { name: entry.name, content, data: compressed, method: 8 }
+                : { name: entry.name, content, data: content, method: 0 });
+        }
+        return assembleZip(records);
+    } catch (_) {
+        return createZip(entries);
+    }
+}
+
+// `content` is the uncompressed entry (CRC and uncompressed size); `data` is
+// what is written to the archive with `method` (0 = store, 8 = deflate).
+function assembleZip(records) {
     const encoder = new TextEncoder();
     const localParts = [];
     const centralParts = [];
     let localOffset = 0;
 
-    for (const entry of entries) {
-        const name = encoder.encode(entry.name);
-        const content = typeof entry.content === 'string'
-            ? encoder.encode(entry.content)
-            : (entry.content instanceof Uint8Array
-                ? entry.content
-                : new Uint8Array(entry.content));
+    for (const record of records) {
+        const name = encoder.encode(record.name);
+        const { content, data, method } = record;
         const checksum = crc32(content);
         const local = new Uint8Array(30);
         write32(local, 0, 0x04034B50);
         write16(local, 4, 20);
         write16(local, 6, 0x0800); // UTF-8 names
-        write16(local, 8, 0);      // stored, no compression
+        write16(local, 8, method);
         write32(local, 14, checksum);
-        write32(local, 18, content.length);
+        write32(local, 18, data.length);
         write32(local, 22, content.length);
         write16(local, 26, name.length);
-        localParts.push(local, name, content);
+        localParts.push(local, name, data);
 
         const central = new Uint8Array(46);
         write32(central, 0, 0x02014B50);
         write16(central, 4, 20);
         write16(central, 6, 20);
         write16(central, 8, 0x0800);
-        write16(central, 10, 0);
+        write16(central, 10, method);
         write32(central, 16, checksum);
-        write32(central, 20, content.length);
+        write32(central, 20, data.length);
         write32(central, 24, content.length);
         write16(central, 28, name.length);
         write32(central, 42, localOffset);
         centralParts.push(central, name);
 
-        localOffset += local.length + name.length + content.length;
+        localOffset += local.length + name.length + data.length;
     }
 
     const centralDirectory = concatBytes(centralParts);
     const end = new Uint8Array(22);
     write32(end, 0, 0x06054B50);
-    write16(end, 8, entries.length);
-    write16(end, 10, entries.length);
+    write16(end, 8, records.length);
+    write16(end, 10, records.length);
     write32(end, 12, centralDirectory.length);
     write32(end, 16, localOffset);
     return concatBytes([...localParts, centralDirectory, end]);
@@ -942,9 +1120,11 @@ if (typeof globalThis !== 'undefined') {
         generateCSV,
         generatePostsText,
         generateXLSX,
+        generateXLSXAsync,
         generateExportFilename,
         compactExportData,
         selectPopulatedHeaders,
+        collectPopulatedHeaders,
         escapeCSVValue,
         escapeXml,
         POSTS_HEADERS,

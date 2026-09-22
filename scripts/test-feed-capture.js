@@ -14,6 +14,8 @@ function loadScript(relativePath, context) {
 }
 
 const parserContext = vm.createContext({ window: {} });
+// Manifest order: the shared capture contract loads before the feed parser.
+loadScript('utils/capture-contract.js', parserContext);
 loadScript('content/feed-parser.js', parserContext);
 const parser = parserContext.window.XPorterFeedParser;
 
@@ -85,6 +87,15 @@ const repost = parser.parseTweet(repostWrapper);
 assert.strictEqual(repost.id, '4444444444444444444', 'reposts use the visible original post ID');
 assert.strictEqual(repost.text, 'Canonical original');
 assert.strictEqual(repost.is_retweet, true);
+
+assert.strictEqual(parser.supportsOperation('UserTweets'), true);
+assert.strictEqual(parser.supportsOperation(null), false);
+
+// legacy.full_text is HTML-escaped by X; the captured text must be readable.
+const escaped = parser.parseTweet(tweetResult('5555555555555555555', {
+    text: 'Q&amp;A: 1 &lt; 2 &amp;&amp; 3 &gt; 2, literal &amp;lt;'
+}));
+assert.strictEqual(escaped.text, 'Q&A: 1 < 2 && 3 > 2, literal &lt;');
 
 const databaseContext = vm.createContext({ globalThis: {} });
 loadScript('utils/post-database.js', databaseContext);

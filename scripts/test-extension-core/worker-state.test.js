@@ -421,12 +421,12 @@ async function testAllFeedKeepsOnlyProfilePostsAndContext() {
     assert.equal(savedItems[2].reply_to_post.id, '200',
         'a later self-reply must retain the preceding author post as thread context');
     assert.equal(
-        vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'all' })", harness.context),
+        vm.runInContext("XPorterExportPolicy.rateLimitKeyForMode('posts', { profileFeed: 'all' })", harness.context),
         'UserTweets',
         'adaptive pacing must read the quota for the endpoint actually in use'
     );
     assert.equal(
-        vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'posts' })", harness.context),
+        vm.runInContext("XPorterExportPolicy.rateLimitKeyForMode('posts', { profileFeed: 'posts' })", harness.context),
         'UserOriginalsTimeline',
         'Posts must pace against its own redesigned endpoint budget'
     );
@@ -473,7 +473,7 @@ async function testAllFeedKeepsOnlyProfilePostsAndContext() {
     assert.equal(savedReplies[1].reply_to_post.id, '200',
         'Replies must preserve a preceding author reply as nested thread context');
     assert.equal(
-        vm.runInContext("rateLimitKeyForMode('posts', { profileFeed: 'replies' })", repliesHarness.context),
+        vm.runInContext("XPorterExportPolicy.rateLimitKeyForMode('posts', { profileFeed: 'replies' })", repliesHarness.context),
         'UserRepliesTimeline',
         'Replies must pace against the endpoint actually in use'
     );
@@ -912,7 +912,7 @@ async function testBookmarksModeSkipsUsernameResolutionAndKeepsEverySavedAuthor(
     assert.equal(savedReply.reply_to_post.article_title, 'Parent Article');
     assert.equal(savedReply.reply_to_post.article_text, 'The available parent Article body.');
     assert.equal(
-        vm.runInContext("rateLimitKeyForMode('bookmarks', {})", harness.context),
+        vm.runInContext("XPorterExportPolicy.rateLimitKeyForMode('bookmarks', {})", harness.context),
         'Bookmarks'
     );
 }
@@ -2072,7 +2072,7 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
             exportSpeed: 'turtle',
             userExportSpeed: 'turbo'
         }, 'about_account').adaptiveFloor,
-        postCustom: resolveSpeedPreset({
+        postCustom: XPorterExportPolicy.resolveSpeedPreset({
             exportSpeed: 'custom',
             customDelaySec: 3,
             customBatchSize: 10,
@@ -2082,7 +2082,7 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
             userCustomBatchSize: 40,
             userCustomCooldownMin: 6
         }, 'posts'),
-        userCustom: resolveSpeedPreset({
+        userCustom: XPorterExportPolicy.resolveSpeedPreset({
             exportSpeed: 'custom',
             customDelaySec: 3,
             customBatchSize: 10,
@@ -2092,7 +2092,7 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
             userCustomBatchSize: 40,
             userCustomCooldownMin: 6
         }, 'followers'),
-        decimalCommaCustom: resolveSpeedPreset({
+        decimalCommaCustom: XPorterExportPolicy.resolveSpeedPreset({
             exportSpeed: 'custom',
             customDelaySec: '0,5',
             customBatchSize: 7,

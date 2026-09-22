@@ -257,6 +257,7 @@
     };
 
     for (const instruction of instructions) {
+      if (!instruction || typeof instruction !== 'object') continue;
       if (instruction.type === 'TimelinePinEntry' && instruction.entry) {
         extractTimelineEntry(instruction.entry, sinks, { pinned: true });
       }
@@ -341,8 +342,6 @@
     if (entryId.startsWith('cursor-bottom-')) sinks.setNextCursor(entry.content?.value || null);
     if (entryId.startsWith('cursor-top-')) sinks.setPreviousCursor(entry.content?.value || null);
 
-    const directTweet = extractTweetResult(entry);
-    if (directTweet) sinks.addTweet(directTweet, options);
     walkTimelineNode(entry.content, sinks, options);
   }
 
@@ -354,7 +353,10 @@
     }
     if (typeof node !== 'object') return;
 
-    const tweetResult = node.tweet_results?.result || node.itemContent?.tweet_results?.result;
+    // Each tweet_results object is parsed exactly once, where it is found;
+    // parseTweetObject already handles the quote/repost nested inside it, so
+    // the walk never descends into an already-parsed tweet.
+    const tweetResult = node.tweet_results?.result;
     if (tweetResult) {
       const parsed = parseTweetObject(tweetResult);
       if (parsed) sinks.addTweet(parsed, options);
@@ -363,16 +365,33 @@
       if (node.cursorType === 'Bottom') sinks.setNextCursor(node.value || null);
       if (node.cursorType === 'Top') sinks.setPreviousCursor(node.value || null);
     }
-    for (const value of Object.values(node)) walkTimelineNode(value, sinks, options);
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'tweet_results') continue;
+      walkTimelineNode(value, sinks, options);
+    }
   }
 
-  function extractTweetResult(entry) {
-    const result = entry.content?.itemContent?.tweet_results?.result;
-    return result ? parseTweetObject(result) : null;
+  function unwrapTweetResult(result) {
+    return result?.__typename === 'TweetWithVisibilityResults' ? result.tweet : result;
+  }
+
+  // X's legacy.full_text is HTML-escaped (&amp; &lt; &gt; only). Decode those
+  // three, &amp; last so "&amp;lt;" stays the literal text "&lt;".
+  function decodeTextEntities(text) {
+    return String(text || '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  }
+
+  function toViewCount(value) {
+    if (value === undefined || value === null || value === '') return '';
+    const number = Number(value);
+    return Number.isFinite(number) ? number : '';
   }
 
   function parseTweetObject(result, options = {}) {
-    if (result?.__typename === 'TweetWithVisibilityResults') result = result.tweet;
+    result = unwrapTweetResult(result);
     if (!result || result.__typename === 'TweetTombstone') return null;
     const legacy = result.legacy;
     if (!legacy?.id_str) return null;
@@ -382,22 +401,41 @@
     const userCore = tweetUser?.core || {};
     const authorName = userCore.name || userLegacy.name || '';
     const authorUsername = userCore.screen_name || userLegacy.screen_name || '';
-    let text = result.note_tweet?.note_tweet_results?.result?.text || legacy.full_text || '';
-    const media = extractMedia(legacy);
-    const article = extractArticle(result, authorUsername);
-    if (article.title && !text.trim()) text = article.title;
 
-    let urls = (legacy.entities?.urls || []).map(url => url.expanded_url).filter(Boolean).join(', ');
-    if (!urls) urls = extractCardUrl(result);
+    // A repost row stays owned by the reposter (id, URL, date, author and the
+    // stable author ID the worker filters by), but its content and engagement
+    // belong to the original post: the wrapper only carries a truncated
+    // "RT @user: …" text and zeroed metrics.
+    const retweetedResult = unwrapTweetResult(
+      legacy.retweeted_status_result?.result || result.retweeted_status_result?.result
+    );
+    const content = retweetedResult?.legacy?.id_str ? retweetedResult : result;
+    const contentLegacy = content.legacy;
+    const contentUser = content.core?.user_results?.result;
+    const contentUsername = content === result
+      ? authorUsername
+      : (contentUser?.core?.screen_name || contentUser?.legacy?.screen_name || '');
+
+    const note = content.note_tweet?.note_tweet_results?.result;
+    const usesNoteText = typeof note?.text === 'string' && note.text !== '';
+    let text = usesNoteText ? note.text : decodeTextEntities(contentLegacy.full_text);
+    // Long posts carry their complete entity list beside the note text.
+    const entities = (usesNoteText && note.entity_set) || contentLegacy.entities || {};
+    const media = extractMedia(contentLegacy);
+    const article = extractArticle(content, contentUsername);
+    if (article.title && !text.trim()) text = article.title;
+    if (content !== result && contentUsername) text = `RT @${contentUsername}: ${text}`;
+
+    let urls = (Array.isArray(entities.urls) ? entities.urls : [])
+      .map(url => url?.expanded_url).filter(Boolean).join(', ');
+    if (!urls) urls = extractCardUrl(content);
     const statusUrl = authorUsername
       ? `https://x.com/${authorUsername}/status/${legacy.id_str}`
       : `https://x.com/i/web/status/${legacy.id_str}`;
     let quotedResult = options.includeQuotedPost === false
       ? null
-      : result.quoted_status_result?.result;
-    if (quotedResult?.__typename === 'TweetWithVisibilityResults') {
-      quotedResult = quotedResult.tweet;
-    }
+      : content.quoted_status_result?.result;
+    quotedResult = unwrapTweetResult(quotedResult);
     const quotedTweet = quotedResult
       ? parseTweetObject(quotedResult, { includeQuotedPost: false })
       : null;
@@ -407,22 +445,23 @@
       id: legacy.id_str,
       text,
       tweet_url: statusUrl,
-      language: legacy.lang || '',
+      language: contentLegacy.lang || legacy.lang || '',
       type: detectTweetType(legacy, result),
       author_name: authorName,
       author_username: authorUsername,
       reply_to_id: legacy.in_reply_to_status_id_str || '',
       reply_to_username: legacy.in_reply_to_screen_name || '',
       conversation_id: legacy.conversation_id_str || '',
-      view_count: result.views?.count || '',
-      bookmark_count: legacy.bookmark_count || 0,
-      favorite_count: legacy.favorite_count || 0,
-      retweet_count: legacy.retweet_count || 0,
-      reply_count: legacy.reply_count || 0,
-      quote_count: legacy.quote_count || 0,
+      view_count: toViewCount(content.views?.count),
+      bookmark_count: contentLegacy.bookmark_count || 0,
+      favorite_count: contentLegacy.favorite_count || 0,
+      retweet_count: contentLegacy.retweet_count || 0,
+      reply_count: contentLegacy.reply_count || 0,
+      quote_count: contentLegacy.quote_count || 0,
       created_at: legacy.created_at || '',
       source: extractSource(legacy.source),
-      hashtags: (legacy.entities?.hashtags || []).map(tag => tag.text).join(', '),
+      hashtags: (Array.isArray(entities.hashtags) ? entities.hashtags : [])
+        .map(tag => tag?.text).filter(Boolean).join(', '),
       urls,
       media_type: media.type,
       media_urls: media.urls,
@@ -441,12 +480,12 @@
     Object.defineProperty(parsed, '_context_metric_presence', {
       enumerable: false,
       value: {
-        view_count: result.views?.count !== undefined && result.views?.count !== null,
-        bookmark_count: legacy.bookmark_count !== undefined && legacy.bookmark_count !== null,
-        favorite_count: legacy.favorite_count !== undefined && legacy.favorite_count !== null,
-        retweet_count: legacy.retweet_count !== undefined && legacy.retweet_count !== null,
-        reply_count: legacy.reply_count !== undefined && legacy.reply_count !== null,
-        quote_count: legacy.quote_count !== undefined && legacy.quote_count !== null
+        view_count: content.views?.count !== undefined && content.views?.count !== null,
+        bookmark_count: contentLegacy.bookmark_count !== undefined && contentLegacy.bookmark_count !== null,
+        favorite_count: contentLegacy.favorite_count !== undefined && contentLegacy.favorite_count !== null,
+        retweet_count: contentLegacy.retweet_count !== undefined && contentLegacy.retweet_count !== null,
+        reply_count: contentLegacy.reply_count !== undefined && contentLegacy.reply_count !== null,
+        quote_count: contentLegacy.quote_count !== undefined && contentLegacy.quote_count !== null
       }
     });
     if (quotedTweet) {
@@ -464,7 +503,7 @@
         article_title: quotedTweet.article_title,
         article_url: quotedTweet.article_url,
         article_text: quotedTweet.article_text,
-        view_count: quotedResult?.views?.count ?? '',
+        view_count: toViewCount(quotedResult?.views?.count),
         bookmark_count: quotedLegacy.bookmark_count ?? '',
         favorite_count: quotedLegacy.favorite_count ?? '',
         retweet_count: quotedLegacy.retweet_count ?? '',
@@ -476,7 +515,8 @@
   }
 
   function detectTweetType(legacy, result) {
-    if (result.legacy?.retweeted_status_result || legacy.retweeted_status_result) return 'retweet';
+    if (result.legacy?.retweeted_status_result || legacy.retweeted_status_result ||
+        result.retweeted_status_result) return 'retweet';
     if (result.article?.article_results?.result) return 'article';
     if (legacy.in_reply_to_status_id_str) return 'reply';
     if (result.quoted_status_result) return 'quote';
@@ -518,7 +558,9 @@
   }
 
   function extractMedia(legacy) {
-    const media = legacy.extended_entities?.media || legacy.entities?.media || [];
+    const candidates = [legacy?.extended_entities?.media, legacy?.entities?.media]
+      .find(Array.isArray) || [];
+    const media = candidates.filter(item => item && typeof item === 'object');
     if (media.length === 0) return { type: '', urls: '', altTexts: '' };
 
     const types = new Set(media.map(item => item.type));
@@ -529,8 +571,8 @@
 
     const urls = media.map(item => {
       if (item.type === 'video' || item.type === 'animated_gif') {
-        const variants = (item.video_info?.variants || [])
-          .filter(variant => variant.content_type === 'video/mp4')
+        const variants = (Array.isArray(item.video_info?.variants) ? item.video_info.variants : [])
+          .filter(variant => variant?.content_type === 'video/mp4' && variant.url)
           .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
         if (variants.length > 0) return variants[0].url;
       }

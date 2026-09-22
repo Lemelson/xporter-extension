@@ -19,8 +19,6 @@
     const CONFIG = {
         // Deep-link straight to the Chrome Web Store reviews section.
         STORE_URL: 'https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja/reviews',
-        // Fallback destination when no popup callback is supplied.
-        BUG_URL: 'https://t.me/Lemelson',
         STORAGE_KEY: 'xporter_rate_prompt',
 
         // First ask: after this many completed exports since install.
@@ -44,7 +42,6 @@
         rateCta: "Leave a review",
         rateLater: "Maybe later",
         acknowledgementCountdown: '{action} ({seconds})',
-        rateReport: 'Report a problem',
         rateClose: 'Close',
         rateThanks: 'Thank you!'
     };
@@ -120,19 +117,15 @@
         window.open(url, '_blank', 'noopener');
     }
     function openStore() { openTab(CONFIG.STORE_URL); }
-    function openBugChannel() { openTab(CONFIG.BUG_URL); }
 
     // ==================== Overlay ====================
+    // Loaded locale strings win (even an intentionally empty one); the baked-in
+    // English only covers a missing key.
     function makeT(translations) {
-        return (key) => (translations && translations[key]) || EN[key] || key;
-    }
-
-    // Escape HTML, then turn **word** into <strong>word</strong> so a few key
-    // words in the body can be emphasised. Input is our own locale text.
-    function mdBold(s) {
-        const esc = String(s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        return esc.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        return (key) => {
+            const translated = translateKey(translations, key);
+            return translated !== key ? translated : translateKey(EN, key);
+        };
     }
 
     function closeOverlay(overlay, prevFocus) {
@@ -162,14 +155,6 @@
             lastDeferAt: Date.now(),
             exportsAtDefer: s.exports || 0
         };
-    }
-
-    // Resolve a deferral. The show itself is persisted as a deferral before the
-    // overlay is rendered, so a popup that closes without firing/finishing an
-    // async pagehide write still cannot show the prompt again immediately.
-    async function markDeferred(overlay) {
-        if (!overlay || overlay._deferResolved) return;
-        overlay._deferResolved = true;
     }
 
     function renderThanks(card, t) {
@@ -203,7 +188,8 @@
         closeBtn.innerHTML = X_SVG;
         closeBtn.setAttribute('aria-label', t('rateClose'));
         overlay.querySelector('.xrp-title').textContent = t('rateTitle');
-        overlay.querySelector('.xrp-body').innerHTML = mdBold(t('rateBody'));
+        // Escaped locale text; only **bold** spans become <strong>.
+        overlay.querySelector('.xrp-body').innerHTML = renderHelpMarkup(t('rateBody'));
         overlay.querySelector('.xrp-rate-label').textContent = t('rateCta');
         overlay.querySelector('.xrp-later').textContent = t('rateLater');
 
@@ -211,9 +197,11 @@
         const laterBtn = overlay.querySelector('.xrp-later');
         let canDismiss = false;
 
-        const later = async () => {
+        // The show itself was persisted as a deferral before rendering, so
+        // dismissing only has to close; a silently closed popup cannot re-ask.
+        const later = () => {
             if (!canDismiss || overlay._deferResolved) return;
-            await markDeferred(overlay);
+            overlay._deferResolved = true;
             closeOverlay(overlay, prevFocus);
         };
 
@@ -302,6 +290,6 @@
     }
 
     window.XPorterRatePrompt = {
-        maybeShow, show, incrementExports, rateNow, openStore, openBugChannel, CONFIG
+        maybeShow, show, incrementExports, rateNow, openStore, CONFIG
     };
 })();

@@ -1,7 +1,33 @@
 // XPorter — Rate Limit Manager
 // Handles request throttling to avoid X API rate limits
 
+// Transient failures reported by utils/api.js with a stable `error.code`
+// (the message starts with the same code). They share the network-error
+// retry path: bounded by maxRetries, paced by rateLimitPause.
+const TRANSIENT_ERROR_CODES = new Set([
+    'NETWORK_TIMEOUT',
+    'GRAPHQL_TRANSIENT',
+    'API_SERVER_ERROR',
+    'INVALID_JSON_RESPONSE'
+]);
+
+function isTransientRequestError(error) {
+    const code = typeof error?.code === 'string' ? error.code : '';
+    if (TRANSIENT_ERROR_CODES.has(code)) return true;
+    const message = String(error?.message || '');
+    const prefix = message.split(/[\s:]/, 1)[0];
+    if (TRANSIENT_ERROR_CODES.has(prefix)) return true;
+    // HTTP 5xx surfaced as API_ERROR_5xx by older/REST call paths.
+    if (/^API_ERROR_5\d\d$/.test(prefix)) return true;
+    // Fallback for browser fetch failures that carry no code.
+    return message.includes('fetch') || message.includes('network') || message.includes('Failed');
+}
+
 class RateLimitManager {
+    static isTransientError(error) {
+        return isTransientRequestError(error);
+    }
+
     constructor(options = {}) {
         const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
         this.requestDelay = options.requestDelay || C.REQUEST_DELAY || 3000;
@@ -9,6 +35,10 @@ class RateLimitManager {
         this.cooldownDuration = options.cooldownDuration || C.COOLDOWN_DURATION || 180000;
         this.rateLimitPause = options.rateLimitPause || C.RATE_LIMIT_PAUSE || 60000;
         this.maxRetries = options.maxRetries || C.MAX_RETRIES || 5;
+        // STALE_QUERY_ID has its own small budget: api.js already walks every
+        // queryId candidate, so outer retries only cover a late native template.
+        this.maxStaleRetries = options.maxStaleRetries ||
+            Math.min(this.maxRetries, C.MAX_STALE_RETRIES || 3);
         // A real 429 is only ever cleared by X's rolling window. Wait for the
         // reset X advertises (or the whole window), retry, and give up only
         // once the user's total wait budget is spent. The budget can never be
@@ -83,6 +113,7 @@ class RateLimitManager {
         setPositive('cooldownDuration');
         setPositive('rateLimitPause');
         setPositive('maxRetries');
+        setPositive('maxStaleRetries');
         if (Number.isFinite(Number(options.rateLimitWaitMs)) && Number(options.rateLimitWaitMs) > 0) {
             this.rateLimitWaitBudget = Math.max(this.rateLimitWindow, Number(options.rateLimitWaitMs));
         }
@@ -324,10 +355,14 @@ class RateLimitManager {
             }
         }
 
-        // Execute with retry logic
+        // Execute with retry logic. Each failure class owns its own budget:
+        // 429 waits are bounded only by the user's wait budget, so a long
+        // rate-limit wait can no longer consume the network/stale retries.
         let lastError = null;
         let retryReason = null;
         let rateLimitedSince = null;
+        let transientRetries = 0;
+        let staleRetries = 0;
         for (let attempt = 0; ; attempt++) {
             if (this._aborted) throw new Error('ABORTED');
 
@@ -382,12 +417,13 @@ class RateLimitManager {
                         this._recordRequestAttempt();
                         throw error;
                     }
-                    if (attempt >= this.maxRetries) {
+                    if (staleRetries >= this.maxStaleRetries) {
                         this._recordRequestAttempt();
                         break;
                     }
+                    staleRetries++;
                     const C = (typeof XPORTER_CONFIG !== 'undefined') ? XPORTER_CONFIG : {};
-                    const waitTime = (C.STALE_RETRY_BASE_WAIT || 10000) * (attempt + 1);
+                    const waitTime = (C.STALE_RETRY_BASE_WAIT || 10000) * staleRetries;
                     retryReason = 'STALE_QUERY_ID';
                     this._emitStatus('error', {
                         error: 'API changed, refreshing...',
@@ -398,13 +434,15 @@ class RateLimitManager {
                     continue;
                 }
 
-                // Network errors — retry (NETWORK_TIMEOUT = a fetch that hit
-                // its deadline in api.js; same recovery path as any drop)
-                if (error.message === 'NETWORK_TIMEOUT' || error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed')) {
-                    if (attempt >= this.maxRetries) {
+                // Network and other transient errors — retry (NETWORK_TIMEOUT =
+                // a fetch that hit its deadline in api.js; 5xx, transient
+                // GraphQL errors and non-JSON 200 bodies recover the same way).
+                if (isTransientRequestError(error)) {
+                    if (transientRetries >= this.maxRetries) {
                         this._recordRequestAttempt();
                         break;
                     }
+                    transientRetries++;
                     const waitTime = this.rateLimitPause;
                     retryReason = 'NETWORK_ERROR';
                     this._emitStatus('error', {
@@ -443,7 +481,7 @@ class RateLimitManager {
         const fresh = !Number.isFinite(Number(rl?.at)) || (Date.now() - Number(rl.at)) <= this.adaptiveHeaderTtl;
         if (Number.isFinite(reset) && reset > 0 && fresh) {
             const msLeft = reset * 1000 - Date.now();
-            if (msLeft > 0) wait = Math.min(wait, msLeft + this.adaptivePad);
+            if (msLeft > 0) wait = msLeft + this.adaptivePad;
         }
         return Math.max(5000, Math.min(wait, budgetLeft));
     }
@@ -451,6 +489,20 @@ class RateLimitManager {
     /**
      * Abort all pending operations — instantly cancels any active _wait()
      */
+    isAborted() {
+        return this._aborted === true;
+    }
+
+    /**
+     * Forget request counters without touching abort state or listeners
+     * (used when a request against another endpoint must not count here).
+     */
+    resetCounters() {
+        this.requestCount = 0;
+        this.totalRequests = 0;
+        this.lastRequestAt = null;
+    }
+
     abort() {
         this._aborted = true;
         if (this._abortController) {

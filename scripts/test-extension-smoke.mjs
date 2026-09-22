@@ -79,6 +79,7 @@ async function main() {
       const prefix = document.querySelector('#usernamePrefix');
       const input = document.querySelector('#usernameInput');
       const icon = document.querySelector('.account-edit-icon');
+      const cardStyle = getComputedStyle(document.querySelector('#targetAccountCard'));
       const nameStyle = getComputedStyle(name);
       const editorStyle = getComputedStyle(editor);
       const prefixStyle = getComputedStyle(prefix);
@@ -96,7 +97,8 @@ async function main() {
         prefixSize: parseFloat(prefixStyle.fontSize),
         prefixWeight: prefixStyle.fontWeight,
         sameFont: inputStyle.fontFamily === prefixStyle.fontFamily,
-        editorBackground: editorStyle.backgroundColor,
+        cardBackground: cardStyle.backgroundColor,
+        cardBorderWidth: parseFloat(cardStyle.borderTopWidth),
         editorCursor: editorStyle.cursor,
         iconVisible: icon.getBoundingClientRect().width >= 14
       };
@@ -109,7 +111,9 @@ async function main() {
     assert(editableHandle.inputSize > editableHandle.nameSize,
       'the editable handle must be typographically stronger than the display name');
     assert.notEqual(editableHandle.inputColor, editableHandle.nameColor);
-    assert.notEqual(editableHandle.editorBackground, 'rgba(0, 0, 0, 0)');
+    assert.notEqual(editableHandle.cardBackground, 'rgba(0, 0, 0, 0)',
+      'the containing account card supplies the editable field surface');
+    assert(editableHandle.cardBorderWidth > 0, 'the editable account card retains a visible boundary');
     assert.equal(editableHandle.editorCursor, 'text');
     assert.equal(editableHandle.iconVisible, true);
     await popup.locator('#usernamePrefix').click();
@@ -158,7 +162,13 @@ async function main() {
     await popup.locator('#exportMode').selectOption('posts');
     assert.equal(await popup.locator('#usernameInput').inputValue(), 'Oheva_sf');
     await popup.locator('#usernameInput').fill('not valid!');
-    await popup.locator('#startBtn').click();
+    assert.equal(await popup.locator('#signInBtn').isVisible(), true,
+      'a disposable signed-out profile offers Sign in');
+    assert.equal(await popup.locator('#startBtn').isVisible(), false,
+      'export is hidden until the popup detects a session');
+    // Exercise the input guard independently of auth presentation. No valid
+    // export request or account credentials are needed for this negative case.
+    await popup.locator('#startBtn').evaluate(button => button.click());
     assert.equal(await popup.locator('#usernameInput').getAttribute('aria-invalid'), 'true');
     assert.equal(await popup.locator('#usernameError').isVisible(), true);
     await popup.locator('#usernameInput').fill('Oheva_sf');

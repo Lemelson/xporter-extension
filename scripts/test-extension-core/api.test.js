@@ -147,16 +147,19 @@ async function testBookmarksEndpointUsesViewerTimelineWithoutUsername() {
 async function testSearchErrorsAreRelayed() {
     const posted = [];
     const window = {
-        location: { origin: 'https://x.com' },
+        location: { origin: 'https://x.com', pathname: '/search' },
         postMessage(message) { posted.push(message); },
         fetch: async () => new Response('{"errors":[{"code":88}]}', { status: 429 })
     };
     window.window = window;
 
     class FakeXHR {
+        constructor() { this.listeners = {}; }
         addEventListener(type, listener) {
             if (type === 'load') this.loadListener = listener;
+            (this.listeners[type] ||= []).push(listener);
         }
+        emit(type) { for (const listener of this.listeners[type] || []) listener(); }
         open() {}
     }
 
@@ -164,6 +167,7 @@ async function testSearchErrorsAreRelayed() {
         window,
         XMLHttpRequest: FakeXHR,
         Request,
+        URL,
         setTimeout,
         clearTimeout
     });
@@ -189,6 +193,34 @@ async function testSearchErrorsAreRelayed() {
     xhr.loadListener();
     const xhrCapture = posted.filter(message => message.type === '__XPORTER_GRAPHQL_RESPONSE__').at(-1);
     assert.equal(xhrCapture?.status, 429, 'empty XHR error responses must also reach the worker');
+
+    // A transport-level XHR failure must be reported like the fetch path does.
+    for (const type of ['error', 'abort', 'timeout']) {
+        const failedXhr = new FakeXHR();
+        failedXhr.open('GET', xhrUrl);
+        failedXhr.emit(type);
+        const failure = posted.filter(message => message.type === '__XPORTER_GRAPHQL_RESPONSE__').at(-1);
+        assert.equal(failure?.error, 'SEARCH_NETWORK_ERROR', `XHR ${type} must emit SEARCH_NETWORK_ERROR`);
+        assert.equal(failure?.bodyText, '');
+    }
+
+    // Ordinary X tabs never clone or relay (multi-MB) search responses.
+    const relayedBefore = posted.filter(message => message.type === '__XPORTER_GRAPHQL_RESPONSE__').length;
+    window.location.pathname = '/home';
+    await window.fetch('https://x.com/i/api/graphql/query-id/SearchTimeline?variables=%7B%7D');
+    const otherTabXhr = new FakeXHR();
+    otherTabXhr.open('GET', xhrUrl);
+    otherTabXhr.status = 200;
+    otherTabXhr.responseText = '{}';
+    otherTabXhr.emit('load');
+    otherTabXhr.emit('error');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+        posted.filter(message => message.type === '__XPORTER_GRAPHQL_RESPONSE__').length,
+        relayedBefore,
+        'SearchTimeline outside the /search capture tab must not be relayed'
+    );
+    window.location.pathname = '/search';
 
     await window.fetch('https://x.com/i/api/graphql/replies-query-id/UserTweetsAndReplies?variables=%7B%7D');
     const rejectedRepliesTemplate = posted.find(message =>
@@ -402,7 +434,9 @@ async function testNativeRequestTemplateReplaysAtomicallyAcrossWorkerRestart() {
     assert.match(firstUrl.pathname, /accepted-native-replies-id\/UserTweetsAndReplies$/);
     assert.deepEqual(JSON.parse(firstUrl.searchParams.get('features')), nativeTemplate.features,
         'captured features must travel atomically with their accepted query ID');
-    assert.deepEqual(JSON.parse(firstUrl.searchParams.get('fieldToggles')), nativeTemplate.fieldToggles);
+    assert.deepEqual(JSON.parse(firstUrl.searchParams.get('fieldToggles')),
+        { ...nativeTemplate.fieldToggles, withArticlePlainText: true },
+        'native field toggles are kept, but the full article text XPorter requests must survive');
     assert.equal(JSON.parse(firstUrl.searchParams.get('variables')).userId, 'target-user-id',
         'dynamic variables must still come from XPorter, never the captured page request');
     assert(stored.xporter_native_request_templates_v1,
@@ -661,9 +695,12 @@ async function testGraphqlErrorsWithoutTimelineAreNotSuccessfulEmptyExports() {
     });
     context.XPorterAPI.setLiveQueryId('UserTweets', 'invalid-payload-posts-id');
 
+    // Code 131 is X's internal error: transient, never a stale query ID (which
+    // would discard templates and re-scan bundles).
     await assert.rejects(
         context.XPorterAPI.fetchUserTweets('1'),
-        error => error.message === 'STALE_QUERY_ID' && error.staleCandidatesExhausted === true,
+        error => error.message === 'GRAPHQL_TRANSIENT' && error.code === 'GRAPHQL_TRANSIENT' &&
+            error.staleCandidatesExhausted !== true,
         'HTTP 200 with GraphQL errors and no timeline must not become a green zero-row export'
     );
 }
@@ -690,6 +727,7 @@ async function testStaleDiscoveredEndpointInvalidatesPersistedCache() {
         UserByScreenName: { queryId: 'cached-user-id', operationName: 'UserByScreenName' },
         UserTweets: { queryId: 'cached-posts-id', operationName: 'UserTweets' },
         UserTweetsAndReplies: { queryId: 'cached-replies-id', operationName: 'UserTweetsAndReplies' },
+        Bookmarks: { queryId: 'cached-bookmarks-id', operationName: 'Bookmarks' },
         SearchTimeline: { queryId: 'cached-search-id', operationName: 'SearchTimeline' },
         Followers: { queryId: 'cached-followers-id', operationName: 'Followers' },
         Following: { queryId: 'cached-following-id', operationName: 'Following' },
@@ -753,19 +791,27 @@ async function testRequiredOperationBypassesPartialDiscoveryCache() {
 
     const first = await context.XPorterAPI.discoverEndpoints(true, 'UserTweetsAndReplies');
     assert.notEqual(first.UserTweetsAndReplies.queryId, 'fresh-replies-id');
-
-    includeReplies = true;
-    const second = await context.XPorterAPI.discoverEndpoints(false, 'UserTweetsAndReplies');
-    assert.equal(
-        second.UserTweetsAndReplies.queryId,
-        'fresh-replies-id',
-        'a fallback-only partial scan must not satisfy required-operation discovery'
-    );
-    assert.equal(bundleFetches, 2, 'missing required operation must force another bundle scan');
+    assert.equal(first.UserTweets.queryId, 'fresh-posts-id',
+        'operations found by a partial scan must be kept');
     assert.equal(
         stored.xporter_discovered_endpoints.discoveredOperations.includes('UserTweetsAndReplies'),
-        true,
+        false,
         'persisted metadata must distinguish discovered operations from fallback stand-ins'
+    );
+
+    includeReplies = true;
+    const cached = await context.XPorterAPI.discoverEndpoints(false, 'UserTweetsAndReplies');
+    assert.equal(bundleFetches, 1,
+        'an operation just proven absent from the bundles must not re-scan on every page');
+    assert.notEqual(cached.UserTweetsAndReplies.queryId, 'fresh-replies-id');
+
+    // Stale recovery forces a pass, which bypasses the negative cache.
+    const second = await context.XPorterAPI.discoverEndpoints(true, 'UserTweetsAndReplies');
+    assert.equal(second.UserTweetsAndReplies.queryId, 'fresh-replies-id');
+    assert.equal(bundleFetches, 2);
+    assert.equal(
+        stored.xporter_discovered_endpoints.discoveredOperations.includes('UserTweetsAndReplies'),
+        true
     );
 }
 

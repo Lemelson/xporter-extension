@@ -9,6 +9,7 @@ const copy = value => value == null ? value : JSON.parse(JSON.stringify(value));
 
 function createWorkerHarness() {
     let runtimeListener;
+    let startupListener;
     let savedState = null;
     let cleared = false;
     let firstItemRecords = 0;
@@ -113,7 +114,7 @@ function createWorkerHarness() {
             runtime: {
                 id: 'test-extension',
                 onInstalled: { addListener() {} },
-                onStartup: { addListener() {} },
+                onStartup: { addListener(listener) { startupListener = listener; } },
                 onMessage: { addListener(listener) { runtimeListener = listener; } },
                 getManifest: () => ({ version: '1.4.8' }),
                 setUninstallURL() {},
@@ -144,6 +145,7 @@ function createWorkerHarness() {
     vm.runInContext(source('background/service-worker.js'), context, { filename: 'background/service-worker.js' });
     return {
         context,
+        dispatchStartup() { return startupListener(); },
         dispatchRuntime(message, sender) {
             return new Promise(resolve => runtimeListener(copy(message), copy(sender), resolve));
         },

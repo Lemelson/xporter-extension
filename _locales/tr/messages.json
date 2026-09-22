@@ -4,7 +4,7 @@
     "description": "Extension name for CWS"
   },
   "extDescription": {
-    "message": "X gönderilerini, yer işaretlerini ve hesap listelerini CSV, JSON, XLSX veya TXT olarak ücretsiz aktarın. Dosyalar tarayıcıda oluşur.",
+    "message": "X gönderi, yer işareti ve hesap listelerini CSV, JSON, XLSX veya TXT olarak ücretsiz aktarın. Dosyalar tarayıcıda oluşur.",
     "description": "Extension description for CWS"
   }
 }

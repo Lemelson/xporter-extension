@@ -30,7 +30,8 @@
                 fallback.classList.remove('hidden');
             };
             image.onerror = showFallback;
-            if (avatarUrl) {
+            // Same rule as history avatars: only load remote https images.
+            if (avatarUrl && avatarUrl.startsWith('https://')) {
                 image.src = avatarUrl;
                 image.classList.remove('hidden');
                 fallback.classList.add('hidden');

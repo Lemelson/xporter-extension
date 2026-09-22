@@ -28,7 +28,9 @@ const root = process.env.XPORTER_WORKSPACE_ROOT || process.cwd();
       return r.width > 0 && r.height > 0 && !!hit && (hit === el || el.contains(hit));
     });
     async function wheelUntil(selector, direction) {
-      await page.mouse.move(160, 230);
+      // Stay in the tab's padding: as content scrolls under a stationary mouse,
+      // the center can hover a help button and legitimately scroll its popover.
+      await page.mouse.move(8, 230);
       for (let i = 0; i < 32; i++) {
         if (await visibleAtCenter(selector)) return;
         const distance = await page.locator(selector).evaluate(el => {

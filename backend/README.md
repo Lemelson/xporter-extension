@@ -1,11 +1,11 @@
 # XPorter diagnostic schema 2
 
-Canonical collector: `apps-script.gs`. Bound workbook: `1P-X_y88WQQb5vU7BIL5uR_477G6BiLWMtWxf7P0clss` (the existing UninstallsXPorter book). The script refuses to write when its bound ID differs. Keep the existing web-app deployment URL; edit that deployment and select a new version.
+Canonical collector: `apps-script.gs`, container-bound to the existing UninstallsXPorter workbook. Run `configureBoundSpreadsheet()` once from its editor to store the workbook ID in the private Script Property `SPREADSHEET_ID`; an existing conflicting property is rejected. Web requests use `SpreadsheetApp.openById()` with that property and fail closed when configuration is missing. `getActiveSpreadsheet()` is available to the editor initializer, [not to web-app executions](https://developers.google.com/apps-script/guides/bound). The workbook ID is never committed or returned by the collector. Keep the existing web-app deployment URL; edit that deployment and select a new version.
 
 ## Sheets and compatibility
 
 - `Sheet1`: existing uninstall/direct feedback. Existing rows and legacy column meanings remain; new columns are appended as needed. Blank `schema_version` means legacy 1. Never backfill missing historical fields with zero.
-- `Usage`: voluntary snapshots during use, one installation/UTC-day. Cumulative counters: **do not sum rows**. Use differences between ordered snapshots for activity over an interval. This is a consenting sample, not the total installed population or a churn denominator.
+- `Usage`: legacy opt-in snapshots from the abandoned during-use experiment; no longer written (the collector rejects `source=usage`). Cumulative counters: **do not sum rows**.
 - `TelemetryTests`: synthetic traffic; always exclude from analysis. `test:true` in a POST or `?test=1` in the feedback page routes here.
 - `TelemetrySchema`: field dictionary and caveats created by `setupTelemetrySchema()`. Setup only adds documentation and never migrates Sheet1.
 
@@ -29,9 +29,9 @@ Legacy `dl` means a download was handed to the browser, not proof of a saved fil
 
 Deploy the updated collector allowlist first, then the website codec/privacy policy, then distribute the extension. The URL field order is append-only; an older website codec cannot decode the longer payload. The page already forwards codec fields, so its recording algorithm is unchanged. New columns are appended on receipt; no migration is required.
 
-## Transport and consent
+## Transport and abuse limits
 
-The extension collects bounded local diagnostics without uploading them during ordinary use by default. The dedicated Settings control plus optional Google host permission enables usage snapshots. `diagnosticsConsentVersion=1` is required. Disabling sharing aborts pending uploads. Failed attempts are throttled; a sleeping worker may defer an upload until the next activity. Local report download never enables sharing.
+The extension keeps bounded diagnostics locally and uploads nothing during use; only the uninstall feedback page posts to the collector. The collector accepts `source` `uninstall`/`direct`, event types `open`/`reason`/`reason_update`/`detail`, `schema_version` 1/2, drops unknown keys, caps strings (detail 4,000 = chip summary + 2,000-character textarea; subreason lists 4,000; stats 128; other text ≤ 200) and the body at 64 KB. `CacheService` applies best-effort budgets of 40 writes per session per 10 minutes and 300 new sessions per hour (`rate_limited` / `busy`), before the ScriptLock (`tryLock` 5 s) is requested. Counters are non-atomic and may be evicted; cache failures are logged and do not reject feedback. These budgets reduce casual flooding, not sustained concurrent abuse. Clients get generic codes (`invalid`, `too_large`, `busy`, `rate_limited`, `unavailable`); details go to the Apps Script execution log. Every string cell is formula-escaped on every write (including merged rewrites) and text cells get the plain-text `@` format; digit-only values and ISO timestamps keep default parsing.
 
 Uninstall URL `d2` uses append-only positional fields, dictionary codes, DEFLATE and base64url, limited to 1023 characters. It is **not encryption**. When needed, oldest download/attempt records are removed with `transport_omitted_*` counts; `transport_summary_only` or `transport_error` signals degraded transport. Never infer that omitted attempts did not happen. Preserve codec ordering and mirror files exactly.
 
@@ -40,14 +40,14 @@ The form prefers normalized extension language, then browser language, then Engl
 ## Deploy and verify
 
 1. Run `node scripts/test-all.js` and `git diff --check`.
-2. Back up the current source and Sheet1 values. Open Apps Script **from the target spreadsheet**, confirm account and existing deployment ID.
-3. Replace Code.gs with this canonical source, save, and run `setupTelemetrySchema`.
-4. Manage deployments → edit the existing deployment → new version → Deploy. Preserve the URL and existing access settings.
-5. Check GET health: `collector_version:2` and exact spreadsheet ID.
-6. Send synthetic open/reason/detail records with `test:true`; verify `TelemetryTests`, receipt, stable timestamp and no legacy-row changes. Do not put synthetic traffic into Sheet1/Usage.
-7. Publish the owned `docs/` changes to the canonical GitHub Pages repository; verify live asset hashes and a synthetic real browser form submission.
+2. Open the workbook in Google Sheets → **Extensions → Apps Script** (this opens the bound script). Back up the current Code.gs and Sheet1 values.
+3. Replace Code.gs with `apps-script.gs` and save. Run `configureBoundSpreadsheet` once from this bound editor (authorize if asked). It privately saves `SPREADSHEET_ID`; no ID needs to be pasted into the code. If it reports a mismatch, check the workbook and existing Script Property before changing either.
+4. Run `setupTelemetrySchema` once. It uses the configured workbook and only appends schema documentation.
+5. **Deploy → Manage deployments** → edit (pencil) the existing web-app deployment → Version: **New version** → Deploy. This keeps the `/exec` URL and its access settings (Execute as: Me; Who has access: Anyone).
+6. Open the `/exec` URL: the response is only `{ok, service, collector_version, time}`.
+7. Submit the live form with `?test=1`; confirm the row in `TelemetryTests`, the receipt, and that no legacy Sheet1 row changed.
 
-The current workbook is viewable by anyone with its link; the privacy policy reflects this. Do not put credentials or sensitive personal data in feedback. Schema changes do not alter workbook sharing.
+Keep the workbook's sharing **Restricted** (only the developer). The web app runs as the owner, so it needs no public link. Do not put credentials or sensitive personal data in feedback.
 
 Deterministic/fixture browser tests do not prove live X API compatibility or that installed store copies contain the update. Ship the extension package separately through the usual store release process.
 

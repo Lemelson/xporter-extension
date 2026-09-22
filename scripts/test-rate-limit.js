@@ -42,6 +42,95 @@ function budget({ remaining, resetInMs, ageMs = 0 }) {
     };
 }
 
+// 429 waits, transient/network retries and stale retries each own a budget.
+// Six long 429 waits used to consume the shared attempt counter, so the first
+// NETWORK_TIMEOUT afterwards ended the export without a single retry.
+async function testIndependentRetryBudgets(realNow) {
+    let fakeNow = 10_000_000;
+    Date.now = () => fakeNow;
+    try {
+        const limiter = new RateLimitManager({ rateLimitWaitMs: 24 * 60 * 60000, maxRetries: 5 });
+        const waits = [];
+        limiter._wait = async (ms) => { waits.push(ms); fakeNow += ms; };
+        const script = [
+            'RATE_LIMITED', 'RATE_LIMITED', 'RATE_LIMITED',
+            'RATE_LIMITED', 'RATE_LIMITED', 'RATE_LIMITED',
+            'NETWORK_TIMEOUT', 'NETWORK_TIMEOUT'
+        ];
+        let calls = 0;
+        const result = await limiter.executeWithRateLimit(async () => {
+            const failure = script[calls++];
+            if (failure) throw new Error(failure);
+            return 'ok';
+        });
+        assert.equal(result, 'ok', 'network retries must survive earlier 429 waits');
+        assert.equal(calls, script.length + 1);
+        assert.equal(waits.length, 8);
+
+        // maxRetries still bounds consecutive transient failures on its own.
+        const bounded = new RateLimitManager({ maxRetries: 2 });
+        let boundedCalls = 0;
+        bounded._wait = async (ms) => { fakeNow += ms; };
+        await assert.rejects(
+            bounded.executeWithRateLimit(async () => {
+                boundedCalls += 1;
+                throw new Error('NETWORK_TIMEOUT');
+            }),
+            /NETWORK_TIMEOUT/
+        );
+        assert.equal(boundedCalls, 3, 'one attempt plus maxRetries transient retries');
+
+        // STALE_QUERY_ID has its own small limit that network retries do not spend.
+        const stale = new RateLimitManager({ maxRetries: 5 });
+        const staleWaits = [];
+        stale._wait = async (ms) => { staleWaits.push(ms); fakeNow += ms; };
+        let staleCalls = 0;
+        await assert.rejects(
+            stale.executeWithRateLimit(async () => {
+                staleCalls += 1;
+                throw new Error(staleCalls <= 2 ? 'NETWORK_TIMEOUT' : 'STALE_QUERY_ID');
+            }),
+            /STALE_QUERY_ID/
+        );
+        assert.equal(stale.maxStaleRetries, 3);
+        assert.equal(staleCalls, 2 + 1 + 3, 'two network retries, then one stale attempt plus three stale retries');
+        assert.deepEqual(staleWaits.slice(2), [10000, 20000, 30000],
+            'stale backoff counts stale retries, not every earlier attempt');
+    } finally {
+        Date.now = realNow;
+    }
+}
+
+// api.js reports transient failures by stable code (message prefixed by the
+// same code). They retry like network errors; other API errors stay terminal.
+function testTransientErrorClassification() {
+    const coded = (code, message = code) => Object.assign(new Error(message), { code });
+    for (const error of [
+        coded('GRAPHQL_TRANSIENT', 'GRAPHQL_TRANSIENT: Timeout: Unspecified'),
+        coded('API_SERVER_ERROR', 'API_ERROR_503'),
+        coded('INVALID_JSON_RESPONSE', 'INVALID_JSON_RESPONSE'),
+        new Error('GRAPHQL_TRANSIENT: over capacity'),
+        new Error('API_ERROR_502'),
+        new Error('INVALID_JSON_RESPONSE'),
+        new Error('NETWORK_TIMEOUT'),
+        new TypeError('Failed to fetch')
+    ]) {
+        assert.equal(RateLimitManager.isTransientError(error), true, error.message);
+    }
+    for (const error of [
+        new Error('API_ERROR_400'),
+        new Error('API_ERROR_404'),
+        new Error('AUTH_ERROR'),
+        new Error('STALE_QUERY_ID'),
+        new Error('REPLIES_UNAVAILABLE'),
+        new Error('USER_UNAVAILABLE'),
+        new Error('USER_SUSPENDED'),
+        coded('SOMETHING_ELSE', 'API_ERROR_418')
+    ]) {
+        assert.equal(RateLimitManager.isTransientError(error), false, error.message);
+    }
+}
+
 async function run() {
     const oneLeft = new RateLimitManager({
         rateLimitProvider: () => budget({ remaining: 1, resetInMs: 600000 })
@@ -382,6 +471,16 @@ async function run() {
     assert(Math.abs(waits[0] - 602000) < 1000,
         `a 429 must wait until the reset X advertises (+pad), got ${waits[0]}`);
 
+    const laterReset = new RateLimitManager({
+        rateLimitProvider: () => budget({ remaining: 0, resetInMs: 1800000 }),
+        rateLimitWaitMs: 60 * 60000,
+        adaptivePad: 2000
+    });
+    assert(Math.abs(laterReset._rateLimitWaitTime(60 * 60000) - 1802000) < 1000,
+        'a valid advertised reset must not be shortened to the fallback window');
+    assert.equal(laterReset._rateLimitWaitTime(10 * 60000), 10 * 60000,
+        'the user wait budget still bounds a later advertised reset');
+
     // "16 minutes means 16 minutes": the budget bounds the total wait, and a
     // second 429 only gets whatever is left of it.
     let repeatedAttempts = 0;
@@ -512,6 +611,9 @@ async function run() {
     assert.equal(recoveredStaleResult, 'recovered');
     assert.equal(recoverableStaleCalls, 2, 'a non-exhausted stale signal may still use one outer retry');
     assert.deepEqual(recoverableStaleWaits, [10000]);
+
+    await testIndependentRetryBudgets(realNow);
+    testTransientErrorClassification();
 
     globalThis.USER_FEATURES = {};
     globalThis.USER_FIELD_TOGGLES = {};

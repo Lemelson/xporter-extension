@@ -28,7 +28,21 @@
     }, window.location.origin);
   }
 
-  function postGraphqlResponse(operationName, url, status, bodyText, error) {
+  // x-rate-limit-reset (unix seconds) lets the worker wait exactly until X's
+  // window reopens after a 429. Only a plain positive integer is forwarded.
+  function rateLimitResetFrom(status, readHeader) {
+    if (status !== 429) return null;
+    try {
+      const raw = String(readHeader('x-rate-limit-reset') ?? '').trim();
+      if (!/^\d{1,12}$/.test(raw)) return null;
+      const seconds = Number(raw);
+      return seconds > 0 ? seconds : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function postGraphqlResponse(operationName, url, status, bodyText, error, rateLimitReset = null) {
     if (typeof bodyText !== 'string') return;
     // Report the reason without forwarding an oversized response body.
     if (bodyText.length > CAPTURE_CONTRACT.MAX_BODY_CHARS) {
@@ -41,6 +55,7 @@
       url,
       status,
       bodyText,
+      ...(rateLimitReset ? { rateLimitReset } : {}),
       ...(error ? { error } : {})
     }, window.location.origin);
   }
@@ -58,11 +73,24 @@
     } catch (e) { /* passive collection must never affect X */ }
   }
 
+  // Date-range export captures SearchTimeline only in XPorter's own search
+  // tab (always /search). Search responses can be megabytes; never clone and
+  // relay them from ordinary X tabs (typeahead, other pages).
+  function capturesSearchExport(operationName) {
+    return operationName === 'SearchTimeline' && window.location?.pathname === '/search';
+  }
+
   function operationFromUrl(requestUrl) {
     if (!requestUrl || !requestUrl.includes('/i/api/graphql/')) return null;
     const match = requestUrl.match(/\/i\/api\/graphql\/([^/]+)\/([^?]+)/);
     if (!match) return null;
     return { queryId: match[1], operationName: match[2] };
+  }
+
+  function absoluteRequestUrl(requestUrl) {
+    // The worker validates URLs without a document base. Native fetch/XHR
+    // callers may use relative URLs, including their failed-request paths.
+    return new URL(requestUrl, window.location.href || window.location.origin).href;
   }
 
   window.fetch = async function (...args) {
@@ -75,6 +103,7 @@
       requestUrl = (typeof args[0] === 'string')
         ? args[0]
         : (args[0] instanceof Request ? args[0].url : String(args[0]));
+      requestUrl = absoluteRequestUrl(requestUrl);
       // Fetch init overrides the method stored in a Request object.
       const method = args[1]?.method ||
         (args[0] instanceof Request ? args[0].method : 'GET');
@@ -89,14 +118,14 @@
     try {
       response = await _origFetch.apply(this, args);
     } catch (error) {
-      if (operationName === 'SearchTimeline') {
+      if (capturesSearchExport(operationName)) {
         postGraphqlResponse(operationName, requestUrl, 200, '', 'SEARCH_NETWORK_ERROR');
       }
       throw error;
     }
 
     try {
-      const capturesExport = operationName === 'SearchTimeline';
+      const capturesExport = capturesSearchExport(operationName);
       const capturesFeed = window.XPorterFeedParser?.supportsOperation(operationName);
       const successful = response && response.status >= 200 && response.status < 300;
       if (successful && nativeTemplate) postNativeTemplate(nativeTemplate);
@@ -105,7 +134,10 @@
       // retry. Feed collection remains success-only.
       if ((capturesExport || (capturesFeed && successful)) && response) {
         response.clone().text().then((bodyText) => {
-          if (capturesExport) postGraphqlResponse(operationName, requestUrl, response.status, bodyText);
+          if (capturesExport) {
+            postGraphqlResponse(operationName, requestUrl, response.status, bodyText, undefined,
+              rateLimitResetFrom(response.status, name => response.headers?.get(name)));
+          }
           if (capturesFeed && successful &&
               bodyText.length <= CAPTURE_CONTRACT.MAX_FEED_BODY_CHARS) {
             // Yield once so X can render the response before passive parsing.
@@ -131,10 +163,10 @@
       this.__xporterNativeTemplate = null;
       this.__xporterOpenToken = (this.__xporterOpenToken || 0) + 1;
 
-      const requestUrl = String(url);
+      const requestUrl = absoluteRequestUrl(String(url));
       const operation = operationFromUrl(requestUrl);
       if (operation) {
-        const capturesExport = operation.operationName === 'SearchTimeline';
+        const capturesExport = capturesSearchExport(operation.operationName);
         const capturesFeed = window.XPorterFeedParser?.supportsOperation(operation.operationName);
         const nativeTemplate =
           globalThis.XPorterNativeTemplate?.parseRequestUrl(requestUrl, method) || null;
@@ -158,9 +190,11 @@
                   if (capturesExport) {
                     postGraphqlResponse(
                       operation.operationName,
-                      this.responseURL || requestUrl,
+                      absoluteRequestUrl(this.responseURL || requestUrl),
                       this.status,
-                      bodyText
+                      bodyText,
+                      undefined,
+                      rateLimitResetFrom(this.status, name => this.getResponseHeader(name))
                     );
                   }
                   if (capturesFeed && successful &&
@@ -171,6 +205,19 @@
               }
             } catch (e) { /* ignore */ }
           }, { once: true });
+          if (capturesExport) {
+            // Mirror the fetch path: a transport failure must reach the worker
+            // as SEARCH_NETWORK_ERROR instead of leaving the capture waiting.
+            const reportFailure = () => {
+              try {
+                if (this.__xporterOpenToken !== token) return;
+                postGraphqlResponse(operation.operationName, requestUrl, 200, '', 'SEARCH_NETWORK_ERROR');
+              } catch (e) { /* ignore */ }
+            };
+            for (const type of ['error', 'abort', 'timeout']) {
+              this.addEventListener(type, reportFailure, { once: true });
+            }
+          }
         }
       }
     } catch (e) { /* ignore */ }

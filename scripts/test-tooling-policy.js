@@ -296,3 +296,69 @@ test('package contains only the root extension manifest', () => {
         assert.deepEqual(entries.stdout.trim().split('\n').filter(name => /(^|\/)manifest\.json$/i.test(name)), ['manifest.json']);
     } finally { fs.rmSync(fixture.root, {recursive:true, force:true}); }
 });
+
+test('package ships emoji runtime and licenses but not build-only artwork', () => {
+    const fixture = createPackageFixture();
+    const output = path.join(fixture.root, 'result.zip');
+    try {
+        const repoRoot = path.join(__dirname, '..');
+        fs.cpSync(path.join(repoRoot, 'popup/emoji'), path.join(fixture.root, 'popup/emoji'), {recursive:true});
+        fs.copyFileSync(path.join(repoRoot, 'THIRD_PARTY_NOTICES'), path.join(fixture.root, 'THIRD_PARTY_NOTICES'));
+        fs.writeFileSync(path.join(fixture.root, 'popup/stray-notes.md'), 'draft\n');
+        const notices = fs.readFileSync(path.join(repoRoot, 'THIRD_PARTY_NOTICES'), 'utf8');
+        const noticeRefs = notices.match(/popup\/[\w./-]+[\w/]/g);
+        for (const ref of noticeRefs) {
+            const source = path.join(repoRoot, ref);
+            if (!ref.endsWith('/') && fs.existsSync(source) && !fs.existsSync(path.join(fixture.root, ref))) {
+                fs.copyFileSync(source, path.join(fixture.root, ref));
+            }
+        }
+        const result = spawnSync(path.join(fixture.scriptsDir, 'package.sh'), [], {
+            cwd: fixture.root, encoding: 'utf8',
+            env: {...process.env, PATH: `${fixture.binDir}:/usr/bin:/bin`, XPORTER_ZIP_OUT: output}
+        });
+        assert.equal(result.status, 0, result.stderr);
+        const entries = new Set(spawnSync('zipinfo', ['-1', output], {encoding:'utf8'}).stdout.trim().split('\n'));
+        for (const file of ['popup/emoji/ui-emoji.woff2', 'popup/emoji/attribution.html', 'popup/emoji/emoji-notices.txt',
+            'popup/emoji/LICENSE-GRAPHICS.txt']) assert(entries.has(file), `${file} must ship`);
+        for (const file of fs.readdirSync(path.join(repoRoot, 'popup/emoji/licenses'))) {
+            assert(entries.has(`popup/emoji/licenses/${file}`), `license ${file} must ship`);
+        }
+        assert(![...entries].some(name => name.startsWith('popup/emoji/sources/') || /^popup\/emoji\/[^/]+\.png$/.test(name)),
+            'emoji source and normalized PNGs are build inputs, not runtime assets');
+        assert(!entries.has('popup/stray-notes.md'), 'stray markdown outside emoji licenses stays excluded');
+        // Every shipped path named by THIRD_PARTY_NOTICES must exist in the ZIP,
+        // except the hash manifest, which it explicitly places in the source repository.
+        for (const ref of noticeRefs) {
+            if (ref === 'popup/emoji/manifest.json') continue;
+            const exists = ref.endsWith('/') ? [...entries].some(name => name.startsWith(ref)) : entries.has(ref);
+            assert(exists, `THIRD_PARTY_NOTICES references ${ref}, which the package does not contain`);
+        }
+    } finally { fs.rmSync(fixture.root, {recursive:true, force:true}); }
+});
+
+test('runtime assets never reference emoji PNG artwork excluded from the package', () => {
+    const repoRoot = path.join(__dirname, '..');
+    const runtime = [];
+    (function walk(dir) {
+        for (const item of fs.readdirSync(path.join(repoRoot, dir), {withFileTypes:true})) {
+            const rel = `${dir}/${item.name}`;
+            if (item.isDirectory()) { if (rel !== 'popup/emoji') walk(rel); }
+            else if (/\.(js|css|html)$/.test(item.name)) runtime.push(rel);
+        }
+    })('popup');
+    for (const dir of ['background', 'content', 'utils']) {
+        for (const name of fs.readdirSync(path.join(repoRoot, dir))) if (name.endsWith('.js')) runtime.push(`${dir}/${name}`);
+    }
+    for (const file of runtime) {
+        const text = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+        assert(!/emoji\/(sources\/|[0-9a-f-]+\.png)/.test(text), `${file} references build-only emoji artwork`);
+    }
+});
+
+test('manifest requests no activeTab: x.com host access covers tab URLs and reloads', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8'));
+    assert(!manifest.permissions.includes('activeTab'));
+    assert.deepEqual(manifest.host_permissions, ['https://x.com/*', 'https://twitter.com/*'],
+        'changing required hosts triggers a permission prompt for existing installs');
+});

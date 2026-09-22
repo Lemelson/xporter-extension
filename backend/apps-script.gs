@@ -1,9 +1,24 @@
-/** XPorter collector v2. Bound to the existing UninstallsXPorter workbook.
+/** XPorter collector v2. Container-bound to the UninstallsXPorter workbook.
  * Deploy by editing the EXISTING web-app deployment, choosing a new version.
  * setupTelemetrySchema() only creates documentation; it never migrates Sheet1.
+ * Run configureBoundSpreadsheet() once from the bound editor before deployment.
+ * Web requests open the private SPREADSHEET_ID Script Property; web apps have
+ * no active spreadsheet. The ID is never stored in source control or responses.
  */
-var EXPECTED_SPREADSHEET_ID = '1P-X_y88WQQb5vU7BIL5uR_477G6BiLWMtWxf7P0clss';
 var COLLECTOR_VERSION = 2;
+var SERVICE_NAME = 'xporter-feedback';
+// Only what docs/feedback.html actually sends; anything else is rejected.
+var SOURCES = ['uninstall','direct'];
+var EVENT_TYPES = ['open','reason','reason_update','detail'];
+var SCHEMA_VERSIONS = [1,2];
+// detail = page chip summary (up to ~1.1k chars) + textarea (maxlength 2000).
+var LIMITS = {payload:64000, detail:4000, list:4000, text:200, stat:128};
+// Abuse limits. The page writes once per chip/reason click and on every hide,
+// so the per-session budget leaves room for a genuinely indecisive visitor.
+var RATE = {sessionWrites:40, sessionWindowS:600, newSessionsPerHour:300, seenTtlS:21600};
+// Always stored as plain text: identifiers and free text must never be parsed.
+var TEXT_COLUMNS = ['sessionId','source','reason','detail','pageLang','lastType','ua','src','detail_receipt',
+  'subreasons','subreason_labels','reason_history','subreasons_all','subreason_labels_all','language_source'];
 var BASE_COLUMNS = ['received','sessionId','source','reason','detail','pageLang','lastType','clientTs','updated','ua'];
 var STAT_FIELDS = ['schema_version','v','os','days','installed_at','ui_lang','theme','opens','active_s',
   'exp_started','exp_ok','exp_err','exp_stopped','m_posts','m_followers','m_following','m_verified','m_dates',
@@ -33,16 +48,30 @@ var SETTING_FIELDS = ['includeOriginalPosts','includeQuotes','includeReplies','i
 var REASONS = ['r_broken','r_confusing','r_slow','r_missing','r_once','r_alt','r_privacy','r_other'];
 
 function getBoundSpreadsheet() {
-  var book = SpreadsheetApp.getActiveSpreadsheet();
-  if (!book || book.getId() !== EXPECTED_SPREADSHEET_ID) throw new Error('Wrong bound spreadsheet; no data written');
+  var expected = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (!expected) throw new Error('Configure the bound spreadsheet before deployment');
+  var book = SpreadsheetApp.openById(expected);
+  if (!book || book.getId() !== expected) throw new Error('Configured spreadsheet mismatch; no data written');
   return book;
+}
+// Editor-only initialization; never called from public doGet/doPost endpoints.
+function configureBoundSpreadsheet() {
+  var book = SpreadsheetApp.getActiveSpreadsheet();
+  if (!book) throw new Error('Run from the bound spreadsheet editor');
+  var properties = PropertiesService.getScriptProperties();
+  var expected = properties.getProperty('SPREADSHEET_ID');
+  if (expected && expected !== book.getId()) throw new Error('Configured spreadsheet mismatch; unchanged');
+  properties.setProperty('SPREADSHEET_ID', book.getId());
+  return health();
 }
 function nowIso() { return Utilities.formatDate(new Date(), 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'"); }
 function json(value) { return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON); }
+function health() { return {ok:true,service:SERVICE_NAME,collector_version:COLLECTOR_VERSION,time:nowIso()}; }
+// Sheets evaluates =, +, - and @ (also after leading whitespace/tab/CR) as a
+// formula. A leading apostrophe forces text and is not part of the stored value.
+function escapeFormula(text) { return /^\s*[=+@-]/.test(text) ? "'" + text : text; }
 function textCell(value, limit) {
-  var text = String(value === undefined || value === null ? '' : value).slice(0, limit || 128);
-  // setValues must never interpret user comments as spreadsheet formulas.
-  return /^[\s]*[=+@-]/.test(text) ? "'" + text : text;
+  return escapeFormula(String(value === undefined || value === null ? '' : value).slice(0, limit || LIMITS.stat));
 }
 function primitive(value) {
   if (value === null || value === undefined) return null;
@@ -87,7 +116,7 @@ function cleanStat(key, value) {
   if (key === 'diag_totals') return JSON.stringify(cleanRecord(value, TOTAL_FIELDS));
   if (typeof value === 'number') return primitive(value);
   if (typeof value === 'boolean') return value ? 1 : 0;
-  return textCell(value, /labels|subreasons|reason_history/.test(key) ? 4000 : 128);
+  return textCell(value, /labels|subreasons|reason_history/.test(key) ? LIMITS.list : LIMITS.stat);
 }
 function getHeaders(sheet) {
   return sheet.getLastRow() ? sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0] : [];
@@ -107,15 +136,15 @@ function findRowBySession(sheet, headers, id) {
 function flatten(payload, now) {
   var stats = payload.stats || {};
   var flat = {received:now,first_received:now,sessionId:payload.sessionId,source:payload.source,
-    reason:REASONS.indexOf(payload.reason) >= 0 ? payload.reason : '',detail:textCell(payload.detail,8000),
-    pageLang:textCell(payload.pageLang,16),lastType:['open','reason','reason_update','detail'].indexOf(payload.type)>=0 ? payload.type : '',
+    reason:REASONS.indexOf(payload.reason) >= 0 ? payload.reason : '',detail:textCell(payload.detail,LIMITS.detail),
+    pageLang:textCell(payload.pageLang,16),lastType:EVENT_TYPES.indexOf(payload.type)>=0 ? payload.type : '',
     clientTs:textCell(payload.ts,32),updated:now,ua:'',collector_version:COLLECTOR_VERSION,
     schema_version:Number(stats.schema_version) === 2 ? 2 : 1};
   STAT_FIELDS.concat(FORM_FIELDS).forEach(function(key) {
     if (key !== 'schema_version' && Object.prototype.hasOwnProperty.call(stats,key)) flat[key]=cleanStat(key,stats[key]);
   });
   flat.src = payload.source;
-  if (Number.isFinite(payload.feedback_seq)) flat.feedback_seq = Math.max(0,payload.feedback_seq);
+  if (Number.isFinite(payload.feedback_seq)) flat.feedback_seq = Math.max(0,Math.min(1e6,Math.floor(payload.feedback_seq)));
   if (payload.type === 'detail' && /^[A-Za-z0-9_-]{10,80}$/.test(payload.receipt_id || '')) flat.detail_receipt=payload.receipt_id;
   if (flat.diag_totals) {
     var totals=JSON.parse(flat.diag_totals);
@@ -148,38 +177,109 @@ function mergeRow(headers, previous, flat) {
     if (['received','first_received','lived_min','schema_version','collector_version','installed_at','schema_since'].indexOf(key)>=0) return prior;
     if (key === 'lastType') return freshFeedback && (ranks[incoming]||0)>=(ranks[prior]||0) ? incoming : prior;
     if (feedbackFields.indexOf(key)>=0 && !freshFeedback) return prior;
+    // Explicit Send replaces the submitted comment, including a deliberate
+    // empty value after Back. Passive dwell/reason events retain the comment.
+    if (key === 'detail' && flat.lastType === 'detail') return incoming;
     if (key === 'page_s') return Math.max(Number(prior)||0,Number(incoming)||0);
     if (key === 'diag_revision' && Number(incoming)<Number(prior)) return prior;
     return incoming !== undefined && incoming !== null && incoming !== '' ? incoming : prior;
   });
 }
+// Validate before any lock or Sheet access. Returns a sanitized payload that
+// carries only the fields the feedback page sends; unknown keys are dropped.
+function parseRequest(e) {
+  var raw=e && e.postData && e.postData.contents || '';
+  if (raw.length>LIMITS.payload) throw new Error('too_large');
+  var body=JSON.parse(raw);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('invalid');
+  if (!/^[A-Za-z0-9:_.-]{1,160}$/.test(body.sessionId || '')) throw new Error('invalid');
+  if (SOURCES.indexOf(body.source)<0) throw new Error('invalid');
+  if (body.type !== undefined && EVENT_TYPES.indexOf(body.type)<0) throw new Error('invalid');
+  if (body.test !== undefined && typeof body.test !== 'boolean') throw new Error('invalid');
+  var stats=body.stats === undefined ? {} : body.stats;
+  if (!stats || typeof stats !== 'object' || Array.isArray(stats)) throw new Error('invalid');
+  var schema=stats.schema_version;
+  if (schema !== undefined && schema !== '' && SCHEMA_VERSIONS.indexOf(Number(schema))<0) throw new Error('invalid');
+  return {sessionId:body.sessionId,source:body.source,type:body.type,test:body.test === true,
+    reason:typeof body.reason === 'string' ? body.reason.slice(0,LIMITS.text) : '',
+    detail:typeof body.detail === 'string' ? body.detail.slice(0,LIMITS.detail) : '',
+    pageLang:typeof body.pageLang === 'string' ? body.pageLang.slice(0,LIMITS.text) : '',
+    ts:typeof body.ts === 'string' ? body.ts.slice(0,LIMITS.text) : '',
+    receipt_id:typeof body.receipt_id === 'string' ? body.receipt_id.slice(0,LIMITS.text) : '',
+    feedback_seq:body.feedback_seq,stats:stats};
+}
+// CacheService counters are approximate (no atomic increment) but need no lock:
+// a flood is refused before it can queue on the ScriptLock.
+function rateLimit(sessionId) {
+  try {
+    var cache=CacheService.getScriptCache(), now=Date.now();
+    var sessionKey='w:'+Math.floor(now/(RATE.sessionWindowS*1000))+':'+sessionId;
+    var writes=Number(cache.get(sessionKey)) || 0;
+    if (writes>=RATE.sessionWrites) return 'rate_limited';
+    var seenKey='s:'+sessionId;
+    if (!cache.get(seenKey)) {
+      var hourKey='n:'+Math.floor(now/3600000);
+      var created=Number(cache.get(hourKey)) || 0;
+      if (created>=RATE.newSessionsPerHour) return 'busy';
+      cache.put(hourKey,String(created+1),3600);
+      cache.put(seenKey,'1',RATE.seenTtlS);
+    }
+    cache.put(sessionKey,String(writes+1),RATE.sessionWindowS);
+  } catch (error) {console.error('xporter-feedback cache unavailable',error);}
+  return '';
+}
+function columnName(column) {
+  var name='';
+  for (;column>0;column=Math.floor((column-1)/26)) name=String.fromCharCode(65+(column-1)%26)+name;
+  return name;
+}
+// Stored text must stay text on every write, including rewrites of values read
+// back with getValues() (which drops the protective apostrophe). Numbers and
+// server/ISO timestamps keep their default format so analysis stays numeric.
+function needsTextFormat(key, value) {
+  if (typeof value !== 'string' || value === '') return false;
+  if (TEXT_COLUMNS.indexOf(key)>=0) return true;
+  return !/^\d+(\.\d+)?$/.test(value) && !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/.test(value);
+}
+function writeRow(sheet, row, headers, values) {
+  var safe=values.map(function(value) {
+    if (value === undefined || value === null) return '';
+    return typeof value === 'string' ? escapeFormula(value) : value;
+  });
+  var textCells=[];
+  safe.forEach(function(value,i) {if (needsTextFormat(headers[i],value)) textCells.push(columnName(i+1)+row);});
+  if (textCells.length) sheet.getRangeList(textCells).setNumberFormat('@');
+  sheet.getRange(row,1,1,safe.length).setValues([safe]);
+}
 function doPost(e) {
+  var payload;
+  try {payload=parseRequest(e);}
+  catch (error) {
+    console.error('xporter-feedback rejected request',error);
+    return json({ok:false,error:error && error.message === 'too_large' ? 'too_large' : 'invalid'});
+  }
+  var limited=rateLimit(payload.sessionId);
+  if (limited) return json({ok:false,error:limited});
+  var flat=flatten(payload,nowIso());
   var lock=LockService.getScriptLock();
-  try {lock.waitLock(20000);} catch (_) {return json({ok:false,error:'busy'});}
+  if (!lock.tryLock(5000)) return json({ok:false,error:'busy'});
   try {
     var book=getBoundSpreadsheet();
-    var raw=e && e.postData && e.postData.contents || '';
-    if (raw.length>64000) throw new Error('Payload too large');
-    var payload=JSON.parse(raw);
-    if (!/^[A-Za-z0-9:_.-]{1,160}$/.test(payload.sessionId || '')) throw new Error('Invalid sessionId');
-    payload.source=payload.source === 'uninstall' ? 'uninstall' : payload.source === 'usage' ? 'usage' : 'direct';
-    if (payload.source === 'usage' && (Number(payload.stats && payload.stats.schema_version)!==2
-        || Number(payload.stats.consent_version)!==1 || !/^[a-f0-9-]{36}$/.test(payload.stats.install_id || ''))) throw new Error('Usage consent/schema missing');
-    var sheetName=payload.test === true ? 'TelemetryTests' : payload.source === 'usage' ? 'Usage' : 'Sheet1';
+    var sheetName=payload.test ? 'TelemetryTests' : 'Sheet1';
     var sheet=book.getSheetByName(sheetName) || book.insertSheet(sheetName);
     if (!sheet.getLastRow()) {sheet.appendRow(BASE_COLUMNS);sheet.setFrozenRows(1);}
-    var flat=flatten(payload,nowIso());
     ensureColumns(sheet,Object.keys(flat));
     var headers=getHeaders(sheet);
     var index=findRowBySession(sheet,headers,payload.sessionId);
     if (index>0) {
       var previous=sheet.getRange(index,1,1,headers.length).getValues()[0];
-      if (payload.source === 'usage' && Number(flat.diag_revision)<Number(previous[headers.indexOf('diag_revision')])) return json({ok:true,ignored:true,collector_version:2});
-      sheet.getRange(index,1,1,headers.length).setValues([mergeRow(headers,previous,flat)]);
-    } else sheet.appendRow(headers.map(function(key) {return flat[key] === undefined || flat[key] === null ? '' : flat[key];}));
-    return json({ok:true,collector_version:2,sheet:sheetName,sessionId:payload.sessionId});
-  } catch (error) {return json({ok:false,error:String(error)});}
-  finally {lock.releaseLock();}
+      writeRow(sheet,index,headers,mergeRow(headers,previous,flat));
+    } else writeRow(sheet,sheet.getLastRow()+1,headers,headers.map(function(key) {return flat[key];}));
+    return json({ok:true,collector_version:COLLECTOR_VERSION});
+  } catch (error) {
+    console.error('xporter-feedback write failed',error);
+    return json({ok:false,error:'unavailable'});
+  } finally {lock.releaseLock();}
 }
 function doGet(e) {
   if (e && e.parameter && e.parameter.callback) {
@@ -188,8 +288,8 @@ function doGet(e) {
     var receipt=findReceipt(e.parameter.sessionId,e.parameter.receipt_id,e.parameter.test === '1');
     return ContentService.createTextOutput(callback+'('+JSON.stringify(receipt)+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
-  try {return json({ok:true,service:'xporter-feedback',collector_version:2,spreadsheetId:getBoundSpreadsheet().getId(),time:nowIso()});}
-  catch (error) {return json({ok:false,error:String(error)});}
+  try {getBoundSpreadsheet(); return json(health());}
+  catch (error) {console.error('xporter-feedback health failed',error); return json({ok:false,error:'unavailable'});}
 }
 // A receipt reveals only whether this unguessable token was written, never
 // comments, counters, contacts or other users' records. Used after explicit Send.
@@ -205,7 +305,8 @@ function findReceipt(sessionId, token, test) {
 }
 
 function setupTelemetrySchema() {
-  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  var lock=LockService.getScriptLock();
+  if (!lock.tryLock(5000)) throw new Error('Collector busy; retry setupTelemetrySchema');
   try {
     var book=getBoundSpreadsheet();
     var sheet=book.getSheetByName('TelemetrySchema') || book.insertSheet('TelemetrySchema');
@@ -217,14 +318,14 @@ function setupTelemetrySchema() {
     if (sheet.getLastRow()>1) sheet.getRange(2,1,sheet.getLastRow()-1,1).getValues().forEach(function(row){documented[row[0]]=true;});
     var definitions=schemaDefinitions();
     definitions.forEach(function(row) {if (!documented[row[0]]) sheet.appendRow(row.concat([nowIso()]));});
-    return {ok:true,spreadsheetId:book.getId(),collector_version:2};
+    return health();
   } finally {lock.releaseLock();}
 }
 function schemaDefinitions() {
   var rows=[
     ['SCHEMA 2','2','New diagnostics are additive. Старые строки не изменены.','','Blank schema_version means legacy 1. Never fill historical missing values with zero.'],
     ['Sheet1','1/2','Uninstall and direct feedback / Удаления и прямые посещения','','Filter source=uninstall; a client-provided label is not cryptographic proof of removal.'],
-    ['Usage','2','Opt-in daily installation snapshots / Добровольные дневные снимки','','One row per install/day; cumulative totals, do not sum snapshots. Not all installations.'],
+    ['Usage','2','Legacy opt-in daily snapshots (no longer written) / Устаревшие снимки','','Historical only; cumulative totals, do not sum snapshots. Not all installations.'],
     ['TelemetryTests','2','Synthetic verification only / Только тестовые записи','','Exclude this entire sheet from product analysis.'],
     ['schema_version','2','Version of extension measurement semantics','','Blank or 1 = legacy; 2 = additional diagnostics since schema_since.'],
     ['collector_version','2','Collector that first created this row','','Independent of extension and form versions.'],

@@ -12,11 +12,15 @@ const XPORTER_CONFIG = {
         initialResponseTimeoutMs: 20000,
         responseTimeoutMs: 8000,
         responseAttempts: 6,
-        maxConsecutiveFailures: 3, // includes the initial failed response
-        maxNoProgressPages: 3,
+        maxConsecutiveFailures: 3, // includes the initial failed response; 429s use the wait budget instead
+        maxNoProgressPages: 3, // consecutive parsed pages that add no new unique post ID → SEARCH_STALLED
         maxSkippedPayloads: 12, // consecutive Top/unrelated-cursor responses before SEARCH_STALLED
         retryDelayMs: 1000,
+        // 429 on SearchTimeline: wait until the relayed x-rate-limit-reset, or
+        // start at rateLimitPauseMs and double up to rateLimitMaxPauseMs. The
+        // total is bounded by the user's X-limit wait setting.
         rateLimitPauseMs: 60000,
+        rateLimitMaxPauseMs: 15 * 60 * 1000,
         recoveryRounds: 1,
         recoveryDelayMs: 10000,
         overlayInitialDelayMs: 1000,
@@ -27,15 +31,16 @@ const XPORTER_CONFIG = {
     // Rate limiting. REQUEST_DELAY is used when adaptive pacing is explicitly
     // disabled; header-less adaptive requests use the mode-specific ranges below.
     REQUEST_DELAY: 3000,           // ms between API requests
-    COOLDOWN_DURATION: 180000,     // 3 min cooldown after each batch
+    COOLDOWN_DURATION: 180000,     // default pause for opt-in Scheduled breaks; speed presets never add one
     RATE_LIMIT_PAUSE: 60000,       // retry wait after a network failure
-    MAX_RETRIES: 5,                // max retry attempts per request (stale query id, network)
+    MAX_RETRIES: 5,                // max network/transient retries per request (429 waits have their own budget)
+    MAX_STALE_RETRIES: 3,          // max outer STALE_QUERY_ID retries per request
     // A real 429 is cleared by X's rolling 15-minute window, nothing sooner.
     // On 429 the limiter waits for the reset time X advertises (or the full
     // window when unknown), retries once, and repeats while the user's wait
     // budget (RATE_LIMIT_WAIT_RANGE_MINUTES) allows.
     RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000,
-    BATCH_SIZE: 20,                // requests before cooldown
+    BATCH_SIZE: 20,                // requests per Scheduled-break group
 
     // Adaptive pacing — use current x-rate-limit-* headers when available, but
     // never schedule a wait until the advertised reset. The selected speed

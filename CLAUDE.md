@@ -2,7 +2,7 @@
 
 **XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, personal bookmarks, followers, following, and verified followers to **CSV / JSON / XLSX / TXT**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Version:** 2.0.0 packaged September 9, 2026 (`manifest.json`); the `v1.6.4` tag is the Chrome Web Store release.
+- **Local version:** 2.0.2 (`manifest.json`). A local verification or ZIP does not establish the published Chrome Web Store version.
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 
@@ -29,7 +29,7 @@
 | Engagement signals (opens + active time) | `utils/usage-tracker.js` (loaded by `popup.html`) sends `XP_SESSION_OPEN` / `XP_ACTIVE_TICK` to the SW → `XPorterStorage.recordOpen` / `addActiveMs`. Surfaced in the uninstall URL as `os`, `installed_at`, `opens`, `active_s`; `feedback.html` adds `page_s` (dwell) and `apps-script.gs` computes `lived_min` (tenure). |
 | Theme bootstrap (anti-FOUC) | `popup/theme-init.js` (must load first) |
 | Public site | `docs/` only (`index.html`, `privacy-policy.html`, `feedback.html`, `assets/`); root site copies were removed |
-| Tests and packaging | `node scripts/test-all.js` runs the 13 deterministic suites; the 107-test core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the deterministic and explicit LibreOffice gates before atomically replacing an allowlist ZIP |
+| Tests and packaging | `node scripts/test-all.js` runs the deterministic suites listed in that file; the core is split under `scripts/test-extension-core/`; browser-only popup/smoke checks live beside them and fail closed inside `CODEX_SANDBOX`; `scripts/package.sh` runs the deterministic and explicit LibreOffice gates before atomically replacing an allowlist ZIP |
 
 ## Export interface
 
@@ -92,7 +92,7 @@ Popup shell height follows intrinsic Home content through `mountHomeSizing` in `
 
 Diagnostics remain local during use. `DIAGNOSTIC_CLIPBOARD_COPIED` and `DIAGNOSTIC_START_REJECTED` record local events for uninstall feedback. No upload module or report UI is loaded.
 
-The canonical collector is `backend/apps-script.gs`, bound to the existing workbook ID with a fail-closed check. See `backend/README.md`; `setupTelemetrySchema` documents semantics without rewriting old rows. Website receipt and language modules live in `docs/assets`. Test traffic uses `test:true` (`?test=1` on the form) and the `TelemetryTests` sheet. Never count it as user feedback.
+The canonical collector is `backend/apps-script.gs`. Run `configureBoundSpreadsheet()` from the bound editor once to save the workbook ID in the private `SPREADSHEET_ID` Script Property; web requests use `openById`, because bound web apps have no active spreadsheet. Missing or conflicting configuration fails closed. See `backend/README.md`; `setupTelemetrySchema` documents semantics without rewriting old rows. Explicit feedback Send waits for a server receipt before showing success. Test traffic uses `test:true` (`?test=1` on the form) and the `TelemetryTests` sheet. Never count it as user feedback.
 
 Ladybug telemetry: `XP_LADYBUG_SQUASH` records one live-bug squash in the worker-serialized `ladybugSquashes` usage counter and immediately refreshes the uninstall URL. `ladybug_squashes` is appended to the compact codec and collector schema; missing historical values remain unknown. Counts start with this feature, not the original installation. After the splat fully fades, a replacement enters from a random viewport side at contact-card walking height; reduced motion uses a static replacement. Collector and Pages changes must be published to receive this field in production.
 
@@ -132,3 +132,14 @@ not verification on an actual Windows host. No Apple artwork is distributed.
 Feedback collector schema 2 and deployment: `backend/README.md`, canonical `backend/apps-script.gs`. Website `docs/feedback.html` decodes compressed diagnostics with `docs/assets/diagnostics-codec.js`, normalizes 14 languages via `feedback-language.js`, and confirms submitted feedback with `feedback-receipt.js`. Legacy extension URLs remain supported. Synthetic `?test=1` traffic is reserved for TelemetryTests. Extension-side v2 instrumentation is prepared separately from this site deployment.
 
 Public homepage: edit `scripts/site/` and run `node scripts/build-site.cjs`. Commit generated `docs/index.html`, `docs/ru/index.html`, shared site assets, sitemap and AI references together. `node scripts/build-site.cjs --check` verifies freshness; `node scripts/test-site.cjs` checks crawlable pages. Hosting constraints and external follow-ups are in `deployment/SEO.md`.
+
+## September 22 verification contracts
+
+- GraphQL errors are classified as rate limit, authentication, stale query or transient failure. Empty/nested-null result envelopes with errors are not successful empty exports. Accepted partial timeline rows are preserved. Date search uses the same classifier, including HTTP 200/code 88; HTTP reset timestamps are honored within the user wait budget.
+- Stop during a batch write leaves an unfinished page resumable; neither a terminal response nor a next cursor may skip unread rows. Date Resume replays and deduplicates; user-list Resume preserves its current page cursor.
+- Settings and export-state reads fail with `STORAGE_READ_FAILED`; callers must not replace unreadable stored data with defaults, empty exports or expiry decisions. Startup catches this failure without clearing the existing badge/data.
+- XLSX data sheets have one frozen header row and optional Profile/Media sheets. XML strips invalid characters, keeps long IDs as text, and marks cells truncated by Excel's length limit. Async generation uses DEFLATE for XML, falls back to STORE, and observes both compression-stream promises. Current multipart downloads determine columns across all parts before serialization.
+- Native request capture normalizes relative fetch/XHR URLs before relaying; SearchTimeline bodies are captured only on search pages. Endpoint discovery preserves good per-operation results and remembers absent operations for the cache lifetime.
+- Release ZIPs keep only the root manifest and runtime emoji font/licensing assets; source PNGs and nested build manifests are excluded. `scripts/test-xlsx-export.js` runs through the download-transaction suite. Browser review scenarios are in `scripts/test-popup-review-fixes.mjs` and use disposable profiles.
+
+Popup recovery: initial status read failure blocks Start, mode changes and New Export until a readable snapshot arrives; a translated error is shown and visible-popup polling retries. Mode changes roll back mode and format if clearing fails. Ordinary saves serialize their diff against the updated settings cache; pagehide/visibility flushing sends the final edit even during an in-flight write. Deleted history entries are removed from the localization cache. `test-popup-review-fixes.mjs` covers these paths. The language menu is bounded to the header and visible shell at narrow widths/short heights; tab arrow navigation follows RTL. `test-popup-menu-layout.mjs` covers extreme menu geometry and long mode labels.

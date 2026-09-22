@@ -19,6 +19,7 @@ export function inspectCopy() {
         for (const rect of range.getClientRects()) {
             if (rect.width <= 0) continue;
             let issue = null;
+            let scrollableY = false;
             if (rect.left < -1 || rect.right > innerWidth + 1) issue = 'text-outside-window';
             for (let ancestor = el; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
                 const style = getComputedStyle(ancestor);
@@ -27,7 +28,12 @@ export function inspectCopy() {
                     if (rect.left < box.left - 1 || rect.right > box.right + 1) issue = 'clipped-text';
                 }
                 // A closed accordion is intentionally hidden, not a clipped translation.
-                if (style.overflowY === 'hidden' && !ancestor.classList.contains('detail-body')) {
+                // Text below a scrollable tab's viewport remains reachable;
+                // the outer shell's clipping is not lost translated content.
+                if (['auto', 'scroll'].includes(style.overflowY) && ancestor.scrollHeight > ancestor.clientHeight) {
+                    scrollableY = true;
+                }
+                if (style.overflowY === 'hidden' && !scrollableY && !ancestor.classList.contains('detail-body')) {
                     if (rect.top < box.top - 2 || rect.bottom > box.bottom + 2) issue = 'clipped-text-height';
                 }
             }
@@ -45,7 +51,9 @@ export function inspectCopy() {
         const style = getComputedStyle(select);
         measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
         const available = select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-        for (const option of select.options) {
+        // The opened native menu sizes itself independently from the closed
+        // control. Only its selected option must fit inside the closed field.
+        for (const option of select.selectedOptions) {
             const needed = measure.measureText(option.textContent).width;
             if (needed > available + 1) problems.push({ kind: 'select-truncation', element: name(select),
                 key: option.dataset.i18n, text: option.textContent, needed: Math.ceil(needed), available });
@@ -53,4 +61,3 @@ export function inspectCopy() {
     }
     return problems;
 }
-

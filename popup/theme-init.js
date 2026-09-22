@@ -45,8 +45,8 @@ try {
 document.documentElement.classList.toggle('action-popup', isActionView);
 XPorterUIAppearance.apply(document.body, {});
 chrome.storage.local.get('xporter_settings', (r) => {
+  // apply() also applies the theme preset (XPorterThemes.apply).
   XPorterUIAppearance.apply(document.body, r.xporter_settings || {});
-  XPorterThemes.apply(document.body, r.xporter_settings || {});
 });
 
 // Native selects can retain :focus-visible after mouse selection on macOS.

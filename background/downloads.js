@@ -72,13 +72,15 @@
         return () => clearInterval(timer);
     }
 
+    // Returns the embeddable targets plus how many valid photos were left out
+    // by the per-part target cap (reported on the Media sheet).
     function collectPhotoTargets(items) {
         const targets = [];
         const seen = new Set();
+        let overflow = 0;
         const add = (exportedPostId, post, relation) => {
             if (!post || typeof post !== 'object') return;
             for (const rawUrl of String(post.media_urls || '').split(/,\s*/)) {
-                if (targets.length >= MAX_EMBEDDED_PHOTO_TARGETS) return;
                 const sourceUrl = rawUrl.trim();
                 if (!sourceUrl) continue;
                 let parsed;
@@ -91,6 +93,10 @@
                 const key = `${exportedPostId}|${relation}|${sourceUrl}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
+                if (targets.length >= MAX_EMBEDDED_PHOTO_TARGETS) {
+                    overflow++;
+                    continue;
+                }
                 targets.push({
                     postId: String(exportedPostId || post.id || ''),
                     contextPostId: String(post.id || ''),
@@ -111,7 +117,7 @@
                 'reply_to_post.quoted_post'
             );
         }
-        return targets;
+        return { targets, overflow };
     }
 
     function imageType(response, sourceUrl) {
@@ -329,9 +335,10 @@
         assetCache = createPhotoAssetCache(),
         onProgress = null
     ) {
-        const targets = collectPhotoTargets(items);
-        if (targets.length === 0) return [];
+        const { targets, overflow } = collectPhotoTargets(items);
+        if (targets.length === 0) return { assets: [], attempted: 0, skipped: overflow };
         const results = new Array(targets.length);
+        let skippedByBytes = 0;
         let nextIndex = 0;
         let completed = 0;
         let retainedBytes = 0;
@@ -384,6 +391,7 @@
                     retainedBytes += asset.bytes.byteLength;
                     results[index] = { ...asset, ...target };
                 } else {
+                    if (asset) skippedByBytes++;
                     results[index] = null;
                 }
                 completed += 1;
@@ -396,7 +404,31 @@
                 () => worker()
             )
         );
-        return results.filter(Boolean);
+        return {
+            assets: results.filter(Boolean),
+            attempted: targets.length,
+            skipped: overflow + skippedByBytes
+        };
+    }
+
+    // Photo previews settle quickly; at most ~5 progress messages per second
+    // reach the popup, and the first and final counts are always sent.
+    function throttlePhotoProgress(report, intervalMs = 200) {
+        let lastSentAt = 0;
+        return ({ current, total }) => {
+            const now = Date.now();
+            if (current !== 0 && current < total && now - lastSentAt < intervalMs) return;
+            lastSentAt = now;
+            report({ current, total });
+        };
+    }
+
+    // Only XLSX posts/bookmarks can embed photos, each behind its own setting.
+    function embedsPhotos(format, mode, settings = {}) {
+        return format === 'xlsx' && (
+            (mode === 'posts' && settings.embedPostPhotos === true) ||
+            (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
+        );
     }
 
     function getPartLimit(format, mode, settings = {}) {
@@ -406,11 +438,7 @@
         const ordinaryLimit = Number.isFinite(configured) && configured > 0
             ? configured
             : fallback;
-        const embedsPhotos = format === 'xlsx' && (
-            (mode === 'posts' && settings.embedPostPhotos === true) ||
-            (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
-        );
-        if (!embedsPhotos) return ordinaryLimit;
+        if (!embedsPhotos(format, mode, settings)) return ordinaryLimit;
         const photoLimit = Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_PART_LIMIT) || 250;
         return Math.min(ordinaryLimit, photoLimit);
     }
@@ -462,20 +490,37 @@
         }, format);
     }
 
-    async function* loadCurrentParts(state, partSize) {
+    // Batch reads reject (STORAGE_READ_FAILED) instead of yielding an empty
+    // batch, so a failed read can never become a short file reported as done.
+    async function* loadCurrentBatches(state) {
         const readSize = Math.max(1, Number(XPORTER_CONFIG?.STORAGE_BATCH_READ_SIZE) || 100);
-        let part = [];
-
         for (let start = 0; start < (state.totalBatches || 0); start += readSize) {
             const count = Math.min(readSize, state.totalBatches - start);
             const batches = await XPorterStorage.loadTweetBatches(start, count);
-            for (const batch of batches) {
-                for (const item of batch) {
-                    part.push(item);
-                    if (part.length === partSize) {
-                        yield part;
-                        part = [];
-                    }
+            for (const batch of batches) yield batch;
+        }
+    }
+
+    // Multipart CSV/XLSX parts share one column set: a column populated only in
+    // a later part must still exist (empty) in earlier ones. This costs one
+    // extra bounded pass over the saved batches before the first part.
+    async function collectCurrentHeaders(state, isUsers, headerOpts) {
+        const populated = new Set();
+        for await (const batch of loadCurrentBatches(state)) {
+            XPorterCSV.collectPopulatedHeaders(batch, isUsers, headerOpts, populated);
+        }
+        return [...populated];
+    }
+
+    async function* loadCurrentParts(state, partSize) {
+        let part = [];
+
+        for await (const batch of loadCurrentBatches(state)) {
+            for (const item of batch) {
+                part.push(item);
+                if (part.length === partSize) {
+                    yield part;
+                    part = [];
                 }
             }
         }
@@ -510,10 +555,7 @@
             }
         }, format);
         const mode = state?.exportMode || 'posts';
-        const embedPhotos = plan.format === 'xlsx' && (
-            (mode === 'posts' && downloadSettings.embedPostPhotos === true) ||
-            (mode === 'bookmarks' && downloadSettings.embedBookmarkPhotos === true)
-        );
+        const embedPhotos = embedsPhotos(plan.format, mode, downloadSettings);
         const photoHostAccess = embedPhotos ? await hasPhotoHostAccess() : false;
         const diagnosticId = await diagnose('download_begin', { mode, format: plan.format,
             rows: plan.count, parts: plan.partCount, source: 'current',
@@ -552,6 +594,12 @@
         } = transaction;
         if (!state || plan.count === 0 || !state.totalBatches) return { error: 'NO_DATA' };
 
+        const mode = state.exportMode || 'posts';
+        const populatedHeaders = plan.multipart && (plan.format === 'csv' || plan.format === 'xlsx')
+            ? await collectCurrentHeaders(state, mode !== 'posts' && mode !== 'bookmarks', {
+                includeAboutAccountDetails: state.settings?.includeAboutAccountDetails === true
+            })
+            : null;
         let partNumber = 0;
         let downloadedCount = 0;
         let lastResult = null;
@@ -560,14 +608,16 @@
             partNumber++;
             reportDownload({
                 type: 'DOWNLOAD_PROGRESS',
+                source: 'current',
                 partNumber,
                 partCount: plan.partCount,
                 count: plan.count,
                 format: plan.format
             });
             lastResult = await downloadItems(items, {
+                source: 'current',
                 username: state.username || 'unknown',
-                mode: state.exportMode || 'posts',
+                mode,
                 format: plan.format,
                 profile: state.userInfo || null,
                 postSelection: state.settings || null,
@@ -582,6 +632,7 @@
                 downloadSettings,
                 photoHostAccess,
                 photoAssetCache,
+                ...(populatedHeaders ? { populatedHeaders } : {}),
                 diagnosticId: transaction.diagnosticId
             });
             if (lastResult?.success !== true) return lastResult;
@@ -591,25 +642,22 @@
 
         if (partNumber === 0) return { error: 'NO_DATA' };
         if (downloadedCount !== plan.count) {
-            // The files are already on disk and contain every persisted row.
-            // Failing here only hides them behind a red toast. Repair the
-            // counter instead so the UI stops promising rows that never existed.
+            // Every saved batch was read successfully (a failed or missing
+            // batch rejects above), so the files hold all persisted rows. Only
+            // report what was written; never rewrite the saved export count
+            // from a download.
             XLog.error(`Download row count mismatch: expected ${plan.count}, read ${downloadedCount}`);
-            const saved = await XPorterStorage.loadExportState();
-            if (saved && !saved.running && saved.tweetCount !== downloadedCount) {
-                saved.tweetCount = downloadedCount;
-                await XPorterStorage.saveExportState(saved);
-            }
         }
         await recordSuccessfulDownload();
         reportDownload({
             type: 'DOWNLOAD_COMPLETE',
+            source: 'current',
             partCount: partNumber,
-            count: plan.count,
+            count: downloadedCount,
             format: plan.format
         });
         if (!plan.multipart) return lastResult;
-        return { success: true, count: plan.count, partCount: partNumber, filenames };
+        return { success: true, count: downloadedCount, partCount: partNumber, filenames };
     }
 
     async function downloadCurrent(format) {
@@ -643,6 +691,7 @@
                     if (result?.success !== true) {
                         reportDownload({
                             type: 'DOWNLOAD_ERROR',
+                            source: 'current',
                             error: result?.error || 'DOWNLOAD_FAILED'
                         });
                     }
@@ -652,6 +701,7 @@
                     XLog.error('Download failed:', error.message);
                     reportDownload({
                         type: 'DOWNLOAD_ERROR',
+                        source: 'current',
                         error: error.message || 'DOWNLOAD_FAILED'
                     });
                     return { error: error.message || 'DOWNLOAD_FAILED' };
@@ -735,6 +785,7 @@
             dateFrom: entry.dateFromCalendar || entry.dateFrom,
             dateTo: entry.dateToCalendar || entry.dateTo,
             exportedAt: entry.completedAt || new Date(),
+            source: 'history',
             diagnosticSource: 'history'
         });
         if (result.success) await recordSuccessfulDownload();
@@ -743,8 +794,7 @@
 
     async function downloadSingle(items, options) {
         const settings = await XPorterStorage.loadSettings();
-        const photosEnabled = options.format === 'xlsx' && ((options.mode === 'posts' && settings.embedPostPhotos)
-            || (options.mode === 'bookmarks' && settings.embedBookmarkPhotos));
+        const photosEnabled = embedsPhotos(options.format, options.mode, settings);
         const photoPermission = photosEnabled ? await hasPhotoHostAccess() : false;
         const id = await diagnose('download_begin', { mode: options.mode, format: options.format,
             source: options.diagnosticSource, rows: items.length, parts: 1, photosEnabled, photoPermission });
@@ -765,6 +815,9 @@
         const format = options.format || 'csv';
         const isPostRows = mode === 'posts' || mode === 'bookmarks';
         const isUsers = !isPostRows;
+        // Progress from a history re-download must not be mistaken for the
+        // current export's download (the popup locks Home controls on it).
+        const source = options.source === 'history' ? 'history' : 'current';
         let content;
         let mimeType;
         let extension;
@@ -774,7 +827,8 @@
             localize: settings.localizeExportHeaders === true,
             lang: settings.language || 'en',
             includeAboutAccountDetails:
-                options.includeAboutAccountDetails === true
+                options.includeAboutAccountDetails === true,
+            ...(options.populatedHeaders ? { populatedHeaders: options.populatedHeaders } : {})
         };
 
         if (format === 'txt' && isPostRows) {
@@ -789,12 +843,10 @@
             mimeType = 'application/json;charset=utf-8;';
             extension = 'json';
         } else if (format === 'xlsx') {
-            const embedPhotos = isPostRows && (
-                (mode === 'posts' && settings.embedPostPhotos === true) ||
-                (mode === 'bookmarks' && settings.embedBookmarkPhotos === true)
-            );
+            const embedPhotos = embedsPhotos(format, mode, settings);
             const progressBase = {
                 type: 'DOWNLOAD_PROGRESS',
+                source,
                 partNumber: options.partNumber || 1,
                 partCount: options.partCount || 1,
                 count: allItems.length,
@@ -805,29 +857,29 @@
                     ? options.photoHostAccess
                     : await hasPhotoHostAccess())
                 : false;
-            const mediaAssets = (embedPhotos && photoHostAccess)
+            const photos = (embedPhotos && photoHostAccess)
                 ? await fetchPhotoAssets(
                     allItems,
                     options.photoAssetCache,
-                    ({ current, total }) => {
+                    throttlePhotoProgress(({ current, total }) => {
                         reportDownload({
                             ...progressBase,
                             stage: 'photos',
                             photoCurrent: current,
                             photoTotal: total
                         });
-                    }
+                    })
                 )
-                : [];
-            const photoTargets = embedPhotos && photoHostAccess ? collectPhotoTargets(allItems).length : 0;
-            if (options.diagnosticId) await diagnose('photos', { id: options.diagnosticId, attempted: photoTargets,
-                loaded: mediaAssets.length, failed: Math.max(0, photoTargets - mediaAssets.length) });
+                : { assets: [], attempted: 0, skipped: 0 };
+            const mediaAssets = photos.assets;
+            if (options.diagnosticId) await diagnose('photos', { id: options.diagnosticId, attempted: photos.attempted,
+                loaded: mediaAssets.length, failed: Math.max(0, photos.attempted - mediaAssets.length) });
             reportDownload({ ...progressBase, stage: 'building_xlsx' });
-            content = XPorterCSV.generateXLSX(allItems, isUsers, {
+            content = await XPorterCSV.generateXLSXAsync(allItems, isUsers, {
                 ...headerOpts,
                 mode,
                 postSelection: options.postSelection || null,
-                ...(mediaAssets.length > 0 ? { mediaAssets } : {}),
+                ...(mediaAssets.length > 0 ? { mediaAssets, mediaSkippedCount: photos.skipped } : {}),
                 ...(!isUsers ? { profile: options.profile || {} } : {})
             });
             mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -897,16 +949,18 @@
             );
             mimeType = 'application/json;charset=utf-8;';
         } else {
-            const headers = XPorterCSV.selectPopulatedHeaders(rows, FEED_EXPORT_HEADERS);
-            const lines = [headers.map(XPorterCSV.escapeCSVValue).join(',')];
-            for (const row of rows) {
-                lines.push(headers.map(header => XPorterCSV.escapeCSVValue(row[header])).join(','));
-            }
-            content = '\uFEFF' + lines.join('\n') + '\n';
+            // Plain row keys (the users path) with the feed column list.
+            content = XPorterCSV.generateCSV(rows, true, { candidateHeaders: FEED_EXPORT_HEADERS });
             mimeType = 'text/csv;charset=utf-8;';
         }
 
-        const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+        // Local wall-clock time, like the main export filenames.
+        const now = new Date();
+        const pad = (value) => String(value).padStart(2, '0');
+        const stamp = [
+            now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate()),
+            pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())
+        ].join('-');
         const filename = `XPorter_seen_posts_${stamp}.${format}`;
         const result = await startDownload(content, mimeType, filename, true, diagnosticId);
         return result.success ? { ...result, count: rows.length, filename } : result;
@@ -918,19 +972,26 @@
         return new Promise((resolve) => {
             reader.onerror = () => resolve({ error: 'DOWNLOAD_FAILED' });
             reader.onload = () => {
-                chrome.downloads.download({
-                    url: reader.result,
-                    filename,
-                    saveAs
-                }, (downloadId) => {
-                    if (chrome.runtime.lastError || downloadId === undefined) {
-                        XLog.error('Download failed:', chrome.runtime.lastError?.message);
-                        resolve({ error: 'DOWNLOAD_FAILED' });
-                        return;
-                    }
-                    Promise.resolve(globalThis.XPorterDownloadDiagnostics?.track(downloadId, diagnosticId, blob.size))
-                        .catch(() => {}).finally(() => resolve({ success: true, downloadId }));
-                });
+                // A synchronous throw here would otherwise leave this promise
+                // pending forever and the current-download lock held.
+                try {
+                    chrome.downloads.download({
+                        url: reader.result,
+                        filename,
+                        saveAs
+                    }, (downloadId) => {
+                        if (chrome.runtime.lastError || downloadId === undefined) {
+                            XLog.error('Download failed:', chrome.runtime.lastError?.message);
+                            resolve({ error: 'DOWNLOAD_FAILED' });
+                            return;
+                        }
+                        Promise.resolve(globalThis.XPorterDownloadDiagnostics?.track(downloadId, diagnosticId, blob.size))
+                            .catch(() => {}).finally(() => resolve({ success: true, downloadId }));
+                    });
+                } catch (error) {
+                    XLog.error('Download failed:', error?.message);
+                    resolve({ error: 'DOWNLOAD_FAILED' });
+                }
             };
             reader.readAsDataURL(blob);
         });

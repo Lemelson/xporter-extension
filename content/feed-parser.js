@@ -1,11 +1,19 @@
 // XPorter — passive feed parser (MAIN world)
 // Extracts compact post records from GraphQL responses already loaded by X.
 (function () {
-  const POST_OPERATION = /(Timeline|Tweets|TweetDetail|Bookmarks|Likes|Community|ListLatest|UserMedia)/i;
   const MAX_POSTS_PER_RESPONSE = 250;
 
+  // The operation allowlist is shared with the isolated relay (capture contract).
   function supportsOperation(operationName) {
-    return typeof operationName === 'string' && POST_OPERATION.test(operationName);
+    return globalThis.XPorterCaptureContract?.isPostOperation(operationName) === true;
+  }
+
+  // X's legacy.full_text is HTML-escaped (&amp; &lt; &gt; only); &amp; last.
+  function decodeTextEntities(text) {
+    return String(text || '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
   }
 
   function unwrapTweet(result) {
@@ -34,7 +42,8 @@
     const userLegacy = user?.legacy || {};
     const userCore = user?.core || {};
     const username = userCore.screen_name || userLegacy.screen_name || '';
-    const text = result.note_tweet?.note_tweet_results?.result?.text || legacy.full_text || '';
+    const text = result.note_tweet?.note_tweet_results?.result?.text ||
+      decodeTextEntities(legacy.full_text);
     const media = legacy.extended_entities?.media || legacy.entities?.media || [];
 
     return {

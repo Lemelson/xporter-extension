@@ -52,10 +52,15 @@ done
 # Nested manifest.json files are build metadata, not extension manifests.
 # Collect regular files from the allowed directories, dropping junk
 # (dotfiles like .DS_Store and any stray markdown) even inside allowed dirs.
+# Emoji license texts ship even though some are markdown: THIRD_PARTY_NOTICES
+# points at them. Emoji source/normalized PNGs are build inputs only; the
+# runtime uses popup/emoji/ui-emoji.woff2 (see popup/emoji.css).
 FILES=("${INCLUDE_FILES[@]}")
 while IFS= read -r -d '' f; do
   FILES+=("${f#./}")
-done < <(find "${INCLUDE_DIRS[@]}" -type f ! -name '.*' ! -name '*.md' ! -iname 'manifest.json' -print0 | sort -z)
+done < <(find "${INCLUDE_DIRS[@]}" -type f ! -name '.*' \
+  \( ! -name '*.md' -o -path 'popup/emoji/licenses/*' \) ! -iname 'manifest.json' \
+  ! -path 'popup/emoji/sources/*' ! -path 'popup/emoji/*.png' -print0 | sort -z)
 
 OUT_DIR="$(dirname "$OUT")"
 OUT_NAME="$(basename "$OUT")"

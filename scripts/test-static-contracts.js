@@ -56,7 +56,8 @@ const requiredDeterministicSuites = [
     'scripts/test-export-persistence.js',
     'scripts/test-api-discovery-cancellation.js',
     'scripts/test-capture-contract.js',
-    'scripts/test-export-policy.js'
+    'scripts/test-export-policy.js',
+    'scripts/test-worker-lifecycle.js'
 ];
 assertFile('scripts/test-all.js', 'canonical deterministic gate');
 const testAllSource = read('scripts/test-all.js');
@@ -458,11 +459,11 @@ for (const script of ['history.js', 'seen-posts.js', 'guarded-dialog.js', 'expor
 const updateEntries = [...popupHtml.matchAll(
     /<div class="detail-item update-item">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/g
 )].map((match) => match[1]);
-assert.equal(updateEntries.length, 3, 'About must show the current build and two latest public releases');
+assert.equal(updateEntries.length, 3, 'About must show the current build and two previous updates');
 const readme = read('README.md');
-const chromeWebStoreRelease = /`v(\d+\.\d+\.\d+)` tag matches the package released through the Chrome Web Store/
+const chromeWebStoreRelease = /Chrome Web Store listing reports version `(\d+\.\d+\.\d+)`/
     .exec(readme)?.[1];
-const mainDevelopmentVersion = /`main` branch now reports version `(\d+\.\d+\.\d+)`/
+const mainDevelopmentVersion = /current local release candidate reports version `(\d+\.\d+\.\d+)`/
     .exec(readme)?.[1];
 assert.match(
     chromeWebStoreRelease || '',
@@ -485,15 +486,15 @@ assert.match(updateEntries[1], /<time data-release-date datetime=/,
     'release history must retain its date without requiring a Released prefix');
 assert.match(
     updateEntries[1],
-    /<span class="update-meta-version">v1\.6\.5<\/span>/,
-    'the previous build must be v1.6.5'
+    /<span class="update-meta-version">v2\.0\.1<\/span>/,
+    'the previous build must be v2.0.1'
 );
 assert.match(updateEntries[2], /<time data-release-date datetime=/,
     'release history must retain its date without requiring a Released prefix');
 assert.match(
     updateEntries[2],
-    /<span class="update-meta-version">v1\.6\.4<\/span>/,
-    'the older public release must be v1.6.4'
+    /<span class="update-meta-version">v1\.6\.5<\/span>/,
+    'the older update must be v1.6.5'
 );
 const currentBuildDate = /<time data-release-date datetime="([^"]+)"/.exec(updateEntries[0])?.[1];
 const footerBuildDate = /footer-build-date">([^<]+)</.exec(popupHtml)?.[1];
@@ -786,7 +787,7 @@ assert.match(popupHtml, /id=["']exportSpeed["']/, 'popup must expose the posts s
 assert.match(popupHtml, /id=["']userExportSpeed["']/, 'popup must expose the user-list speed control');
 assert.match(
     popupRuntime,
-    /if\s*\(resumeAddsItems\)\s*message\.extraItems\s*=\s*extraPosts/,
+    /if\s*\(resumeAddsItems\)\s*message\.extraItems\s*=\s*resumeExtraItems\(\)/,
     'only a completed export may turn Resume into a +N quantity extension'
 );
 assert.match(
@@ -885,7 +886,6 @@ for (const file of localeFiles) {
         'safetyBreakHelp',
         'safetyBreakMinutes',
         'safetyBreakEvery',
-        'safetyBreakRequests',
         'statusRateLimitTitle',
         'statusRateLimitSubtitle',
         'statusRateLimitHelp',
@@ -934,7 +934,7 @@ for (const file of localeFiles) {
             `${file} ${key} must lead with its one bold summary`
         );
     }
-    for (const key of ['errRateLimited', 'ovRateLimited', 'statusRateLimitWait']) {
+    for (const key of ['errRateLimited', 'ovRateLimited', 'statusRateLimitTitle']) {
         assert.match(
             locale[key],
             /X/,
@@ -987,6 +987,108 @@ for (const dir of storeLocaleDirs) {
 }
 for (const match of JSON.stringify(manifest).matchAll(/__MSG_([^_][A-Za-z0-9_]*)__/g)) {
     assert(storeKeys.includes(match[1]), `manifest references missing store message: ${match[1]}`);
+}
+
+// ==================== Popup review fixes (2026-09-22) ====================
+const popupJs = read('popup/popup.js');
+const historyJs = read('popup/history.js');
+const seenPostsJs = read('popup/seen-posts.js');
+const settingsFormJs = read('popup/settings-form.js');
+const downloadHandler = popupJs.split('function handleDownloadUpdate', 2)[1]?.split('\n    }\n', 1)[0] || '';
+assert.match(downloadHandler, /^\(message\)\s*\{[\s\S]*?if\s*\(message\.source\s*===\s*['"]history['"]\)\s*return;/,
+    'history downloads must never lock or relabel the current export controls');
+assert.match(popupJs, /EXPORT_COMMAND_TIMEOUT\s*=\s*(\d+)/, 'export commands need an explicit timeout');
+assert(Number(/EXPORT_COMMAND_TIMEOUT\s*=\s*(\d+)/.exec(popupJs)[1]) >= 12000,
+    'Start/Stop/Resume must outlast the worker stop path (~8 s)');
+for (const type of ['START_EXPORT', 'STOP_EXPORT', 'RESUME_EXPORT']) {
+    assert.match(popupJs, new RegExp(`${type}[\\s\\S]{0,800}?EXPORT_COMMAND_TIMEOUT`),
+        `${type} must use the long export-command timeout`);
+}
+assert.match(popupJs, /resumeFromRepliesError[\s\S]*?sendMessage\(\{ type \}, EXPORT_COMMAND_TIMEOUT\)/,
+    'Posts-only/replies Resume must use the long export-command timeout');
+assert.match(popupJs, /result\?\.error\s*===\s*['"]TIMEOUT['"][\s\S]{0,400}?GET_STATUS/,
+    'a Stop timeout must re-poll status instead of reporting a failure');
+assert.match(popupJs, /\['complete', 'stopped', 'error', 'idle'\]\.includes\(result\?\.status\)/,
+    'a Resume reply with a terminal status must render that state, not a running export');
+assert.equal((popupJs.match(/await renderRefusedResume\(result\)/g) || []).length, 2,
+    'both Resume paths must handle a terminal Resume reply');
+assert.match(popupJs, /status: 'stopped',[\s\S]{0,200}?\}\);[\s\S]{0,200}?type: 'GET_STATUS'/,
+    'a confirmed Stop must re-read the worker state (it may have saved complete)');
+assert.match(popupJs, /startBtn\.disabled\s*=\s*true[\s\S]*?finally\s*\{\s*startBtn\.disabled\s*=\s*false/,
+    'Start must stay disabled while its request is pending');
+assert.match(popupJs, /resumeBtn\.disabled\s*=\s*true[\s\S]*?finally\s*\{\s*resumeBtn\.disabled\s*=/,
+    'Resume must stay disabled while its request is pending');
+assert.match(popupJs, /switchingModeLosesRows\(lastExportState\)[\s\S]*?confirmAction\(/,
+    'switching modes over unsaved rows must ask for confirmation first');
+assert.match(popupJs, /exportMode\.value\s*=\s*committedMode;\s*\n\s*const confirmed/,
+    'an unconfirmed mode switch must keep showing the current mode');
+assert.match(popupJs, /dateCheck\.checked\s*&&\s*!dateRangeIsUsable\(\)/,
+    'an enabled date filter without a usable date must not start a normal feed export');
+assert.match(popupJs, /settingsLoaded\s*&&\s*!currentSettings\.language/,
+    'the detected language must never be persisted over settings that failed to load');
+assert.match(popupJs, /markSettingsUnavailable\(\{\}\)/,
+    'a failed settings load must disable persistence for the popup session');
+assert.match(historyJs, /HISTORY_DOWNLOAD_TIMEOUT\s*=\s*(\d+)/);
+assert(Number(/HISTORY_DOWNLOAD_TIMEOUT\s*=\s*(\d+)/.exec(historyJs)[1]) >= 180000,
+    'history XLSX-with-photos downloads may build for minutes');
+assert.match(historyJs, /confirmAction\(\{[\s\S]*?clearHistoryTitle[\s\S]*?CLEAR_HISTORY/,
+    'Clear all history must be confirmed before deleting');
+assert.match(historyJs, /Array\.from\(String\(entry\.displayName/, 'avatar initials must keep surrogate pairs whole');
+assert.doesNotMatch(seenPostsJs, /window\.confirm/, 'native confirm is not used in the popup');
+assert.match(seenPostsJs, /confirmAction\(\{[\s\S]*?CLEAR_FEED_DB/, 'clearing seen posts must use the guarded dialog');
+assert.match(read('popup/account-fields.js'), /avatarUrl\.startsWith\('https:\/\/'\)/,
+    'account avatars must only load https images');
+assert.match(settingsFormJs, /addEventListener\('pagehide'/, 'pending settings edits must flush when the popup closes');
+assert.match(settingsFormJs, /visibilityState\s*===\s*'hidden'/, 'pending settings edits must flush when hidden');
+assert.match(settingsFormJs, /showToast\(formatError\(result\?\.error/, 'autosave failures must be visible');
+assert.equal((settingsFormJs.match(/quantityLimit\.addEventListener\('change'/g) || []).length, 1);
+assert.doesNotMatch(settingsFormJs, /includeBookmarkArticles,\s*quantityLimit,/,
+    'quantityLimit must have one change listener (its own handler saves)');
+// Popup form fallbacks only display (persistence is refused after a failed
+// load), but they must agree with the storage.js defaults.
+const storageDefaults = read('utils/storage.js').split('async function loadSettings()', 2)[1];
+for (const key of ['includeOriginalPosts', 'includeQuotes', 'includeReplies', 'includeRetweets',
+    'includeArticles', 'includeBookmarkReplyContext', 'includeBookmarkArticles',
+    'includeAboutAccountDetails', 'postSafetyBreakEnabled', 'userSafetyBreakEnabled',
+    'autoExpireEnabled', 'ladybugEnabled', 'localizeExportHeaders']) {
+    const storageDefault = new RegExp(`\\n\\s*${key}:\\s*(true|false),`).exec(storageDefaults)?.[1];
+    assert(storageDefault, `storage.js must define a boolean default for ${key}`);
+    const expected = storageDefault === 'true'
+        ? new RegExp(`currentSettings\\.${key}\\s*!==\\s*false`)
+        : new RegExp(`currentSettings\\.${key}\\s*===\\s*true`);
+    assert.match(settingsFormJs, expected, `settings form fallback for ${key} must match storage.js (${storageDefault})`);
+}
+assert.match(popupHtml, /id="githubLink"[\s\S]*?data-i18n-aria-label="viewSource"/, 'GitHub link name must be localized');
+assert.match(popupHtml, /id="langBtn"[^>]*aria-haspopup="menu"[^>]*aria-controls="langDropdown"/,
+    'language button must expose its menu');
+assert.match(popupHtml, /id="langDropdown"[^>]*role="menu"/);
+assert.match(popupHtml, /id="toastRegion"[^>]*aria-live="polite"/, 'toasts need one persistent live region');
+assert.doesNotMatch(read('popup/presentation.js'), /toast\.setAttribute\('role'/,
+    'individual toasts must not re-create live regions');
+assert.match(popupHtml, /<time data-release-date data-date-style="short" datetime="([^"]+)" class="footer-build-date">/,
+    'the footer build date must be localized from its machine-readable date');
+assert.equal(/datetime="([^"]+)" class="footer-build-date"/.exec(popupHtml)?.[1], currentBuildDate,
+    'the footer date must use the current About build date');
+assert.match(popupHtml, /data-i18n-template="authRequired">[^<]*<a data-slot="link"/,
+    'the sign-in warning must be one localized sentence around its link');
+const themeJs = read('popup/theme.js');
+assert.doesNotMatch(themeJs, /function toggleTheme|\bsun:|\bmoon:|\bdownload:/, 'dead theme helpers stay removed');
+assert.doesNotMatch(read('popup/theme-init.js').split("chrome.storage.local.get('xporter_settings'", 2)[1] || '',
+    /XPorterThemes\.apply\(/, 'theme-init applies the preset once, through XPorterUIAppearance.apply');
+const ratePromptJs = read('popup/rate-prompt.js');
+assert.doesNotMatch(ratePromptJs, /markDeferred|openBugChannel|BUG_URL|rateReport|mdBold/,
+    'dead review-prompt helpers stay removed');
+assert.doesNotMatch(popupJs, /onReportBug/);
+assert.doesNotMatch(read('popup/presentation.js'), /characterData:\s*true/,
+    'Home sizing must not re-measure on every counter digit update');
+for (const dir of storeLocaleDirs0()) {
+    const description = JSON.parse(read(`_locales/${dir}/messages.json`)).extDescription.message;
+    assert([...description].length <= 132, `${dir} store description exceeds the CWS 132-character limit`);
+}
+assert([...JSON.parse(read('_locales/tr/messages.json')).extDescription.message].length <= 125,
+    'Turkish store description keeps a safety margin below the CWS limit');
+function storeLocaleDirs0() {
+    return fs.readdirSync(path.join(ROOT, '_locales')).sort();
 }
 
 const workerCases = new Set([...workerSource.matchAll(/case\s+['"]([A-Z][A-Z0-9_]*)['"]/g)]

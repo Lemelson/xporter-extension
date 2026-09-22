@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-FZEAAnxx3rduhxbRlAflsP2q3cExcuicBLPlqrO+KK8=' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'sha256-YRH7sKhCLvGbhr9tJoCyXMPZwBgGsdARsQSmuwHDvRY='; img-src 'self'; font-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; worker-src blob:; base-uri 'none'; form-action 'none'; object-src 'none'" />
   <script src="assets/emoji-platform.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, follow" />
@@ -621,6 +622,7 @@
     textarea::placeholder { color: var(--text-muted); }
     .contact-consent { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; padding-inline: 2px; }
     .contact-consent strong { color: var(--text-secondary); font-weight: 650; }
+    .record-note { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; margin: 10px 2px 0; }
 
     /* Final CTA: organic ocean landscape with a continuous flowing outline. */
     @property --cta-angle {
@@ -1113,7 +1115,7 @@
           <div class="action-row">
             <div class="detail-stack">
               <label class="detail-question" id="detailQuestion" for="detail"></label>
-              <textarea id="detail"></textarea>
+              <textarea id="detail" maxlength="2000"></textarea>
               <p class="contact-consent" id="contactConsent"></p>
             </div>
             <button class="btn-send" id="submitBtn">
@@ -1123,6 +1125,7 @@
               <span data-i18n="submit"></span>
             </button>
           </div>
+          <p class="record-note" data-i18n="recordNote"></p>
         </div>
       </div>
     </section>
@@ -1283,6 +1286,23 @@
       "ko": {"thanks":"의견을 받았습니다.","thanksSub":"의견 감사합니다. 다음에 개선할 부분을 정하는 데 도움이 됩니다.","backToFeedback":"작성한 의견으로 돌아가기"},
       "zh_CN": {"thanks":"已收到反馈。","thanksSub":"感谢你的反馈，这将帮助我决定接下来改进什么。","backToFeedback":"返回填写反馈"}
     };
+    // Short disclosure beside Send; privacy-policy.html has the complete list.
+    const RECORD_I18N = {
+      "en": {"recordNote":"What is recorded: your answers, time on this page and the uninstall diagnostics (version, counters, settings, a random install ID). No exported X content."},
+      "ru": {"recordNote":"Что записывается: ваши ответы, время на этой странице и диагностика удаления (версия, счётчики, настройки, случайный ID установки). Экспортированный контент X не передаётся."},
+      "de": {"recordNote":"Was gespeichert wird: Ihre Antworten, die Zeit auf dieser Seite und die Deinstallationsdiagnose (Version, Zähler, Einstellungen, eine zufällige Installations-ID). Keine exportierten X-Inhalte."},
+      "es": {"recordNote":"Qué se registra: tus respuestas, el tiempo en esta página y el diagnóstico de desinstalación (versión, contadores, ajustes, un ID de instalación aleatorio). Ningún contenido exportado de X."},
+      "fr": {"recordNote":"Ce qui est enregistré : vos réponses, le temps passé sur cette page et le diagnostic de désinstallation (version, compteurs, réglages, un identifiant d’installation aléatoire). Aucun contenu X exporté."},
+      "it": {"recordNote":"Cosa viene registrato: le tue risposte, il tempo su questa pagina e la diagnostica di disinstallazione (versione, contatori, impostazioni, un ID di installazione casuale). Nessun contenuto X esportato."},
+      "pt_BR": {"recordNote":"O que é registrado: suas respostas, o tempo nesta página e o diagnóstico de desinstalação (versão, contadores, configurações, um ID de instalação aleatório). Nenhum conteúdo exportado do X."},
+      "tr": {"recordNote":"Kaydedilenler: yanıtlarınız, bu sayfada geçen süre ve kaldırma tanılaması (sürüm, sayaçlar, ayarlar, rastgele bir kurulum kimliği). Dışa aktarılan X içeriği yoktur."},
+      "id": {"recordNote":"Yang dicatat: jawaban Anda, waktu di halaman ini, dan diagnostik pencopotan (versi, penghitung, pengaturan, ID instalasi acak). Tanpa konten X yang diekspor."},
+      "ar": {"recordNote":"ما يُسجَّل: إجاباتك، ووقتك على هذه الصفحة، وبيانات تشخيص الإزالة (الإصدار والعدّادات والإعدادات ومعرّف تثبيت عشوائي). لا يتضمن أي محتوى مُصدَّر من X."},
+      "hi": {"recordNote":"क्या दर्ज होता है: आपके उत्तर, इस पेज पर बिताया समय और अनइंस्टॉल डायग्नोस्टिक्स (संस्करण, काउंटर, सेटिंग्स, एक रैंडम इंस्टॉल ID)। X से एक्सपोर्ट की गई सामग्री शामिल नहीं है।"},
+      "ja": {"recordNote":"記録される内容：回答、このページの滞在時間、アンインストール診断（バージョン、カウンター、設定、ランダムなインストールID）。エクスポートしたXのコンテンツは含まれません。"},
+      "ko": {"recordNote":"기록되는 내용: 답변, 이 페이지에 머문 시간, 삭제 진단 정보(버전, 카운터, 설정, 무작위 설치 ID). 내보낸 X 콘텐츠는 포함되지 않습니다."},
+      "zh_CN": {"recordNote":"记录的内容：你的回答、在此页面停留的时间和卸载诊断信息（版本、计数、设置、随机安装 ID）。不包含导出的 X 内容。"}
+    };
     Object.keys(REASON_I18N).forEach(function (code) {
       if (I18N[code]) Object.assign(I18N[code], REASON_I18N[code]);
     });
@@ -1291,6 +1311,9 @@
     });
     Object.keys(SUCCESS_I18N).forEach(function (code) {
       if (I18N[code]) Object.assign(I18N[code], SUCCESS_I18N[code]);
+    });
+    Object.keys(RECORD_I18N).forEach(function (code) {
+      if (I18N[code]) Object.assign(I18N[code], RECORD_I18N[code]);
     });
 
     // Native language names for the switcher.
@@ -1820,15 +1843,18 @@
       // would reject even though the POST succeeds server-side. Use no-cors:
       // the response is opaque. Explicit Send additionally checks a server receipt.
       // text/plain keeps this a simple request.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       return fetch(ENDPOINT, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
-        keepalive: true
+        keepalive: true,
+        signal: controller.signal
       }).then(() => payload.type === 'detail'
         ? XPorterFeedbackReceipt.check(ENDPOINT, payload.sessionId, payload.receipt_id, payload.test)
-        : true).catch(() => false);
+        : true).catch(() => false).finally(() => clearTimeout(timeout));
     }
 
     const actionCollapsedFrame = {
@@ -2129,12 +2155,8 @@
       if (label) label.textContent = t("sending");
       const delivery = send(Object.assign(basePayload(), { type: "detail", reason: selectedReason, detail }));
       const minimumWait = new Promise(resolve => setTimeout(resolve, 720));
-      const result = await Promise.race([
-        delivery.then(ok => ({ settled: true, ok })),
-        new Promise(resolve => setTimeout(() => resolve({ settled: false, ok: true }), 1200))
-      ]);
-      await minimumWait;
-      if (result.settled && !result.ok && !(ENDPOINT.startsWith("PASTE_"))) {
+      const [confirmed] = await Promise.all([delivery, minimumWait]);
+      if (!confirmed) {
         btn.disabled = false;
         btn.classList.remove("is-sending");
         if (label) label.textContent = t("submit");
@@ -2142,11 +2164,6 @@
         return;
       }
       finish();
-      if (!result.settled) {
-        delivery.then(function (ok) {
-          if (!ok) console.warn("[XPorter feedback] The background detail request did not finish.");
-        });
-      }
     });
     document.getElementById("backToFeedback").addEventListener("click", returnToFeedback);
     document.getElementById("confettiReplay").addEventListener("click", function () {

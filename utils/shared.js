@@ -35,6 +35,23 @@ function sendMessage(msg, timeoutMs) {
     });
 }
 
+// Settings caches whose initial GET_SETTINGS failed. Their form fallbacks are
+// display-only: persisting them would overwrite the user's real settings.
+const _unavailableSettings = new WeakSet();
+
+/**
+ * Mark a popup settings cache as unloaded so every later persist is refused
+ * with SETTINGS_UNAVAILABLE for the rest of that page session.
+ */
+function markSettingsUnavailable(settings) {
+    _unavailableSettings.add(settings);
+    return settings;
+}
+
+function settingsAreUnavailable(settings) {
+    return _unavailableSettings.has(settings);
+}
+
 /**
  * Persist a partial settings update and advance the caller's cache only after
  * storage confirms the write. Keeping this transaction in one place prevents
@@ -42,6 +59,7 @@ function sendMessage(msg, timeoutMs) {
  */
 async function persistSettingsPatch(currentSettings, patch) {
     if (!patch || Object.keys(patch).length === 0) return { success: true };
+    if (_unavailableSettings.has(currentSettings)) return { error: 'SETTINGS_UNAVAILABLE' };
     const result = await sendMessage({ type: 'SAVE_SETTINGS', settings: patch });
     if (result?.success === true) {
         Object.assign(currentSettings, patch);
@@ -90,6 +108,11 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'errHistoryDataGone',
         'STORAGE_FULL': 'errStorageFull',
         'DOWNLOAD_FAILED': 'errDownloadFailed',
+        'STORAGE_READ_FAILED': 'errStorageReadFailed',
+        // Temporary X-side failures (5xx, transient GraphQL, unreadable JSON)
+        'GRAPHQL_TRANSIENT': 'errXTemporary',
+        'API_SERVER_ERROR': 'errXTemporary',
+        'INVALID_JSON_RESPONSE': 'errXTemporary',
         'DOWNLOAD_IN_PROGRESS': 'errDownloadInProgress',
         'COPY_TOO_LARGE': 'errCopyTooLarge',
         'SEARCH_CAPTURE_TIMEOUT': 'errSearchCapture',
@@ -106,6 +129,7 @@ function formatError(error, t) {
         'DATE_EXPORT_RESTART_REQUIRED': 'errDateExportRestart',
         'TIMEOUT': 'errExtensionTimeout',
         'MESSAGING_ERROR': 'errExtensionConnection',
+        'SETTINGS_UNAVAILABLE': 'errSettingsUnavailable',
         'NO_EXPORT_TO_RESUME': 'errNoResume',
         'No export to resume': 'errNoResume',
         // Timed-out fetch — same user guidance as a failed connection
@@ -133,6 +157,10 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'The saved data for this export is no longer available. Start a new export to download it again.',
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
+        'STORAGE_READ_FAILED': 'XPorter could not read the saved export data. Please try again.',
+        'GRAPHQL_TRANSIENT': 'X is having temporary problems. Your progress is saved. Wait a few minutes, then select Resume.',
+        'API_SERVER_ERROR': 'X is having temporary problems. Your progress is saved. Wait a few minutes, then select Resume.',
+        'INVALID_JSON_RESPONSE': 'X is having temporary problems. Your progress is saved. Wait a few minutes, then select Resume.',
         'DOWNLOAD_IN_PROGRESS': 'A download is already in progress',
         'COPY_TOO_LARGE': 'This export is too large to copy — download the numbered files instead',
         'SEARCH_CAPTURE_TIMEOUT': 'Could not read the search results.',
@@ -150,17 +178,20 @@ function formatError(error, t) {
         'NETWORK_TIMEOUT': 'Could not connect to X. Check that x.com opens, then try again.',
         'TIMEOUT': 'XPorter did not respond. Reopen the extension and try again.',
         'MESSAGING_ERROR': 'Could not connect to XPorter. Reopen the extension and try again.',
+        'SETTINGS_UNAVAILABLE': 'XPorter could not load your settings, so changes won’t be saved. Reopen XPorter and try again.',
         'NO_EXPORT_TO_RESUME': 'No saved export to resume. Start a new export.',
         'No export to resume': 'No saved export to resume. Start a new export.',
     };
 
-    const i18nKey = errorMap[error];
+    // X server errors arrive as API_ERROR_<status>; all 5xx read the same.
+    const code = /^API_ERROR_5\d\d$/.test(String(error)) ? 'API_SERVER_ERROR' : error;
+    const i18nKey = errorMap[code];
     if (i18nKey && typeof t === 'function') {
         const translated = t(i18nKey);
         // If t() returns the key itself, fall back to English
         if (translated !== i18nKey) return translated;
     }
-    return fallbacks[error] || error;
+    return fallbacks[code] || error;
 }
 
 // ==================== Username Parsing ====================
@@ -231,6 +262,68 @@ function extractUsernameFromInput(input) {
 // ==================== i18n Helpers ====================
 
 /**
+ * Look up a UI string. An intentionally empty translation stays empty; only a
+ * key that is absent from the merged locale (English fallback included) or not
+ * a string falls back to the key itself.
+ */
+function translateKey(translations, key) {
+    const value = translations && Object.prototype.hasOwnProperty.call(translations, key)
+        ? translations[key]
+        : undefined;
+    return typeof value === 'string' ? value : key;
+}
+
+const TEMPLATE_PLACEHOLDER = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
+
+/**
+ * Split a localized template into literal text and {placeholder} parts so each
+ * language controls word order and punctuation around dynamic values.
+ */
+function splitTemplate(template) {
+    const text = String(template ?? '');
+    const parts = [];
+    let last = 0;
+    for (const match of text.matchAll(TEMPLATE_PLACEHOLDER)) {
+        if (match.index > last) parts.push({ text: text.slice(last, match.index) });
+        parts.push({ name: match[1], raw: match[0] });
+        last = match.index + match[0].length;
+    }
+    if (last < text.length) parts.push({ text: text.slice(last) });
+    return parts;
+}
+
+/**
+ * Fill a localized template with plain-text values. Unknown placeholders stay
+ * visible instead of silently disappearing.
+ */
+function formatTemplate(template, values = {}) {
+    return splitTemplate(template).map((part) => {
+        if (part.text !== undefined) return part.text;
+        return Object.prototype.hasOwnProperty.call(values, part.name)
+            ? String(values[part.name])
+            : part.raw;
+    }).join('');
+}
+
+/**
+ * Render a template into an element. Values that are DOM nodes (for example a
+ * localized link) are inserted as nodes; everything else becomes text, so
+ * locale strings and user data never pass through innerHTML.
+ */
+function renderTemplateInto(element, template, values = {}) {
+    const nodes = splitTemplate(template).map((part) => {
+        if (part.text !== undefined) return document.createTextNode(part.text);
+        const value = Object.prototype.hasOwnProperty.call(values, part.name)
+            ? values[part.name]
+            : part.raw;
+        return value && typeof value === 'object' && typeof value.nodeType === 'number'
+            ? value
+            : document.createTextNode(String(value));
+    });
+    element.replaceChildren(...nodes);
+}
+
+/**
  * Escape HTML so locale strings can never inject markup.
  */
 function escapeHtml(str) {
@@ -264,7 +357,18 @@ function stripHelpMarkup(text) {
  * Used by extension UI pages.
  */
 function applyI18nToDOM(translations) {
-    document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-tooltip], [data-i18n-aria-label]').forEach(el => {
+    document.querySelectorAll('[data-i18n], [data-i18n-template], [data-i18n-placeholder], [data-i18n-title], [data-i18n-tooltip], [data-i18n-aria-label]').forEach(el => {
+        // A template element keeps its [data-slot] children (for example a
+        // link) and rebuilds the surrounding text in the language's own order.
+        // Slots are later translated by their own data-i18n attribute.
+        const templateKey = el.getAttribute('data-i18n-template');
+        if (templateKey && typeof translations[templateKey] === 'string') {
+            const slots = {};
+            el.querySelectorAll(':scope > [data-slot]').forEach((slot) => {
+                slots[slot.dataset.slot] = slot;
+            });
+            renderTemplateInto(el, translations[templateKey], slots);
+        }
         const textKey = el.getAttribute('data-i18n');
         if (textKey && translations[textKey] !== undefined) {
             if (el.hasAttribute('data-i18n-bold')) {
@@ -573,7 +677,8 @@ function stopWaitProgress(element) {
 // ==================== General ====================
 
 /**
- * Debounce a function. Returns a debounced version with an optional .flush() method.
+ * Debounce a function. Returns a debounced version with .flush() (run now) and
+ * .cancel() (drop the pending call) methods.
  */
 function debounce(fn, ms) {
     let timer;
@@ -584,6 +689,9 @@ function debounce(fn, ms) {
     debounced.flush = () => {
         clearTimeout(timer);
         return fn();
+    };
+    debounced.cancel = () => {
+        clearTimeout(timer);
     };
     return debounced;
 }

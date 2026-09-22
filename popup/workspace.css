@@ -113,11 +113,18 @@ html.action-popup .tab-content { overscroll-behavior-y: auto; }
 .brand { font-size: calc(19px * var(--text-scale, 1)); }
 .header-right { gap: 3px; }
 .lang-btn { letter-spacing: 0; padding-inline: 6px; }
+/* Anchor the menu to the whole header: narrow windows and large text can
+   make it wider than the space before the language button, in either direction. */
+.lang-selector { position: static; }
 .lang-dropdown {
-  max-height: max(80px, min(330px, calc(100dvh / var(--ui-scale) - 76px)));
+  right: 16px;
+  max-width: calc(100% - 32px);
+  max-height: max(40px, min(330px, calc(100dvh / var(--ui-scale) - var(--header-height, 64px) - 12px),
+    calc(min(var(--home-height, 600px), 600px / var(--ui-scale)) * var(--popup-height, 1) - var(--header-height, 64px) - 12px)));
 }
-html.action-popup .lang-dropdown {
-  max-height: min(330px, calc(600px / var(--ui-scale) - 76px));
+[dir="rtl"] .lang-dropdown {
+  right: auto;
+  left: 16px;
 }
 .tabs, body.light .tabs, body.simplified .tabs {
   flex: 0 0 auto;
@@ -175,6 +182,11 @@ html.action-popup .lang-dropdown {
   grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
   gap: 0 12px;
   align-items: end;
+}
+/* This mode has a long localized name; give the selected value its own row.
+   Native menus can expand for unselected options, but closed selects cannot. */
+.export-format-row:has(#exportMode option[value="verified_followers"]:checked) {
+  grid-template-columns: minmax(0, 1fr);
 }
 :is(body, body.light, body.simplified) :is(.select, .input-small, .account-card) {
   border-color: var(--glass-border);

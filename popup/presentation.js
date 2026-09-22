@@ -111,17 +111,14 @@
 
         // ==================== Toast Notifications ====================
         // Replaces native alert() — keeps the glass aesthetic and is non-blocking.
-        let toastContainer = null;
+        // One persistent live region (#toastRegion in popup.html), present
+        // before the first message: screen readers announce additions to an
+        // existing region far more reliably than freshly inserted role nodes.
         function showToast(message, type = 'info') {
             if (!message) return;
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.className = 'toast-container';
-                popup.appendChild(toastContainer);
-            }
+            const toastContainer = document.getElementById('toastRegion');
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
-            toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
             toast.textContent = message;
             toastContainer.appendChild(toast);
             // Force reflow then animate in
@@ -150,8 +147,9 @@
             tab.addEventListener('click', () => activateTab(tab));
             tab.addEventListener('keydown', (event) => {
                 let nextIndex = null;
-                if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
-                if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+                const direction = document.documentElement.dir === 'rtl' ? -1 : 1;
+                if (event.key === 'ArrowRight') nextIndex = (index + direction + tabs.length) % tabs.length;
+                if (event.key === 'ArrowLeft') nextIndex = (index - direction + tabs.length) % tabs.length;
                 if (event.key === 'Home') nextIndex = 0;
                 if (event.key === 'End') nextIndex = tabs.length - 1;
                 if (nextIndex === null) return;
@@ -225,16 +223,21 @@ function mountHomeSizing() {
             const scroller = document.getElementById('homeContent');
             const scrollTop = scroller.scrollTop;
             popup.classList.add('measuring-home');
-            const height = home.offsetHeight + popup.querySelector('.header').offsetHeight
+            const headerHeight = popup.querySelector('.header').offsetHeight;
+            const height = home.offsetHeight + headerHeight
                 + popup.querySelector('.tabs').offsetHeight;
             popup.classList.remove('measuring-home');
             popup.style.setProperty('--home-height', `${height}px`);
+            popup.style.setProperty('--header-height', `${headerHeight}px`);
             scroller.scrollTop = scrollTop;
         });
     }
+    // Only structural changes can move Home's height: nodes (textContent
+    // replacement included) and visibility classes. Rolling-counter digit
+    // data, progress widths and tooltip positions must not force a measurement.
     new MutationObserver(schedule).observe(home, {
-        subtree: true, childList: true, characterData: true, attributes: true,
-        attributeFilter: ['class', 'style', 'hidden']
+        subtree: true, childList: true, attributes: true,
+        attributeFilter: ['class', 'hidden']
     });
     new MutationObserver(schedule).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
     new ResizeObserver(schedule).observe(popup.querySelector('.header'));

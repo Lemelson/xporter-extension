@@ -72,7 +72,11 @@ Twemoji and Emojitwo artwork: CC BY 4.0, https://creativecommons.org/licenses/by
 Full legal text: popup/emoji/LICENSE-GRAPHICS.txt
 Microsoft Fluent Color: globe with meridians. Copyright Microsoft Corporation, MIT.
 Source: https://github.com/microsoft/fluentui-emoji
-Licenses: popup/emoji/licenses/. Exact source URLs and SHA-256 hashes:
-popup/emoji/manifest.json. Images are resized/rasterized to 72px and embedded
-in a subset sbix/WOFF2 font with custom metrics; artwork colors/shapes unchanged.
+Licenses: popup/emoji/licenses/; all notices and license texts combined:
+popup/emoji/emoji-notices.txt. Exact source URLs and SHA-256 hashes are in
+popup/emoji/manifest.json in the source repository
+(https://github.com/Lemelson/xporter-extension); it is not shipped because a
+Chrome Web Store package may contain only one manifest.json. Images are
+resized/rasterized to 72px and embedded in a subset sbix/WOFF2 font with
+custom metrics; artwork colors/shapes unchanged.
 Apple platforms keep the installed system font; no Apple artwork is distributed.

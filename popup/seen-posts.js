@@ -2,7 +2,7 @@
 // Owns summary rendering, dataset downloads, clearing, and its disclosure row.
 
 (function () {
-    function mount({ t, showToast, getLanguage }) {
+    function mount({ t, showToast, confirmAction, getLanguage }) {
         const countElement = document.getElementById('feedDbCount');
         const summaryElement = document.getElementById('feedDbSummary');
         const csvButton = document.getElementById('downloadFeedCsv');
@@ -57,7 +57,13 @@
         csvButton.addEventListener('click', () => download('csv', csvButton));
         jsonButton.addEventListener('click', () => download('json', jsonButton));
         clearButton.addEventListener('click', async () => {
-            if (!window.confirm(t('clearSeenConfirm'))) return;
+            const confirmed = await confirmAction({
+                title: t('clearSeenTitle'),
+                body: t('clearSeenConfirm'),
+                confirm: t('clearSeenData'),
+                trigger: clearButton
+            });
+            if (!confirmed) return;
             const result = await sendMessage({ type: 'CLEAR_FEED_DB' });
             if (result?.success) {
                 showToast(t('seenDataCleared'), 'success');

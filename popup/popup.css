@@ -4223,4 +4223,5 @@ body.simplified {
 }
 
 /* Each release-note point remains readable in every locale. */
+[data-i18n="update202Body"],
 [data-i18n="update200Body"] { white-space: pre-line; }

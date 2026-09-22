@@ -22,6 +22,7 @@ function createSearchHarness(pages) {
     const harness = createWorkerHarness();
     const context = harness.context;
     vm.runInContext(source('utils/api-parsers.js'), context);
+    vm.runInContext(source('utils/api.js'), context);
     context.__pages = [...pages];
     vm.runInContext(`
         currentExport = {
@@ -51,16 +52,45 @@ async function testSearchErrorsNeverBecomeEmptySuccess() {
     for (const value of [{errors:[{message:'temporary'}]}, {}, ...invalidInstructions.map(instruction =>
         ({data:{search_by_raw_query:{search_timeline:{timeline:{instructions:[instruction]}}}}}))]) {
         const harness=createSearchHarness([{status:200,url:'error-page',bodyText:JSON.stringify(value)}]);
-        await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context), /SEARCH_(RESPONSE_ERROR|INVALID_RESPONSE)/);
+        await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),
+            value.errors ? /GRAPHQL_TRANSIENT/ : /SEARCH_(RESPONSE_ERROR|INVALID_RESPONSE)/);
         assert.equal(vm.runInContext('currentExport.completionReason',harness.context),null);
     }
     const harness=createSearchHarness([{status:200,url:'bad-json',bodyText:'{'}]);
     await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()',harness.context),/SEARCH_INVALID_RESPONSE/);
+    // A row whose date cannot be determined (bad created_at, no snowflake ID)
+    // is skipped, later rows are still collected, and the run stays
+    // unconfirmed instead of throwing a deterministic Resume-blocking error.
     const invalidRow = createSearchHarness([searchPage([
-        {id:'saved-before-error',date:'2026-09-05T01:00:00Z'}, {id:'invalid-date',date:'invalid'}
+        {id:'saved-before-error',date:'2026-09-05T01:00:00Z'}, {id:'invalid-date',date:'invalid'},
+        {id:'saved-after-error',date:'2026-09-05T02:00:00Z'}
     ])]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', invalidRow.context), /SEARCH_INVALID_RESPONSE/);
-    assert.deepEqual(invalidRow.getSavedBatches().flat().map(row => row.id), ['saved-before-error']);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', invalidRow.context), /SEARCH_END_UNCONFIRMED/);
+    assert.deepEqual(invalidRow.getSavedBatches().flat().map(row => row.id), ['saved-before-error', 'saved-after-error']);
+    assert.equal(vm.runInContext('currentExport.completionReason', invalidRow.context), null);
+
+    // A snowflake ID still dates the row exactly: 2026-09-05T03:00:00Z.
+    const snowflakeMs = BigInt(Date.parse('2026-09-05T03:00:00Z'));
+    const inRangeId = String((snowflakeMs - 1288834974657n) << 22n);
+    const outOfRangeId = String((BigInt(Date.parse('2026-09-01T03:00:00Z')) - 1288834974657n) << 22n);
+    const snowflake = createSearchHarness([searchPage([
+        {id:inRangeId,date:'invalid'}, {id:outOfRangeId,date:''}
+    ])]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', snowflake.context);
+    assert.deepEqual(snowflake.getSavedBatches().flat().map(row => row.id), [inRangeId]);
+    assert.equal(snowflake.getSavedState().completionReason, 'source_exhausted');
+
+    // Resume replays saved rows first: an undated duplicate is recognized by
+    // ID before any date check and never blocks the replay.
+    const replay = createSearchHarness([searchPage([
+        {id:'already-saved',date:'invalid'}, {id:'fresh',date:'2026-09-05T04:00:00Z'}
+    ])]);
+    replay.getSavedBatches()[0] = [{id:'already-saved'}];
+    replay.context.XPorterStorage.loadAllTweets = async () => [{id:'already-saved'}];
+    vm.runInContext('currentExport.tweetCount=1;currentExport.totalBatches=1;currentExport.dateResume=true;', replay.context);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', replay.context);
+    assert.deepEqual(replay.getSavedBatches().flat().map(row => row.id), ['already-saved', 'fresh']);
+    assert.equal(replay.getSavedState().completionReason, 'source_exhausted');
 }
 
 async function testSearchTodayIncludesExactBoundsAndFreezesNow() {
@@ -522,7 +552,7 @@ async function testSearchPartialErrorsKeepRowsButNeverComplete() {
     assert.equal(vm.runInContext('currentExport.completionReason', unconfirmed.context), null);
     // Errors without rows remain a failed page that must be repaired at the same URL.
     const empty = createSearchHarness([withErrors(searchPage([], 'page-c'))]);
-    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', empty.context), /SEARCH_RESPONSE_ERROR/);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', empty.context), /GRAPHQL_TRANSIENT/);
     // Unrecognized instruction types are X drift, ignored next to a recognized paging instruction.
     const drifted = searchPage([{id:'drift',date:'2026-09-05T01:00:00Z'}]);
     const driftBody = JSON.parse(drifted.bodyText);

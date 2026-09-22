@@ -24,10 +24,11 @@
 
 ## Release status
 
-The `v1.6.4` tag matches the package released through the Chrome Web Store.
-The `main` branch now reports version `2.0.1`, packaged on September 9, 2026,
-with a redesigned interface, theme picker, sizing controls, export fixes and a persistent ladybug counter.
-This package is separate from the 1.6.4 Store release; Store publication is not implied.
+The Chrome Web Store listing reports version `2.0.1`, updated September 20, 2026
+(checked September 22, 2026).
+The current local release candidate reports version `2.0.2`, dated September 22, 2026,
+with fixes for export recovery, storage errors, XLSX generation and downloads.
+Local verification and packaging do not establish Store publication of this candidate.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. When you first select **Embed photo previews**,
@@ -54,7 +55,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Passive seen-post dataset** — stores one local row per non-reply post already loaded while you browse X, with first/latest metrics and no extra API requests
 - **Multiple export modes** — posts, personal bookmarks, followers, following, and verified followers
 - **CSV, JSON, XLSX, and TXT output** — download the AI-friendly TXT or copy it straight to your clipboard
-- **Two XLSX photo modes** — keep links for the smallest file, or add bounded previews to a separate Media sheet
+- **Two XLSX photo modes** — keep links for the smallest file, or add bounded previews to a separate Media sheet. Profile metadata has its own Profile sheet; data starts with a single frozen header row. XLSX uses compression when available, and multipart files keep the same columns.
 - **Date range filtering** — export posts from an inclusive calendar-date window in your browser’s timezone. For today, the cutoff is the moment you start; Resume keeps that cutoff. Keep the search tab open. Search uses extra boundary days and filters rows to the exact interval. A stalled search preserves partial results and offers Resume; it does not claim completeness from date coverage. X search availability still limits which posts can be returned. An ending without explicit confirmation remains unconfirmed, with partial rows available to download. Date exports saved by older versions must be downloaded and restarted; Resume never silently changes their date semantics.
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
@@ -266,7 +267,7 @@ xporter/
 - Export files are generated locally. XPorter does not automatically upload their contents to a separate service.
 - The seen-post dataset is stored only in local IndexedDB and can be exported or cleared from Settings
 - No third-party analytics, advertising, or tracking SDKs
-- No extension-owned backend; normal export traffic goes only to X.com
+- Export requests go to X.com; optional embedded-photo downloads use X's image host. The uninstall feedback page uses a separate Google Apps Script collector.
 - Export requests use your existing X session to communicate with X. XPorter does not send your credentials to a separate extension service.
 - Technical usage statistics are not uploaded while using the extension.
 - Opening the uninstall feedback page sends limited, pseudonymous product diagnostics. Exported X content is not included automatically; any text or contact details you submit are sent with your feedback. See the [live privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html) for details.

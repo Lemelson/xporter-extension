@@ -98,7 +98,11 @@
 
         let url;
         try {
-            url = new URL(String(rawUrl));
+            // X's own client may request a relative path. Resolve it against
+            // the page when one exists (MAIN/isolated world); elsewhere (the
+            // service worker) only absolute URLs can pass the host check.
+            const base = typeof root.location?.href === 'string' ? root.location.href : undefined;
+            url = new URL(String(rawUrl), base);
         } catch (_) {
             return null;
         }

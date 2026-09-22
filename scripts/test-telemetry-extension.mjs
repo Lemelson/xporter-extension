@@ -6,9 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import toolingPolicy from './tooling-policy.js';
 toolingPolicy.assertBrowserSmokeCanLaunch();
-const {chromium}=await import('playwright');
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root=process.cwd(), profile=fs.mkdtempSync(path.join(os.tmpdir(),'xporter-telemetry-extension-'));
-const context=await chromium.launchPersistentContext(profile,{headless:true,channel:'chromium',acceptDownloads:true,args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`]});
+const context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.XPORTER_BROWSER_EXECUTABLE || chromium.executablePath(),acceptDownloads:true,args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`]});
 try {
  const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
  await worker.evaluate(()=>{

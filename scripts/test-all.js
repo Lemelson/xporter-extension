@@ -29,7 +29,8 @@ const SUITES = [
     'scripts/test-export-persistence.js',
     'scripts/test-api-discovery-cancellation.js',
     'scripts/test-capture-contract.js',
-    'scripts/test-export-policy.js'
+    'scripts/test-export-policy.js',
+    'scripts/test-worker-lifecycle.js'
 ];
 
 for (const suite of SUITES) {

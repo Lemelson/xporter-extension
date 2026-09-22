@@ -7,9 +7,9 @@ toolingPolicy.assertBrowserSmokeCanLaunch();
 const {chromium}=await import('playwright');
 const root=process.cwd();
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
-const expectedPoints=JSON.parse(fs.readFileSync(path.join(root,'popup/locales/en.json'),'utf8')).update200Body.split('\n').length;
+const expectedPoints=JSON.parse(fs.readFileSync(path.join(root,'popup/locales/en.json'),'utf8')).update202Body.split('\n').length;
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'xporter-release-'));
-const context=await chromium.launchPersistentContext(profile,{headless:true,channel:'chromium',args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`]});
+const context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.XPORTER_BROWSER_EXECUTABLE || chromium.executablePath(),args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`]});
 try {
  const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
  const page=await context.newPage();await page.setViewportSize({width:350,height:600});
@@ -17,6 +17,7 @@ try {
   await worker.evaluate(language=>XPorterStorage.saveSettings({language}),language);
   await page.goto(`chrome-extension://${new URL(worker.url()).host}/popup/popup.html`);
   await page.locator('#tabBtnAbout').click();
+  assert.equal(await page.locator('.about-updates > .update-item').count(),3);
   const note=page.locator('.update-item').first();await note.locator('.detail-head').click();
   await page.waitForTimeout(400);
   assert.equal(await page.locator('#extensionVersion').textContent(),`v${manifest.version}`);

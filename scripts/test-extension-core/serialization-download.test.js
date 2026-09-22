@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const { source } = require('./support.js');
+const { readZipEntries } = require('../lib/xlsx-package.js');
 
 async function testXlsxIsRealOoxmlZip() {
     const context = vm.createContext({ TextEncoder, Uint8Array, DataView, ArrayBuffer });
@@ -155,10 +156,18 @@ function testPostsXlsxStartsWithProfileMetadata() {
             followingCount: 45
         }
     });
-    const archiveText = new TextDecoder().decode(bytes);
+    const entries = readZipEntries(bytes);
+    const part = name => entries.get(name)?.data.toString('utf8') || '';
+    const archiveText = part('xl/worksheets/sheet3.xml');
+    const dataSheet = part('xl/worksheets/sheet1.xml');
+    assert(entries.has('xl/styles.xml'), 'post XLSX must include styles');
+    assert.match(part('xl/workbook.xml'),
+        /<sheet name="Export" sheetId="1" r:id="rId1"\/><sheet name="Profile" sheetId="2" r:id="rId2"\/>/,
+        'profile metadata must live on its own sheet after the data sheet');
+    assert.match(part('xl/_rels/workbook.xml.rels'), /Id="rId2"[^>]*Target="worksheets\/sheet3\.xml"/);
+    assert.match(part('[Content_Types].xml'), /PartName="\/xl\/worksheets\/sheet3\.xml"/);
 
     for (const required of [
-        'xl/styles.xml',
         'PROFILE',
         'Name',
         'Example Person',
@@ -192,17 +201,20 @@ function testPostsXlsxStartsWithProfileMetadata() {
     ]) {
         assert(archiveText.includes(required), `post XLSX profile block is missing ${required}`);
     }
-    assert.match(archiveText, /<cols>[\s\S]*customWidth="1"[\s\S]*<\/cols>/,
+    assert.match(dataSheet, /<cols>[\s\S]*customWidth="1"[\s\S]*<\/cols>/,
         'post XLSX must define readable column widths');
     assert.match(archiveText, /<c r="A1" s="1"/,
         'the PROFILE row must use the section-header style');
     assert.match(archiveText, /<c r="A2" s="2"/,
         'profile labels must be visually distinct from their values');
-    assert(
-        archiveText.indexOf('PROFILE') < archiveText.indexOf('POSTS (1)') &&
-        archiveText.indexOf('POSTS (1)') < archiveText.indexOf('A post'),
-        'post XLSX must place profile metadata before the post table'
-    );
+    assert.doesNotMatch(archiveText, /<pane /, 'the profile sheet must not freeze rows');
+    // The data sheet starts with its header, so exactly one row is frozen
+    // no matter how long the bio is.
+    assert.match(dataSheet, /<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"\/>/);
+    assert.match(dataSheet, /<row r="1"><c r="A1" s="3" t="inlineStr"><is><t>id<\/t>/);
+    assert.match(dataSheet, /<autoFilter ref="A1:B2"\/>/);
+    assert(dataSheet.includes('A post') && !dataSheet.includes('PROFILE'),
+        'the post table must not share its sheet with profile metadata');
 }
 
 function testDetailedUserListColumnsAreOptIn() {
@@ -916,7 +928,7 @@ async function testDownloadModulePreservesCurrentExportContract() {
                 return 'id,text\n12345,hello\n';
             },
             generatePostsText(_items, profile) { txtProfile = profile; return 'PROFILE\n'; },
-            generateXLSX(_items, _isUsers, opts) {
+            async generateXLSXAsync(_items, _isUsers, opts) {
                 xlsxProfile = opts?.profile || null;
                 xlsxMediaAssets = opts?.mediaAssets || null;
                 return new Uint8Array([1]);
@@ -1002,9 +1014,12 @@ async function testDownloadModulePreservesCurrentExportContract() {
         progressEvents
             .filter(event => event.type === 'DOWNLOAD_PROGRESS' && event.stage === 'photos')
             .map(event => [event.photoCurrent, event.photoTotal]),
-        [[0, 2], [1, 2], [2, 2]],
-        'photo progress must start at zero and advance for every settled preview'
+        [[0, 2], [2, 2]],
+        'throttled photo progress must still report the start and the final count'
     );
+    assert(progressEvents.filter(event => event.type.startsWith('DOWNLOAD_'))
+        .every(event => event.source === 'current'),
+    'current-export download broadcasts must identify their source');
     assert(
         progressEvents.some(event =>
             event.type === 'DOWNLOAD_PROGRESS' && event.stage === 'building_xlsx'
@@ -1061,6 +1076,7 @@ async function testLargeDownloadsAreSplitAndReadIncrementally() {
     const startedDownloads = [];
     const progressEvents = [];
     const exportedAtValues = [];
+    const partHeaders = [];
 
     class FakeFileReader {
         readAsDataURL() {
@@ -1097,9 +1113,17 @@ async function testLargeDownloadsAreSplitAndReadIncrementally() {
         },
         XPorterPostDB: { async getAllPosts() { return []; } },
         XPorterCSV: {
-            generateCSV(items) { generatedParts.push(items.map(item => item.id)); return 'csv'; },
+            generateCSV(items, _isUsers, opts) {
+                generatedParts.push(items.map(item => item.id));
+                partHeaders.push(opts.populatedHeaders);
+                return 'csv';
+            },
+            collectPopulatedHeaders(items, _isUsers, _opts, into) {
+                for (const item of items) into.add(`seen-${item.id}`);
+                return into;
+            },
             generatePostsText() { return 'txt'; },
-            generateXLSX() { return new Uint8Array([1]); },
+            async generateXLSXAsync() { return new Uint8Array([1]); },
             generateExportFilename(_username, _mode, extension, options) {
                 exportedAtValues.push(options.exportedAt.getTime());
                 const suffix = options.partCount > 1
@@ -1139,7 +1163,11 @@ async function testLargeDownloadsAreSplitAndReadIncrementally() {
     assert.equal(result.success, true);
     assert.equal(result.partCount, 3);
     assert.deepEqual(JSON.parse(JSON.stringify(generatedParts)), [['1', '2'], ['3', '4'], ['5']]);
-    assert.deepEqual(rangeReads, [[0, 2], [2, 1]]);
+    // One bounded column pass, then one bounded read per range for the parts.
+    assert.deepEqual(rangeReads, [[0, 2], [2, 1], [0, 2], [2, 1]]);
+    const allColumns = ['seen-1', 'seen-2', 'seen-3', 'seen-4', 'seen-5'];
+    assert.deepEqual(JSON.parse(JSON.stringify(partHeaders)), [allColumns, allColumns, allColumns],
+        'every part must receive the column set of the whole export');
     assert.deepEqual(startedDownloads.map(download => download.saveAs), [false, false, false]);
     assert.deepEqual(startedDownloads.map(download => download.filename), [
         'XPorter_part-001-of-003.csv',

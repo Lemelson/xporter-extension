@@ -1,6 +1,6 @@
 # Testing XPorter
 
-Run `node scripts/test-all.js` and `git diff --check` before committing. The complete deterministic gate still runs all 13 suites; each core test has a deadline so an unresolved Promise cannot silently end the process with success.
+Run `node scripts/test-all.js` and `git diff --check` before committing. That runner lists the complete deterministic gate; each core test has a deadline so an unresolved Promise cannot silently end the process with success.
 
 For focused work, use `node scripts/test-extension-core.js --suite=date-export` (also `worker-state`, `api`, `serialization-download`, `ui-content`) or run the relevant standalone suite. The core runner validates every test registration even during a focused run. An unknown suite is an error. A focused run does not replace the complete gate.
 
@@ -18,7 +18,9 @@ CI runs deterministic tests under `Etc/UTC`, `Europe/Moscow`, `America/New_York`
 
 Keep real-X and browser verification separate. `fixtures/search-endings.synthetic.json` contains constructed cases, not captured responses. A green gate does not establish which final-page/alert shapes X currently emits, authenticated endpoint compatibility, popup layout, or completed Chrome download behavior. See `fixtures/README.md` for the outstanding live-search captures and the repository browser policy for unpacked checks.
 
-The core currently contains 107 tests, including guarded-dialog cancellation, focus restoration and synchronous confirmation. `test-storage-concurrency.js` exercises concurrent history saves/deletes/expiry/clear, failed history/counter reads and recoverable queues.
+The core includes guarded-dialog cancellation, focus restoration and synchronous confirmation. `test-storage-concurrency.js` exercises concurrent history saves/deletes/expiry/clear, failed reads and recoverable queues. `test-worker-lifecycle.js` exercises retries, Stop/Resume and worker message boundaries; `test-download-transaction.js` also runs the dedicated `test-xlsx-export.js` serializer suite.
+
+For the September 22 fixes, run `node scripts/test-popup-review-fixes.mjs` in an approved disposable browser profile. It exercises mode rollback after failed clearing, history refresh, settings read/write failure and overlapping saves, close flushing, unavailable export status and recovery, Stop/Resume, dates and keyboard actions. `node scripts/test-popup-menu-layout.mjs` checks narrow/short language-menu bounds, large text, RTL navigation and long selected mode labels. Both accept `XPORTER_BROWSER_EXECUTABLE`; these synthetic scenarios do not establish authenticated X compatibility.
 
 Run `node scripts/test-quality-regressions.mjs` outside the macOS sandbox (approved unsandboxed exec in Codex). It loads the unpacked extension into a disposable Chromium profile and checks old quantity presets, pending-save confirmation boundaries (including retry typing before blur, cancel, confirm and a subsequent decrease), concurrent IndexedDB trimming at 50,000 rows, and whole-batch rollback after an injected write failure. `XPORTER_TEST_EXTENSION_ROOT` can point this test at a separate baseline checkout for before/after proof; its synthetic data never enters a user's browser profile.
 
@@ -44,7 +46,7 @@ Date-export regression cases preserve available rows beside GraphQL errors but r
 
 ## Diagnostic schema 2
 
-The deterministic gate includes reducer, compressed transport, collector migration and opt-in upload checks. Run `node scripts/test-telemetry-browser.mjs` for the 14-language website-to-collector fixture flow and `node scripts/test-telemetry-extension.mjs` for a disposable unpacked extension, local report, consent enforcement and real Chrome download completion. Both browser scripts require approved unsandboxed execution and send no production feedback. `test-feedback-localized-copy.mjs` covers 616 responsive/theme/form states. Live deployment evidence is recorded in `backend/VERIFICATION-2026-09-08.md`; it does not prove live X endpoint compatibility.
+The deterministic gate includes reducer, compressed transport, collector migration and checks that the abandoned upload path stays disabled. Run `node scripts/test-telemetry-browser.mjs` for the 14-language website-to-collector fixture flow and `node scripts/test-telemetry-extension.mjs` for a disposable unpacked extension, disabled legacy sharing routes even with old saved consent, local diagnostics and real browser download completion. Both browser scripts require approved unsandboxed execution and send no production feedback. `test-feedback-localized-copy.mjs` covers 616 responsive/theme/form states. Live deployment evidence is recorded in `backend/VERIFICATION-2026-09-08.md`; it does not prove live X endpoint compatibility.
 
 ### Curated theme picker
 

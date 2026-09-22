@@ -70,13 +70,17 @@
         }
 
         // ==================== Load Settings ====================
+        // GET_SETTINGS returns storage.js defaults already applied. The
+        // fallbacks below only fill the form when that read failed, and then
+        // persisting is refused (SETTINGS_UNAVAILABLE); they mirror the
+        // storage.js defaults so the display does not contradict them.
         let lastAcceptedAboutRetries = 5;
         if (currentSettings) {
             includeOriginalPosts.checked = currentSettings.includeOriginalPosts !== false;
             includeQuotes.checked = currentSettings.includeQuotes !== false;
-            includeReplies.checked = currentSettings.includeReplies === true;
-            includeRetweets.checked = currentSettings.includeRetweets === true;
-            includeArticles.checked = currentSettings.includeArticles === true;
+            includeReplies.checked = currentSettings.includeReplies !== false;
+            includeRetweets.checked = currentSettings.includeRetweets !== false;
+            includeArticles.checked = currentSettings.includeArticles !== false;
             syncPostSelectionUI();
             includeBookmarkReplyContext.checked =
                 currentSettings.includeBookmarkReplyContext !== false;
@@ -130,7 +134,7 @@
                 window.XPorterLadybug?.setEnabled?.(ladybugEnabled.checked);
             }
             if (localizeExportHeaders) {
-                localizeExportHeaders.checked = currentSettings.localizeExportHeaders === true;
+                localizeExportHeaders.checked = currentSettings.localizeExportHeaders !== false;
             }
         }
 
@@ -196,7 +200,19 @@
             );
         }
 
-        const saveSettingsDebounced = debounce(async () => {
+        let pendingSave = Promise.resolve();
+        let pendingFormPatch = null;
+
+        function saveSettingsNow() {
+            // Diff only after the preceding write has updated our cache. If a
+            // control changes A -> B -> A while B is saving, diffing against
+            // the old cache would otherwise drop the final A as a no-op.
+            const save = pendingSave.then(() => saveFormSnapshot());
+            pendingSave = save.catch(() => {});
+            return save;
+        }
+
+        async function saveFormSnapshot(baseline = currentSettings) {
             let qLimit;
             if (quantityLimit.value === 'custom') {
                 // Empty/0 custom value must keep the previous limit — never
@@ -241,13 +257,51 @@
             // full stale snapshot would roll that newer value back.
             const patch = {};
             for (const [key, value] of Object.entries(nextSettings)) {
-                if (currentSettings[key] !== value) patch[key] = value;
+                if (baseline[key] !== value) patch[key] = value;
             }
             if (Object.keys(patch).length > 0) {
-                return await persistSettingsPatch(currentSettings, patch);
+                pendingFormPatch = patch;
+                try {
+                    return await persistSettingsPatch(currentSettings, patch);
+                } finally {
+                    if (pendingFormPatch === patch) pendingFormPatch = null;
+                }
             }
             return { success: true };
-        }, 500);
+        }
+
+        // Background autosaves have no caller to report to, so a refused or
+        // failed write (STORAGE_FULL, TIMEOUT, SETTINGS_UNAVAILABLE) is shown here.
+        async function saveSettingsAndReport(closing = false) {
+            let result;
+            try {
+                // A closing popup cannot wait for a prior reply before sending
+                // its final edit. The worker serializes settings writes; diff
+                // against the submitted patch and dispatch the last change now.
+                result = closing
+                    ? await saveFormSnapshot({ ...currentSettings, ...pendingFormPatch })
+                    : await saveSettingsNow();
+            } catch (error) {
+                result = { error: error?.message || 'STORAGE_FULL' };
+            }
+            if (result?.success !== true) {
+                showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+            }
+            return result;
+        }
+
+        const saveSettingsDebounced = debounce(saveSettingsAndReport, 500);
+
+        // Closing the popup must not drop an edit still inside the debounce
+        // window. The patch is diffed, so an idle flush sends nothing.
+        const flushOnHide = () => {
+            saveSettingsDebounced.cancel();
+            void saveSettingsAndReport(true);
+        };
+        window.addEventListener('pagehide', flushOnHide);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushOnHide();
+        });
 
         if (localizeExportHeaders) {
             localizeExportHeaders.addEventListener('change', saveSettingsDebounced);
@@ -311,7 +365,7 @@
 
         [includeOriginalPosts, includeQuotes, includeReplies, includeRetweets, includeArticles,
             includeBookmarkReplyContext, includeBookmarkArticles,
-            quantityLimit, exportSpeed, customQuantity, autoExpireHours,
+            exportSpeed, customQuantity, autoExpireHours,
             customDelaySec, postSafetyBreakEnabled, postSafetyBreakMin, postSafetyBreakEvery,
             userExportSpeed, userCustomDelaySec, userSafetyBreakEnabled,
             userSafetyBreakMin, userSafetyBreakEvery,
@@ -324,7 +378,11 @@
         });
 
         return Object.freeze({
-            flush: saveSettingsDebounced.flush,
+            // Start reports its own failure, so this flush does not toast.
+            flush() {
+                saveSettingsDebounced.cancel();
+                return saveSettingsNow();
+            },
             validatePostSelection() {
                 if (syncPostSelectionUI() > 0) return true;
                 postSelectionPanel.scrollIntoView({ block: 'nearest' });

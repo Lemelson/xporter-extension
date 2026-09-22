@@ -99,6 +99,17 @@ let _discoveryInFlight = null;
 // absent from the bundle. Keep provenance separately so a fallback value can
 // never satisfy discovery for the operation the current export actually needs.
 let discoveredOperations = new Set();
+// Negative cache: operation -> expiry (ms). An operation absent from X's
+// bundles (or unresolved after a failed pass) uses its fallback queryId until
+// then, instead of re-scanning multi-MB bundles on every export page.
+let missingOperations = Object.create(null);
+// Bumped on every committed successful scan so an older failing caller can
+// tell that a newer success exists and must not be overwritten.
+let _endpointsCommitSeq = 0;
+
+function _operationKnownMissing(operation, now = Date.now()) {
+  return Number(missingOperations[operation]) > now;
+}
 
 // Persist discovered endpoints across MV3 service-worker restarts.
 // The in-memory cache above is wiped every time the worker sleeps, which made
@@ -107,6 +118,7 @@ let discoveredOperations = new Set();
 const ENDPOINTS_STORAGE_KEY = 'xporter_discovered_endpoints';
 const NATIVE_TEMPLATE_STORAGE_KEY = 'xporter_native_request_templates_v1';
 const NATIVE_TEMPLATE_TTL = _C.NATIVE_TEMPLATE_TTL || (30 * 60 * 1000);
+const NATIVE_TEMPLATE_REWRITE_INTERVAL = 5 * 60 * 1000;
 
 async function _persistEndpoints() {
   try {
@@ -116,7 +128,8 @@ async function _persistEndpoints() {
           endpoints: discoveredEndpoints,
           time: endpointsCacheTime,
           bearer: activeBearerToken,
-          discoveredOperations: [...discoveredOperations]
+          discoveredOperations: [...discoveredOperations],
+          missingOperations: { ...missingOperations }
         }
       });
     }
@@ -148,6 +161,17 @@ async function _hydrateEndpoints() {
             ? cached.discoveredOperations.filter(key => FALLBACK_ENDPOINTS[key])
             : []
         );
+        missingOperations = Object.create(null);
+        const now = Date.now();
+        const cachedMissing = cached.missingOperations;
+        if (cachedMissing && typeof cachedMissing === 'object' && !Array.isArray(cachedMissing)) {
+          for (const [key, expiresAt] of Object.entries(cachedMissing)) {
+            if (FALLBACK_ENDPOINTS[key] && !discoveredOperations.has(key) &&
+                Number(expiresAt) > now && Number(expiresAt) <= now + ENDPOINTS_CACHE_TTL) {
+              missingOperations[key] = Number(expiresAt);
+            }
+          }
+        }
         if (cached.bearer) activeBearerToken = cached.bearer;
         XLog.log('Endpoints hydrated from storage cache');
         return true;
@@ -162,6 +186,7 @@ async function _invalidatePersistedEndpoints() {
   endpointsCacheTime = 0;
   endpointsCacheTtl = ENDPOINTS_CACHE_TTL;
   discoveredOperations = new Set();
+  missingOperations = Object.create(null);
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.remove) {
       await chrome.storage.local.remove(ENDPOINTS_STORAGE_KEY);
@@ -240,6 +265,18 @@ async function setLiveRequestTemplate(candidate) {
   const clean = sanitizer?.sanitizeWireTemplate(candidate);
   if (!clean) return false;
   await _hydrateNativeTemplates();
+  // X repeats the same request on every scroll. An identical template that is
+  // still young needs no storage write; the TTL keeps it usable meanwhile.
+  const current = liveRequestTemplates[clean.operationName];
+  if (current &&
+      Number.isFinite(current.capturedAt) &&
+      Date.now() - current.capturedAt >= 0 &&
+      Date.now() - current.capturedAt < NATIVE_TEMPLATE_REWRITE_INTERVAL &&
+      current.queryId === clean.queryId &&
+      JSON.stringify(current.features) === JSON.stringify(clean.features) &&
+      JSON.stringify(current.fieldToggles) === JSON.stringify(clean.fieldToggles)) {
+    return true;
+  }
   liveRequestTemplates[clean.operationName] = {
     ...clean,
     capturedAt: Date.now()
@@ -398,13 +435,33 @@ async function readTextTimed(response) {
 // deadline after the headers already arrived — normalize it the same way,
 // or the raw TimeoutError would bypass the retry path and churn stats.
 async function readJsonTimed(response) {
+  let data;
   try {
-    return await response.json();
+    data = await response.json();
   } catch (err) {
+    // A 200 with an HTML/empty/truncated body is a transient server problem,
+    // not a code bug: give it a stable code the rate limiter can retry.
+    if (err?.name === 'SyntaxError') throw codedError('INVALID_JSON_RESPONSE');
     throw normalizeBodyReadError(response, err);
   } finally {
     releaseResponse(response);
   }
+  if (!data || typeof data !== 'object') throw codedError('INVALID_JSON_RESPONSE');
+  return data;
+}
+
+// Stable machine-readable failure: `code` for new consumers, the message for
+// the existing string comparisons across the worker and rate limiter.
+function codedError(code, message = code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function httpStatusError(status) {
+  const error = new Error(`API_ERROR_${status}`);
+  if (status >= 500 && status <= 599) error.code = 'API_SERVER_ERROR';
+  return error;
 }
 
 // ==================== Rate-limit budget tracking ====================
@@ -460,8 +517,12 @@ async function discoverEndpoints(forceRefresh = false, requiredOperation = null)
     await _hydrateEndpoints();
   }
 
-  // Return cached if still valid (unless explicitly forcing a refresh)
-  const hasRequiredOperation = !requiredOperation || discoveredOperations.has(requiredOperation);
+  // Return cached if still valid (unless explicitly forcing a refresh). An
+  // operation recently proven absent from the bundles is satisfied by its
+  // fallback stand-in; only a forced (stale-recovery) pass re-scans for it.
+  const hasRequiredOperation = !requiredOperation ||
+    discoveredOperations.has(requiredOperation) ||
+    _operationKnownMissing(requiredOperation);
   if (!forceRefresh && hasRequiredOperation &&
       discoveredEndpoints && (Date.now() - endpointsCacheTime) < endpointsCacheTtl) {
     return discoveredEndpoints;
@@ -472,42 +533,52 @@ async function discoverEndpoints(forceRefresh = false, requiredOperation = null)
   // Cap and cancel the whole pass: scanning several multi-MB bundles on a slow
   // connection must not continue after the caller has already fallen back.
   // Concurrent callers share this generation, including its deadline.
+  const commitSeqAtStart = _endpointsCommitSeq;
   try {
     if (!_discoveryInFlight) {
-      const flight = _runDiscoveryGeneration(requiredOperation);
+      const flight = _runDiscoveryGeneration();
       const tracked = flight.finally(() => {
         if (_discoveryInFlight === tracked) _discoveryInFlight = null;
       });
       _discoveryInFlight = tracked;
       tracked.catch(() => { /* every caller may time out or disappear */ });
     }
-    const result = await _discoveryInFlight;
-    if (requiredOperation && !discoveredOperations.has(requiredOperation)) {
-      throw new Error(`Missing required queryId: ${requiredOperation}`);
-    }
-    return result;
+    return await _discoveryInFlight;
   } catch (error) {
-    XLog.warn('Discovery failed, using fallback endpoints:', error.message);
-    discoveredEndpoints = { ...FALLBACK_ENDPOINTS };
-    endpointsCacheTime = Date.now();
+    // A newer pass committed while this one was failing: keep its result.
+    if (_endpointsCommitSeq !== commitSeqAtStart && discoveredEndpoints) {
+      return discoveredEndpoints;
+    }
+    XLog.warn('Discovery failed, using fallback endpoints for unresolved operations:', error.message);
+    // Never discard operations that an earlier pass really discovered; the
+    // fallback fills only the gaps, and the gaps are remembered briefly so a
+    // network blip does not re-scan on every page.
+    const now = Date.now();
+    const merged = { ...FALLBACK_ENDPOINTS };
+    for (const key of discoveredOperations) {
+      if (discoveredEndpoints?.[key]?.queryId) merged[key] = discoveredEndpoints[key];
+    }
+    discoveredEndpoints = merged;
+    discoveredOperations = new Set(
+      [...discoveredOperations].filter(key => merged[key] !== FALLBACK_ENDPOINTS[key])
+    );
+    for (const key of Object.keys(FALLBACK_ENDPOINTS)) {
+      if (!discoveredOperations.has(key)) missingOperations[key] = now + FALLBACK_CACHE_TTL;
+    }
+    endpointsCacheTime = now;
     endpointsCacheTtl = FALLBACK_CACHE_TTL;
-    discoveredOperations = new Set();
     return discoveredEndpoints;
   }
 }
 
 let _discoveryGeneration = 0;
 
-async function _runDiscoveryGeneration(requiredOperation) {
+async function _runDiscoveryGeneration() {
   const generation = ++_discoveryGeneration;
   const controller = new AbortController();
   const totalMs = _C.DISCOVERY_TOTAL_TIMEOUT || 25000;
   let timeoutId = null;
-  const scan = _discoverEndpointsInner(
-    requiredOperation,
-    controller.signal,
-    generation
-  );
+  const scan = _discoverEndpointsInner(controller.signal, generation);
   scan.catch(() => { /* a timed-out generation may settle after its caller */ });
 
   try {
@@ -526,10 +597,34 @@ async function _runDiscoveryGeneration(requiredOperation) {
     // Commit only after this generation wins its total-deadline race. The
     // single-flight promise remains active through persistence, so no newer
     // generation can start and race this snapshot into storage.
-    discoveredEndpoints = result.endpoints;
-    discoveredOperations = result.operations;
-    endpointsCacheTime = Date.now();
+    // Merge: operations found now win; operations an earlier pass discovered
+    // (still cached) survive a pass that happened to miss them; everything
+    // else uses its fallback stand-in and is negatively cached for the TTL.
+    const now = Date.now();
+    const cacheStillValid = discoveredEndpoints &&
+      (now - endpointsCacheTime) < endpointsCacheTtl;
+    const previous = cacheStillValid ? discoveredEndpoints : null;
+    const previousOperations = cacheStillValid ? discoveredOperations : new Set();
+    const endpoints = { ...FALLBACK_ENDPOINTS };
+    const operations = new Set();
+    const missing = Object.create(null);
+    for (const key of Object.keys(FALLBACK_ENDPOINTS)) {
+      if (result.found[key]) {
+        endpoints[key] = { queryId: result.found[key], operationName: key };
+        operations.add(key);
+      } else if (previousOperations.has(key) && previous?.[key]?.queryId) {
+        endpoints[key] = previous[key];
+        operations.add(key);
+      } else {
+        missing[key] = now + ENDPOINTS_CACHE_TTL;
+      }
+    }
+    discoveredEndpoints = endpoints;
+    discoveredOperations = operations;
+    missingOperations = missing;
+    endpointsCacheTime = now;
     endpointsCacheTtl = ENDPOINTS_CACHE_TTL;
+    _endpointsCommitSeq++;
     if (result.bearer) activeBearerToken = result.bearer;
     XLog.log('Endpoints discovered successfully');
     await _persistEndpoints();
@@ -545,7 +640,7 @@ async function _runDiscoveryGeneration(requiredOperation) {
   }
 }
 
-async function _discoverEndpointsInner(requiredOperation = null, signal = null, generation = 0) {
+async function _discoverEndpointsInner(signal = null, generation = 0) {
   // Fetch X's main page to find JS bundle URLs
   const mainPageResponse = await fetchTimed('https://x.com', {
     credentials: 'include',
@@ -568,7 +663,7 @@ async function _discoverEndpointsInner(requiredOperation = null, signal = null, 
     throw new Error('No JS bundles found');
   }
 
-  const targetOperations = ['UserByScreenName', 'AboutAccountQuery', 'UserTweets', 'UserOriginalsTimeline', 'UserRepliesTimeline', 'UserTweetsAndReplies', 'Bookmarks', 'TweetResultsByRestIds', 'SearchTimeline', 'Followers', 'Following', 'BlueVerifiedFollowers'];
+  const targetOperations = Object.keys(FALLBACK_ENDPOINTS);
   const found = {};
   let discoveredBearer = null;
 
@@ -650,58 +745,20 @@ async function _discoverEndpointsInner(requiredOperation = null, signal = null, 
     throw new Error('DISCOVERY_ABORTED');
   }
 
-  if (found.UserByScreenName && found.UserTweets &&
-      (!requiredOperation || found[requiredOperation])) {
-    // Log discovery results for debugging
-    for (const op of targetOperations) {
-      if (found[op]) {
-        XLog.log(`✓ ${op}: discovered queryId = ${found[op]}`);
-      } else {
-        XLog.warn(`✗ ${op}: NOT found in bundles, using fallback = ${FALLBACK_ENDPOINTS[op]?.queryId || 'none'}`);
-      }
-    }
-    const endpoints = {
-      UserByScreenName: { queryId: found.UserByScreenName, operationName: 'UserByScreenName' },
-      AboutAccountQuery: found.AboutAccountQuery
-        ? { queryId: found.AboutAccountQuery, operationName: 'AboutAccountQuery' }
-        : FALLBACK_ENDPOINTS.AboutAccountQuery,
-      UserTweets: { queryId: found.UserTweets, operationName: 'UserTweets' },
-      UserOriginalsTimeline: found.UserOriginalsTimeline
-        ? { queryId: found.UserOriginalsTimeline, operationName: 'UserOriginalsTimeline' }
-        : FALLBACK_ENDPOINTS.UserOriginalsTimeline,
-      UserRepliesTimeline: found.UserRepliesTimeline
-        ? { queryId: found.UserRepliesTimeline, operationName: 'UserRepliesTimeline' }
-        : FALLBACK_ENDPOINTS.UserRepliesTimeline,
-      UserTweetsAndReplies: found.UserTweetsAndReplies
-        ? { queryId: found.UserTweetsAndReplies, operationName: 'UserTweetsAndReplies' }
-        : FALLBACK_ENDPOINTS.UserTweetsAndReplies,
-      Bookmarks: found.Bookmarks
-        ? { queryId: found.Bookmarks, operationName: 'Bookmarks' }
-        : FALLBACK_ENDPOINTS.Bookmarks,
-      TweetResultsByRestIds: found.TweetResultsByRestIds
-        ? { queryId: found.TweetResultsByRestIds, operationName: 'TweetResultsByRestIds' }
-        : FALLBACK_ENDPOINTS.TweetResultsByRestIds,
-      SearchTimeline: found.SearchTimeline
-        ? { queryId: found.SearchTimeline, operationName: 'SearchTimeline' }
-        : FALLBACK_ENDPOINTS.SearchTimeline,
-      Followers: found.Followers
-        ? { queryId: found.Followers, operationName: 'Followers' }
-        : FALLBACK_ENDPOINTS.Followers,
-      Following: found.Following
-        ? { queryId: found.Following, operationName: 'Following' }
-        : FALLBACK_ENDPOINTS.Following,
-      BlueVerifiedFollowers: found.BlueVerifiedFollowers
-        ? { queryId: found.BlueVerifiedFollowers, operationName: 'BlueVerifiedFollowers' }
-        : FALLBACK_ENDPOINTS.BlueVerifiedFollowers
-    };
-    return {
-      endpoints,
-      operations: new Set(Object.keys(found)),
-      bearer: discoveredBearer
-    };
+  // A pass that found nothing at all is a failed pass (bundle format drift,
+  // blocked scripts). Anything found is committed per operation; the rest keep
+  // their fallback stand-ins without failing the operations that were found.
+  if (Object.keys(found).length === 0) {
+    throw new Error(`Missing queryIds: ${targetOperations.join(', ')}`);
   }
-
-  throw new Error(`Missing queryIds: ${targetOperations.filter(op => !found[op]).join(', ')}`);
+  for (const op of targetOperations) {
+    if (found[op]) {
+      XLog.log(`✓ ${op}: discovered queryId = ${found[op]}`);
+    } else {
+      XLog.warn(`✗ ${op}: NOT found in bundles, using fallback = ${FALLBACK_ENDPOINTS[op]?.queryId || 'none'}`);
+    }
+  }
+  return { found, bearer: discoveredBearer };
 }
 
 // ==================== Auth ====================
@@ -735,7 +792,13 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
   const auth = await getAuthTokens();
   const nativeTemplate = endpoint.nativeTemplate || null;
   const effectiveFeatures = nativeTemplate ? nativeTemplate.features : features;
-  const effectiveFieldToggles = nativeTemplate ? nativeTemplate.fieldToggles : fieldToggles;
+  // A native template keeps X's own field toggles, but content XPorter
+  // explicitly asks for (full article text) must survive the swap: X's client
+  // sends withArticlePlainText=false, which would degrade exports to previews.
+  let effectiveFieldToggles = nativeTemplate ? nativeTemplate.fieldToggles : fieldToggles;
+  if (nativeTemplate && fieldToggles?.withArticlePlainText === true) {
+    effectiveFieldToggles = { ...(nativeTemplate.fieldToggles || {}), withArticlePlainText: true };
+  }
   const requestPath = `/i/api/graphql/${endpoint.queryId}/${endpoint.operationName}`;
   let transactionId = null;
   if (SIGNED_REPLY_OPERATIONS.has(endpoint.operationName) &&
@@ -798,16 +861,96 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
   if (!response.ok) {
     const body = await readTextTimed(response).catch(() => '');
     XLog.error(`API error ${response.status}:`, body.substring(0, 500));
-    throw new Error(`API_ERROR_${response.status}`);
+    throw httpStatusError(response.status);
   }
 
   const jsonData = await readJsonTimed(response);
 
-  if (jsonData.errors) {
+  if (hasGraphqlErrors(jsonData)) {
     XLog.error(`GraphQL errors for ${endpoint.operationName}:`, JSON.stringify(jsonData.errors).substring(0, 300));
+    // Partial success (rows beside errors) stays a success. Without any data
+    // the errors decide the outcome — never blindly "stale query ID", which
+    // would discard a working template and re-scan X's bundles.
+    if (!hasGraphqlData(jsonData)) {
+      throw classifyGraphqlErrors(jsonData.errors);
+    }
   }
 
   return jsonData;
+}
+
+function hasGraphqlData(jsonData) {
+  const data = jsonData?.data;
+  return !!data && typeof data === 'object' &&
+    Object.values(data).some(value => value !== null && value !== undefined);
+}
+
+function hasGraphqlErrors(jsonData) {
+  return !!jsonData?.errors && (!Array.isArray(jsonData.errors) || jsonData.errors.length > 0);
+}
+
+function rejectEmptyGraphqlResults(jsonData, items) {
+  // Partial success must contain actual rows. An empty timeline accompanied
+  // by an error is not evidence that the user's export reached its end.
+  if (items.length === 0 && hasGraphqlErrors(jsonData)) {
+    throw classifyGraphqlErrors(jsonData.errors);
+  }
+}
+
+const GRAPHQL_AUTH_ERROR_CODES = new Set([32, 64, 239, 326, 353]);
+const GRAPHQL_STALE_MESSAGE =
+  /GRAPHQL_VALIDATION_FAILED|Query: Unspecified|PersistedQueryNotFound|Cannot query field|Unknown (?:argument|field|feature|type)|features cannot be null|must be defined|Variable ["'$]?\w+["']? (?:of required type|got invalid)/i;
+
+/**
+ * Map GraphQL-level errors (HTTP 200) to the codes the rest of the extension
+ * already understands. Only query-shape problems are STALE_QUERY_ID; unknown
+ * server-side failures become GRAPHQL_TRANSIENT and leave caches untouched.
+ */
+function classifyGraphqlErrors(errors) {
+  const list = (Array.isArray(errors) ? errors : [errors])
+    .filter(item => item && typeof item === 'object');
+  const codes = new Set();
+  const messages = [];
+  const kinds = [];
+  for (const item of list) {
+    for (const value of [item.code, item.extensions?.code]) {
+      const number = Number(value);
+      if (Number.isFinite(number)) codes.add(number);
+    }
+    if (typeof item.message === 'string') messages.push(item.message);
+    for (const value of [item.kind, item.extensions?.kind, item.extensions?.name, item.name,
+      item.extensions?.code]) {
+      if (typeof value === 'string') kinds.push(value);
+    }
+  }
+  const text = messages.join(' | ');
+
+  if (codes.has(88) || /rate limit/i.test(text) || kinds.includes('RateLimit')) {
+    return codedError('RATE_LIMITED');
+  }
+  if ([...codes].some(code => GRAPHQL_AUTH_ERROR_CODES.has(code)) ||
+      /could not authenticate/i.test(text)) {
+    noteAuthFailure();
+    return codedError('AUTH_ERROR');
+  }
+  if (GRAPHQL_STALE_MESSAGE.test(text) ||
+      kinds.includes('Validation') || kinds.includes('GRAPHQL_VALIDATION_FAILED')) {
+    return codedError('STALE_QUERY_ID');
+  }
+  const error = codedError('GRAPHQL_TRANSIENT');
+  error.detail = text.substring(0, 200);
+  return error;
+}
+
+// A 200 whose expected structure is missing: when X attached errors, they
+// explain why (rate limit, auth, transient); without errors the operation
+// itself no longer matches this client, which is the stale-query path.
+function missingStructureError(jsonData) {
+  const errors = jsonData?.errors;
+  if (errors && (!Array.isArray(errors) || errors.length > 0)) {
+    return classifyGraphqlErrors(errors);
+  }
+  return codedError('STALE_QUERY_ID');
 }
 
 // ==================== Stale Query ID Retry Wrapper ====================
@@ -882,11 +1025,14 @@ async function withStaleRetry(endpointKey, makeRequest) {
   const discoveredId = endpoints[endpointKey]?.queryId;
   if (discoveredId && !triedIds.has(discoveredId)) {
     triedIds.add(discoveredId);
+    const wasDiscovered = discoveredOperations.has(endpointKey);
     try {
       return await requestCandidate(endpoints[endpointKey]);
     } catch (err) {
       if (err.message !== 'STALE_QUERY_ID') throw err;
-      await _invalidatePersistedEndpoints();
+      // A rejected fallback stand-in says nothing about the operations that
+      // were really discovered; only a rejected discovered ID drops the cache.
+      if (wasDiscovered) await _invalidatePersistedEndpoints();
       XLog.log(`Discovered queryId for ${endpointKey} was stale (${discoveredId}), re-discovering...`);
     }
   }
@@ -896,11 +1042,12 @@ async function withStaleRetry(endpointKey, makeRequest) {
   const freshId = freshEndpoints[endpointKey]?.queryId;
   if (freshId && !triedIds.has(freshId)) {
     triedIds.add(freshId);
+    const wasDiscovered = discoveredOperations.has(endpointKey);
     try {
       return await requestCandidate(freshEndpoints[endpointKey]);
     } catch (err) {
       if (err.message !== 'STALE_QUERY_ID') throw err;
-      await _invalidatePersistedEndpoints();
+      if (wasDiscovered) await _invalidatePersistedEndpoints();
       XLog.log(`Fresh queryId for ${endpointKey} also stale (${freshId}), trying fallback...`);
     }
   }
@@ -972,9 +1119,14 @@ async function getUserByScreenName(screenName) {
     withSafetyModeUserFields: true
   };
 
-  const data = await withStaleRetry('UserByScreenName', (endpoint) =>
-    graphqlRequest(endpoint, variables, USER_FEATURES, USER_FIELD_TOGGLES)
-  );
+  const data = await withStaleRetry('UserByScreenName', async (endpoint) => {
+    const response = await graphqlRequest(endpoint, variables, USER_FEATURES, USER_FIELD_TOGGLES);
+    if (!response?.data?.user?.result && response?.errors &&
+        (!Array.isArray(response.errors) || response.errors.length > 0)) {
+      throw classifyGraphqlErrors(response.errors);
+    }
+    return response;
+  });
 
   const userResult = data?.data?.user?.result;
 
@@ -1019,9 +1171,14 @@ async function getUserByScreenName(screenName) {
 }
 
 async function getAccountAbout(screenName) {
-  const data = await withStaleRetry('AboutAccountQuery', (endpoint) =>
-    graphqlRequest(endpoint, { screenName }, null, null)
-  );
+  const data = await withStaleRetry('AboutAccountQuery', async (endpoint) => {
+    const response = await graphqlRequest(endpoint, { screenName }, null, null);
+    const result = response?.data?.user_result_by_screen_name?.result || response?.data?.user?.result;
+    if (!result?.about_profile && hasGraphqlErrors(response)) {
+      throw classifyGraphqlErrors(response.errors);
+    }
+    return response;
+  });
   return XPorterApiParsers.parseAboutAccountResponse(data);
 }
 
@@ -1045,9 +1202,9 @@ async function fetchFollowing(userId, cursor = null, count = 100) {
 async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) {
   const auth = await getAuthTokens();
 
-  let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${userId}&count=${count}&skip_status=true&include_user_entities=true`;
+  let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${encodeURIComponent(String(userId))}&count=${encodeURIComponent(String(count))}&skip_status=true&include_user_entities=true`;
   if (cursor && cursor !== '0' && cursor !== '-1') {
-    url += `&cursor=${cursor}`;
+    url += `&cursor=${encodeURIComponent(String(cursor))}`;
   }
 
   XLog.log(`[REST] Fetching ${endpointKey} via v1.1 API (cursor: ${cursor || 'initial'})`);
@@ -1078,13 +1235,21 @@ async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) 
   if (!response.ok) {
     const body = await readTextTimed(response).catch(() => '');
     XLog.error(`[REST] ${endpointKey} API error ${response.status}:`, body.substring(0, 500));
-    throw new Error(`API_ERROR_${response.status}`);
+    throw httpStatusError(response.status);
   }
 
   const data = await readJsonTimed(response);
 
+  if (!Array.isArray(data.users)) {
+    if (data.errors && (!Array.isArray(data.errors) || data.errors.length > 0)) {
+      throw classifyGraphqlErrors(data.errors);
+    }
+    throw codedError('INVALID_JSON_RESPONSE');
+  }
+  rejectEmptyGraphqlResults(data, data.users);
+
   // Parse REST v1.1 response into the same format used by GraphQL
-  const users = (data.users || []).filter(u => u?.id_str || Number.isFinite(u?.id)).map(u => ({
+  const users = data.users.filter(u => u?.id_str || Number.isFinite(u?.id)).map(u => ({
     id: u.id_str || String(u.id),
     name: u.name || '',
     username: u.screen_name || '',
@@ -1128,11 +1293,20 @@ async function _fetchUserList(endpointKey, userId, cursor, count) {
     variables.cursor = cursor;
   }
 
-  const data = await withStaleRetry(endpointKey, (endpoint) =>
-    graphqlRequest(endpoint, variables, FOLLOWERS_FEATURES, FOLLOWERS_FIELD_TOGGLES)
-  );
-
-  return XPorterApiParsers.parseFollowersResponse(data);
+  return withStaleRetry(endpointKey, async (endpoint) => {
+    const response = await graphqlRequest(endpoint, variables, FOLLOWERS_FEATURES, FOLLOWERS_FIELD_TOGGLES);
+    const result = response?.data?.user?.result;
+    if (result?.__typename === 'UserUnavailable') {
+      throw new Error(result.reason === 'Suspended' ? 'USER_SUSPENDED' : 'USER_UNAVAILABLE');
+    }
+    const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
+    // Missing payloads are not empty lists: otherwise a transient GraphQL
+    // failure would terminate the export with a misleading success status.
+    if (!Array.isArray(timeline?.instructions)) throw missingStructureError(response);
+    const parsed = XPorterApiParsers.parseFollowersResponse(response);
+    rejectEmptyGraphqlResults(response, parsed.users);
+    return parsed;
+  });
 }
 
 // ==================== Tweet Fetching ====================
@@ -1169,12 +1343,19 @@ async function fetchUserTweets(userId, cursor = null, count = 20, profileFeed = 
       withArticlePlainText: true
     });
     const result = data?.data?.user?.result;
+    // The account became unavailable after it was resolved (suspended,
+    // deactivated, withheld): a user-facing condition, not a stale query.
+    if (result?.__typename === 'UserUnavailable') {
+      throw new Error(result.reason === 'Suspended' ? 'USER_SUSPENDED' : 'USER_UNAVAILABLE');
+    }
     const timeline = result?.timeline_v2?.timeline || result?.timeline?.timeline;
     if (!Array.isArray(timeline?.instructions)) {
       XLog.error(`GraphQL ${endpointKey} returned no usable timeline`);
-      throw new Error('STALE_QUERY_ID');
+      throw missingStructureError(data);
     }
-    return XPorterApiParsers.parseTimelineResponse(data);
+    const parsed = XPorterApiParsers.parseTimelineResponse(data);
+    rejectEmptyGraphqlResults(data, parsed.tweets);
+    return parsed;
   });
 }
 
@@ -1196,9 +1377,11 @@ async function fetchBookmarks(cursor = null, count = 20) {
       || data?.data?.bookmark_timeline?.timeline;
     if (!Array.isArray(timeline?.instructions)) {
       XLog.error('GraphQL Bookmarks returned no usable timeline');
-      throw new Error('STALE_QUERY_ID');
+      throw missingStructureError(data);
     }
-    return XPorterApiParsers.parseBookmarksResponse(data);
+    const parsed = XPorterApiParsers.parseBookmarksResponse(data);
+    rejectEmptyGraphqlResults(data, parsed.tweets);
+    return parsed;
   });
 }
 
@@ -1215,19 +1398,21 @@ async function fetchTweetsByIds(tweetIds) {
     withVoice: true,
     withCommunity: true
   };
-  const data = await withStaleRetry('TweetResultsByRestIds', (endpoint) =>
-    graphqlRequest(
+  return withStaleRetry('TweetResultsByRestIds', async (endpoint) => {
+    const response = await graphqlRequest(
       endpoint,
       variables,
       TWEET_RESULTS_FEATURES,
       TWEET_RESULTS_FIELD_TOGGLES
-    )
-  );
-  if (!Array.isArray(data?.data?.tweetResult)) {
-    XLog.error('GraphQL TweetResultsByRestIds returned no usable results');
-    throw new Error('STALE_QUERY_ID');
-  }
-  return XPorterApiParsers.parseTweetResultsResponse(data);
+    );
+    if (!Array.isArray(response?.data?.tweetResult)) {
+      XLog.error('GraphQL TweetResultsByRestIds returned no usable results');
+      throw missingStructureError(response);
+    }
+    const parsed = XPorterApiParsers.parseTweetResultsResponse(response);
+    rejectEmptyGraphqlResults(response, parsed);
+    return parsed;
+  });
 }
 
 // Export for use in service worker
@@ -1246,6 +1431,7 @@ if (typeof globalThis !== 'undefined') {
     toPostContext: XPorterApiParsers.toPostContext,
     parseUserObject: XPorterApiParsers.parseUserObject,
     parseSearchTimelineResponse: XPorterApiParsers.parseSearchTimelineResponse,
+    classifyGraphqlErrors,
     discoverEndpoints,
     setLiveRequestTemplate,
     setLiveQueryId,

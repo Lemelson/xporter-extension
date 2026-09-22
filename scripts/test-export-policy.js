@@ -188,6 +188,37 @@ function testSelectionPolicy(policy) {
     );
 }
 
+// "Continue without replies" must never be offered for a replies-only
+// selection: UserTweets would be walked in full and every row discarded.
+function testRepliesFallbackSelection(policy) {
+    const explicit = (types) => ({
+        postSelectionVersion: 1,
+        includeOriginalPosts: false,
+        includeQuotes: false,
+        includeReplies: false,
+        includeRetweets: false,
+        includeArticles: false,
+        ...types
+    });
+    // loadSettings always writes includeReplies and never profileFeed, so the
+    // legacy profileFeed helper alone calls every reply selection "combined".
+    assert.equal(policy.profileFeedForSettings(explicit({ includeReplies: true })), 'legacy_with_replies');
+    assert.equal(policy.canDropRepliesFromSelection(explicit({ includeReplies: true })), false);
+    for (const type of ['includeOriginalPosts', 'includeQuotes', 'includeRetweets', 'includeArticles']) {
+        assert.equal(
+            policy.canDropRepliesFromSelection(explicit({ includeReplies: true, [type]: true })),
+            true,
+            `${type} + replies keeps a non-reply type after dropping replies`
+        );
+    }
+    assert.equal(policy.canDropRepliesFromSelection(explicit({ includeOriginalPosts: true })), false,
+        'a selection without replies never used the combined feed');
+    assert.equal(policy.canDropRepliesFromSelection({ includeReplies: true }), true,
+        'legacy posts+replies snapshots keep their fallback');
+    assert.equal(policy.canDropRepliesFromSelection({ profileFeed: 'replies' }), false);
+    assert.equal(policy.canDropRepliesFromSelection({ includeReplies: false }), false);
+}
+
 function testRateLimitKeys(policy) {
     assert.equal(policy.rateLimitKeyForMode('posts', {}), 'UserTweets');
     assert.equal(
@@ -351,6 +382,7 @@ function testFacadeIsImmutable(policy) {
         'profileFeedAllowsTweet',
         'hasExplicitPostSelection',
         'postFeedPlanForSettings',
+        'canDropRepliesFromSelection',
         'postSelectionAllowsTweet',
         'rateLimitKeyForMode',
         'clampCustomSpeed',
@@ -367,6 +399,7 @@ function testFacadeIsImmutable(policy) {
 
 const tests = [
     ['selection and filtering', ({ policy }) => testSelectionPolicy(policy)],
+    ['replies fallback needs a non-reply type', ({ policy }) => testRepliesFallbackSelection(policy)],
     ['rate-limit keys', ({ policy }) => testRateLimitKeys(policy)],
     ['pacing and clamps', ({ policy, rateLimitKeys }) =>
         testPacingAndClamps(policy, rateLimitKeys)],

@@ -90,7 +90,12 @@ function testManifestOrderAndConsumerOwnership() {
     assert.doesNotMatch(interceptor, /const\s+TRACKED\s*=/);
     assert.doesNotMatch(relay, /const\s+RELAY_TRACKED_OPERATIONS\s*=/);
     assert.match(relay, /RELAY_POST_ID_PATTERN/);
-    assert.match(relay, /RELAY_POST_OPERATION_PATTERN/);
+    // One post-operation allowlist, owned by the contract (no local copies).
+    const feedParser = read('content/feed-parser.js');
+    for (const source of [relay, feedParser]) {
+        assert.match(source, /isPostOperation/);
+        assert.doesNotMatch(source, /TweetDetail\|Bookmarks\|Likes/);
+    }
     assert.match(interceptor, /operationFromUrl/);
     assert.match(interceptor, /XPorterNativeTemplate\?\.parseRequestUrl/);
     for (const source of [interceptor, relay]) {
@@ -98,18 +103,28 @@ function testManifestOrderAndConsumerOwnership() {
     }
 }
 
-function createContentHarness({ onRuntimeMessage, postToMain } = {}) {
+function createContentHarness({ onRuntimeMessage, postToMain, pathname = '/home', querySelector } = {}) {
     const windowListeners = new Map();
+    const navigationListeners = new Map();
     const runtimeMessages = [];
+    const timers = new Set();
     let runtimeListener;
+    let mutationObservers = 0;
     const window = {
         location: {
-            pathname: '/home',
-            href: 'https://x.com/home',
+            pathname,
+            href: `https://x.com${pathname}`,
             origin: 'https://x.com'
+        },
+        navigation: {
+            addEventListener(type, listener) { navigationListeners.set(type, listener); },
+            removeEventListener(type) { navigationListeners.delete(type); }
         },
         addEventListener(type, listener) {
             windowListeners.set(type, listener);
+        },
+        removeEventListener(type, listener) {
+            if (windowListeners.get(type) === listener) windowListeners.delete(type);
         },
         postMessage(message) { postToMain?.(message); }
     };
@@ -117,9 +132,19 @@ function createContentHarness({ onRuntimeMessage, postToMain } = {}) {
     const document = {
         documentElement: {},
         body: null,
-        querySelector() { return null; },
+        querySelector: querySelector || (() => null),
         addEventListener() {},
         getElementById() { return null; }
+    };
+    const runtime = {
+        id: 'xporter-test',
+        sendMessage(message) {
+            runtimeMessages.push(
+                JSON.parse(JSON.stringify(message))
+            );
+            return Promise.resolve(onRuntimeMessage?.(message) || { success: true });
+        },
+        onMessage: { addListener(listener) { runtimeListener = listener; } }
     };
     const context = vm.createContext({
         globalThis: window,
@@ -127,29 +152,29 @@ function createContentHarness({ onRuntimeMessage, postToMain } = {}) {
         document,
         URL,
         console,
-        setTimeout,
-        clearTimeout,
-        MutationObserver: class {
-            constructor(callback) { this.callback = callback; }
-            observe() {}
+        setTimeout(callback, delay) {
+            const id = setTimeout(() => { timers.delete(id); callback(); }, delay);
+            timers.add(id);
+            return id;
         },
-        chrome: {
-            runtime: {
-                sendMessage(message) {
-                    runtimeMessages.push(
-                        JSON.parse(JSON.stringify(message))
-                    );
-                    return Promise.resolve(onRuntimeMessage?.(message) || { success: true });
-                },
-                onMessage: { addListener(listener) { runtimeListener = listener; } }
-            }
-        }
+        clearTimeout(id) { timers.delete(id); clearTimeout(id); },
+        MutationObserver: class {
+            constructor(callback) { this.callback = callback; mutationObservers += 1; }
+            observe() {}
+            disconnect() {}
+        },
+        chrome: { runtime }
     });
     load(CONTRACT_FILE, context);
     load('content/content.js', context);
     return {
         context,
+        runtime,
         runtimeMessages,
+        windowListeners,
+        navigationListeners,
+        pendingTimers: () => timers.size,
+        mutationObservers: () => mutationObservers,
         dispatchRuntime(message) {
             return new Promise(resolve => runtimeListener(message, {}, resolve));
         },
@@ -168,17 +193,21 @@ function createInterceptorHarness({ postToContent } = {}) {
     const posted = [];
     const listeners = new Map();
     class FakeXHR {
-        constructor() { this.listeners = []; this.responseType = ''; }
-        addEventListener(type, callback) { if (type === 'load') this.listeners.push(callback); }
-        emitLoad() {
-            const pending = this.listeners.splice(0);
+        constructor() { this.listeners = {}; this.responseType = ''; }
+        addEventListener(type, callback) { (this.listeners[type] ||= []).push(callback); }
+        emit(type) {
+            const pending = (this.listeners[type] || []).splice(0);
             for (const callback of pending) callback();
         }
+        emitLoad() { this.emit('load'); }
     }
     FakeXHR.prototype.open = function (_method, url) { this.responseURL = url; };
+    FakeXHR.prototype.getResponseHeader = function (name) {
+        return this.responseHeaders?.[name.toLowerCase()] ?? null;
+    };
 
     const window = {
-        location: { origin: 'https://x.com' },
+        location: { origin: 'https://x.com', pathname: '/search' },
         _bodyText: '{}',
         addEventListener(type, listener) { listeners.set(type, listener); },
         postMessage(message) {
@@ -189,8 +218,10 @@ function createInterceptorHarness({ postToContent } = {}) {
             if (this._networkError) throw this._networkError;
             const bodyText = this._bodyText;
             const readError = this._readError;
+            const headers = this._headers || {};
             return {
                 status: this._status || 200,
+                headers: { get: name => headers[name.toLowerCase()] ?? null },
                 clone() {
                     return {
                         async text() { if (readError) throw readError; return bodyText; }
@@ -216,6 +247,7 @@ function createInterceptorHarness({ postToContent } = {}) {
         window,
         XMLHttpRequest: FakeXHR,
         Request,
+        URL,
         console,
         setTimeout,
         clearTimeout
@@ -265,7 +297,19 @@ async function testMainWorldRejectionBehavior() {
 }
 
 async function testIsolatedRelayRejectionBehavior() {
-    const harness = createContentHarness();
+    const offSearch = createContentHarness({ pathname: '/home' });
+    offSearch.dispatch({
+        type: '__XPORTER_GRAPHQL_RESPONSE__',
+        operationName: 'SearchTimeline',
+        url: 'https://x.com/i/api/graphql/query/SearchTimeline',
+        status: 200,
+        bodyText: '{}'
+    });
+    await Promise.resolve();
+    assert.deepEqual(offSearch.runtimeMessages.map(message => message.type), [],
+        'search bodies from ordinary X tabs must never reach the worker');
+
+    const harness = createContentHarness({ pathname: '/search' });
     const contract =
         harness.context.globalThis.XPorterCaptureContract;
     const baseResponse = {
@@ -342,6 +386,7 @@ function createLinkedCaptureHarness() {
     `, worker.context);
     let main;
     const content = createContentHarness({
+        pathname: '/search',
         postToMain: message => queueMicrotask(() => main.dispatch(message)),
         onRuntimeMessage: message => worker.dispatchRuntime(message, {tab:{id:42,url:'https://x.com/search'}})
     });
@@ -406,7 +451,164 @@ async function testLinkedCaptureNetworkFailureAndSameUrlRetry() {
     assert.equal(diagnostic?.bodyText, '');
 }
 
+async function testRelativeSearchUrlsReachWorker() {
+    for (const transport of ['fetch', 'xhr', 'xhr-error']) {
+        const harness = createLinkedCaptureHarness();
+        const relative = harness.url.replace('https://x.com', '');
+        const pending = harness.nextPayload();
+        if (transport === 'fetch') {
+            await harness.main.window.fetch(relative);
+        } else {
+            const xhr = new harness.main.FakeXHR();
+            xhr.open('GET', relative);
+            xhr.status = 200;
+            xhr.responseText = '{}';
+            xhr.emit(transport === 'xhr' ? 'load' : 'error');
+        }
+        const payload = await pending;
+        assert.equal(payload?.url, harness.url, `${transport}: worker must receive an absolute X URL`);
+        assert.equal(payload?.error, transport === 'xhr-error' ? 'SEARCH_NETWORK_ERROR' : undefined);
+    }
+}
+
+async function testLinkedXhrTransportFailureIsReported() {
+    const harness = createLinkedCaptureHarness();
+    for (const type of ['error', 'abort', 'timeout']) {
+        const pending = harness.nextPayload();
+        const xhr = new harness.main.FakeXHR();
+        xhr.open('GET', harness.url);
+        xhr.emit(type);
+        const failure = await pending;
+        assert.equal(failure?.error, 'SEARCH_NETWORK_ERROR', `XHR ${type} must reach the worker`);
+        assert.equal(failure?.bodyText, '');
+    }
+    // A re-opened XHR must not report the previous request's failure.
+    const posted = harness.main.posted.length;
+    const xhr = new harness.main.FakeXHR();
+    xhr.open('GET', harness.url);
+    const staleError = xhr.listeners.error[0];
+    xhr.open('GET', harness.url);
+    staleError();
+    assert.equal(harness.main.posted.length, posted);
+}
+
+async function testAccountDetectionIsBoundedAndNavigationDriven() {
+    let reads = 0;
+    let rendered = false;
+    const switcher = {
+        get innerText() { reads += 1; return 'Ada\n@ada'; },
+        querySelector() { return null; }
+    };
+    const harness = createContentHarness({
+        pathname: '/home',
+        querySelector(selector) {
+            if (rendered && selector.includes('SideNav_AccountSwitcher_Button')) return switcher;
+            return null;
+        }
+    });
+    assert.equal(harness.mutationObservers(), 0,
+        'account detection must not observe every DOM mutation');
+
+    // Not rendered yet: bounded retries, then silence.
+    await new Promise(resolve => setTimeout(resolve, 5_600));
+    assert.equal(harness.pendingTimers(), 0, 'retries must stop after the bounded window');
+    assert.equal(harness.runtimeMessages.some(message => message.type === 'SET_CURRENT_ACCOUNT'), false);
+
+    // An SPA navigation starts a new short detection window.
+    rendered = true;
+    harness.context.window.location.pathname = '/ada';
+    harness.context.window.location.href = 'https://x.com/ada';
+    harness.navigationListeners.get('currententrychange')();
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const account = harness.runtimeMessages.find(message => message.type === 'SET_CURRENT_ACCOUNT');
+    assert.deepEqual(account?.account, { name: 'Ada', username: 'ada', avatarUrl: '' });
+    assert(harness.runtimeMessages.some(message => message.type === 'SET_USERNAME' && message.username === 'ada'),
+        'URL changes must still report the profile username');
+    assert.equal(harness.pendingTimers(), 0, 'a detected account ends the retry window');
+    assert.equal(reads, 1);
+}
+
+async function testInvalidatedContextStopsRelaying() {
+    const harness = createContentHarness({ pathname: '/search' });
+    const response = {
+        type: '__XPORTER_GRAPHQL_RESPONSE__',
+        operationName: 'SearchTimeline',
+        url: 'https://x.com/i/api/graphql/query/SearchTimeline',
+        status: 200,
+        bodyText: '{}'
+    };
+    harness.dispatch(response);
+    assert.equal(harness.runtimeMessages.length, 1);
+
+    // Extension reloaded: Chrome clears runtime.id and sendMessage throws.
+    const messageListener = harness.windowListeners.get('message');
+    harness.runtime.id = undefined;
+    harness.runtime.sendMessage = () => { throw new Error('Extension context invalidated.'); };
+    assert.doesNotThrow(() => messageListener({ source: harness.context.window, origin: 'https://x.com', data: response }));
+    assert.equal(harness.windowListeners.has('message'), false, 'page relay listener must be removed');
+    assert.equal(harness.windowListeners.has('popstate'), false);
+    assert.equal(harness.navigationListeners.has('currententrychange'), false);
+    assert.equal(harness.pendingTimers(), 0, 'pending detection timers must be cleared');
+
+    // A synchronous throw from a still-"alive" looking runtime is also handled.
+    const second = createContentHarness({ pathname: '/search' });
+    second.runtime.sendMessage = () => { throw new Error('Extension context invalidated.'); };
+    assert.doesNotThrow(() => second.dispatch(response));
+    assert.equal(second.windowListeners.has('message'), false);
+}
+
+async function testRateLimitResetIsRelayedWith429() {
+    const reset = Math.floor(Date.now() / 1000) + 120;
+    const harness = createLinkedCaptureHarness();
+    harness.main.window._status = 429;
+    harness.main.window._bodyText = '{"errors":[{"code":88}]}';
+    harness.main.window._headers = { 'x-rate-limit-reset': String(reset) };
+    const pendingFetch = harness.nextPayload();
+    await harness.main.window.fetch(harness.url);
+    const fetched = await pendingFetch;
+    assert.equal(fetched?.status, 429);
+    assert.equal(fetched?.rateLimitReset, reset, 'fetch 429 must carry x-rate-limit-reset');
+
+    const xhrPending = harness.nextPayload();
+    const xhr = new harness.main.FakeXHR();
+    xhr.open('GET', harness.url);
+    xhr.status = 429;
+    xhr.responseText = '';
+    xhr.responseHeaders = { 'x-rate-limit-reset': String(reset + 1) };
+    xhr.emitLoad();
+    assert.equal((await xhrPending)?.rateLimitReset, reset + 1, 'XHR 429 must carry x-rate-limit-reset');
+
+    // Only a 429 with a plain integer header carries the field.
+    const posted = harness.main.posted;
+    harness.main.window._status = 200;
+    await harness.main.window.fetch(harness.url);
+    harness.main.window._status = 429;
+    harness.main.window._headers = { 'x-rate-limit-reset': '12abc' };
+    await harness.main.window.fetch(harness.url);
+    await new Promise(resolve => setImmediate(resolve));
+    const relayed = posted.filter(message => message.type === '__XPORTER_GRAPHQL_RESPONSE__').slice(-2);
+    assert.deepEqual(relayed.map(message => message.rateLimitReset), [undefined, undefined]);
+
+    // The isolated relay forwards only a positive integer, and only with 429.
+    const content = createContentHarness({ pathname: '/search' });
+    const base = {
+        type: '__XPORTER_GRAPHQL_RESPONSE__',
+        operationName: 'SearchTimeline',
+        url: 'https://x.com/i/api/graphql/query/SearchTimeline',
+        bodyText: ''
+    };
+    content.dispatch({ ...base, status: 429, rateLimitReset: reset });
+    content.dispatch({ ...base, status: 429, rateLimitReset: '9999999999' });
+    content.dispatch({ ...base, status: 200, rateLimitReset: reset });
+    assert.deepEqual(content.runtimeMessages.map(message => message.rateLimitReset), [reset, undefined, undefined]);
+}
+
 const tests = [
+    ['relative search URLs reach worker', testRelativeSearchUrlsReachWorker],
+    ['429 rate-limit reset relay', testRateLimitResetIsRelayedWith429],
+    ['linked XHR transport failure', testLinkedXhrTransportFailureIsReported],
+    ['bounded navigation-driven account detection', testAccountDetectionIsBoundedAndNavigationDriven],
+    ['invalidated extension context stops relaying', testInvalidatedContextStopsRelaying],
     ['linked capture readiness, fetch and XHR', testLinkedCaptureReadinessAndResponses],
     ['linked network failure and same-URL retry', testLinkedCaptureNetworkFailureAndSameUrlRetry],
     ['shared immutable contract', testSharedContractShape],

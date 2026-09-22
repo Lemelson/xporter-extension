@@ -22,6 +22,8 @@ class FakeFileReader {
 function createHarness(options = {}) {
     const generatedLanguages = [];
     const generatedMediaAssets = [];
+    const generatedXlsxOptions = [];
+    const savedStates = [];
     let settingsReads = 0;
     let stateReads = 0;
     let downloadId = 0;
@@ -124,6 +126,10 @@ function createHarness(options = {}) {
                 }
                 return { ...settings };
             },
+            async saveExportState(state) {
+                savedStates.push(state);
+                return true;
+            },
             async recordDownload() {}
         },
         XPorterPostDB: {
@@ -139,9 +145,14 @@ function createHarness(options = {}) {
             generatePostsText() {
                 return 'txt';
             },
-            generateXLSX(_items, _isUsers, xlsxOptions) {
+            async generateXLSXAsync(_items, _isUsers, xlsxOptions) {
                 generatedMediaAssets.push(xlsxOptions.mediaAssets || []);
+                generatedXlsxOptions.push(xlsxOptions);
                 return new Uint8Array([1]);
+            },
+            collectPopulatedHeaders(_items, _isUsers, _opts, into = new Set()) {
+                into.add('id');
+                return into;
             },
             compactExportData(items) {
                 return items;
@@ -175,6 +186,7 @@ function createHarness(options = {}) {
             },
             downloads: {
                 download(_downloadOptions, callback) {
+                    if (options.downloadThrows) throw new Error('downloads API unavailable');
                     downloadId += 1;
                     if (options.holdDownloads) {
                         pendingDownloadCallbacks.push(() => callback(downloadId));
@@ -195,6 +207,8 @@ function createHarness(options = {}) {
         downloads: context.XPorterDownloads,
         generatedLanguages,
         generatedMediaAssets,
+        generatedXlsxOptions,
+        savedStates,
         settingsReads: () => settingsReads,
         stateReads: () => stateReads,
         photoFetches: () => photoFetches,
@@ -585,6 +599,8 @@ async function testActiveDownloadKeepsItsFrozenPlan() {
     assert.equal(harness.settingsReads(), 1,
         'reading the active plan must not reload mutable settings');
 
+    // Let workbook generation (asynchronous DEFLATE) reach the held handoff.
+    await new Promise(resolve => setImmediate(resolve));
     harness.releaseDownloads();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(harness.downloads.isCurrentDownloadActive(), false);
@@ -679,6 +695,243 @@ async function testCalendarLabelsSurviveDownloadAndHistory() {
     assert.match(history.filename,/_from_2026-09-04_to_2026-09-04_/);
 }
 
+async function waitForIdle(harness) {
+    for (let attempt = 0; attempt < 200 && harness.downloads.isCurrentDownloadActive(); attempt++) {
+        await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(harness.downloads.isCurrentDownloadActive(), false,
+        'the detached download must settle and release its lock');
+}
+
+async function testFailedBatchReadIsNeverReportedAsComplete() {
+    const harness = createHarness({
+        fakeKeepAlive: true,
+        async loadTweetBatches({ start }) {
+            if (start > 0) throw new Error('STORAGE_READ_FAILED');
+            return [[{ id: '1' }], [{ id: '2' }]];
+        },
+        sourceBatches: [[{ id: '1' }], [{ id: '2' }], [{ id: '3' }]]
+    });
+
+    const started = await harness.downloads.startCurrentDownload('csv');
+    assert.equal(started.success, true);
+    await waitForIdle(harness);
+
+    const types = harness.progressEvents.map(event => event.type);
+    assert(!types.includes('DOWNLOAD_COMPLETE'),
+        'a failed batch read must not end as a completed download');
+    const failure = harness.progressEvents.find(event => event.type === 'DOWNLOAD_ERROR');
+    assert.deepEqual(failure, { type: 'DOWNLOAD_ERROR', source: 'current', error: 'STORAGE_READ_FAILED' });
+    assert.deepEqual(harness.savedStates, [],
+        'a failed download must never rewrite the saved export state');
+}
+
+async function testFailedStateReadReleasesDownloadReservation() {
+    const harness = createHarness({
+        fakeKeepAlive: true,
+        async loadExportState({ readNumber, sourceBatches }) {
+            if (readNumber === 1) throw new Error('STORAGE_READ_FAILED');
+            return {
+                username: 'snapshot', exportMode: 'posts', outputFormat: 'csv',
+                tweetCount: sourceBatches.flat().length, totalBatches: sourceBatches.length,
+                settings: {}
+            };
+        }
+    });
+    await assert.rejects(harness.downloads.startCurrentDownload('csv'), /STORAGE_READ_FAILED/);
+    assert.equal(harness.downloads.isCurrentDataReadActive(), false,
+        'an initial state-read failure must release the download reservation');
+    assert.equal(harness.progressEvents.length, 0, 'a failed snapshot must not announce a completed download');
+    assert.equal((await harness.downloads.startCurrentDownload('csv')).success, true,
+        'a recovered storage read must permit retry');
+    await waitForIdle(harness);
+}
+
+async function testShortSavedDataNeverLowersTheSavedCount() {
+    const sourceBatches = [[{ id: '1' }], [{ id: '2' }]];
+    const harness = createHarness({
+        sourceBatches,
+        async loadExportState() {
+            return {
+                username: 'snapshot', exportMode: 'posts', outputFormat: 'csv',
+                tweetCount: 3, totalBatches: sourceBatches.length, settings: {}
+            };
+        }
+    });
+
+    const result = await harness.downloads.downloadCurrent('csv');
+    assert.equal(result.success, true);
+    assert.equal(result.count, 2, 'the result must report the rows actually written');
+    assert.deepEqual(harness.savedStates, [],
+        'a download must never lower the persisted export count');
+    const complete = harness.progressEvents.find(event => event.type === 'DOWNLOAD_COMPLETE');
+    assert.equal(complete.count, 2);
+    assert.equal(complete.source, 'current');
+}
+
+async function testMultipartPartsShareOneColumnSet() {
+    const harness = createHarness({
+        sourceBatches: [
+            [{ id: '1', text: 'first' }],
+            [{ id: '2', text: 'second', hashtags: '#late' }]
+        ],
+        settings: { localizeExportHeaders: false, language: 'en' }
+    });
+    const real = vm.createContext({ TextEncoder, Uint8Array, DataView, ArrayBuffer });
+    vm.runInContext(fs.readFileSync(path.join(root, 'utils/csv.js'), 'utf8'), real);
+    const csvParts = [];
+    harness.context.XPorterCSV.collectPopulatedHeaders = real.XPorterCSV.collectPopulatedHeaders;
+    harness.context.XPorterCSV.generateCSV = (items, isUsers, opts) => {
+        const csv = real.XPorterCSV.generateCSV(items, isUsers, opts);
+        csvParts.push(csv);
+        return csv;
+    };
+
+    const result = await harness.downloads.downloadCurrent('csv');
+    assert.equal(result.success, true);
+    assert.equal(result.partCount, 2);
+    const headerRows = csvParts.map(csv => csv.slice(1).split('\n')[0]);
+    assert.deepEqual(headerRows, ['id,text,hashtags', 'id,text,hashtags'],
+        'a column populated only in part 2 must also exist in part 1');
+    assert.equal(csvParts[0].split('\n')[1], '1,first,');
+
+    // A single-part download keeps choosing columns from its own rows.
+    const single = real.XPorterCSV.generateCSV([{ id: '1', text: 'only' }], false, {});
+    assert.equal(single.slice(1).split('\n')[0], 'id,text');
+}
+
+async function testMultipartXlsxSharesNestedAndAccountColumns() {
+    const { readZipEntries } = require('./lib/xlsx-package.js');
+    const real = vm.createContext({ TextEncoder, Uint8Array, DataView, ArrayBuffer });
+    vm.runInContext(fs.readFileSync(path.join(root, 'utils/csv.js'), 'utf8'), real);
+    const scenarios = [
+        {
+            mode: 'posts', rows: [{ id: '1' }, { id: '2', quoted_post: { text: 'late quote', view_count: 0 } }],
+            expected: ['id', 'quoted_post_text', 'quoted_post_view_count']
+        },
+        {
+            mode: 'followers', rows: [{ id: '1', username: 'early' }, {
+                id: '2', account_based_in: 'France', account_location_accurate: false
+            }],
+            expected: ['id', 'username', 'account_based_in', 'account_location_accurate']
+        }
+    ];
+    for (const { mode, rows, expected } of scenarios) {
+        const sheets = [];
+        const harness = createHarness({
+            sourceBatches: rows.map(row => [row]),
+            settings: { localizeExportHeaders: false, language: 'en' },
+            loadExportState: async () => ({
+                username: 'snapshot', exportMode: mode, tweetCount: rows.length,
+                totalBatches: rows.length, settings: { includeAboutAccountDetails: true }
+            })
+        });
+        harness.context.XPorterCSV.collectPopulatedHeaders = real.XPorterCSV.collectPopulatedHeaders;
+        harness.context.XPorterCSV.generateXLSXAsync = async (items, isUsers, opts) => {
+            const bytes = await real.XPorterCSV.generateXLSXAsync(items, isUsers, opts);
+            sheets.push(readZipEntries(bytes).get('xl/worksheets/sheet1.xml').data.toString('utf8'));
+            return bytes;
+        };
+        assert.equal((await harness.downloads.downloadCurrent('xlsx')).success, true);
+        assert.equal(sheets.length, 2);
+        for (const sheet of sheets) {
+            const header = sheet.match(/<row r="1">([\s\S]*?)<\/row>/)[1];
+            const labels = [...header.matchAll(/<t>([^<]*)<\/t>/g)].map(match => match[1]);
+            assert.deepEqual(labels, expected, `${mode}: every XLSX part must retain later populated columns`);
+        }
+    }
+}
+
+async function testSynchronousDownloadFailureReleasesTheLock() {
+    const harness = createHarness({
+        sourceBatches: [[{ id: '1' }]],
+        fakeKeepAlive: true,
+        downloadThrows: true
+    });
+
+    const started = await harness.downloads.startCurrentDownload('csv');
+    assert.equal(started.success, true);
+    await waitForIdle(harness);
+    assert.deepEqual(
+        harness.progressEvents.find(event => event.type === 'DOWNLOAD_ERROR'),
+        { type: 'DOWNLOAD_ERROR', source: 'current', error: 'DOWNLOAD_FAILED' }
+    );
+    const retry = await harness.downloads.startCurrentDownload('csv');
+    assert.notDeepEqual(retry, { error: 'DOWNLOAD_IN_PROGRESS' },
+        'a thrown downloads API call must not keep the download lock');
+    await waitForIdle(harness);
+}
+
+async function testHistoryDownloadProgressIsTaggedAsHistory() {
+    const harness = createHarness({
+        settings: {
+            localizeExportHeaders: false,
+            language: 'en',
+            embedPostPhotos: true,
+            embedBookmarkPhotos: false
+        }
+    });
+    harness.context.XPorterStorage.loadExportHistoryEntry = async () => ({
+        username: 'old', exportMode: 'posts',
+        items: [{ id: '1', media_urls: 'https://pbs.twimg.com/media/history.png' }]
+    });
+
+    const result = await harness.downloads.downloadHistory('entry', 'xlsx');
+    assert.equal(result.success, true);
+    const progress = harness.progressEvents.filter(event => event.type === 'DOWNLOAD_PROGRESS');
+    assert(progress.length >= 2, 'history photo download must report progress');
+    assert(progress.every(event => event.source === 'history'),
+        'history download progress must not look like the current export download');
+}
+
+async function testPhotoProgressIsThrottled() {
+    const urls = Array.from({ length: 40 }, (_, index) => `https://pbs.twimg.com/media/p${index}.png`);
+    const harness = createHarness({
+        sourceBatches: [[{ id: '1', media_urls: urls.join(', ') }]],
+        postXlsxPartLimit: 10,
+        settings: {
+            localizeExportHeaders: false,
+            language: 'en',
+            embedPostPhotos: true,
+            embedBookmarkPhotos: false
+        }
+    });
+
+    const result = await harness.downloads.downloadCurrent('xlsx');
+    assert.equal(result.success, true);
+    const photoEvents = harness.progressEvents
+        .filter(event => event.stage === 'photos')
+        .map(event => [event.photoCurrent, event.photoTotal]);
+    assert.deepEqual(photoEvents[0], [0, 40]);
+    assert.deepEqual(photoEvents.at(-1), [40, 40], 'the final photo count must always be sent');
+    assert(photoEvents.length <= 5,
+        `40 instant previews must not flood the popup (${photoEvents.length} messages)`);
+}
+
+async function testPhotosSkippedByPartCapsAreCounted() {
+    const urls = ['one', 'two', 'three'].map(name => `https://pbs.twimg.com/media/${name}.png`);
+    const byCount = createHarness({
+        sourceBatches: [[{ id: '1', media_urls: urls.join(', ') }]],
+        photoTargetLimit: 1,
+        settings: { localizeExportHeaders: false, language: 'en', embedPostPhotos: true }
+    });
+    assert.equal((await byCount.downloads.downloadCurrent('xlsx')).success, true);
+    assert.equal(byCount.photoFetches(), 1);
+    assert.equal(byCount.generatedXlsxOptions[0].mediaSkippedCount, 2,
+        'photos beyond the per-part photo cap must be counted for the Media note');
+
+    const byBytes = createHarness({
+        sourceBatches: [[{ id: '1', media_urls: urls.slice(0, 2).join(', ') }]],
+        photoMaxBytes: 100,
+        photoPartMaxBytes: 30,
+        settings: { localizeExportHeaders: false, language: 'en', embedPostPhotos: true }
+    });
+    assert.equal((await byBytes.downloads.downloadCurrent('xlsx')).success, true);
+    assert.equal(byBytes.generatedXlsxOptions[0].mediaAssets.length, 1);
+    assert.equal(byBytes.generatedXlsxOptions[0].mediaSkippedCount, 1,
+        'photos dropped by the per-part byte budget must be counted');
+}
+
 async function main() {
     await testCalendarLabelsSurviveDownloadAndHistory();
     await testMultipartDownloadUsesOneSettingsSnapshot();
@@ -692,6 +945,16 @@ async function main() {
     await testActiveDownloadKeepsItsFrozenPlan();
     await testTextCopyUsesTheCurrentDataReadLease();
     await testConcurrentStartsReserveDownloadBeforeSnapshotRead();
+    await testFailedBatchReadIsNeverReportedAsComplete();
+    await testFailedStateReadReleasesDownloadReservation();
+    await testShortSavedDataNeverLowersTheSavedCount();
+    await testMultipartPartsShareOneColumnSet();
+    await testMultipartXlsxSharesNestedAndAccountColumns();
+    await testSynchronousDownloadFailureReleasesTheLock();
+    await testHistoryDownloadProgressIsTaggedAsHistory();
+    await testPhotoProgressIsThrottled();
+    await testPhotosSkippedByPartCapsAreCounted();
+    await require('./test-xlsx-export.js').run();
     console.log('Download transaction tests passed.');
 }
 

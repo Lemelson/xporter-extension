@@ -27,3 +27,5 @@ Changes:
 | id / errorMsg | Masukan tidak terkirim. Coba lagi atau hubungi saya di Telegram. | Belum dapat memastikan masukan Anda diterima. Coba lagi atau hubungi saya lewat Telegram. |
 | id / sr_missing_more_fields | Perlu bidang atau data media tambahan | Perlu kolom atau data media tambahan |
 | tr / errorMsg | Geri bildiriminiz gönderilemedi. Tekrar deneyin veya bana Telegram'dan yazın. | Geri bildiriminizin alındığı doğrulanamadı. Lütfen yeniden deneyin veya Telegram üzerinden bana ulaşın. |
+
+2026-09-22: added `recordNote` (a one-line "what is recorded" disclosure beside Send) in all 14 locales. It summarizes the privacy policy: answers, time on the page, uninstall diagnostics with a random install ID, and no exported X content. Editorial translation, not native-speaker certified.

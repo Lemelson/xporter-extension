@@ -31,3 +31,15 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# Local-only release/verification artefacts (never sources)
+*.bundle
+*.bak
+*.orig
+*.backup
+backup/
+backups/
+/screenshots/
+/verification-screenshots/
+/qa-output/
+.playwright-mcp/

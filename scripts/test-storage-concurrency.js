@@ -14,14 +14,18 @@ function clone(value) {
 }
 
 function createStorageHarness(initialSettings, {
-    failFirstSet = false, history = [], failHistoryRead = false, usage = {}, failUsageRead = false
+    failFirstSet = false, history = [], failHistoryRead = false, usage = {}, failUsageRead = false,
+    extra = {}, failArrayRead = false, failStateRead = false, failSettingsRead = false,
+    withGetKeys = false, permissions = ['unlimitedStorage']
 } = {}) {
     const stored = {
         [SETTINGS_KEY]: clone(initialSettings),
         xporter_export_history: clone(history),
-        xporter_usage: clone(usage)
+        xporter_usage: clone(usage),
+        ...clone(extra)
     };
     let setAttempts = 0;
+    const calls = { getAll: 0, getKeys: 0, getBytesInUse: 0 };
 
     const context = vm.createContext({
         console: {
@@ -32,11 +36,17 @@ function createStorageHarness(initialSettings, {
         XPORTER_CONFIG: {},
         chrome: {
             runtime: {
-                getManifest: () => ({ permissions: ['unlimitedStorage'] })
+                getManifest: () => ({ permissions })
             },
             storage: {
                 local: {
                     async get(key) {
+                        if (key === SETTINGS_KEY && failSettingsRead) {
+                            throw new Error('simulated settings read rejection');
+                        }
+                        if (key === 'xporter_export_state' && failStateRead) {
+                            throw new Error('simulated export state read rejection');
+                        }
                         if (key === 'xporter_usage' && failUsageRead) {
                             failUsageRead = false;
                             throw new Error('simulated usage read rejection');
@@ -45,6 +55,10 @@ function createStorageHarness(initialSettings, {
                             failHistoryRead = false;
                             throw new Error('simulated history read rejection');
                         }
+                        if (Array.isArray(key) && failArrayRead) {
+                            throw new Error('simulated batch read rejection');
+                        }
+                        if (key === null) calls.getAll++;
                         const snapshot = clone(stored);
                         // Resolve on the next microtask. Without settings-write
                         // serialization, two concurrent callers both capture the
@@ -79,8 +93,15 @@ function createStorageHarness(initialSettings, {
                         for (const key of [].concat(keys)) delete stored[key];
                     },
                     async getBytesInUse() {
+                        calls.getBytesInUse++;
                         return 0;
                     },
+                    ...(withGetKeys ? {
+                        async getKeys() {
+                            calls.getKeys++;
+                            return Object.keys(stored);
+                        }
+                    } : {}),
                     QUOTA_BYTES: 10 * 1024 * 1024
                 }
             }
@@ -92,8 +113,107 @@ function createStorageHarness(initialSettings, {
         storage: context.XPorterStorage,
         settings: () => clone(stored[SETTINGS_KEY]),
         history: () => clone(stored.xporter_export_history),
-        usage: () => clone(stored.xporter_usage)
+        usage: () => clone(stored.xporter_usage),
+        stored: () => clone(stored),
+        calls
     };
+}
+
+const BATCH = index => `xporter_tweets_batch_${index}`;
+const EXPORT_STATE = 'xporter_export_state';
+
+async function testBatchReadsNeverDegradeToEmptyData() {
+    const complete = createStorageHarness({}, { extra: {
+        [EXPORT_STATE]: { totalBatches: 2 },
+        [BATCH(0)]: [{ id: '1' }],
+        [BATCH(1)]: [{ id: '2' }]
+    } });
+    assert.deepEqual(clone(await complete.storage.loadTweetBatches(0, 2)), [[{ id: '1' }], [{ id: '2' }]]);
+    assert.deepEqual(clone(await complete.storage.loadAllTweets()), [{ id: '1' }, { id: '2' }]);
+    assert.deepEqual(clone(await complete.storage.loadTweetBatch(1)), [{ id: '2' }]);
+
+    const gap = createStorageHarness({}, { extra: {
+        [EXPORT_STATE]: { totalBatches: 2 },
+        [BATCH(0)]: [{ id: '1' }]
+    } });
+    await assert.rejects(gap.storage.loadTweetBatches(0, 2), /STORAGE_READ_FAILED/,
+        'a missing batch inside the saved range is a read failure, not an empty batch');
+    await assert.rejects(gap.storage.loadAllTweets(), /STORAGE_READ_FAILED/,
+        'history payloads must not silently drop a missing batch');
+    await assert.rejects(gap.storage.loadTweetBatch(1), /STORAGE_READ_FAILED/);
+
+    const rejected = createStorageHarness({}, {
+        extra: { [EXPORT_STATE]: { totalBatches: 1 }, [BATCH(0)]: [{ id: '1' }] },
+        failArrayRead: true
+    });
+    await assert.rejects(rejected.storage.loadTweetBatches(0, 1), /STORAGE_READ_FAILED/);
+    await assert.rejects(rejected.storage.loadAllTweets(), /STORAGE_READ_FAILED/);
+
+    const rejectedState = createStorageHarness({}, {
+        extra: { [EXPORT_STATE]: { totalBatches: 1 }, [BATCH(0)]: [{ id: '1' }] },
+        failStateRead: true
+    });
+    await assert.rejects(rejectedState.storage.loadExportState(), /STORAGE_READ_FAILED/,
+        'a failed state read must be distinguishable from no saved export');
+    await assert.rejects(rejectedState.storage.loadAllTweets(), /STORAGE_READ_FAILED/,
+        'a failed initial state read must not yield an empty successful history payload');
+    assert.equal(await createStorageHarness({}).storage.loadExportState(), null,
+        'a genuinely missing export state still means no saved export');
+}
+
+async function testActiveTimeTicksAreBounded() {
+    const harness = createStorageHarness({}, { usage: { activeMs: 1000 } });
+    for (const invalid of [NaN, Infinity, -5000, 0, '5000', null, undefined]) {
+        await harness.storage.addActiveMs(invalid);
+    }
+    assert.equal(harness.usage().activeMs, 1000, 'invalid active-time values must be ignored');
+    await harness.storage.addActiveMs(2500);
+    assert.equal(harness.usage().activeMs, 3500);
+    await harness.storage.addActiveMs(24 * 60 * 60 * 1000);
+    assert.equal(harness.usage().activeMs, 3500 + 5 * 60 * 1000,
+        'one tick can add at most five minutes');
+}
+
+async function testFailedSettingsReadCannotExpireRetainedHistory() {
+    const history = [{ id: 'keep', completedAt: 1, items: [{ id: 'row' }], hasData: true }];
+    const harness = createStorageHarness({ autoExpireEnabled: false }, {
+        history, failSettingsRead: true
+    });
+    await assert.rejects(harness.storage.loadSettings(), /STORAGE_READ_FAILED/,
+        'a failed settings read must not pretend the default expiry preference was saved');
+    await assert.rejects(harness.storage.pruneExpiredExportHistory(undefined, 20_000_000),
+        /STORAGE_READ_FAILED/, 'expiry must stop when preferences cannot be read');
+    assert.deepEqual(harness.history(), history, 'retained rows must survive the settings read failure');
+}
+
+async function testExportCleanupListsKeysWithoutLoadingValues() {
+    const extra = {
+        [EXPORT_STATE]: { totalBatches: 1 },
+        [BATCH(0)]: [{ id: '1' }],
+        [BATCH(7)]: [{ id: 'stranded' }]
+    };
+    const modern = createStorageHarness({}, { extra, withGetKeys: true });
+    assert.equal(await modern.storage.clearExportState(), true);
+    assert.equal(modern.calls.getKeys, 1);
+    assert.equal(modern.calls.getAll, 0, 'getKeys must replace the full get(null) load');
+    assert.deepEqual(Object.keys(modern.stored()).filter(key => key.startsWith('xporter_tweets_')
+        || key === EXPORT_STATE), []);
+
+    const legacy = createStorageHarness({}, { extra });
+    assert.equal(await legacy.storage.clearExportState(), true);
+    assert.equal(legacy.calls.getAll, 1, 'Chrome before 130 keeps the get(null) sweep');
+    assert.equal(legacy.stored()[BATCH(7)], undefined);
+}
+
+async function testUnlimitedStorageSkipsByteCounting() {
+    const unlimited = createStorageHarness({});
+    assert.equal((await unlimited.storage.checkStorageQuota()).isWarning, false);
+    assert.equal(unlimited.calls.getBytesInUse, 0,
+        'unlimitedStorage has no quota, so the byte count is never requested');
+
+    const limited = createStorageHarness({}, { permissions: [] });
+    await limited.storage.checkStorageQuota();
+    assert.equal(limited.calls.getBytesInUse, 1);
 }
 
 async function testConcurrentPartialPatchesAreMerged() {
@@ -140,6 +260,11 @@ async function testRejectedWriteDoesNotPoisonLaterPatch() {
 (async () => {
     await testConcurrentPartialPatchesAreMerged();
     await testRejectedWriteDoesNotPoisonLaterPatch();
+    await testBatchReadsNeverDegradeToEmptyData();
+    await testFailedSettingsReadCannotExpireRetainedHistory();
+    await testActiveTimeTicksAreBounded();
+    await testExportCleanupListsKeysWithoutLoadingValues();
+    await testUnlimitedStorageSkipsByteCounting();
     const concurrent = createStorageHarness({});
     await Promise.all([
         concurrent.storage.saveExportHistory({ username: 'first' }),
