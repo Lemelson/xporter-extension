@@ -72,7 +72,7 @@ try {
         await page.locator('label:has(#dateCheck)').click();
         assert.equal(await page.locator('#dateFields').isVisible(), true);
         await page.locator('label:has(#dateCheck)').click();
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => (window.scrollTo(0, 0), document.getElementById('homeContent').scrollTop = 0));
         const overflow = await page.evaluate(() => ({
           width: innerWidth, scrollWidth: document.documentElement.scrollWidth,
           clipped: [...document.querySelectorAll('#tab-home input, #tab-home select, #tab-home button, .tab')]
@@ -85,12 +85,12 @@ try {
           // Screenshot fixture: authenticated appearance, without using a real account.
           await page.locator('#authWarning').evaluate(el => el.classList.add('hidden'));
           await page.locator('#usernameInput').fill('AteoBreaking');
-          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.evaluate(() => (window.scrollTo(0, 0), document.getElementById('homeContent').scrollTop = 0));
           await page.screenshot({ path: path.join(output, `popup-${language}-${theme}.png`) });
         }
         await showStatus({ ...state, searchPhase: 'waiting' });
         await page.locator('#stopBtn').waitFor({ state: 'visible' });
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => (window.scrollTo(0, 0), document.getElementById('homeContent').scrollTop = 0));
         const active = await page.locator('#exportStatus').boundingBox();
         assert(active.y + active.height < 600, `${language}/${theme}/${width}: running status must fit`);
         if (width === 350 && ['en', 'ru'].includes(language)) {
@@ -172,7 +172,7 @@ try {
       const rect = await overlay.boundingBox();
       assert(rect.x >= -1 && rect.x+rect.width <= width+1 && rect.y >= -1 && rect.y+rect.height <= 601,
         `overlay ${theme}/${simplifiedDesign}/${uiScale}/${width}: ${JSON.stringify(rect)}`);
-      assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-simple')), simplifiedDesign);
+      assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-simple')), !simplifiedDesign);
       assert.equal(await overlay.evaluate(el=>el.classList.contains('xporter-capture-light')), theme === 'light');
       if (width===1440 && uiScale===100) {
         await overlay.screenshot({path:path.join(output,`overlay-${theme}-${simplifiedDesign?'simple':'blue'}.png`)});

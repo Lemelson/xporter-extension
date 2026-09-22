@@ -278,3 +278,21 @@ test('repository executable sources cannot bypass the sandbox-safe soffice resol
     assert.deepEqual(offenders, [],
         'use resolveSofficeExecutable() or scripts/soffice-headless.js instead of a GUI-backed binary');
 });
+
+
+test('package contains only the root extension manifest', () => {
+    const fixture = createPackageFixture();
+    const output = path.join(fixture.root, 'result.zip');
+    try {
+        fs.mkdirSync(path.join(fixture.root, 'popup/emoji'));
+        fs.writeFileSync(path.join(fixture.root, 'popup/emoji/manifest.json'), '{"emoji":[]}');
+        const result = spawnSync(path.join(fixture.scriptsDir, 'package.sh'), [], {
+            cwd: fixture.root, encoding: 'utf8',
+            env: {...process.env, PATH: `${fixture.binDir}:/usr/bin:/bin`, XPORTER_ZIP_OUT: output}
+        });
+        assert.equal(result.status, 0, result.stderr);
+        const entries = spawnSync('zipinfo', ['-1', output], {encoding:'utf8'});
+        assert.equal(entries.status, 0);
+        assert.deepEqual(entries.stdout.trim().split('\n').filter(name => /(^|\/)manifest\.json$/i.test(name)), ['manifest.json']);
+    } finally { fs.rmSync(fixture.root, {recursive:true, force:true}); }
+});

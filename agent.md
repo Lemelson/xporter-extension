@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Last verified against the **v1.6.5** release runtime (2026-09-06); the `v1.6.4` tag is the Chrome Web Store release.
+> Last verified against the **v2.0.0** release runtime (2026-09-09); the `v1.6.4` tag is the Chrome Web Store release.
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 1.6.5 (`manifest.json`), packaged 2026-09-06 |
+| Version | 2.0.0 (`manifest.json`), packaged 2026-09-09 |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |
@@ -101,7 +101,8 @@ xporter/
 │
 ├── popup/                       # Scalable popup UI (350px base)
 │   ├── popup.html               # Markup (Home / Settings / About tabs)
-│   ├── popup.css                # 🔑 ALL popup styles (themes, animations, ladybug, logo)
+│   ├── popup.css                # Component styles, animations, ladybug, logo
+│   ├── workspace.css            # Quiet theme surfaces, grouped choices and fixed action/scroll layout
 │   ├── popup.js                 # ~1,000-line initialization and command coordinator
 │   ├── settings-form.js         # Form loading/validation and owned settings patches
 │   ├── export-status.js         # Status/actions/progress renderer; no persistence
@@ -111,8 +112,8 @@ xporter/
 │   ├── history.js               # Export-history rendering/download/delete UI
 │   ├── seen-posts.js            # Passive dataset summary/download/clear UI
 │   ├── ladybug.js               # Easter-egg ladybug on the About tab (see §6.2)
-│   ├── theme-init.js            # Inline-loaded FIRST: applies saved theme to avoid FOUC
-│   ├── theme.js                 # Theme toggle logic + SVG icon helpers
+│   ├── theme-init.js            # Early theme application after theme-presets.js
+│   ├── theme.js                 # Size controls + SVG icon helpers
 │   ├── i18n.js                  # In-app i18n engine + LANGUAGES list + loadTranslations()
 │   └── locales/                 # 🔑 In-app UI strings — 14 JSON files (en is the fallback)
 │       └── en.json, ru.json, es.json, de.json, fr.json, pt.json, it.json,
@@ -139,7 +140,7 @@ xporter/
 │
 ├── scripts/                     # Dev/debug only — NOT shipped in the extension
 │   ├── test-all.js              # Canonical ordered 13-suite deterministic gate
-│   ├── test-extension-core.js   # 101-test aggregator; suites in test-extension-core/
+│   ├── test-extension-core.js   # 107-test aggregator; suites in test-extension-core/
 │   ├── test-*.js                # Focused contracts: rate/feed/tooling/storage/download/
 │   │                            # bookmark lifecycle/API cancellation/capture/export policy
 │   ├── test-extension-smoke.mjs               # unpacked extension runtime smoke
@@ -233,7 +234,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 
 `background/export-policy.js` is the pure facade for feed selection, pacing keys/options, About concurrency/retries, and resume merging. The worker owns limiter instances and reconfigures all active instances in place so live settings apply on the next request without discarding counters.
 
-**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for the active profile-feed operation (`UserTweets`, `UserOriginalsTimeline`, `UserRepliesTimeline`, or `UserTweetsAndReplies`) and for `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All five named presets use burst-first pacing at their advertised delay; advertised headers are advisory, and only an actual 429 enters the one-minute retry wait. Missing/stale headers use mode-specific fallback delays. Optional Scheduled breaks independently opt a mode into a longer batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders ordinary pacing with an amber bar, Scheduled breaks with a teal pause icon/bar, and X rate limits with a shield plus monochrome diagonal bar. A stable original duration plus absolute `until` keeps wait progress monotonic across the popup's 2-second status polls. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
+**Adaptive pacing (default).** `api.js` stores validated rate-limit budgets separately for the active profile-feed operation (`UserTweets`, `UserOriginalsTimeline`, `UserRepliesTimeline`, or `UserTweetsAndReplies`) and for `Followers`, `Following`, and `BlueVerifiedFollowers`; a missing or malformed header clears that endpoint's reading. The SW supplies only the active mode's budget to `RateLimitManager`. All six named presets use burst-first pacing at their advertised delay; advertised headers are advisory, and only an actual 429 enters the one-minute retry wait. Missing/stale headers use mode-specific fallback delays. Optional Scheduled breaks independently opt a mode into a longer batch cooldown. Every inter-request wait emits a `cooldown` status carrying a `kind` (`'pacing'` / `'window'` / `'batch'`). The popup renders ordinary pacing with an amber bar, Scheduled breaks with a teal pause icon/bar, and X rate limits with a shield plus monochrome diagonal bar. A stable original duration plus absolute `until` keeps wait progress monotonic across the popup's 2-second status polls. Page sizes are followers REST `count=100`, following/verified `count=50`, tweets `count=20`; actual speed depends on the live endpoint budget and must be benchmarked against X.
 
 **Export Speed presets.** Posts/Bookmarks and user-list exports have separate `exportSpeed` / `userExportSpeed` controls (`'turbo' | 'fast' | 'standard' | 'careful' | 'turtle' | 'custom'`, default `'standard'`). The five named tiers advertise 2 / 3 / 4 / 7 / 12 second delays; Standard is the recommended 4-second default. `XPORTER_CONFIG.SPEED_PRESETS` maps each named tier to `adaptiveFloor`/`adaptivePad`/`budgetFraction`/`raceReserve` plus `fallbackScale`; `resolveSpeedPreset()` in the SW resolves it. **`'custom'` (⚠️ in the UI)** uses only the user-typed `customDelaySec` or `userCustomDelaySec`; decimal dots and commas are accepted and the exact delay is used without preset padding or jitter.
 
@@ -249,7 +250,7 @@ Request spacing, 429 exponential backoff, `STALE_QUERY_ID`/network linear backof
 | `includeOriginalPosts` / `includeQuotes` / `includeReplies` / `includeRetweets` / `includeArticles` | all `true` | Exact primary-row types selected on Home. Replies-only uses `UserRepliesTimeline`; Replies mixed with any non-reply type use one `UserTweetsAndReplies` pass, filter exact primary types locally, and preserve foreign parents only as nested reply context. |
 | `embedPostPhotos` / `embedBookmarkPhotos` | both `false` | The Home XLSX-only radio group stores independent Posts/Bookmarks choices: false keeps URLs only and is visibly labelled Recommended; true downloads bounded previews into the Media sheet. |
 | `quantityLimit` | `500` | 0 = unlimited; live for an ordinary active export, but never overwrites a `+N more` per-run target |
-| `exportSpeed` | `'standard'` | speed tier `turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
+| `exportSpeed` | `'standard'` | speed tier `ultra/turbo/fast/standard/careful/turtle/custom` → `SPEED_PRESETS` (§4.4) |
 | `customDelaySec` / `userCustomDelaySec` | `5` / `5` | exact Custom delay for Posts/Bookmarks and User Lists; decimal dot or comma accepted |
 | `postSafetyBreakEnabled` / `postSafetyBreakMin` / `postSafetyBreakEvery` | `false` / `3` / `20` | optional Posts/Bookmarks scheduled break |
 | `userSafetyBreakEnabled` / `userSafetyBreakMin` / `userSafetyBreakEvery` | `false` / `3` / `20` | optional User Lists scheduled break |
@@ -299,9 +300,9 @@ XPorter uses native X search rather than assuming profile timelines provide exha
 1. Parse inclusive calendar dates in the browser timezone (including DST). Freeze the effective upper bound at launch via persisted `dateSnapshotAt`; Resume preserves that snapshot. New states persist `schemaVersion: 1`. Unversioned/unsupported date states (including UTC-era 1.6.4) return `DATE_EXPORT_RESTART_REQUIRED` before any state/row mutation; status includes `resumeBlockedReason`, hides Resume and offers Download/New export. Old exports without dates retain their existing Resume path. A future-only interval returns `no_matches` without opening a tab.
 2. Build `(from:username) since:… until:…` with UTC guard days outside the exact interval. Open a **Latest X search tab** at `https://x.com/search?q=…&f=live`. Guard rows are discarded locally; neither crossing a boundary nor covering 95% proves completeness.
 3. `interceptor.js` captures native `SearchTimeline` responses. The worker checks tab ID, query identity and `product: Latest`; `content.js` scrolls and clicks X's Retry button. `XPORTER_SEARCH_PAGE_STATE` probes the MAIN-world hook through nonce-matched `__XPORTER_CAPTURE_PROBE__` / `__XPORTER_CAPTURE_READY__` messages. This probe diagnoses readiness; it is not authentication.
-4. `parseSearchTimelineResponse` rejects GraphQL errors, malformed JSON and unsupported/malformed instruction envelopes. HTTP 401/403 means authentication failure; only HTTP 429 means a rate limit. HTTP, malformed-response and `SEARCH_NETWORK_ERROR` failures share the configured consecutive-failure budget (three failed responses, two retries by default); a valid page resets it and Stop cancels the wait. Oversized bodies remain terminal. Network and oversized-response diagnostics carry an empty body, never an oversized payload.
+4. `parseSearchTimelineResponse` rejects malformed JSON, malformed instruction envelopes, and GraphQL `errors` that arrive without rows. A page carrying rows beside partial `errors` is accepted (X's own client renders it and never re-requests it, so a retry could only skip ahead) but leaves the entire run unconfirmed even after a later clean terminal page. A clean Resume replay can recover completeness. Unrecognized instruction types are filtered before parsing and terminal detection; a page still needs a recognized paging instruction. HTTP 401/403 means authentication failure; only HTTP 429 means a rate limit. HTTP, malformed-response and `SEARCH_NETWORK_ERROR` failures share the configured consecutive-failure budget (three failed responses, two retries by default); a valid page resets it and Stop cancels the wait. Oversized bodies remain terminal. Network and oversized-response diagnostics carry an empty body, never an oversized payload.
 5. Filter each parsed row by target identity, exact inclusive timestamps, selected post types and saved IDs. Commit every page before waiting or advancing a cursor. Date Resume replays search from the top and deduplicates against all saved IDs. Standard posts/user-list paths also flush before mutating their cursor, preserving the retry position on storage failure.
-6. Completion reasons: `limit_reached` for the selected quantity; `source_exhausted` after a valid explicit bottom termination or the captured cursor-only empty-page shape (one `TimelineAddEntries` or two matching `TimelineReplaceEntry` instructions containing exactly the typed Top and Bottom cursor entries); `no_matches` when such an ending has no accepted rows. The `cursor-bottom-0` ID also appears on nonterminal pages and is never sufficient alone. Missing cursors, unknown endings and silence remain resumable errors. GraphQL errors and alerts are rejected; retries must repair the same request URL before later pages can be accepted. Only the initial response or a response for the expected Bottom request cursor can advance the export; Top or unrelated cursor responses are ignored. Resume restarts the search and deduplicates saved rows. Stop remains stopped. This describes X's returned search results, not proof that X indexed every historical post.
+6. Completion reasons: `limit_reached` for the selected quantity; `source_exhausted` after a valid explicit bottom termination or the captured cursor-only empty-page shape (one `TimelineAddEntries` or two matching `TimelineReplaceEntry` instructions containing exactly the typed Top and Bottom cursor entries); `no_matches` when such an ending has no accepted rows. The `cursor-bottom-0` ID also appears on nonterminal pages and is never sufficient alone. Missing cursors, unknown endings and silence remain resumable errors. Alerts and row-less GraphQL errors are rejected; retries must repair the same request URL before later pages can be accepted. Only the initial response or a response for the expected Bottom request cursor can advance the export; Top or unrelated cursor responses are ignored, and `SEARCH_CAPTURE.maxSkippedPayloads` consecutive ignored responses end in `SEARCH_STALLED` instead of resetting the response budget forever. The popup shows `SEARCH_END_UNCONFIRMED` as its own explanation rather than the generic retry hint, because Resume restarts the same search. Resume restarts the search and deduplicates saved rows. Stop remains stopped. This describes X's returned search results, not proof that X indexed every historical post.
 7. Persist `dateFromCalendar` and `dateToCalendar` alongside UTC bounds so current, multipart and history download names retain the selected dates across timezone changes. Missing display fields are filled from the resolved profile only after row author identity is verified.
 8. Popup and overlay show loading, connecting, waiting, collecting and retrying phases. Delayed overlay initialization uses the current phase, and newer status revisions invalidate old delivery retries. The overlay shows an exact percentage only against a selected quantity limit; without a limit it shows activity and the collected count. Calendar depth never supplies a post-count denominator. Short localized errors distinguish unavailable/changed tabs, a missing capture bridge, absent responses, invalid/error responses, oversized bodies, network failures and stalled pagination. Saved partial rows remain downloadable via **Download N rows**; Resume opens a new search tab.
 8. **Keep the search tab open until the export finishes.** `dateRangeHelp` explains this, local timezone handling and today's launch-time cutoff. No first-run layout or download-success analytics redesign is included.
@@ -333,11 +334,11 @@ The popup uses the resolved export profile (`GET_STATUS.userInfo`) as a handle-m
 
 ### Export workspace layout
 
-The default popup retains blue glass surfaces in dark and light themes. The appearance controls in Settings select `simplifiedDesign` (default false) and `uiScale` (85, 100, 115, 130; default 100). Both styles use one DOM and the same export controllers. `theme-init.js` applies the shared appearance policy before content renders; `theme.js` persists each appearance key independently, preserving other settings and restoring controls after failed saves. The base width is 350px, scaled together with text and controls; narrow windows wrap the header and use vertical scrolling.
+The default popup retains the existing neutral classic dark/light surfaces. `themePreset` owns the complete preset; its `theme` light/dark mode is saved with it. `theme-init.js` resolves it before paint. The picker updates only these two keys, preserving export settings. Size and text controls remain independent.
 
 Status, Download/Copy, Resume and New Export precede setup. Mode and output format share a row. Post descriptions live only in tooltips. Every row has a separate 16px information button before its checkbox, so reading help cannot toggle the checkbox. `presentation.js` positions all help relative to visible viewport space, converts measured coordinates for CSS zoom, supports Escape and scrolling long explanations. The worker includes appearance in the cached overlay presentation; SAVE_SETTINGS invalidates that cache. The overlay applies blue/simplified, dark/light and the same scale presets.
 
-`scripts/test-popup-appearance.mjs` covers persistence, independent settings patches, all four scales, both designs/themes, 14 languages, normal/320px widths, compact rows and bottom-edge help. `scripts/test-ui-refresh.mjs` covers real popup/content-script rendering with synthetic worker data, export actions, overlay collapse, progress, waiting and Stop. No authenticated export is started by either test.
+`scripts/test-theme-picker.cjs` checks all presets, persistence, rollback, keyboard focus and all 14 locales at 80/100/130% scales. `scripts/test-popup-appearance.mjs` retains scale/layout/help checks with legacy saved settings. Browser checks use disposable profiles and do not establish real-X compatibility.
 
 ### 6.2. Easter Egg: the Ladybug (`popup/ladybug.js`)
 A ladybug wanders the "Questions or found a bug?" contact card on the **About** tab.
@@ -430,7 +431,7 @@ DevTools → Network → `graphql` → copy `features` / queryId → update `api
 Update `version` in `manifest.json` (the footer reads it via `chrome.runtime.getManifest().version`). The footer date in `popup.html` (`.footer-build-date`) is manual.
 
 ### Testing
-Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 13 explicit suites in order: capture bundle freshness; static contracts; localized runtime templates; the 101-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. The core runner applies a per-test deadline, validates all registrations before an optional `--suite=<id>` selection, and keeps date-export cases in `date-export.test.js`. Worker-based suites share detached JSON storage doubles in `worker-harness.js`. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
+Run `node scripts/test-all.js` as the canonical deterministic gate, then `git diff --check`. It executes 13 explicit suites in order: capture bundle freshness; static contracts; localized runtime templates; the 107-test core aggregator (`scripts/test-extension-core/` contains API, serialization/download, worker/state, and UI/content suites); rate limiting; feed capture; tooling policy; storage concurrency; download transactions; bookmark-context lifecycle; API discovery cancellation; capture contract; and export policy. The core runner applies a per-test deadline, validates all registrations before an optional `--suite=<id>` selection, and keeps date-export cases in `date-export.test.js`. Worker-based suites share detached JSON storage doubles in `worker-harness.js`. Individual `test-*.js` files remain useful for focused iteration, but they are not a substitute for `test-all.js`.
 
 XLSX ZIP/text-cell validation is deterministic; opening the workbook in LibreOffice is the separate, strict `node scripts/test-xlsx-libreoffice.js` integration gate. Missing LibreOffice fails that check instead of silently skipping it. `scripts/package.sh` requires both gates. GitHub CI runs the deterministic gate in UTC, Moscow, New York and Kiritimati, and installs LibreOffice in a separate compatibility job. See `scripts/TESTING.md`.
 
@@ -449,7 +450,7 @@ Outside `CODEX_SANDBOX`, run `node scripts/test-extension-smoke.mjs` plus the fo
 | `downloads` | save files |
 | `storage` + `unlimitedStorage` | export state, settings, batches (no 10 MB ceiling → no silent row loss on huge exports) |
 | `host_permissions` | `https://x.com/*`, `https://twitter.com/*` |
-| `optional_host_permissions` | `https://pbs.twimg.com/*` — the first "Embed photo previews" choice shows a mandatory localized explanation with a three-second guard. Its Continue click calls `chrome.permissions.request()` before any await or acknowledgement write; later attempts request directly. Declining keeps URL-only exports fully functional. Never a required permission: that mistake disabled every 1.5.8 installation during the withdrawn 1.5.9 update. A current download checks the grant once in its frozen transaction and fails closed to URLs when missing. |
+| `optional_host_permissions` | `https://pbs.twimg.com/*` — the first "Embed photo previews" choice shows a mandatory localized explanation with a five-second guard. Its Continue click calls `chrome.permissions.request()` before any await or acknowledgement write; later attempts request directly. Declining keeps URL-only exports fully functional. Never a required permission: that mistake disabled every 1.5.8 installation during the withdrawn 1.5.9 update. A current download checks the grant once in its frozen transaction and fails closed to URLs when missing. |
 
 Both content scripts are manifest-registered at `document_start`; `interceptor.js` uses `"world": "MAIN"` (hence `minimum_chrome_version: 111`). There are no `web_accessible_resources`.
 
@@ -459,6 +460,8 @@ Both content scripts are manifest-registered at `document_start`; `interceptor.j
 
 **Service worker** (`importScripts`, order matters):
 `config.js` → `shared.js` → `api-features.js` → `api-parsers.js` → `native-request-template.js` → `transaction-id.js` → `api.js` → `background/export-policy.js` → `rateLimit.js` → `columns-i18n.js` → `csv.js` → `storage.js` → `post-database.js` → `popup/i18n.js` → `uninstall-feedback.js` → `downloads.js`.
+
+**Popup styles**: `popup.css` → `rate-prompt.css` → `workspace.css`. The workspace has a fixed 600px native action height, with a viewport cap only in regular tabs. Home scrolls inside `#homeContent`; Settings and About scroll inside their panels. The primary action is a sign-in link when `#authWarning` is visible, otherwise the existing export action. Language selection scrolls without resizing the popup.
 
 **Popup** (`popup.html`; theme-init is the first tag inside `<body>`, the rest at end of body):
 `theme-init.js` → `utils/config.js` → `utils/shared.js` → `utils/rolling-counter.js` → `utils/usage-tracker.js` → `i18n.js` → `theme.js` → `rate-prompt.js` → `history.js` → `seen-posts.js` → `acknowledgement-timer.js` → `guarded-dialog.js` → `export-status.js` → `presentation.js` → `account-fields.js` → `settings-form.js` → `popup.js` → `ladybug.js`.
@@ -495,6 +498,62 @@ In pages, `utils/shared.js` exposes its helpers as plain globals; history/seen-p
 ## 14. How to Update This File
 Update `agent.md` (and `CLAUDE.md`) whenever you add/rename a file, change the message protocol or storage schema, add export modes/formats/settings, update feature flags or queryIds, or change the data flow. Keep sections numbered; update §2's diagram for architectural changes.
 
-Native action popup sizing: `theme-init.js` detects action views with `chrome.extension.getViews` before layout. Only action windows bypass `max-width: 100vw`, which otherwise traps the initial preferred size; normal tabs remain responsive. Navigation retains the original icon-only tabs and spacing, with localized screen-reader labels. Tooltips use manual top-layer popovers so measurement and rendering cannot enlarge native action windows or their scrollable area. They stay hidden until localized content exists; viewport coordinates account for CSS zoom. `scripts/test-native-popup-size.mjs` opens actual action windows in disposable Helium profiles and verifies 297/350/402/455px native widths across both styles and themes, traces every hover frame for size/position changes, and checks that downward scrolling reaches the About footer.
+Native action popup sizing: `theme-init.js` detects action views with `chrome.extension.getViews` before layout. Only action windows bypass `max-width: 100vw`, which otherwise traps the initial preferred size; normal tabs remain responsive. Navigation retains the original icon-only tabs and spacing, with localized screen-reader labels. Tooltips use manual top-layer popovers so measurement and rendering cannot enlarge native action windows or their scrollable area. Chrome 111–113 uses localized native title help (with the existing accessible label) when the Popover API is unavailable; unsupported selectors are never evaluated. They stay hidden until localized content exists; viewport coordinates detect and normalize both legacy and standardized CSS zoom semantics. `scripts/test-native-popup-size.mjs` opens actual action windows in disposable Helium profiles and verifies 297/350/402/455px native widths across both styles and themes, traces focused-help frames for size/position changes (pointer hover is covered separately by tab tests), and checks that downward scrolling reaches the About footer. When the browser caps the action viewport below its preferred height, `workspace.css` allows document scrolling and scroll chaining from inner panels; keep the natural preferred height to avoid initial-size feedback. `scripts/test-popup-constrained-height.cjs` verifies wheel-only access to Home, Settings and About at 400/480/600px in English and Arabic with 100/130% element scales.
 
 Localization checks: `scripts/test-i18n-runtime.js` verifies all 14 key sets and interpolation variables, translated connection/resume errors, complete account-count templates, and the contextual quantity label. The approximate 3,200-post hint applies to posts without dates; date-filtered and other export modes use `noCustomLimit`. Safety-break labels are independent fields, and retry countdowns use `retryInSeconds`. `scripts/test-popup-localized-copy.mjs` checks glyph clipping, option widths, help scrolling, and conditional states at classic 100% in both themes. `scripts/test-feedback-localized-copy.mjs` checks all feedback reasons and success/return states at 350/1280px in both themes with preview mode and all external requests blocked. Both browser checks share `scripts/lib/inspect-localized-copy.mjs`, use disposable profiles, and accept `PLAYWRIGHT_MODULE`, `XPORTER_BROWSER_EXECUTABLE`, and `XPORTER_LOCALES`. Native popup checks accept `XPORTER_NATIVE_LOCALES`, `XPORTER_NATIVE_SCALES=100`, and `XPORTER_NATIVE_CLASSIC_ONLY=1`.
+
+Popup appearance uses 11 curated presets: classic dark/light, Aurora dark/light, Obsidian, Signal, Cobalt, British green, Bordeaux, Rose and Electric iris. Cobalt uses a white primary action with dark text. Home hides footer metadata; Settings/About retain it. Existing size controls remain independent of theme selection.
+
+Theme picker: `theme-presets.js` loads before `theme-init.js`; `theme-presets.css` scopes 11 curated looks. The header palette and Settings button open `theme-picker.js` / `.css`: grouped dark/light miniatures, immediate preview, automatic partial persistence of `themePreset` + `theme`, rollback on failure, and keyboard/focus support. Legacy `simplifiedDesign`/background values are not applied to the popup. The custom-color editor was removed. Missing/unknown preset IDs resolve to the matching classic light/dark appearance. `scripts/test-theme-presets.cjs` tests resolution; `scripts/test-theme-picker.cjs` verifies persistence, error rollback, miniature bounds and all 14 locales at three scales.
+
+When GET_ACCOUNT_CONTEXT fails on an active X tab, the popup offers an explicit Refresh X tab action. It reloads only that tab after a user click; URL-based export stays available and unrelated tabs never show the notice. This recovers stale content scripts after extension reload without adding permissions.
+
+The review invitation uses five decorative gold stars, personal developer-support copy in all 14 locales, and a gold support-with-a-review button on a blue surface. The store caption and in-dialog problem link are removed; contact options remain in About. About uses a separate `rateAboutBody` translation in all 14 locales. `rate-prompt.css` owns both surfaces; workspace styles do not override them. Entry motion is a brief fade/8px translation and a single staggered star greeting, with no looping motion, and respects reduced motion. Eligibility and permanent dismissal after a store click remain unchanged.
+
+Size settings live in the collapsed `sizeSettings` disclosure. `popupWidth` is 80–150% of 350px; `popupHeight` is 50–100% of intrinsic Home height capped at 600 physical pixels. `uiScale` now controls elements (80–130%) without changing width; `--text-scale` compensates element zoom so `textScale` independently controls text (80–130 labels, 88–118% actual). All use steps of 5 and a highlighted 100% tick. Colorful Tabler icons lead each heading beside its live value; redundant Default captions are omitted. Dimensions apply on release, text previews immediately, and each control persists only its own key. `scripts/test-popup-dimensions.cjs` verifies independence, persistence and disclosure behavior.
+
+Popup shell height follows intrinsic Home content through `mountHomeSizing` in `presentation.js`, capped at 600 physical pixels. Settings/About scroll within that height; appearance, content and font changes trigger remeasurement. `scripts/test-popup-home-height.cjs` checks compact Home and stable tab heights.
+
+
+
+## Diagnostic schema 2
+
+`utils/diagnostics.js` is the worker-owned bounded event reducer in `storage.local` (five attempts, five downloads; separate v2 cumulative totals). `background/download-diagnostics.js` reconciles browser download completion. `utils/diagnostics-codec.js` must match `docs/assets/diagnostics-codec.js`; it encodes a <=1023-character uninstall URL. Legacy counters retain their original meaning. Current preferences (appearance, size percentages, auto-expiration, mode/format and content options) are appended primitive `s_*` fields, separate from launch-time attempt settings; missing fields in older payloads remain unknown. The collector allowlist and both codec copies must be updated together.
+
+Diagnostics remain local during use. `DIAGNOSTIC_CLIPBOARD_COPIED` and `DIAGNOSTIC_START_REJECTED` record local events for uninstall feedback. No upload module or report UI is loaded.
+
+The canonical collector is `backend/apps-script.gs`, bound to the existing workbook ID with a fail-closed check. See `backend/README.md`; `setupTelemetrySchema` documents semantics without rewriting old rows. Website receipt and language modules live in `docs/assets`. Test traffic uses `test:true` (`?test=1` on the form) and the `TelemetryTests` sheet. Never count it as user feedback.
+
+Ladybug telemetry: `XP_LADYBUG_SQUASH` records one live-bug squash in the worker-serialized `ladybugSquashes` usage counter and immediately refreshes the uninstall URL. `ladybug_squashes` is appended to the compact codec and collector schema; missing historical values remain unknown. Counts start with this feature, not the original installation. After the splat fully fades, a replacement enters from a random viewport side at contact-card walking height; reduced motion uses a static replacement. Collector and Pages changes must be published to receive this field in production.
+
+Optional during-use telemetry was abandoned on 2026-09-09. Recovery snapshot: local branch `archive/abandoned-usage-telemetry-2026-09-09` (includes in-progress tracked workspace state; do not merge wholesale). Sharing UI, report action, upload module, message routes and Google host permissions are removed. Old saved consent cannot trigger uploads. Local diagnostics and uninstall feedback remain.
+
+Uninstall field `theme_preset` records the selected catalog ID (for example `obsidian` or `glass-dark`); `theme` remains light/dark. The worker loads `popup/theme-presets.js` before `uninstall-feedback.js` to resolve legacy settings exactly like the UI. Codec fields are appended, and the collector validates catalog IDs. Older reports stay blank. Publish the matching Pages codec and Apps Script collector to receive this new column in production.
+
+The 2.0.0 ladybug uses `popup/ladybug-shell.webp` over two-joint SVG legs. Load the pure `ladybug-motion.js` helper before `ladybug.js`. Position and joints update through transforms at at most 30 Hz, with no frame work while resting, hidden, offscreen or disabled. `prefers-reduced-motion` changes take effect immediately. The squash counter and worker message remain unchanged.
+
+Review copy: About and the review prompt share a personal invitation that starts with time saved or easier work, asks what the user uses XPorter for and liked, then explains ongoing features, fixes and support while keeping it free. The final sentence connects reviews to supporting that work and discovery. EN/RU use approved copy; the other 12 locales adapt its meaning naturally. English HTML and prompt fallbacks match the locale.
+
+Review emphasis: all 14 locales highlight time saved or easier work, free availability and support through a review with three `**bold**` spans. About opts into escaped `renderHelpMarkup` through `data-i18n-bold`; ordinary i18n text remains plain. Both review surfaces share the same strong-text styling.
+
+Dismissal delays: the review invitation locks Later, Close, Escape and backdrop dismissal for five seconds, using the shared acknowledgement timer and localized countdown label. Its review action remains available. Photo-permission, account-detail and high-retry warnings lock both confirmation and cancellation for five seconds; focus stays on the dialog during the lock. Closing the browser popup itself remains outside extension control. `scripts/test-review-dismiss-delay.cjs` covers all dismissal routes and all three warning dialogs.
+
+### Platform emoji
+
+Apple platforms retain native emoji; other platforms use the local selected set:
+Noto flags/posts/following, Emojitwo bookmarks, Twemoji followers/warnings,
+Microsoft Fluent Color globe. Overrides are scoped to product copy, never user
+text or exports. Sources, hashes and licenses are in `popup/emoji/`.
+`node scripts/prepare-emoji-assets.cjs --download` refreshes sources and normalizes
+PNGs (requires unsandboxed browser); omit --download to use verified local inputs.
+`scripts/build-emoji-font.py` builds both WOFF2 copies offline with FontTools/Brotli.
+Keep sbix originOffsetY at zero: negative origins clip artwork in Chromium.
+GPOS centers the complete glyph within a 1.25em advance and lowers its baseline;
+CSS size-adjust stays 100% so bitmap size is independent of text advance.
+`test-emoji-assets.js` checks choices, coverage, hashes and platform policy;
+`test-emoji-font.cjs` checks browser font selection, ligatures and geometry;
+`test-emoji-bitmap.cjs` compares all 20 painted bitmaps to their source pixels.
+`test-emoji-alignment.cjs` compares painted vertical centers to Apple at five text
+sizes and checks horizontal centering within each glyph advance.
+Browser checks need unsandboxed execution. Windows selection is simulated on Mac,
+not verification on an actual Windows host. No Apple artwork is distributed.

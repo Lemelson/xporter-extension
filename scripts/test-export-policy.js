@@ -46,7 +46,7 @@ function loadPolicy() {
                 following: [10_000, 11_000],
                 about_account: [12_000, 13_000]
             },
-            ABOUT_ACCOUNT_RETRY_RANGE: [1, 20, 5],
+            RATE_LIMIT_WAIT_RANGE_MINUTES: [15, 20, 15],
             ABOUT_ACCOUNT_BATCH_SIZES: {
                 turtle: 1,
                 careful: 3,
@@ -267,9 +267,10 @@ function testPacingAndClamps(policy, rateLimitKeys) {
         userExportSpeed: 'fast',
         aboutAccountMaxRetries: 999
     }, 'about_account');
-    assert.equal(about.maxRetries, 20);
-    assert.equal(policy.resolveAboutAccountMaxRetries({ aboutAccountMaxRetries: 0 }), 1);
-    assert.equal(policy.resolveAboutAccountMaxRetries({}), 5);
+    assert.equal(about.rateLimitWaitMs, 20 * 60 * 1000, 'the wait budget is clamped to the configured maximum');
+    assert.equal(about.maxRetries, undefined);
+    assert.equal(policy.resolveRateLimitWaitMinutes({ aboutAccountMaxRetries: 0 }), 15);
+    assert.equal(policy.resolveRateLimitWaitMinutes({}), 15);
     assert.deepEqual(
         rateLimitKeys,
         ['UserTweets', 'Following']
@@ -353,7 +354,7 @@ function testFacadeIsImmutable(policy) {
         'postSelectionAllowsTweet',
         'rateLimitKeyForMode',
         'clampCustomSpeed',
-        'resolveAboutAccountMaxRetries',
+        'resolveRateLimitWaitMinutes',
         'resolveSpeedPreset',
         'resolveSafetyBreak',
         'buildRateLimiterOptions',

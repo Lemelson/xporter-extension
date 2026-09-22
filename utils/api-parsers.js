@@ -160,24 +160,31 @@
   function parseSearchTimelineResponse(data) {
     const timeline = data?.data?.search_by_raw_query?.search_timeline?.timeline;
     // A successful HTTP status does not imply a successful GraphQL search.
-    // Even partial data with errors is not evidence of an exhausted source.
-    if (data?.errors && (!Array.isArray(data.errors) || data.errors.length)) {
-      throw new Error('SEARCH_RESPONSE_ERROR');
-    }
+    // X commonly attaches partial `errors` to a page that still carries rows;
+    // its own client renders those rows and never re-requests the page, so a
+    // retry could only skip ahead. Rows on such a page are accepted below,
+    // but the page is never evidence of an exhausted source.
+    const hasErrors = !!data?.errors && (!Array.isArray(data.errors) || data.errors.length > 0);
     if (!Array.isArray(timeline?.instructions)) {
-      throw new Error('SEARCH_INVALID_RESPONSE');
+      throw new Error(hasErrors ? 'SEARCH_RESPONSE_ERROR' : 'SEARCH_INVALID_RESPONSE');
     }
     // Alerts may accompany entries. They never prove a successful search,
     // even if a termination instruction or no bottom cursor accompanies them.
     if (timeline.instructions.some(instruction => instruction?.type === 'TimelineShowAlert')) {
       throw new Error('SEARCH_RESPONSE_ERROR');
     }
-    const known = new Set(['TimelineAddEntries', 'TimelineAddToModule', 'TimelinePinEntry',
-      'TimelineReplaceEntry', 'TimelineTerminateTimeline', 'TimelineClearCache', 'TimelineShowAlert']);
-    if (timeline.instructions.some(instruction => !instruction || !known.has(instruction.type))) {
+    // Unrecognized instruction types are X drift, not proof of a broken page:
+    // they are ignored. A page still needs a recognized paging instruction below.
+    if (timeline.instructions.some(instruction => !instruction || typeof instruction !== 'object' ||
+        typeof instruction.type !== 'string')) {
       throw new Error('SEARCH_INVALID_RESPONSE');
     }
-    for (const instruction of timeline.instructions) {
+    const pagingTypes = new Set(['TimelineAddEntries', 'TimelineAddToModule', 'TimelinePinEntry',
+      'TimelineReplaceEntry', 'TimelineTerminateTimeline']);
+    // Use the same supported list for rows, cursors and terminal evidence.
+    const instructions = timeline.instructions.filter(instruction => pagingTypes.has(instruction.type));
+    if (timeline.instructions.length && !instructions.length) throw new Error('SEARCH_INVALID_RESPONSE');
+    for (const instruction of instructions) {
       if ((instruction.type === 'TimelineAddEntries' && !Array.isArray(instruction.entries)) ||
           (instruction.type === 'TimelineAddToModule' && !Array.isArray(instruction.moduleItems)) ||
           (['TimelinePinEntry', 'TimelineReplaceEntry'].includes(instruction.type) &&
@@ -185,24 +192,19 @@
         throw new Error('SEARCH_INVALID_RESPONSE');
       }
     }
-    if (timeline.instructions.length && !timeline.instructions.some(instruction =>
-      ['TimelineAddEntries', 'TimelineAddToModule', 'TimelinePinEntry', 'TimelineReplaceEntry',
-        'TimelineTerminateTimeline'].includes(instruction.type))) {
-      throw new Error('SEARCH_INVALID_RESPONSE');
-    }
-    const result = parseTimelineByInstructions(timeline.instructions, 'search_timeline');
-    const terminated = timeline.instructions.some(instruction =>
+    const result = parseTimelineByInstructions(instructions, 'search_timeline');
+    const terminated = instructions.some(instruction =>
       instruction.type === 'TimelineTerminateTimeline' && instruction.direction === 'Bottom');
     // Native Latest search returns an empty page as one AddEntries or two
     // ReplaceEntry instructions with only explicit Top and Bottom cursors.
     // The same bottom-0 ID occurs on nonterminal pages, so neither its value,
     // a short page, nor a page whose rows were filtered out proves exhaustion.
-    const replacements = timeline.instructions.length === 2 && timeline.instructions.every(instruction =>
+    const replacements = instructions.length === 2 && instructions.every(instruction =>
       instruction.type === 'TimelineReplaceEntry' &&
       instruction.entry_id_to_replace === instruction.entry?.entryId);
-    const entries = timeline.instructions.length === 1 &&
-      timeline.instructions[0].type === 'TimelineAddEntries'
-      ? timeline.instructions[0].entries : (replacements ? timeline.instructions.map(i => i.entry) : []);
+    const entries = instructions.length === 1 &&
+      instructions[0].type === 'TimelineAddEntries'
+      ? instructions[0].entries : (replacements ? instructions.map(i => i.entry) : []);
     const cursorOnly = entries.length === 2 && ['Top', 'Bottom'].every(direction =>
       entries.filter(entry => entry?.content?.entryType === 'TimelineTimelineCursor' &&
         entry.content.__typename === 'TimelineTimelineCursor' &&
@@ -210,6 +212,10 @@
         typeof entry.content.value === 'string' && entry.content.value.length > 0 &&
         entry.entryId === (direction === 'Top' ? 'cursor-top-9223372036854775807' : 'cursor-bottom-0') &&
         entry.sortIndex === (direction === 'Top' ? '9223372036854775807' : '0')).length === 1);
+    if (hasErrors) {
+      if (!(result.tweets || []).length) throw new Error('SEARCH_RESPONSE_ERROR');
+      return { ...result, sourceExhausted: false, hasPartialErrors: true };
+    }
     return { ...result, sourceExhausted: terminated || cursorOnly };
   }
 

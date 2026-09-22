@@ -122,9 +122,7 @@ async function testSearchResumeDedupAndFailureRecovery() {
 
 async function testSearchRetryCannotSkipFailedPage() {
     const failed = searchPage([{id:'lost',date:'2026-09-05T01:00:00Z'}], 'page-a');
-    const body = JSON.parse(failed.bodyText);
-    body.errors = [{message:'partial response'}];
-    failed.bodyText = JSON.stringify(body);
+    failed.status = 503;
     const later = searchPage([{id:'later',date:'2026-09-05T02:00:00Z'}]);
     const gap = createSearchHarness([failed, later]);
     await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', gap.context), /SEARCH_RESPONSE_ERROR/);
@@ -502,7 +500,103 @@ async function testBottomPaginationIgnoresTopEmptyResponse() {
     assert.equal(harness.getSavedState().tweetCount,1);
 }
 
+async function testSearchPartialErrorsKeepRowsButNeverComplete() {
+    // X attaches partial `errors` to pages that still carry rows; its client
+    // renders them and never re-requests the page, so the rows must be kept.
+    const withErrors = page => {
+        const body = JSON.parse(page.bodyText);
+        body.errors = [{message:'Dependency: Unspecified'}];
+        return { ...page, bodyText: JSON.stringify(body) };
+    };
+    const continuing = createSearchHarness([
+        withErrors(searchPage([{id:'first',date:'2026-09-05T01:00:00Z'}], 'page-b')),
+        searchPage([{id:'second',date:'2026-09-05T02:00:00Z'}])
+    ]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', continuing.context), /SEARCH_END_UNCONFIRMED/);
+    assert.deepEqual(continuing.getSavedBatches().flat().map(row => row.id), ['first', 'second']);
+    assert.equal(vm.runInContext('currentExport.completionReason', continuing.context), null);
+    // A terminal marker beside errors proves nothing: rows are saved, completion stays unconfirmed.
+    const unconfirmed = createSearchHarness([withErrors(searchPage([{id:'only',date:'2026-09-05T01:00:00Z'}]))]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', unconfirmed.context), /SEARCH_END_UNCONFIRMED/);
+    assert.deepEqual(unconfirmed.getSavedBatches().flat().map(row => row.id), ['only']);
+    assert.equal(vm.runInContext('currentExport.completionReason', unconfirmed.context), null);
+    // Errors without rows remain a failed page that must be repaired at the same URL.
+    const empty = createSearchHarness([withErrors(searchPage([], 'page-c'))]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', empty.context), /SEARCH_RESPONSE_ERROR/);
+    // Unrecognized instruction types are X drift, ignored next to a recognized paging instruction.
+    const drifted = searchPage([{id:'drift',date:'2026-09-05T01:00:00Z'}]);
+    const driftBody = JSON.parse(drifted.bodyText);
+    driftBody.data.search_by_raw_query.search_timeline.timeline.instructions.unshift({type:'TimelineShowCover', cover:{}});
+    drifted.bodyText = JSON.stringify(driftBody);
+    const tolerant = createSearchHarness([drifted]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', tolerant.context);
+    assert.deepEqual(tolerant.getSavedBatches().flat().map(row => row.id), ['drift']);
+}
+
+async function testSearchMissingRowsNeverBecomeComplete() {
+    const first = searchPage([
+        {id:'kept',date:'2026-09-05T01:00:00Z'},
+        {id:'lost',date:'2026-09-05T02:00:00Z'}
+    ], 'next');
+    const body = JSON.parse(first.bodyText);
+    body.data.search_by_raw_query.search_timeline.timeline.instructions[0].entries[1]
+        .content.itemContent.tweet_results.result = null;
+    body.errors = [{message:'Failed to resolve tweet', path:['search_by_raw_query','search_timeline',
+        'timeline','instructions',0,'entries',1,'content','itemContent','tweet_results','result']}];
+    first.bodyText = JSON.stringify(body);
+    first.requestCursor = null;
+    const next = searchPage([{id:'later',date:'2026-09-05T03:00:00Z'}]);
+    next.requestCursor = 'next';
+    const harness = createSearchHarness([first, next]);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context), /SEARCH_END_UNCONFIRMED/);
+    assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['kept','later']);
+    assert.equal(harness.getSavedState().completionReason, null);
+
+    // Resume replays from the beginning; a clean replay can recover the gap.
+    harness.context.__pages = [searchPage([
+        {id:'kept',date:'2026-09-05T01:00:00Z'},
+        {id:'lost',date:'2026-09-05T02:00:00Z'},
+        {id:'later',date:'2026-09-05T03:00:00Z'}
+    ])];
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context);
+    assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['kept','later','lost']);
+    assert.equal(harness.getSavedState().completionReason, 'source_exhausted');
+}
+
+async function testSearchUnknownInstructionsDoNotAffectPaging() {
+    const fixture = JSON.parse(source('scripts/fixtures/search-empty.live.json'));
+    fixture.data.search_by_raw_query.search_timeline.timeline.instructions.unshift({
+        type: 'TimelineShowCover', cover: {},
+        entry: { entryId: 'cursor-bottom-foreign', content: { value: 'foreign' } }
+    });
+    const harness = createSearchHarness([{ status: 200, url: 'end', bodyText: JSON.stringify(fixture) }]);
+    await vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context);
+    assert.equal(harness.getSavedState().completionReason, 'no_matches');
+
+    const page = JSON.parse(searchPage([{id:'kept',date:'2026-09-05T01:00:00Z'}], 'real').bodyText);
+    page.data.search_by_raw_query.search_timeline.timeline.instructions.push({
+        type: 'FutureInstruction', entries: [{entryId:'cursor-bottom-other',content:{value:'other'}}],
+        moduleItems: [{item:{itemContent:{tweet_results:{result:{legacy:{id_str:'foreign'}}}}}}]
+    });
+    harness.context.__response = page;
+    const parsed = vm.runInContext('XPorterApiParsers.parseSearchTimelineResponse(__response)', harness.context);
+    assert.equal(parsed.nextCursor, 'real');
+    assert.deepEqual(Array.from(parsed.tweets, row => row.id), ['kept']);
+}
+
+async function testSearchIgnoredPayloadsAreBounded() {
+    const refreshes = Array.from({length: 20}, (_, index) =>
+        ({requestCursor:'top-refresh', status:200, url:'top-' + index, bodyText:'{}'}));
+    const harness = createSearchHarness(refreshes);
+    await assert.rejects(vm.runInContext('_fetchPostsByDateRangeLoop()', harness.context), /SEARCH_STALLED/);
+    const cap = vm.runInContext('XPORTER_CONFIG.SEARCH_CAPTURE.maxSkippedPayloads', harness.context);
+    assert.equal(harness.context.__pages.length, refreshes.length - cap - 1,
+        'ignored Top refreshes must stop resetting the response budget after the configured cap');
+}
+
 const tests = [
+    { name: "missing search rows never become complete", run: testSearchMissingRowsNeverBecomeComplete, order: 105 },
+    { name: "unknown search instructions do not affect paging", run: testSearchUnknownInstructionsDoNotAffectPaging, order: 104 },
     { name: "bottom pagination ignores top empty response", run: testBottomPaginationIgnoresTopEmptyResponse, order: 98 },
     { name: "overlay retains selected calendar labels", run: testOverlayRetainsSelectedCalendarLabels, order: 97 },
     { name: "search captured cursor-only ending", run: testSearchCapturedCursorOnlyEnding, order: 96 },
@@ -522,6 +616,8 @@ const tests = [
     { name: "search resume dedup and malformed retry", run: testSearchResumeDedupAndFailureRecovery, order: 82 },
     { name: "search tab and bridge diagnosis", run: testSearchDiagnosesTabAndBridgeFailures, order: 84 },
     { name: "search query identity and transport errors", run: testSearchCaptureRejectsOtherQueriesAndReportsTransportErrors, order: 85 },
+    { name: "partial GraphQL errors keep rows but never complete", run: testSearchPartialErrorsKeepRowsButNeverComplete, order: 102 },
+    { name: "ignored search payloads are bounded", run: testSearchIgnoredPayloadsAreBounded, order: 103 },
     { name: "local calendar and invalid dates", run: testDateBoundariesUseLocalCalendarAndRejectInvalidDays, order: 86 },
 ];
 

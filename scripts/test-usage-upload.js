@@ -1,0 +1,12 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.join(__dirname, '..');
+const read = p => fs.readFileSync(path.join(root,p),'utf8');
+assert.doesNotMatch(read('popup/popup.html'), /diagnosticsSettings|diagnosticsSharing|downloadDiagnostics|diagnostics-settings/);
+assert.doesNotMatch(read('background/service-worker.js'), /usage-upload|XPorterUsageUpload|case 'SET_DIAGNOSTICS_SHARING'|case 'GET_DIAGNOSTIC_REPORT'/);
+assert.doesNotMatch(read('utils/diagnostics.js'), /XPorterUsageUpload/);
+assert(!JSON.parse(read('manifest.json')).optional_host_permissions.some(host=>host.includes('script.google')));
+assert(!fs.existsSync(path.join(root,'background/usage-upload.js')));
+console.log('Abandoned usage sharing has no UI, message routes, uploader or Google host permissions.');

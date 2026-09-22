@@ -170,6 +170,11 @@ async function testRejectedWriteDoesNotPoisonLaterPatch() {
     await failedRead.storage.saveExportHistory({ username: 'after failure' });
     assert.equal(failedRead.history().length, 2, 'a rejected transaction must not poison the history queue');
 
+    const squashes = createStorageHarness({}, { usage: { opens: 42 } });
+    await Promise.all(Array.from({ length: 20 }, () => squashes.storage.recordLadybugSquash()));
+    assert.equal((await squashes.storage.loadUsage()).ladybugSquashes, 20);
+    assert.equal(squashes.usage().opens, 42);
+
     const usageFailure = createStorageHarness({}, {
         usage: { opens: 42, downloads: 17 }, failUsageRead: true
     });

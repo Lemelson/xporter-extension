@@ -1,4 +1,4 @@
-// Real Helium action windows: preferred width, hover stability and bottom scrolling.
+// Real Helium action windows: preferred width, focused help stability and bottom scrolling.
 // A pre-sized browser tab cannot detect the action window resizing around a tooltip.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -73,7 +73,7 @@ try {
                         if (attempt === 4 || !error.message.includes('inactive window')) throw error;
                     }
                 }
-            }, { simplifiedDesign, theme, uiScale, language });
+            }, { simplifiedDesign, theme, uiScale: 100, popupWidth: uiScale, language });
             let target;
             for (let attempt = 0; attempt < 50 && !target; attempt++) {
                 target = (await cdp.send('Target.getTargets')).targetInfos.find(t => t.url.endsWith('/popup/popup.html'));
@@ -81,12 +81,14 @@ try {
             }
             assert(target, 'native action popup must open');
             const { sessionId } = await cdp.send('Target.attachToTarget', { targetId: target.targetId, flatten: false });
+            // Keep DOM focus events deterministic while the desktop user changes windows.
+            await rpc(sessionId, 'Emulation.setFocusEmulationEnabled', { enabled: true });
             const run = expression => evaluate(sessionId, expression);
             await run(`new Promise((resolve, reject) => {
                 const until = performance.now() + 5000;
                 function ready() {
                     if (document.getElementById('postSelectionCount')?.textContent.includes('5') &&
-                        document.getElementById('uiScale')?.value === '${uiScale}') resolve();
+                        document.getElementById('popupWidth')?.value === '${uiScale}') resolve();
                     else if (performance.now() > until) reject(new Error('Popup did not initialize'));
                     else requestAnimationFrame(ready);
                 }
@@ -100,9 +102,21 @@ try {
 
             async function pointAt(selector) {
                 await run(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'center' })`);
-                await new Promise(resolve => setTimeout(resolve, 100));
-                return run(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
-                    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+                return run(`new Promise((resolve, reject) => {
+                    const el = document.querySelector(${JSON.stringify(selector)});
+                    const deadline = performance.now() + 3000;
+                    let previous = '', stable = 0;
+                    function frame() {
+                        const r = el.getBoundingClientRect();
+                        const geometry = JSON.stringify([r.x, r.y, r.width, r.height]);
+                        stable = geometry === previous ? stable + 1 : 0;
+                        previous = geometry;
+                        if (stable >= 4) resolve({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+                        else if (performance.now() > deadline) reject(new Error('Unstable target geometry'));
+                        else requestAnimationFrame(frame);
+                    }
+                    frame();
+                })`);
             }
             async function click(selector) {
                 const point = await pointAt(selector);
@@ -113,36 +127,41 @@ try {
             async function startTrace() {
                 await run(`window.__popupTrace = []; window.__traceUntil = performance.now() + 350;
                     (function frame() {
-                        window.__popupTrace.push({ width: innerWidth, x: screenX, y: scrollY,
+                        window.__popupTrace.push({ width: innerWidth, x: screenX, y: document.querySelector('.tab-content.active')?.scrollTop || document.getElementById('homeContent')?.scrollTop || 0,
                             scrollWidth: document.documentElement.scrollWidth });
                         if (performance.now() < window.__traceUntil) requestAnimationFrame(frame);
                     })()`);
             }
             for (const selector of ['[data-i18n-tooltip="postTypeRepliesHelp"]', '[data-i18n-tooltip="exportModeHelp"]']) {
-                const point = await pointAt(selector);
+                await pointAt(selector);
+                await rpc(sessionId, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
                 await startTrace();
-                await rpc(sessionId, 'Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+                // Native OS pointer events can overwrite CDP's synthetic hover.
+                // Focus opens the same top-layer help and stays stable across
+                // those events; real pointer hover is covered by the tab tests.
+                await run(`document.querySelector(${JSON.stringify(selector)}).focus({ preventScroll: true })`);
                 await new Promise(resolve => setTimeout(resolve, 400));
                 const frames = await run('window.__popupTrace');
                 assert(frames.every(f => f.width === expectedWidth && f.scrollWidth <= expectedWidth && f.x === frames[0].x),
-                    `${tag} hover ${selector}: action window moved/resized: ${JSON.stringify(frames)}`);
-                const help = await run(`document.querySelector(${JSON.stringify(selector)}).querySelector('.help-pop').getBoundingClientRect().toJSON()`);
-                assert(help.width > 0 && help.left >= 0 && help.right <= expectedWidth + 1 && help.top >= 0 && help.bottom <= 601,
+                    `${tag} help ${selector}: action window moved/resized: ${JSON.stringify(frames)}`);
+                const help = await run(`({ ...document.querySelector(${JSON.stringify(selector)}).querySelector('.help-pop').getBoundingClientRect().toJSON(), innerHeight })`);
+                assert(help.width > 0 && help.left >= 0 && help.right <= expectedWidth + 1 && help.top >= 0 && help.bottom <= help.innerHeight + 1,
                     `${tag}: help must fit the actual action window: ${JSON.stringify(help)}`);
-                await rpc(sessionId, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+                await run(`document.querySelector(${JSON.stringify(selector)}).blur()`);
                 await new Promise(resolve => setTimeout(resolve, 180));
             }
             await click('#tabBtnAbout');
-            await run('window.scrollTo(0, document.documentElement.scrollHeight)');
+            await run('document.getElementById("tab-about").scrollTop = document.getElementById("tab-about").scrollHeight');
             await new Promise(resolve => setTimeout(resolve, 200));
             await startTrace();
             await rpc(sessionId, 'Input.dispatchMouseEvent', { type: 'mouseWheel', x: expectedWidth / 2, y: 500, deltaX: 0, deltaY: 800 });
             await new Promise(resolve => setTimeout(resolve, 400));
-            const footer = await run("document.querySelector('.footer').getBoundingClientRect().toJSON()");
+            const footer = await run("({ ...document.querySelector('.footer').getBoundingClientRect().toJSON(), innerHeight })");
             const frames = await run('window.__popupTrace');
-            if (footer.bottom > 601) footerProblems.push({ tag, footer });
+            const footerReachable = footer.bottom <= footer.innerHeight + 1;
+            if (!footerReachable) footerProblems.push({ tag, footer });
             assert(frames.every((f, i) => !i || f.y >= frames[i - 1].y - 1), `${tag}: downward wheel must not move content back up`);
-            console.log(`${footer.bottom <= 601 ? 'PASS' : 'FAIL footer'} native ${tag}: ${geometry.width}px, stationary hover and reachable About footer`);
+            console.log(`${footerReachable ? 'PASS' : 'FAIL footer'} native ${tag}: ${geometry.width}px, stationary focused help and reachable About footer`);
             await run('setTimeout(() => window.close(), 0); true');
             await new Promise(resolve => setTimeout(resolve, 120));
         }

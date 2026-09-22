@@ -35,33 +35,52 @@ function toggleTheme(themeIconEl) {
     return isLight ? 'light' : 'dark';
 }
 
-// Appearance owns only its two keys; it never saves a stale export-settings form.
+// Appearance owns only its appearance keys; it never saves a stale export-settings form.
 function mountAppearanceSettings({ currentSettings, t, showToast }) {
-    const simplified = document.getElementById('simplifiedDesign');
     const scale = document.getElementById('uiScale');
+    const textScale = document.getElementById('textScale');
+    const sliders = [scale, textScale, document.getElementById('popupWidth'), document.getElementById('popupHeight')];
+    const controls = sliders;
+    function renderScale(control, value) {
+        document.getElementById(`${control.id}Value`).textContent = `${value}%`;
+        control.setAttribute('aria-valuetext', `${value}%`);
+        const progress = (value - Number(control.min)) / (Number(control.max) - Number(control.min)) * 100;
+        control.style.setProperty('--range-progress', `${progress}%`);
+    }
     function render() {
         const appearance = XPorterUIAppearance.apply(document.body, currentSettings);
-        simplified.checked = appearance.simplifiedDesign;
-        scale.value = String(appearance.uiScale);
+        for (const control of sliders) {
+            control.value = String(appearance[control.id]);
+            renderScale(control, appearance[control.id]);
+        }
     }
     render();
     async function save(event) {
         const control = event.currentTarget;
         const previousTop = control.getBoundingClientRect().top;
-        simplified.disabled = true;
-        scale.disabled = true;
-        const patch = control === simplified
-            ? { simplifiedDesign: simplified.checked }
-            : { uiScale: Number(scale.value) };
+        const restoreKeyboardFocus = document.activeElement === control && document.body.dataset.inputModality === 'keyboard';
+        controls.forEach(element => { element.disabled = true; });
+        const patch = { [control.id]: Number(control.value) };
         const result = await persistSettingsPatch(currentSettings, patch);
         render();
-        simplified.disabled = false;
-        scale.disabled = false;
-        window.scrollBy(0, control.getBoundingClientRect().top - previousTop);
+        controls.forEach(element => { element.disabled = false; });
+        if (restoreKeyboardFocus) control.focus({ preventScroll: true });
+        const scroller = control.closest('.tab-content');
+        scroller.scrollTop += (control.getBoundingClientRect().top - previousTop) / (Number(scale.value) / 100);
         if (result?.success !== true) {
             showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
         }
     }
-    simplified.addEventListener('change', save);
-    scale.addEventListener('change', save);
+    for (const control of sliders) {
+        control.addEventListener('change', save);
+        control.addEventListener('input', () => {
+            const value = Number(control.value);
+            renderScale(control, value);
+            // Resizing the window during a drag moves the track under the pointer.
+            // Preview text immediately; apply interface dimensions on release.
+            if (control === textScale) {
+                XPorterUIAppearance.apply(document.body, { ...currentSettings, textScale: value });
+            }
+        });
+    }
 }

@@ -20,6 +20,12 @@ try {
         if (route.request().isNavigationRequest() && new URL(route.request().url()).hostname === 'localhost') {
             return route.fulfill({ contentType: 'text/html', body: html });
         }
+        const url = new URL(route.request().url());
+        const asset = url.pathname.slice(1);
+        if (url.hostname === 'localhost' && ['assets/diagnostics-codec.js', 'assets/feedback-language.js',
+            'assets/feedback-receipt.js', 'vendor/canvas-confetti.browser.js'].includes(asset)) {
+            return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join('docs',asset),'utf8')});
+        }
         blockedRequests.push(route.request().url());
         return route.abort();
     });

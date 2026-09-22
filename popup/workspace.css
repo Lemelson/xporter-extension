@@ -1,0 +1,586 @@
+/* Popup workspace: stable navigation/action chrome, quiet theme surfaces.
+   Component behavior remains in popup.css; this file owns visual hierarchy. */
+
+body {
+  --shell-bg: var(--bg-tertiary);
+  --header-bg: var(--shell-bg);
+  --surface-shadow: none;
+  --primary-bg: #1374cd;
+  --primary-hover: #0965b9;
+  --primary-text: #ffffff;
+}
+
+body, body.simplified {
+  --bg-primary: #202833;
+  --bg-secondary: #1b222d;
+  --bg-tertiary: #151b24;
+  --bg-hover: #28374a;
+  --text-primary: #edf2f8;
+  --text-secondary: #afbbcb;
+  --text-muted: #94a2b5;
+  --accent: #8ac2ff;
+  --accent-hover: #b7daff;
+  --accent-glow: rgba(105, 177, 255, 0.16);
+  --input-bg: #202833;
+  --control-bg: var(--input-bg);
+  --glass-bg: var(--input-bg);
+  --control-hover-bg: #28374a;
+  --glass-border: #35404e;
+  --glass-border-strong: #5b718d;
+  --border: #35404e;
+  --glass-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --glass-edge: var(--glass-inner-glow);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --surface-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --header-bg: linear-gradient(115deg, #23384f -30%, #1b2635 55%, #302a42 150%);
+  --ic-green: #63caa8;
+  --ic-blue: #8ac2ff;
+  --ic-purple: #baa7f2;
+  --ic-cyan: #65c8db;
+}
+
+body.light, body.light.simplified {
+  --bg-primary: #ffffff;
+  --bg-secondary: #eef2f7;
+  --bg-tertiary: #f5f7fa;
+  --bg-hover: #edf4ff;
+  --text-primary: #202b3b;
+  --text-secondary: #526176;
+  --text-muted: #65758a;
+  --accent: #096ac8;
+  --accent-hover: #0754a1;
+  --accent-glow: rgba(9, 106, 200, 0.13);
+  --input-bg: #ffffff;
+  --control-hover-bg: #f0f6ff;
+  --glass-border: #dce3ed;
+  --glass-border-strong: #9bacbf;
+  --border: #dce3ed;
+  --glass-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --card-shadow: 0 1px 3px rgba(26, 45, 70, 0.05);
+  --surface-shadow: 0 1px 2px rgba(26, 45, 70, 0.025);
+  --header-bg: linear-gradient(115deg, #e4f0ff -20%, #f3f6fc 55%, #eeeafa 140%);
+  --ic-green: #178360;
+  --ic-blue: #096ac8;
+  --ic-purple: #7854c5;
+  --ic-cyan: #078093;
+}
+
+/* Standard appearance adds a soft blue/rose haze; simplified keeps the neutral canvas. */
+body:not(.simplified) {
+  --workspace-bg: radial-gradient(ellipse at 0% 8%, #263d53 0%, transparent 65%),
+    radial-gradient(ellipse at 100% 88%, #302b43 0%, transparent 70%), #151b24;
+}
+body.light, body.light.simplified { --bg-tertiary: #e9eef5; --glass-border: #c5d0df; --border: #c5d0df; }
+body.light:not(.simplified) {
+  --workspace-bg: radial-gradient(ellipse at 0% 10%, #cde4fc 0%, transparent 68%),
+    radial-gradient(ellipse at 100% 90%, #f0d8e9 0%, transparent 72%), #e9eaf7;
+}
+
+body, body.light { background: var(--shell-bg) !important; overflow: hidden; }
+.popup, body.simplified .popup {
+  height: calc(min(var(--home-height, 600px), 600px / var(--ui-scale)) * var(--popup-height, 1));
+  max-height: calc(100dvh / var(--ui-scale));
+  min-height: 0;
+  background: var(--workspace-bg, var(--shell-bg)) !important;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow: hidden;
+}
+/* Native action sizing must never feed its initial viewport back into itself. */
+html.action-popup .popup { max-height: none; }
+/* Keep the natural preferred size, but let the document scroll when the browser
+   gives an action window less room. A viewport height cap here reintroduces the
+   initial-size feedback loop. Inner scrollers must hand off at their edges. */
+html.action-popup body { overflow-y: auto; }
+html.action-popup .home-content,
+html.action-popup .tab-content { overscroll-behavior-y: auto; }
+
+.header, body.light .header, body.simplified .header {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  background: var(--header-bg) !important;
+  border-bottom: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.header::before { display: none; }
+.logo, body.light .logo, .about-icon, body.light .about-icon {
+  animation: none;
+  filter: none;
+}
+.brand { font-size: calc(19px * var(--text-scale, 1)); }
+.header-right { gap: 3px; }
+.lang-btn { letter-spacing: 0; padding-inline: 6px; }
+.lang-dropdown {
+  max-height: max(80px, min(330px, calc(100dvh / var(--ui-scale) - 76px)));
+}
+html.action-popup .lang-dropdown {
+  max-height: min(330px, calc(600px / var(--ui-scale) - 76px));
+}
+.tabs, body.light .tabs, body.simplified .tabs {
+  flex: 0 0 auto;
+  background: var(--shell-bg) !important;
+  border-bottom: 1px solid var(--border);
+}
+.tab { padding: 8px 10px; min-height: 36px; }
+.tab > svg { width: 19px; height: 19px; }
+.tab.active, body.light .tab.active, body.simplified .tab.active {
+  background: transparent;
+}
+.tab.active::after { height: 2px; box-shadow: none; }
+.tab:hover, body.light .tab:hover { background: var(--bg-hover); }
+
+.tab-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+  animation: none;
+}
+#tab-home.active { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.home-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 12px;
+}
+#tab-home > .actions, #tab-home > .actions:has(#startBtn:not(.hidden)) {
+  position: static;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--shell-bg);
+}
+#tab-home > .actions:not(:has(#startBtn:not(.hidden))) { display: none; }
+.footer, body.light .footer {
+  flex: 0 0 auto;
+  margin-block-start: 0;
+  background: var(--shell-bg);
+  border-top: 0;
+  padding: 5px 16px 7px;
+  font-size: calc(10px * var(--text-scale, 1));
+  line-height: 1.4;
+}
+
+.field { margin-bottom: 12px; }
+.field-label { font-size: calc(12px * var(--text-scale, 1)); font-weight: 500; margin-bottom: 5px; }
+.field-label-row { gap: 6px; margin-bottom: 5px; }
+.export-format-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
+  gap: 0 12px;
+  align-items: end;
+}
+:is(body, body.light, body.simplified) :is(.select, .input-small, .account-card) {
+  border-color: var(--glass-border);
+  box-shadow: var(--surface-shadow);
+  border-radius: 9px;
+}
+.select { padding-block: 9px; font-size: calc(13px * var(--text-scale, 1)); line-height: calc(18px * var(--text-scale, 1)); }
+
+:is(body, body.light, body.simplified) .account-card {
+  min-height: 42px;
+  padding: 6px 10px;
+  gap: 8px;
+  background: var(--input-bg);
+}
+:is(body, body.light, body.simplified) .account-avatar {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  flex-basis: 28px;
+  border: 0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.account-avatar > span { display: flex; }
+:is(body, body.light, body.simplified) .account-card .account-meta--input {
+  padding: 0;
+  min-height: 20px;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+.account-meta--input input, .account-input-prefix { font-size: calc(15px * var(--text-scale, 1)); font-weight: 500; }
+.account-meta--input input::placeholder { font-weight: 400; }
+#targetAccountCard:has(input:placeholder-shown) .account-input-prefix { color: var(--text-muted); }
+.account-edit-icon { opacity: 1; }
+.auth-warning {
+  gap: 8px;
+  padding: 9px 10px;
+  font-size: calc(12px * var(--text-scale, 1));
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+#signInBtn { display: none; text-decoration: none; }
+#signInBtn > span::first-letter { text-transform: uppercase; }
+#tab-home:has(.auth-warning:not(.hidden)) > .actions:has(#startBtn:not(.hidden)) #signInBtn { display: flex; }
+#tab-home:has(.auth-warning:not(.hidden)) > .actions #startBtn { display: none; }
+
+.post-selection-heading { margin-bottom: 8px; }
+.post-selection-heading h2 { font-size: calc(13px * var(--text-scale, 1)); font-weight: 600; }
+.post-selection-count { border: 0; background: var(--bg-secondary); color: var(--text-secondary); font-size: calc(11px * var(--text-scale, 1)); }
+.post-selection-list {
+  gap: 0;
+  padding: 3px;
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 11px;
+  box-shadow: var(--surface-shadow);
+}
+:is(body, body.light, body.simplified) .post-selection-list .post-type-row {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+  transform: none;
+}
+.post-type-row + .post-type-row::before {
+  content: '';
+  position: absolute;
+  inset-inline: 10px;
+  top: 0;
+  height: 1px;
+  background: var(--border);
+  opacity: 0.65;
+  pointer-events: none;
+}
+:is(body, body.light, body.simplified) .post-type-row > .post-type-choice:has(input) {
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  min-height: 40px;
+  padding: 8px;
+  gap: 8px;
+}
+.post-type-row .post-type-help { inset-inline-end: 36px; }
+.post-choice-copy strong { font-weight: 500; }
+.post-type-icon, .post-type-icon svg { width: 21px; height: 21px; }
+.post-selection-note { font-size: calc(11px * var(--text-scale, 1)); color: var(--text-muted); line-height: 1.4; }
+
+/* Consistent, restrained feedback. Rows use an inset ring inside their group. */
+:is(body, body.light, body.simplified) :is(.select, .input-small, .btn-secondary, .history-toggle, .theme-settings-button, .email-action, .about-source):is(:hover, :focus-visible:where(body:not([data-input-modality="pointer"]) *)),
+:is(body, body.light, body.simplified) .detail-item:has(> .detail-head:is(:hover, :focus-visible:where(body:not([data-input-modality="pointer"]) *))),
+:is(body, body.light, body.simplified) .account-card--editable:is(:hover, :focus-within) {
+  background-color: var(--control-hover-bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  transform: none;
+}
+:is(body, body.light, body.simplified) .post-selection-list .post-type-row:is(:hover, :has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *))) {
+  background: var(--control-hover-bg);
+  box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 3px var(--accent-glow);
+  transform: none;
+}
+/* Separators must not paint over the active row's inset outline. */
+.post-type-row:is(:hover, :has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *)))::before,
+.post-type-row:is(:hover, :has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *))) + .post-type-row::before {
+  opacity: 0;
+}
+.post-type-row:has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *)) .post-choice-check { box-shadow: none; }
+:is(body, body.light, body.simplified) .btn-primary {
+  background: var(--primary-bg);
+  color: var(--primary-text);
+  border: 1px solid transparent;
+  box-shadow: none;
+  text-shadow: none;
+}
+:is(body, body.light, body.simplified) .btn-primary:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  transform: none;
+}
+#tab-home > .actions .btn { min-height: 42px; padding: 10px 12px; font-size: calc(14px * var(--text-scale, 1)); }
+
+/* The same surfaces and typography continue through Settings and About. */
+.history-toggle { font-size: calc(13px * var(--text-scale, 1)); }
+.detail-item, .about-contact, .contact-email { box-shadow: var(--surface-shadow); }
+.detail-head { font-size: calc(13px * var(--text-scale, 1)); font-weight: 500; padding: 10px; }
+.details-heading { font-size: calc(10px * var(--text-scale, 1)); letter-spacing: 0.07em; }
+.about-content { padding-top: 2px; }
+.about-icon { margin-bottom: 4px; }
+.about-icon > svg { width: 32px; height: 32px; }
+.about-content h2 { font-size: calc(21px * var(--text-scale, 1)); }
+.about-desc { font-size: calc(12px * var(--text-scale, 1)); line-height: 1.5; }
+.contact-header { font-size: calc(14px * var(--text-scale, 1)); }
+.contact-lead { font-size: calc(12px * var(--text-scale, 1)); line-height: 1.5; }
+.contact-btn-title { font-size: calc(14px * var(--text-scale, 1)); }
+.contact-btn-sub, .contact-email-note { font-size: calc(11px * var(--text-scale, 1)); line-height: 1.45; }
+.contact-email-addr { font-size: calc(13px * var(--text-scale, 1)); }
+.contact-btn--telegram, .contact-btn--telegram:hover { box-shadow: none; }
+.contact-btn--telegram { padding: 10px 12px; }
+.contact-tg-logo { width: 28px; height: 28px; }
+.contact-pill { display: none; }
+:is(body, body.light, body.simplified) .about-contact .contact-email {
+  padding: 12px 0 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.contact-email-icon { width: 28px; height: 28px; }
+[dir="rtl"] #signInBtn > svg { transform: scaleX(-1); }
+
+@media (max-width: 340px) {
+  .home-content { padding-inline: 12px; }
+  #tab-home > .actions, #tab-home > .actions:has(#startBtn:not(.hidden)) { padding-inline: 12px; }
+}
+
+/* A geometric mark avoids the font-dependent baseline of the old exclamation glyph. */
+.date-help::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 8px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(currentColor 0 5px, transparent 5px 6px, currentColor 6px 8px);
+  pointer-events: none;
+}
+
+/* Separate radio cards, with no nested panel or competing recommendation ring. */
+.xlsx-photo-options .post-selection-list {
+  padding: 0;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+:is(body, body.light, body.simplified) .xlsx-photo-choice {
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  padding: 12px;
+  gap: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  box-shadow: var(--surface-shadow);
+  transform: none;
+}
+.xlsx-photo-choice .xlsx-photo-icon { display: grid; grid-column: 1; grid-row: 1; align-self: start; margin-top: 1px; width: 24px; height: 24px; opacity: 1; }
+.xlsx-photo-choice .xlsx-photo-icon svg { width: 24px; height: 24px; }
+.xlsx-photo-choice .post-choice-check { grid-column: 3; grid-row: 1; align-self: start; margin-top: 2px; }
+.xlsx-photo-choice .post-choice-copy { grid-column: 2; grid-row: 1; opacity: 1; }
+.xlsx-photo-choice .post-choice-copy > span { font-size: calc(12px * var(--text-scale, 1)); line-height: 1.45; }
+.xlsx-photo-choice-title { display: flex; flex-direction: column; align-items: start; gap: 5px; }
+.xlsx-photo-recommended-badge { font-size: calc(10px * var(--text-scale, 1)); padding: 2px 6px; box-shadow: none; }
+:is(body, body.light, body.simplified) .xlsx-photo-choice:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+:is(body, body.light, body.simplified) .xlsx-photo-choice:hover { background: var(--control-hover-bg); }
+
+/* Two generous calendar fields; the browser retains keyboard entry and its native picker. */
+.date-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(135px, 100%), 1fr)); gap: 8px; }
+.date-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; }
+.date-label { width: auto; font-size: calc(11px * var(--text-scale, 1)); color: var(--text-secondary); }
+:is(body, body.light, body.simplified) .date-row input[type="date"] {
+  width: 100%; min-width: 0; min-height: 42px; padding: 9px 8px;
+  background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 9px;
+  color: var(--text-primary); font-size: calc(12px * var(--text-scale, 1)); box-shadow: var(--surface-shadow);
+}
+.date-row input[type="date"]::-webkit-calendar-picker-indicator { width: 20px; height: 20px; cursor: pointer; }
+.about-settings-group { margin-block: 8px; padding-block: 10px; }
+.about-settings-group .about-settings-toggle { margin-bottom: 0; }
+
+/* A disclosure is fully readable as soon as it opens, at any text length. */
+.detail-body { transition: none; }
+.detail-item.open .detail-body { display: block; }
+.detail-item.open .detail-body-inner { overflow: visible; }
+.detail-body-inner p { overflow-wrap: anywhere; }
+.update-meta { line-height: 1.5; }
+
+/* One surface per disclosure, with text wrapping and an independent chevron. */
+.history-field { margin-block: 10px; border: 1px solid var(--glass-border); border-radius: 10px; background: var(--input-bg); overflow: hidden; }
+:is(body, body.light, body.simplified) .history-toggle { border: 0; border-radius: 0; box-shadow: none; background: transparent; gap: 10px; }
+.history-toggle-left { min-width: 0; flex: 1; text-align: start; line-height: 1.4; }
+.history-toggle-left > svg, .history-chevron { flex: 0 0 auto; }
+.history-toggle-left > span:first-of-type { overflow-wrap: anywhere; }
+.feed-db-live { margin-inline-start: auto; padding: 2px 6px; background: var(--bg-secondary); border-radius: 6px; }
+.feed-db-body { margin: 0; padding: 0 12px 12px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.feed-db-description { color: var(--text-secondary); line-height: 1.5; }
+.feed-db-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-muted); }
+.feed-db-actions { grid-template-columns: 1fr 1fr; gap: 8px; }
+.feed-db-clear { grid-column: 1 / -1; }
+.feed-db-actions:has(.btn:disabled):not(:has(.btn:not(:disabled))) { display: none; }
+.history-list { margin: 0; padding: 10px 12px; border: 0; }
+.history-empty { padding: 8px 0 12px; font-size: calc(12px * var(--text-scale, 1)); }
+@media (prefers-reduced-motion: reduce) {
+}
+
+/* Header and navigation read as one toolbar in every appearance. */
+.header, body.light .header, body.simplified .header,
+.tabs, body.light .tabs, body.simplified .tabs {
+  background: var(--bg-secondary) !important;
+}
+.tabs, body.light .tabs, body.simplified .tabs {
+  border-bottom: 1px solid var(--glass-border-strong);
+}
+
+/* A familiar dialog footer; the warning symbol floats on its own soft glow. */
+.photo-permission-icon, body.light .photo-permission-icon {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.photo-permission-icon svg {
+  width: 34px;
+  height: 34px;
+  filter: drop-shadow(0 0 9px rgb(245 158 11 / 32%));
+}
+.photo-permission-card .risk-dialog-actions {
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.photo-permission-card .risk-dialog-actions .btn {
+  min-height: 42px;
+  padding: 10px 8px;
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: 1.35;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.photo-permission-card #photoPermissionCancel {
+  background: transparent;
+  border: 1px solid var(--glass-border-strong);
+  color: var(--text-primary);
+}
+.photo-permission-card #photoPermissionCancel:hover { background: var(--control-hover-bg); }
+
+/* Home ends at its fixed action; metadata belongs to Settings and About. */
+.popup:has(#tab-home.active) > .footer { display: none; }
+#tab-home > .actions, #tab-home > .actions:has(#startBtn:not(.hidden)) { padding: 6px 10px; }
+
+/* The wordmark is monochrome; the bolt remains yellow in both appearances. */
+:is(body, body.simplified) :is(.brand, .about-content h2) {
+  color: #ffffff;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+:is(body.light, body.light.simplified) :is(.brand, .about-content h2) { color: #111111; }
+:is(body, body.light, body.simplified) :is(.logo, .about-icon) { color: #ffd60a; }
+:is(body.light, body.light.simplified) :is(.logo, .about-icon) svg path {
+  stroke: #bd8500;
+  stroke-width: 0.65px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+.account-context-notice {
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: calc(12px * var(--text-scale, 1));
+  line-height: 1.45;
+}
+.account-context-notice p { margin: 0 0 8px; }
+.account-context-notice .btn { padding: 7px 10px; font-size: calc(12px * var(--text-scale, 1)); }
+
+/* Native lists use one keyboard outline, without a second glow underneath. */
+:is(body, body.light, body.simplified) .select:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+/* Discrete text sizing: labels advance by 5%, typography by 3%. */
+.text-scale-control { padding: 10px 0 2px; }
+.text-scale-control output {
+  display: block; margin-bottom: 4px; color: var(--text-primary);
+  font-size: calc(13px * var(--text-scale, 1)); font-variant-numeric: tabular-nums;
+}
+.text-scale-slider {
+  --range-progress: 40%;
+  appearance: none; display: block; width: 100%; height: 28px; margin: 0;
+  background: transparent; cursor: pointer;
+}
+.text-scale-slider::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 4px;
+  background: linear-gradient(to right, var(--accent) var(--range-progress), var(--glass-border-strong) var(--range-progress));
+}
+.text-scale-slider::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px; margin-top: -6px;
+  border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.text-scale-slider:disabled { opacity: .6; cursor: wait; }
+.scale-value-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.scale-default-label { color: var(--text-secondary); font-size: calc(10px * var(--text-scale, 1)); }
+.scale-default-label b { color: var(--accent); }
+.text-scale-ticks { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); margin: 0; }
+.text-scale-ticks span {
+  position: relative; padding-top: 9px; color: var(--text-muted); text-align: center;
+  font-size: calc(9px * var(--text-scale, 1)); font-variant-numeric: tabular-nums;
+}
+.text-scale-ticks span::before {
+  content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 4px;
+  background: var(--glass-border-strong);
+}
+.text-scale-ticks .scale-default-tick { color: var(--accent); font-weight: 800; }
+.text-scale-ticks .scale-default-tick::before { width: 3px; height: 7px; background: var(--accent); border-radius: 2px; }
+
+.text-scale-ticks span:first-child { text-align: left; }
+.text-scale-ticks span:last-child { text-align: right; }
+
+/* Measure Home's intrinsic content even while another tab is open. */
+.popup.measuring-home #tab-home {
+  display: flex; flex-direction: column; position: absolute; visibility: hidden;
+  width: 100%; height: auto; max-height: none; padding: 0; overflow: visible;
+}
+.popup.measuring-home #homeContent { flex: none; height: auto; max-height: none; overflow: visible; }
+
+/* Window dimensions are independent of element zoom. */
+body { width: calc(350px * var(--popup-width, 1)); }
+.size-settings-body { padding: 14px 4px 2px; }
+.appearance-settings > summary { list-style: none; cursor: pointer; }
+.appearance-settings > summary::-webkit-details-marker { display: none; }
+.size-settings-chevron { font-size: 18px; }
+.appearance-settings[open] .size-settings-chevron { transform: rotate(180deg); }
+.text-scale-ticks { display: block; position: relative; height: 24px; margin: 0 8px; }
+.text-scale-ticks span { position: absolute; left: var(--tick-position); transform: translateX(-50%); white-space: nowrap; }
+.text-scale-ticks span:first-child { transform: translateX(-8px); }
+.text-scale-ticks span:last-child { transform: translateX(calc(-100% + 8px)); }
+
+#sizeSettings > .size-settings-toggle {
+  display: flex; gap: 12px; align-items: center; padding: 14px 12px;
+  border: 1px solid var(--accent); border-radius: 12px;
+  background: var(--accent-glow); color: var(--text-primary); text-align: start;
+}
+.size-settings-icon { flex: 0 0 auto; color: var(--accent); }
+.size-settings-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.size-settings-copy strong { font-size: calc(13px * var(--text-scale, 1)); line-height: 1.35; font-weight: 600; }
+.size-settings-copy > span { color: var(--text-secondary); font-size: calc(11px * var(--text-scale, 1)); line-height: 1.45; }
+#sizeSettings > .size-settings-toggle:hover { background: var(--control-hover-bg); }
+
+
+
+/* Tabler size controls: icon, label/help and live value share one heading. */
+.size-control-heading { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.size-control-heading .field-label-row { margin: 0; min-width: 0; gap: 6px; }
+.size-control-heading .field-label { margin: 0; color: var(--text-primary); line-height: 1.35; }
+.size-control-heading .size-setting-help { flex-shrink: 0; }
+.size-control-icon { width: 28px; height: 28px; color: var(--size-icon-color); }
+.size-control-heading output { font-size: calc(13px * var(--text-scale, 1)); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.size-control--popupWidth { --size-icon-color: var(--ic-blue); }
+.size-control--popupHeight { --size-icon-color: var(--ic-cyan); }
+.size-control--uiScale { --size-icon-color: var(--ic-purple); }
+.size-control--textScale { --size-icon-color: var(--ic-green); }
+.size-control .text-scale-control { padding-top: 8px; }
+.size-settings-body > .size-control { margin-bottom: 18px; }
+.size-settings-body > .size-control:last-child { margin-bottom: 0; }

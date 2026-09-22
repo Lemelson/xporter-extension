@@ -1,234 +1,165 @@
-// XPorter — ladybug Easter egg.
-// A little ladybug wanders the contact card (the "Questions or found a bug?"
-// block), staying above the Telegram button. Click it and it gets squashed,
-// leaving a small splat that fades away; it won't come back until you leave the
-// About tab and return — then a fresh one spawns somewhere new and wanders off.
-// Its legs react to what it's doing: they pause when it stops, shuffle while it
-// turns in place, and step faster or slower with its walking speed.
-// Can be turned off entirely from Settings (window.XPorterLadybug.setEnabled).
+// XPorter ladybug: shared curved-path math, articulated feet, and a bounded renderer.
 (function () {
   'use strict';
-
   const card = document.querySelector('.about-contact');
   const bug = document.querySelector('.ladybug');
-  const body = bug && bug.querySelector('.lb-body');
+  const body = bug?.querySelector('.lb-body');
   const tab = document.getElementById('tab-about');
   if (!card || !bug || !body || !tab) return;
 
-  const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-
-  const BUG = 22;                 // bug box size (px)
-  const BASE_SPEED = 16;          // px/s on a straight (≈ the old 19 × 0.85 — a touch calmer)
-  const TURN_RATE = 2.4;          // rad/s — limited so turns are smooth, never zigzag
-  const SPLAT_VISIBLE = 3500;     // ms the splat stays solid
-  const SPLAT_FADE = 3500;        // ms it then takes to fade out
-
-  // state: 'gone' | 'walking' | 'static' | 'squashed'
-  let state = 'gone';
-  // phase (while walking): 'walk' | 'turn' (turning in place) | 'idle' (stopped)
-  let phase = 'idle';
-  let phaseUntil = 0;
-  let enabled = true;
-  let raf = 0;
-  let last = 0;
-  let pos = { x: 0, y: 0 };
-  let heading = 0;                // radians; 0 = +x (right)
-  let target = null;
-  let speedScale = 1;
-  let zone = { l: 4, t: 4, r: 80, b: 60 };
-  let splat = null;
-  let timers = [];
-
-  const rnd = (a, b) => a + Math.random() * (b - a);
-  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  const normAngle = (a) => {
-    while (a > Math.PI) a -= Math.PI * 2;
-    while (a < -Math.PI) a += Math.PI * 2;
-    return a;
-  };
-  // Pull a heading partway toward the nearest vertical so the bug rarely walks
-  // straight along a line of text (which would sit on a word); angled/vertical
-  // moves cross the line and clear the word quickly.
-  const deHorizontal = (a) => {
-    const vert = Math.sin(a) >= 0 ? Math.PI / 2 : -Math.PI / 2;
-    return a + 0.45 * normAngle(vert - a);
-  };
-  const headingDeg = () => heading * 180 / Math.PI + 90; // svg faces up at 0deg
-
-  // The walkable area: inside the card, above the Telegram button (its clickable
-  // zone is off-limits), with a small inset so the bug never clips the edges.
-  function computeZone() {
-    const cs = getComputedStyle(card);
-    const borderTop = parseFloat(cs.borderTopWidth) || 0;
-    const cr = card.getBoundingClientRect();
-    let bottom = card.clientHeight - BUG - 6;
-    const tg = card.querySelector('.contact-btn--telegram');
-    if (tg) {
-      const tr = tg.getBoundingClientRect();
-      bottom = (tr.top - cr.top - borderTop) - BUG - 6;
-    }
-    zone = {
-      l: 4,
-      t: 4,
-      r: Math.max(8, card.clientWidth - BUG - 4),
-      b: Math.max(8, bottom),
+  // Keep the translated label separate so language changes preserve the count.
+  const counter = document.getElementById('ladybugSquashCount');
+  if (counter && typeof chrome !== 'undefined' && chrome.storage?.local) {
+    let changed = false;
+    const renderCount = usage => {
+      const count = usage?.ladybugSquashes;
+      counter.textContent = '(' + (Number.isSafeInteger(count) && count >= 0 ? count : 0) + ')';
     };
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.xporter_usage) return;
+      changed = true;
+      renderCount(changes.xporter_usage.newValue);
+    });
+    chrome.storage.local.get('xporter_usage').then(result => {
+      if (!changed) renderCount(result.xporter_usage);
+    }).catch(() => { /* Keep the initial zero if storage is unavailable. */ });
+  }
+
+  const motion = globalThis.XPorterLadybugMotion;
+  const rotator = bug.querySelector('.lb-heading');
+  const legs = [...bug.querySelectorAll('.leg')].map(upper => ({ upper, lower: upper.querySelector('.leg-lower') }));
+  if (!motion || !rotator || legs.length !== 6) return;
+  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const BUG = 22, FRAME_MS = 1000 / 30;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  let enabled = true, inView = true, state = 'gone', resumeFromSide = false;
+  let raf = 0, last = 0, start = null, duration = 0, walked = 0, heading = 0;
+  let pos = { x: 0, y: 0 }, zone, path, splat = null;
+  const timers = new Set();
+  const active = () => enabled && inView && !document.hidden && tab.classList.contains('active');
+
+  function later(fn, ms) {
+    const id = setTimeout(() => { timers.delete(id); if (active()) fn(); }, ms);
+    timers.add(id);
+  }
+
+  function cancelWork() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    timers.forEach(clearTimeout);
+    timers.clear();
+  }
+
+  function computeZone() {
+    const border = parseFloat(getComputedStyle(card).borderTopWidth) || 0;
+    const rect = card.getBoundingClientRect();
+    const scale = rect.width / (card.clientWidth + 2 * border) || 1;
+    const tg = card.querySelector('.contact-btn--telegram');
+    const bottom = tg ? (tg.getBoundingClientRect().top - rect.top) / scale - border : card.clientHeight;
+    zone = { l: 4, t: 4, r: Math.max(8, card.clientWidth - BUG - 4), b: Math.max(8, bottom - BUG - 6) };
+    return { rect, scale };
   }
 
   function render() {
-    bug.style.left = pos.x + 'px';
-    bug.style.top = pos.y + 'px';
-    body.style.transform = 'rotate(' + headingDeg() + 'deg)';
+    // Only transforms change during walking: no layout reads or left/top writes.
+    bug.style.transform = `translate3d(${pos.x.toFixed(2)}px,${pos.y.toFixed(2)}px,0)`;
+    rotator.style.transform = `rotate(${(heading * 180 / Math.PI + 90).toFixed(2)}deg)`;
+    legs.forEach(({ upper, lower }, i) => {
+      const pose = motion.legPose(walked, i);
+      upper.style.transform = `rotate(${pose.sweep.toFixed(1)}deg)`;
+      lower.style.transform = `rotate(${pose.bend.toFixed(1)}deg)`;
+    });
   }
 
-  // Drive the leg gait from what the bug is doing.
-  //  idle → freeze the legs; turn → a steady shuffle; walk → step rate tracks speed.
-  function setGait(mode) {
-    if (mode === 'idle') {
-      body.classList.add('gait-paused');
-      return;
-    }
-    body.classList.remove('gait-paused');
-    const dur = mode === 'turn' ? 0.4 : clamp(0.55 / speedScale, 0.32, 0.78);
-    body.style.setProperty('--gait-dur', dur.toFixed(2) + 's');
-  }
-
-  // Pick the next point to amble toward. Mostly a point in front (so motion
-  // flows forward like a real bug); occasionally anywhere, for variety.
-  function pickTarget() {
-    let ang, dist;
-    if (Math.random() < 0.72) {
-      ang = heading + rnd(-1.7, 1.7);
-      dist = rnd(26, 90);
-    } else {
-      const rx = rnd(zone.l, zone.r);
-      const ry = rnd(zone.t, zone.b);
-      ang = Math.atan2(ry - pos.y, rx - pos.x);
-      dist = Math.max(20, Math.hypot(rx - pos.x, ry - pos.y));
-    }
-    ang = deHorizontal(ang); // bias away from purely horizontal travel
-    target = {
-      x: clamp(pos.x + Math.cos(ang) * dist, zone.l, zone.r),
-      y: clamp(pos.y + Math.sin(ang) * dist, zone.t, zone.b),
-    };
-    speedScale = rnd(0.7, 1.45); // whole next leg is a bit faster or slower
-  }
-
-  // Start a new leg of the journey: if it needs a big turn, pivot in place first.
-  function beginSegment() {
-    pickTarget();
-    const diff = Math.abs(normAngle(Math.atan2(target.y - pos.y, target.x - pos.x) - heading));
-    if (diff > 0.5) { phase = 'turn'; setGait('turn'); }
-    else { phase = 'walk'; setGait('walk'); }
+  function beginSegment(entry = false) {
+    if (!active()) return;
+    state = 'walking';
+    start = null;
+    last = 0;
+    if (entry) {
+      const left = pos.x < zone.l;
+      const inset = Math.min(46, (zone.r - zone.l) / 3);
+      const end = { x: left ? zone.l + inset : zone.r - inset,
+        y: rnd(zone.t + (zone.b - zone.t) * .2, zone.t + (zone.b - zone.t) * .8) };
+      const dx = end.x - pos.x;
+      path = [pos, { x: pos.x + dx * .3, y: pos.y }, { x: end.x - dx * .3, y: end.y }, end];
+    } else path = motion.createPath(pos, heading, zone);
+    duration = Math.max(1700, motion.pathLength(path) / rnd(16, 24) * 1000);
+    raf = requestAnimationFrame(step);
   }
 
   function step(now) {
-    if (state !== 'walking') return;
-    if (!last) last = now;
-    const dt = Math.min((now - last) / 1000, 0.05);
+    raf = 0;
+    if (!active() || state !== 'walking') return;
+    if (start === null) { start = now; last = now - FRAME_MS; }
+    if (now - last < FRAME_MS - .2) { raf = requestAnimationFrame(step); return; }
     last = now;
-
-    if (phase === 'idle') {
-      if (now >= phaseUntil) beginSegment();
-    } else if (phase === 'turn') {
-      // Rotate in place toward the target; the legs shuffle but we don't move.
-      const diff = normAngle(Math.atan2(target.y - pos.y, target.x - pos.x) - heading);
-      heading += clamp(diff, -TURN_RATE * dt, TURN_RATE * dt);
-      render();
-      if (Math.abs(diff) < 0.09) { phase = 'walk'; setGait('walk'); }
-    } else { // walk
-      const diff = normAngle(Math.atan2(target.y - pos.y, target.x - pos.x) - heading);
-      heading += clamp(diff, -TURN_RATE * dt, TURN_RATE * dt); // gentle course correction
-      const turnFactor = 1 - Math.min(Math.abs(diff) / Math.PI, 1) * 0.55;
-      const sp = BASE_SPEED * speedScale * turnFactor;
-      pos.x = clamp(pos.x + Math.cos(heading) * sp * dt, zone.l, zone.r);
-      pos.y = clamp(pos.y + Math.sin(heading) * sp * dt, zone.t, zone.b);
-      render();
-      const dx = target.x - pos.x;
-      const dy = target.y - pos.y;
-      if (dx * dx + dy * dy < 25) {
-        if (Math.random() < 0.5) { phase = 'idle'; phaseUntil = now + rnd(350, 1500); setGait('idle'); }
-        else beginSegment();
-      }
-    }
-    raf = requestAnimationFrame(step);
-  }
-
-  function clearSplat() {
-    timers.forEach(clearTimeout);
-    timers = [];
-    if (splat && splat.parentNode) splat.parentNode.removeChild(splat);
-    splat = null;
-  }
-
-  function squash(e) {
-    if (state !== 'walking' && state !== 'static') return;
-    if (e) e.preventDefault();
-    state = 'squashed';
-    if (raf) { cancelAnimationFrame(raf); raf = 0; }
-    body.classList.add('gait-paused');
-
-    // Flatten in place, keeping the current heading — looks like it gets squished.
-    body.style.transition = 'transform 0.13s cubic-bezier(.3,.85,.4,1)';
-    body.style.transform = 'rotate(' + headingDeg() + 'deg) scale(1.32, 0.16)';
-
-    // Drop a splat at the bug's centre.
-    splat = document.createElement('span');
-    splat.className = 'lb-splat';
-    splat.style.left = (pos.x + BUG / 2) + 'px';
-    splat.style.top = (pos.y + BUG / 2) + 'px';
-    splat.style.setProperty('--r', Math.round(rnd(-40, 40)) + 'deg');
-    card.appendChild(splat);
-
-    timers.push(setTimeout(() => {
-      bug.style.display = 'none';
-      if (splat) splat.style.opacity = '0.85';
-    }, 150));
-    timers.push(setTimeout(() => {
-      if (!splat) return;
-      splat.style.transition = 'opacity ' + SPLAT_FADE + 'ms linear';
-      splat.style.opacity = '0';
-    }, 150 + SPLAT_VISIBLE));
-    timers.push(setTimeout(clearSplat, 150 + SPLAT_VISIBLE + SPLAT_FADE));
+    const t = motion.clamp((now - start) / duration, 0, 1);
+    const eased = t * t * (3 - 2 * t);
+    const next = motion.bezier(path, eased);
+    walked += Math.hypot(next.x - pos.x, next.y - pos.y);
+    pos = next;
+    heading = motion.direction(path, motion.clamp(eased, .001, .999));
+    render();
+    if (t < 1) raf = requestAnimationFrame(step);
+    else if (Math.random() < .35) {
+      state = 'idle'; // No frame loop, CSS leg animation or polling while resting.
+      later(() => beginSegment(), rnd(450, 1200));
+    } else beginSegment();
   }
 
   function despawn() {
+    cancelWork();
+    if (splat?.parentNode) splat.parentNode.removeChild(splat);
+    splat = null;
     state = 'gone';
-    if (raf) { cancelAnimationFrame(raf); raf = 0; }
-    clearSplat();
     bug.style.display = 'none';
-    bug.style.opacity = '';
-    bug.style.transition = '';
-    body.classList.remove('gait-paused');
-    body.style.transition = '';
-    body.style.transform = '';
   }
 
-  function spawn() {
+  function spawn(fromSide = false) {
     despawn();
-    if (!enabled) return;
-    computeZone();
-    if (zone.r <= zone.l || zone.b <= zone.t) return;
-
-    pos = { x: rnd(zone.l, zone.r), y: rnd(zone.t, zone.b) };
-    heading = rnd(-Math.PI, Math.PI); // face any direction
-    target = null;
-    speedScale = rnd(0.7, 1.45);
-    phase = 'idle';
-    phaseUntil = 0; // begins a fresh segment on the first frame
-    body.classList.remove('gait-paused');
-    body.style.setProperty('--gait-dur', '0.5s');
-
+    if (!active()) return;
+    const { rect, scale } = computeZone();
+    const left = Math.random() < .5;
+    pos = { x: rnd(zone.l, zone.r), y: rnd(zone.t + (zone.b - zone.t) * .2, zone.t + (zone.b - zone.t) * .8) };
+    const entry = fromSide && !media.matches;
+    if (entry) pos.x = left ? -rect.left / scale - BUG - 4 : (document.documentElement.clientWidth - rect.left) / scale + 4;
+    heading = left ? 0 : Math.PI;
+    walked = 0;
+    body.style.transform = '';
+    body.style.opacity = '';
     bug.style.display = 'block';
-    body.style.transition = '';
     render();
-
-    if (reduceMotion) { state = 'static'; return; } // sit still, still squashable
-    state = 'walking';
-    last = 0;
-    raf = requestAnimationFrame(step);
+    resumeFromSide = false;
+    if (media.matches) state = 'static';
+    else beginSegment(entry);
   }
 
+  function squash(e) {
+    if (!active() || !['walking', 'idle', 'static'].includes(state)) return;
+    e?.preventDefault();
+    state = 'squashed';
+    resumeFromSide = true;
+    cancelWork();
+    try {
+      chrome.runtime.sendMessage({ type: 'XP_LADYBUG_SQUASH' }, () => { void chrome.runtime.lastError; });
+    } catch (_) { /* Storage failure must not interrupt the animation. */ }
+    body.style.transform = 'scale(1.2,.16)';
+    splat = document.createElement('span');
+    splat.className = 'lb-splat';
+    splat.style.left = `${pos.x + BUG / 2}px`;
+    splat.style.top = `${pos.y + BUG / 2}px`;
+    splat.style.setProperty('--r', `${Math.round(rnd(-35, 35))}deg`);
+    card.appendChild(splat);
+    later(() => { body.style.opacity = '0'; }, 140);
+    later(() => { bug.style.display = 'none'; if (splat) splat.style.opacity = '0'; }, 1100);
+    later(() => spawn(true), 2300);
+  }
+
+  function updateVisibility() {
+    if (!active()) despawn();
+    else if (state === 'gone') spawn(resumeFromSide);
+  }
   // The About-tab lightning bolt only starts animating when its tab is first
   // shown, so it drifts out of phase with the always-running header bolt. Snap
   // its animation phase onto the header's so the two flicker together.
@@ -245,27 +176,27 @@
     } catch (_) { /* noop */ }
   }
 
-  // Respawn on every entry to the About tab; freeze + clear when it's left.
-  // (spawn via timeout, not rAF, so it fires even before the first paint.)
-  let wasActive = tab.classList.contains('active');
-  if (wasActive) { setTimeout(spawn, 16); setTimeout(syncBolts, 40); }
 
-  const obs = new MutationObserver(() => {
-    const active = tab.classList.contains('active');
-    if (active && !wasActive) { setTimeout(spawn, 16); setTimeout(syncBolts, 40); }
-    else if (!active && wasActive) despawn();
-    wasActive = active;
-  });
-  obs.observe(tab, { attributes: true, attributeFilter: ['class'] });
-
+  const observer = new MutationObserver(() => { updateVisibility(); if (active()) syncBolts(); });
+  observer.observe(tab, { attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('visibilitychange', updateVisibility);
+  window.addEventListener('pagehide', despawn);
+  media.addEventListener('change', () => { if (active()) spawn(); });
+  // An About tab can be active while its contact card is scrolled out of view.
+  if (typeof IntersectionObserver === 'function') {
+    new IntersectionObserver(entries => {
+      inView = entries[0].isIntersecting;
+      updateVisibility();
+    }).observe(card);
+  }
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => { if (active() && state !== 'squashed') spawn(); }).observe(card);
+  }
   bug.addEventListener('pointerdown', squash);
-
-  // Public switch for the Settings toggle.
+  bug.addEventListener('click', e => { if (e.detail === 0) squash(e); });
   window.XPorterLadybug = {
-    setEnabled(on) {
-      enabled = !!on;
-      if (!enabled) despawn();
-      else if (tab.classList.contains('active')) setTimeout(spawn, 0);
-    },
+    setEnabled(on) { enabled = !!on; updateVisibility(); }
   };
+  updateVisibility();
+  if (active()) syncBolts();
 })();

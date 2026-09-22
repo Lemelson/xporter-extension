@@ -19,6 +19,8 @@
   --danger: #F4212E;
   --border: rgba(255, 255, 255, 0.18);
   --input-bg: rgba(255, 255, 255, 0.07);
+  --control-hover-bg: rgba(255, 255, 255, 0.24);
+  --control-hover-shadow: 0 6px 18px rgba(6, 10, 28, 0.42);
   /* Shadows tinted with the deep-navy backdrop instead of pure black — reads
      more like real glass casting onto a colored surface. */
   --shadow: rgba(7, 11, 30, 0.35);
@@ -67,7 +69,11 @@ body.light {
   --warning: #F59E0B;
   --danger: #F4212E;
   --border: rgba(0, 0, 0, 0.18);
-  --input-bg: rgba(255, 255, 255, 0.60);
+  /* Opaque neutral controls keep the same white over every gradient stop. */
+  --control-bg: #f4f5fa;
+  --input-bg: var(--control-bg);
+  --control-hover-bg: #ffffff;
+  --control-hover-shadow: 0 6px 18px rgba(30, 41, 89, 0.18);
   --shadow: rgba(30, 41, 89, 0.16);
 
   --glass-bg: rgba(255, 255, 255, 0.32);
@@ -155,7 +161,7 @@ body.light .header {
 /* Glass tabs */
 .tabs {
   border-bottom: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(4, 10, 26, 0.34);
 }
 
 body.light .tabs {
@@ -209,8 +215,8 @@ body.light .tab:hover {
 }
 
 body.light .account-card {
-  background: linear-gradient(135deg, rgba(39, 145, 220, 0.12), rgba(255, 255, 255, 0.68));
-  border-color: rgba(18, 115, 186, 0.24);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.60), rgba(255, 255, 255, 0.68));
+  border-color: rgba(0, 0, 0, 0.16);
   box-shadow: var(--glass-inner-glow), 0 4px 14px rgba(14, 38, 74, 0.10);
 }
 
@@ -243,7 +249,7 @@ body.light .account-card {
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  font-size: 19px;
+  font-size: calc(19px * var(--text-scale, 1));
   background: rgba(96, 184, 255, 0.14);
   outline: 1px solid oklch(1 0 0 / 0.10);
   outline-offset: -1px;
@@ -268,14 +274,14 @@ body.light .account-avatar {
 }
 
 #targetAccountCopy {
-  gap: 4px;
+  gap: 1px;
 }
 
 .account-copy > strong,
 .account-name {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -284,7 +290,7 @@ body.light .account-avatar {
 
 #targetAccountName {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: calc(14px * var(--text-scale, 1));
   font-weight: 500;
   line-height: 1.2;
 }
@@ -295,7 +301,7 @@ body.light .account-avatar {
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
 }
 
 #bookmarksAccountHandle {
@@ -331,8 +337,8 @@ body.light .account-avatar {
 }
 
 body.light .account-meta--input {
-  background: rgba(255, 255, 255, 0.48);
-  box-shadow: inset 0 0 0 1px rgba(15, 55, 88, 0.13);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(15, 55, 88, 0.16);
 }
 
 body.light .account-meta--input:hover {
@@ -350,7 +356,7 @@ body.light .account-meta--input:focus-within {
 .account-input-prefix {
   flex: 0 0 auto;
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -366,7 +372,7 @@ body.light .account-meta--input:focus-within {
   background: transparent;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -409,7 +415,7 @@ body.light .account-meta--input:focus-within {
   border-radius: 999px;
   color: #06223a;
   background: var(--accent);
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale, 1));
   font-weight: 700;
   line-height: 1.35;
 }
@@ -421,7 +427,7 @@ body.light .account-owner-badge {
 .field-error {
   margin-top: 5px;
   color: var(--danger);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.35;
 }
@@ -435,7 +441,7 @@ body.light .account-owner-badge {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   font-family: inherit;
   outline: none;
   cursor: pointer;
@@ -470,7 +476,7 @@ body.light .select {
   padding: 8px;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   font-family: inherit;
   text-align: center;
   outline: none;
@@ -532,7 +538,7 @@ body.light .input-small {
 .status-action-stack.txt-actions .btn-status-action {
   gap: 5px;
   padding-inline: 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
 }
 
 .btn.btn-status-action {
@@ -541,7 +547,7 @@ body.light .input-small {
   min-width: 0;
   min-height: 44px;
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.2;
   border-radius: var(--radius-sm);
@@ -569,8 +575,8 @@ body.light .input-small {
 
 /* Glass buttons */
 .btn-primary {
-  background: linear-gradient(135deg, rgba(29, 155, 240, 0.75) 0%, rgba(20, 140, 220, 0.85) 50%, rgba(40, 170, 255, 0.75) 100%);
-  border: 1px solid rgba(29, 155, 240, 0.5);
+  background: linear-gradient(135deg, #1D9BF0 0%, #148CDC 50%, #28AAFF 100%);
+  border: 1px solid rgba(29, 155, 240, 0.7);
   box-shadow: 0 4px 16px rgba(29, 155, 240, 0.30), var(--glass-inner-glow);
   color: #fff;
 }
@@ -714,34 +720,13 @@ body.light .btn-secondary {
   box-shadow: 0 2px 8px rgba(30, 41, 89, 0.12), var(--glass-edge);
 }
 
-/* ============================================================
-   TIER 2 — glass clickable controls (single source of truth).
-   Resume, New Export, Export History toggle, and the dropdowns (Export Mode,
-   Output Format, Quantity Limit) all share this hover:
-   whiten + accent glow ring + lift + depth shadow. Edit here → all update.
-   body.light copies are required so light-theme base rules don't out-specify. */
-.btn-secondary:hover,
-.history-toggle:hover,
-.select:hover {
-  background-color: rgba(255, 255, 255, 0.24);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(6, 10, 28, 0.42), var(--glass-edge);
-  transform: translateY(-1px);
-}
-
-body.light .btn-secondary:hover,
-body.light .history-toggle:hover,
-body.light .select:hover {
-  background-color: rgba(255, 255, 255, 0.74);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow), 0 6px 18px rgba(30, 41, 89, 0.18), var(--glass-edge);
-  transform: translateY(-1px);
-}
+/* Neutral control interaction is shared with choice rows and About panels
+   in the surface rules below the appearance variants. */
 
 .btn-ghost {
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   padding: 8px 16px;
 }
 
@@ -786,7 +771,7 @@ input[type="number"] {
   background: rgba(255, 255, 255, 0.10);
   box-shadow: var(--glass-edge);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   font-weight: 600;
   font-family: inherit;
   text-align: center;
@@ -829,7 +814,7 @@ body.light .date-row input[type="date"]:hover {
 }
 
 .resume-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -1039,7 +1024,7 @@ body.light .progress-fill.stopped {
   background: rgba(255, 255, 255, 0.02);
   padding: 8px 16px;
   text-align: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   color: var(--text-muted);
 }
 
@@ -1069,7 +1054,7 @@ body.light .footer {
 .feed-db-live {
   margin-left: 2px;
   color: var(--accent);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1087,7 +1072,7 @@ body.light .footer {
 .feed-db-summary {
   margin: 5px 0 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   line-height: 1.4;
 }
 
@@ -1105,7 +1090,7 @@ body.light .footer {
 .feed-db-actions .btn {
   min-height: 34px;
   padding: 7px 9px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
 }
 
 .feed-db-clear {
@@ -1127,7 +1112,7 @@ body.light .footer {
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -1166,7 +1151,7 @@ body.light .footer {
   text-align: center;
   padding: 16px 8px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
 }
 
 /* History card */
@@ -1208,7 +1193,7 @@ body.light .footer {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale, 1));
   font-weight: 700;
 }
 
@@ -1219,7 +1204,7 @@ body.light .footer {
 }
 
 .history-name {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -1228,7 +1213,7 @@ body.light .footer {
 }
 
 .history-handle {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1236,7 +1221,7 @@ body.light .footer {
 }
 
 .history-meta {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   color: var(--text-secondary);
   margin-top: 2px;
   display: flex;
@@ -1249,7 +1234,7 @@ body.light .footer {
   display: inline-block;
   padding: 1px 5px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale, 1));
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -1305,7 +1290,7 @@ body.light .footer {
 
 .history-card:hover .history-del-btn,
 .history-card:focus-within .history-del-btn,
-.history-del-btn:focus-visible {
+.history-del-btn:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
   opacity: 1;
 }
 
@@ -1325,7 +1310,7 @@ body.light .footer {
   border-radius: var(--radius-sm);
   padding: 6px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   font-family: inherit;
   cursor: pointer;
   transition: color 0.2s, border-color 0.2s;
@@ -1337,29 +1322,49 @@ body.light .footer {
 }
 
 
-/* Glass auth warning */
+/* Sign-in prerequisite: use the same neutral surface as the form controls
+   in every appearance, with the action highlighted instead of red body copy. */
 .auth-warning {
-  background: rgba(244, 33, 46, 0.08);
-  border: 1px solid rgba(244, 33, 46, 0.2);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-edge);
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: var(--danger);
-  font-size: 13px;
+  color: var(--text-primary);
+  font-size: calc(13px * var(--text-scale, 1));
+  line-height: 1.4;
   margin-bottom: 14px;
+}
+
+.auth-warning-icon {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.auth-warning > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .auth-warning a {
   color: var(--accent);
-  text-decoration: none;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .auth-warning a:hover {
-  text-decoration: underline;
+  color: var(--accent-hover);
+}
+
+.auth-warning a:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Specular highlight — Apple-style top edge glow */
@@ -1433,7 +1438,7 @@ body.light .toggle-input:checked+.toggle-track--bug {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-family: inherit;
   outline: none;
 }
@@ -1459,11 +1464,11 @@ body {
     radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.12) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 70%),
-    linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+    linear-gradient(135deg, #0a1122 0%, #162033 50%, #0a1122 100%) !important;
   width: 350px;
   min-height: 200px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   color: var(--text-primary);
   overflow-x: hidden;
 }
@@ -1559,7 +1564,7 @@ body.light .about-icon { --zap-glow: 13px; --zap-glow-hi: 21px; }
 
 .brand {
   font-family: 'Avenir Next', 'Avenir', 'Montserrat', 'Segoe UI', system-ui, sans-serif;
-  font-size: 20px;
+  font-size: calc(20px * var(--text-scale, 1));
   font-weight: 800;
   letter-spacing: -0.01em;
   background: linear-gradient(135deg, #4DA8FF, var(--accent) 55%, #1DA1F2);
@@ -1610,6 +1615,13 @@ body.light .about-icon { --zap-glow: 13px; --zap-glow-hi: 21px; }
 
 /* .theme-toggle hover is unified with .lang-btn below — same whiten + glow. */
 
+/* Center the SVG itself without the inline text baseline's descender space. */
+.theme-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Header icon link (GitHub) — mirrors .theme-toggle exactly. */
 .header-icon-btn {
   background: none;
@@ -1656,7 +1668,7 @@ body.light .header-icon-btn:hover {
   transition: all 0.25s ease;
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -1691,7 +1703,7 @@ body.light .lang-btn.active {
 }
 
 .lang-flag {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale, 1));
   line-height: 1;
 }
 
@@ -1786,7 +1798,7 @@ body.light .lang-dropdown {
   background: none;
   width: 100%;
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-primary);
 }
 
@@ -1815,7 +1827,7 @@ body.light .lang-option.active {
 }
 
 .lang-option-flag {
-  font-size: 18px;
+  font-size: calc(18px * var(--text-scale, 1));
   line-height: 1;
 }
 
@@ -1846,7 +1858,7 @@ body.light .lang-option.active {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale, 1));
   transition: all 0.2s;
   color: var(--text-secondary);
   display: flex;
@@ -1883,7 +1895,7 @@ body.light .lang-option.active {
 
 .field-label {
   display: block;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-secondary);
   margin-bottom: 4px;
   font-weight: 500;
@@ -1931,14 +1943,14 @@ body.light .post-selection-panel {
 .post-selection-heading h2 {
   margin: 0 0 2px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   line-height: 1.3;
 }
 
 .post-selection-heading p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.4;
 }
 
@@ -1949,7 +1961,7 @@ body.light .post-selection-panel {
   border-radius: 999px;
   color: var(--accent);
   background: rgba(96, 184, 255, 0.1);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   font-weight: 700;
 }
 
@@ -1975,7 +1987,9 @@ body.light .post-selection-panel {
 }
 
 body.light .post-choice {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.60);
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: var(--glass-inner-glow), 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .post-choice:hover {
@@ -1984,7 +1998,7 @@ body.light .post-choice {
 }
 
 body.light .post-choice:hover {
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.76);
 }
 
 .post-choice input {
@@ -2031,7 +2045,7 @@ body.light .post-choice input:checked + .post-choice-check::after {
   transform: translateY(-1px) rotate(-45deg);
 }
 
-.post-choice input:focus-visible + .post-choice-check {
+.post-choice input:focus-visible:where(body:not([data-input-modality="pointer"]) *) + .post-choice-check {
   outline: 2px solid var(--text-primary);
   outline-offset: 2px;
 }
@@ -2044,13 +2058,13 @@ body.light .post-choice input:checked + .post-choice-check::after {
 
 .post-choice-copy strong {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   line-height: 1.25;
 }
 
 .post-choice-copy span {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.35;
 }
 
@@ -2067,14 +2081,14 @@ body.light .post-choice input:checked + .post-choice-check::after {
   background: rgba(255, 255, 255, 0.055);
 }
 
-.post-type-choice:has(input:focus-visible) {
+.post-type-choice:has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *)) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 body.light .post-type-choice:has(input:checked) {
-  border-color: rgba(36, 113, 177, 0.16);
-  background: rgba(255, 255, 255, 0.48);
+  border-color: rgba(36, 113, 177, 0.22);
+  background: rgba(255, 255, 255, 0.64);
 }
 
 .post-type-icon {
@@ -2102,7 +2116,7 @@ body.light .post-type-choice:has(input:checked) {
 }
 
 .post-type-icon--reply {
-  color: #54d8e1;
+  color: #ff8fbc;
 }
 
 .post-type-icon--repost {
@@ -2122,7 +2136,7 @@ body.light .post-type-icon--quote {
 }
 
 body.light .post-type-icon--reply {
-  color: #0f8f9b;
+  color: #c02669;
 }
 
 body.light .post-type-icon--repost {
@@ -2165,7 +2179,7 @@ body.light .post-type-choice input:checked ~ .post-choice-check::after {
   transform: translateY(-1px) rotate(-45deg);
 }
 
-.post-type-choice input:focus-visible ~ .post-choice-check {
+.post-type-choice input:focus-visible:where(body:not([data-input-modality="pointer"]) *) ~ .post-choice-check {
   outline: 2px solid var(--text-primary);
   outline-offset: 2px;
 }
@@ -2173,7 +2187,7 @@ body.light .post-type-choice input:checked ~ .post-choice-check::after {
 .post-selection-note,
 .post-selection-error {
   margin: 9px 1px 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.4;
 }
 
@@ -2193,7 +2207,7 @@ body.light .post-selection-error {
 .output-format-note {
   margin: 6px 1px 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.4;
 }
 
@@ -2287,7 +2301,7 @@ body.light .xlsx-photo-choice--recommended:hover {
   gap: 3px 6px;
   min-width: 0;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   line-height: 1.25;
 }
 
@@ -2300,7 +2314,7 @@ body.light .xlsx-photo-choice--recommended:hover {
   color: #24324a;
   background: #ffd45a;
   box-shadow: 0 2px 8px rgba(255, 212, 90, 0.24);
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale, 1));
   font-weight: 800;
   line-height: 1.3;
   letter-spacing: 0.015em;
@@ -2341,7 +2355,7 @@ body.light .xlsx-photo-choice input:checked ~ .post-choice-check::after {
   transform: none;
 }
 
-.xlsx-photo-choice input:focus-visible ~ .post-choice-check {
+.xlsx-photo-choice input:focus-visible:where(body:not([data-input-modality="pointer"]) *) ~ .post-choice-check {
   outline: 2px solid var(--text-primary);
   outline-offset: 2px;
 }
@@ -2377,7 +2391,7 @@ body.light .xlsx-photo-choice input:checked ~ .post-choice-check::after {
 .mode-settings-heading {
   margin-block-end: 8px;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2453,7 +2467,7 @@ body.light .risk-dialog-card {
 
 .risk-dialog-icon {
   margin-bottom: 8px;
-  font-size: 30px;
+  font-size: calc(30px * var(--text-scale, 1));
   line-height: 1;
 }
 
@@ -2499,14 +2513,14 @@ body.light .photo-permission-icon {
 
 .risk-dialog-title {
   margin: 0 0 10px;
-  font-size: 18px;
+  font-size: calc(18px * var(--text-scale, 1));
   line-height: 1.25;
 }
 
 .risk-dialog-body {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   line-height: 1.5;
   white-space: pre-line;
 }
@@ -2567,7 +2581,7 @@ body.light .photo-permission-icon {
   width: 100%;
 }
 
-.risk-dialog-card:focus-visible {
+.risk-dialog-card:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -2590,7 +2604,7 @@ body.light .photo-permission-icon {
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   color: var(--text-primary);
   user-select: none;
 }
@@ -2654,7 +2668,7 @@ body.light .photo-permission-icon {
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   font-weight: 700;
   line-height: 1;
   cursor: help;
@@ -2676,7 +2690,7 @@ body.light .photo-permission-icon {
   -webkit-backdrop-filter: blur(16px);
   color: var(--text-primary);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   font-weight: 500;
   line-height: 1.5;
   text-align: start;
@@ -2717,7 +2731,7 @@ body.light .photo-permission-icon {
 }
 
 .help-viewport:hover .help-pop,
-.help-viewport:focus-visible .help-pop {
+.help-viewport:focus-visible:where(body:not([data-input-modality="pointer"]) *) .help-pop {
   pointer-events: auto;
 }
 
@@ -2728,14 +2742,14 @@ body.light .photo-permission-icon {
 }
 
 .date-help:hover,
-.date-help:focus-visible {
+.date-help:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
   border-color: var(--accent);
   color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .date-help:hover .help-pop,
-.date-help:focus-visible .help-pop {
+.date-help:focus-visible:where(body:not([data-input-modality="pointer"]) *) .help-pop {
   display: block;
   opacity: 1;
   transform: translateY(0);
@@ -2770,7 +2784,7 @@ body.light .help-pop {
 }
 
 .date-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-secondary);
   min-width: 40px;
 }
@@ -2780,7 +2794,7 @@ body.light .help-pop {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-secondary);
 }
 
@@ -2812,7 +2826,7 @@ body.light .help-pop {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   color: var(--text-secondary);
 }
 
@@ -2858,7 +2872,7 @@ body.light .safety-break-rows {
 }
 
 .help-local.help-tall:hover .help-pop,
-.help-local.help-tall:focus-visible .help-pop {
+.help-local.help-tall:focus-visible:where(body:not([data-input-modality="pointer"]) *) .help-pop {
   pointer-events: auto;
 }
 
@@ -2888,7 +2902,7 @@ body.light .safety-break-rows {
 
 .status-text {
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2906,7 +2920,7 @@ body.light .safety-break-rows {
 .status-subtitle {
   margin: 4px 0 0 27px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.4;
 }
 
@@ -2980,7 +2994,7 @@ body.light .export-status.phase-safety-break .status-phase-icon {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-secondary);
 }
 
@@ -3071,7 +3085,7 @@ body.light .resumable-state-icon {
 }
 
 .tweet-count {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   font-weight: 600;
   color: var(--text-primary);
   margin-top: 8px;
@@ -3082,7 +3096,7 @@ body.light .resumable-state-icon {
   padding-top: 7px;
   border-top: 1px solid var(--glass-border);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.35;
 }
 
@@ -3101,7 +3115,7 @@ body.light .resumable-state-icon {
   padding: 12px 16px;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 15px;
+  font-size: calc(15px * var(--text-scale, 1));
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -3148,7 +3162,7 @@ body.light .resumable-state-icon {
 
 .about-content h2 {
   font-family: 'Avenir Next', 'Avenir', 'Montserrat', 'Segoe UI', system-ui, sans-serif;
-  font-size: 23px;
+  font-size: calc(23px * var(--text-scale, 1));
   font-weight: 800;
   letter-spacing: -0.01em;
   background: linear-gradient(135deg, #4DA8FF, var(--accent) 55%, #1DA1F2);
@@ -3160,7 +3174,7 @@ body.light .resumable-state-icon {
 
 .about-desc {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   margin-bottom: 16px;
 }
 
@@ -3171,7 +3185,7 @@ body.light .resumable-state-icon {
 }
 
 .details-heading {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3202,7 +3216,7 @@ body.light .resumable-state-icon {
   cursor: pointer;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 600;
   text-align: start;
   transition: background 0.18s ease;
@@ -3313,7 +3327,7 @@ body.light .detail-head:hover {
 .detail-body-inner p {
   margin: 0;
   padding: 0 12px 12px 50px;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   line-height: 1.5;
   color: var(--text-secondary);
 }
@@ -3364,7 +3378,7 @@ body.light .detail-head:hover {
   padding-top: 8px;
   border-top: 1px solid var(--glass-border);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.2;
 }
@@ -3431,13 +3445,13 @@ body.light .detail-head:hover {
 }
 
 .about-source-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .about-source-sub {
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale, 1));
   line-height: 1.4;
   color: var(--text-secondary);
 }
@@ -3462,7 +3476,7 @@ body.light .detail-head:hover {
 }
 
 .about-disclaimer {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale, 1));
   color: var(--text-muted);
   font-style: italic;
 }
@@ -3479,132 +3493,66 @@ body.light .detail-head:hover {
   box-shadow: var(--glass-edge);
 }
 
-/* ===== Easter egg: wandering ladybug ("found a bug?") ===== */
-/* Parked in the top-right corner; the wrapper carries the slow wander path,
-   the SVG body turns to face its heading, and a soft ground shadow follows
-   underneath for a little depth. Purely decorative + non-interactive. */
-/* Position + heading are driven by ladybug.js (it wanders the card, squashes
-   on click, and respawns when you re-enter the About tab). Hidden until JS
-   spawns it. pointer-events:auto so it can be clicked/squashed. */
+/* Ladybug: a 3 KB shell texture over articulated, distance-driven SVG legs. */
 .ladybug {
   position: absolute;
   left: 0;
   top: 0;
   width: 22px;
   height: 22px;
-  pointer-events: auto;
-  cursor: pointer;
-  z-index: 3;
+  border: 0;
+  padding: 0;
+  background: transparent;
   display: none;
-}
-
-.lb-body {
-  position: absolute;
-  inset: 0;
-  transform-origin: 50% 54%;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 3;
   will-change: transform;
-  /* "Ink" = the dark structural parts (legs, antennae, head). The bug is dark in
-     both themes (the classic look). A soft, barely-there shadow underneath
-     (.lb-shadow) gives just a hint of depth — no outline glow. */
-  --lb-ink: #15100f;
-  --lb-eye: #f4f4f6;
+  outline-offset: 4px;
 }
+.lb-heading, .lb-body { position: absolute; inset: 0; display: block; transform-origin: 50% 54%; }
+.lb-body { transition: transform 140ms cubic-bezier(.15,.8,.25,1), opacity 130ms ease-out; }
+.lb-limbs, .lb-shell { position: absolute; inset: 0; width: 22px; height: 22px; pointer-events: none; }
+.lb-limbs { fill: none; stroke: #87938c; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+body.light .lb-limbs { stroke: #242b25; }
+.lb-limbs .leg-lower { stroke-width: 1.1; }
+.lb-limbs .lb-antennae { stroke-width: 1.15; }
+.lb-limbs .leg, .lb-limbs .leg-lower { transform-box: view-box; }
+.leg-l1 { transform-origin: 12px 15px; }
+.leg-l1 .leg-lower { transform-origin: 6px 12px; }
+.leg-l2 { transform-origin: 11px 22px; }
+.leg-l2 .leg-lower { transform-origin: 5px 23px; }
+.leg-l3 { transform-origin: 12px 28px; }
+.leg-l3 .leg-lower { transform-origin: 7px 32px; }
+.leg-r1 { transform-origin: 28px 15px; }
+.leg-r1 .leg-lower { transform-origin: 34px 12px; }
+.leg-r2 { transform-origin: 29px 22px; }
+.leg-r2 .leg-lower { transform-origin: 35px 23px; }
+.leg-r3 { transform-origin: 28px 28px; }
+.leg-r3 .leg-lower { transform-origin: 33px 32px; }
 
-.lb-legs,
-.lb-antennae {
-  fill: none;
-  stroke: var(--lb-ink);
-}
-
-.lb-ink { fill: var(--lb-ink); }
-.lb-head { fill: var(--lb-ink); }
-.lb-eye { fill: var(--lb-eye); }
-
-/* Each leg pivots around its own hip. The six legs run on one stepping cycle
-   but with staggered delays, so they ripple (metachronal gait) and the two
-   alternating tripods (≈0.25s apart) swing out of phase — reads as walking.
-   Step rate (--gait-dur) and pause state are driven by ladybug.js. */
-.leg {
-  transform-box: view-box;
-  animation: lb-step var(--gait-dur, 0.5s) ease-in-out infinite;
-}
-
-/* When the bug stops moving, its legs freeze. */
-.lb-body.gait-paused .leg {
-  animation-play-state: paused;
-}
-
-.leg-l1 { transform-origin: 12px 16px; animation-delay: 0s; }
-.leg-r2 { transform-origin: 29px 22px; animation-delay: -0.05s; }
-.leg-l3 { transform-origin: 12px 28px; animation-delay: -0.10s; }
-.leg-r1 { transform-origin: 28px 16px; animation-delay: -0.25s; }
-.leg-l2 { transform-origin: 11px 22px; animation-delay: -0.30s; }
-.leg-r3 { transform-origin: 28px 28px; animation-delay: -0.35s; }
-
-/* Dark theme: a very soft, barely-there light glow behind the bug — just a hint
-   of separation, not an obvious halo. Sits behind the bug (drawn first). */
-.lb-shadow {
-  position: absolute;
-  left: 50%;
-  top: 56%;
-  width: 24px;
-  height: 18px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07) 55%, rgba(255, 255, 255, 0) 100%);
-}
-
-/* Light theme: a small, soft ground shadow under it for a touch of depth. */
-body.light .lb-shadow {
-  top: 76%;
-  width: 17px;
-  height: 6px;
-  transform: translate(-50%, 0);
-  background: radial-gradient(closest-side, rgba(20, 16, 15, 0.28), rgba(0, 0, 0, 0));
-}
-
-/* Squash mark left where a ladybug was clicked. ~bug-sized, translucent so the
-   text underneath stays readable; placed + timed by ladybug.js. */
 .lb-splat {
   position: absolute;
   width: 20px;
   height: 15px;
   pointer-events: none;
   z-index: 2;
-  opacity: 0;
+  opacity: .72;
   transform: translate(-50%, -50%) rotate(var(--r, 0deg));
   border-radius: 58% 42% 60% 40% / 56% 62% 38% 44%;
-  background: radial-gradient(closest-side, rgba(208, 50, 34, 0.78), rgba(150, 28, 18, 0.52) 52%, rgba(90, 16, 12, 0) 100%);
-  box-shadow:
-    5px -2px 0 -1.5px rgba(170, 32, 20, 0.62),
-    -6px 2px 0 -2px rgba(135, 24, 16, 0.55),
-    2px 5px 0 -2px rgba(185, 36, 22, 0.5);
-  transition: opacity 0.4s ease;
+  background: radial-gradient(closest-side, rgba(208,50,34,.78), rgba(150,28,18,.52) 52%, rgba(90,16,12,0) 100%);
+  box-shadow: 5px -2px 0 -1.5px rgba(170,32,20,.62), -6px 2px 0 -2px rgba(135,24,16,.55), 2px 5px 0 -2px rgba(185,36,22,.5);
+  transition: opacity 1200ms linear;
 }
-
-body.light .lb-splat {
-  background: radial-gradient(closest-side, rgba(190, 40, 26, 0.6), rgba(140, 26, 16, 0.42) 52%, rgba(90, 16, 12, 0) 100%);
-}
-
-/* One leg swings fore/aft around its hip; staggered delays make the six ripple. */
-@keyframes lb-step {
-  0%, 100% { transform: rotate(-12deg); }
-  50% { transform: rotate(12deg); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .ladybug,
-  .lb-body,
-  .leg {
-    animation: none !important;
-  }
+  .lb-body { transition: opacity 130ms ease-out; }
 }
 
 .contact-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 7px;
@@ -3616,7 +3564,7 @@ body.light .lb-splat {
 }
 
 .contact-lead {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale, 1));
   line-height: 1.5;
   color: var(--text-secondary);
   margin-bottom: 12px;
@@ -3675,13 +3623,13 @@ body.light .lb-splat {
 }
 
 .contact-btn-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.2;
 }
 
 .contact-btn-sub {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale, 1));
   line-height: 1.35;
   opacity: 0.9;
 }
@@ -3695,7 +3643,7 @@ body.light .lb-splat {
 
 .contact-btn--telegram .contact-btn-title {
   font-weight: 700;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
 }
 
 .contact-btn--telegram .contact-btn-sub {
@@ -3711,7 +3659,7 @@ body.light .lb-splat {
 
 /* "Preferred" pill — white on blue so it stands out (not blue-on-blue) */
 .contact-pill {
-  font-size: 9px;
+  font-size: calc(9px * var(--text-scale, 1));
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -3753,7 +3701,7 @@ body.light .lb-splat {
 }
 
 .contact-email-addr {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 600;
   line-height: 1.25;
   color: var(--text-primary);
@@ -3762,7 +3710,7 @@ body.light .lb-splat {
 }
 
 .contact-email-note {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--text-scale, 1));
   line-height: 1.3;
   color: var(--text-muted);
 }
@@ -3781,7 +3729,7 @@ body.light .lb-splat {
   gap: 6px;
   padding: 8px 6px;
   border-radius: var(--radius-sm);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-scale, 1));
   font-weight: 600;
   white-space: nowrap;
   text-decoration: none;
@@ -3905,7 +3853,7 @@ html {
 .toast {
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
   font-weight: 500;
   color: var(--text-primary);
   background: var(--glass-bg);
@@ -3942,34 +3890,31 @@ html {
 
 /* ========== KEYBOARD FOCUS ========== */
 /* Visible focus ring for keyboard users (mouse clicks don't trigger it). */
-.btn:focus-visible,
-.lang-btn:focus-visible,
-.lang-option:focus-visible,
-.theme-toggle:focus-visible,
-.history-toggle:focus-visible,
-.history-dl-btn:focus-visible,
-.history-del-btn:focus-visible,
-.history-clear-btn:focus-visible,
-.input-small:focus-visible,
-.toggle-input:focus-visible + .toggle-track {
+.btn:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.lang-btn:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.lang-option:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.theme-toggle:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.history-toggle:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.history-dl-btn:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.history-del-btn:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.history-clear-btn:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.input-small:focus-visible:where(body:not([data-input-modality="pointer"]) *),
+.toggle-input:focus-visible:where(body:not([data-input-modality="pointer"]) *) + .toggle-track {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Selects deliberately get NO persistent :focus ring: a <select> keeps :focus
-   after its dropdown closes, which left a "stuck" blue outline even though
-   there's nothing left to interact with. They now behave like buttons —
-   highlighted only while hovered (see Tier 2).
-   :focus-visible is safe, though: mouse interaction never matches it, so the
-   stuck-outline problem can't occur, while keyboard users still get a ring. */
-.select:focus-visible {
+/* A single keyboard ring; native mouse selection must not leave an outline. */
+.select:focus { outline: none; }
+body[data-input-modality="pointer"] :focus { outline: none; }
+.select:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 /* Tabs are full-bleed rectangles — a snug inner ring reads cleaner than an
    offset outline box. */
-.tab:focus-visible {
+.tab:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--accent);
 }
@@ -3997,7 +3942,7 @@ html.action-popup body { max-width: none; }
 .export-format-row .field { min-width: 0; }
 .post-selection-panel, body.light .post-selection-panel { padding: 0; background: transparent; border: 0; box-shadow: none; }
 .post-selection-panel.is-empty { outline: 2px solid var(--danger); outline-offset: 4px; }
-.post-selection-heading h2 { font-size: 14px; font-weight: 600; }
+.post-selection-heading h2 { font-size: calc(14px * var(--text-scale, 1)); font-weight: 600; }
 .post-selection-count { font-variant-numeric: tabular-nums; }
 .post-type-row { position: relative; border: 1px solid var(--glass-border); border-radius: 9px; background: var(--glass-bg); }
 .post-type-choice, body.light .post-type-choice,
@@ -4006,10 +3951,10 @@ html.action-popup body { max-width: none; }
   min-height: 44px; padding: 10px; border: 0; border-radius: 8px; background: transparent;
 }
 .post-type-choice:hover, body.light .post-type-choice:hover { background: var(--bg-hover); }
-.post-type-choice:has(input:focus-visible) { outline-offset: -2px; }
+.post-type-choice:has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *)) { outline-offset: -2px; }
 .post-type-choice:has(input:not(:checked)), body.light .post-type-choice:has(input:not(:checked)) { background: var(--bg-tertiary); }
 .post-type-icon, .post-type-icon svg { width: 24px; height: 24px; }
-.post-choice-copy strong { font-size: 14px; font-weight: 600; }
+.post-choice-copy strong { font-size: calc(14px * var(--text-scale, 1)); font-weight: 600; }
 .post-type-choice .post-choice-copy { padding-inline-end: 24px; }
 .post-type-choice input:not(:checked) ~ .post-choice-copy { opacity: 1; }
 .post-type-choice input:checked ~ .post-choice-check { box-shadow: none; }
@@ -4019,10 +3964,10 @@ button.date-help { background: transparent; padding: 0; width: 16px; height: 16p
 .appearance-settings { margin-bottom: 12px; }
 .export-status { margin-bottom: 16px; gap: 10px; }
 .status-text { overflow-wrap: anywhere; }
-.tweet-count { font-size: 22px; font-weight: 650; line-height: 1.25; margin: 10px 0 12px; font-variant-numeric: tabular-nums; }
-.status-detail { font-size: 13px; line-height: 1.4; }
+.tweet-count { font-size: calc(22px * var(--text-scale, 1)); font-weight: 650; line-height: 1.25; margin: 10px 0 12px; font-variant-numeric: tabular-nums; }
+.status-detail { font-size: calc(13px * var(--text-scale, 1)); line-height: 1.4; }
 .status-action-stack.running-actions { padding-top: 10px; border-top: 1px solid var(--glass-border); }
-.status-action-stack.running-actions .btn-status-action { min-width: 90px; min-height: 40px; padding: 8px 12px; font-size: 13px; }
+.status-action-stack.running-actions .btn-status-action { min-width: 90px; min-height: 40px; padding: 8px 12px; font-size: calc(13px * var(--text-scale, 1)); }
 .result-actions:not(:has(> :not(.hidden))) { display: none; }
 #tab-home > .actions:has(#startBtn:not(.hidden)) { position: sticky; bottom: 0; z-index: 2; padding: 8px 0 2px; }
 /* Every tooltip uses measured viewport bounds, including at non-default scale. */
@@ -4134,8 +4079,7 @@ body.light.simplified {
 }
 
 
-body.simplified { background: #111419 !important; }
-body.light.simplified { background: #f5f7fa !important; }
+body.simplified { background: var(--bg-tertiary) !important; }
 body.simplified .popup, body.simplified .header, body.simplified .tabs { background: var(--bg-tertiary) !important; box-shadow: none; backdrop-filter: none; }
 body.simplified .header::before { display: none; }
 body.simplified .brand { color: var(--text-primary); background: none; -webkit-text-fill-color: currentColor; }
@@ -4144,8 +4088,6 @@ body.simplified .tab.active { background: var(--bg-hover); color: var(--accent);
 body.simplified .select, body.simplified .input-small, body.simplified .account-card { background-color: var(--input-bg); border-color: var(--border); box-shadow: none; backdrop-filter: none; }
 body.simplified .account-meta--input { background: var(--bg-secondary); border-color: transparent; box-shadow: none; }
 body.simplified .post-type-choice { min-height: 42px; padding-block: 10px; }
-body.simplified .post-type-icon { color: var(--text-secondary); }
-body.simplified .post-type-choice input:checked ~ .post-type-icon { color: var(--accent); }
 body.simplified .post-type-row { background: var(--input-bg); }
 body.simplified .export-status { background: var(--glass-bg); box-shadow: none; backdrop-filter: none; }
 body.simplified .btn-primary { background: var(--accent); color: var(--bg-tertiary); border-color: transparent; box-shadow: none; text-shadow: none; }
@@ -4153,8 +4095,8 @@ body.simplified .btn-primary:hover { background: var(--accent-hover); box-shadow
 body.light.simplified .btn-primary { color: #fff; }
 body.simplified .btn-secondary { background: var(--input-bg); box-shadow: none; }
 body.simplified .btn-status-action.btn-danger { background: transparent; color: var(--text-secondary); border-color: var(--border); box-shadow: none; }
-body.simplified .btn-status-action.btn-danger:hover { color: #ff8b95; background: rgba(244,33,46,.1); }
-body.light.simplified .btn-status-action.btn-danger:hover { color: #b52538; }
+body.simplified .btn-status-action.btn-danger:hover { color: color-mix(in srgb, var(--danger) 70%, var(--text-primary)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+body.light.simplified .btn-status-action.btn-danger:hover { color: color-mix(in srgb, var(--danger) 80%, black); }
 body.simplified #tab-home > .actions { background: var(--bg-tertiary); }
 body.simplified .progress-bar { height: 5px; background: var(--border); }
 body.simplified .progress-fill { box-shadow: none; }
@@ -4171,7 +4113,7 @@ body.simplified .progress-fill::after { display: none; }
   min-height: 44px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: calc(14px * var(--text-scale, 1));
   line-height: 1.25;
   gap: 8px;
 }
@@ -4220,3 +4162,65 @@ body.simplified .progress-fill::after { display: none; }
 }
 .date-help .help-pop[popover]:not(:popover-open) { display: none; }
 .date-help .help-pop[popover]:popover-open { display: block; }
+
+/* ========== CONSISTENT NEUTRAL SURFACES AND INTERACTION ========== */
+/* Keep the gradient on the shell. Nested cards and inputs use an opaque
+   fill so their color does not depend on position or stacked transparency. */
+body.light:not(.simplified) :is(
+  .account-card, .account-meta--input, .post-choice, .post-type-row,
+  .history-toggle, .detail-item, .about-contact, .contact-email,
+  .email-action, .about-source, .btn-secondary, .feed-db-body
+) {
+  background: var(--control-bg);
+}
+
+/* The outer row owns the surface and ring; its label only owns the click.
+   This also covers unchecked choices and hovering the adjacent help button. */
+body .post-type-row > .post-type-choice:has(input),
+body.light .post-type-row > .post-type-choice:has(input) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.post-type-row, .detail-item, .account-card--editable {
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.detail-head:hover,
+body.light .detail-head:hover {
+  background: transparent;
+}
+
+body.simplified {
+  --control-hover-bg: var(--bg-hover);
+  --control-hover-shadow: 0 0 0 0 transparent;
+}
+
+/* Same blue border, ring and lift for every neutral rectangular control.
+   Explicit body variants keep theme overrides from splitting the behavior. */
+:is(body, body.light, body.simplified) :is(
+  .select, .input-small, .btn-secondary, .history-toggle,
+  .email-action, .about-source
+):is(:hover, :focus-visible:where(body:not([data-input-modality="pointer"]) *)),
+:is(body, body.light, body.simplified) .post-type-row:is(:hover, :has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *))),
+:is(body, body.light, body.simplified) .detail-item:has(> .detail-head:is(:hover, :focus-visible:where(body:not([data-input-modality="pointer"]) *))),
+:is(body, body.light, body.simplified) .account-card--editable:is(:hover, :focus-within) {
+  background-color: var(--control-hover-bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--control-hover-shadow);
+  transform: translateY(-1px);
+}
+
+/* Apply keyboard focus to the whole row, without an extra inner rectangle. */
+.post-type-row > .post-type-choice:has(input:focus-visible:where(body:not([data-input-modality="pointer"]) *)),
+.detail-head:focus-visible:where(body:not([data-input-modality="pointer"]) *) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-type-row, .detail-item, .account-card--editable { transition: none; }
+}
+
+/* Each release-note point remains readable in every locale. */
+[data-i18n="update200Body"] { white-space: pre-line; }

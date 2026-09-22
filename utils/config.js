@@ -14,6 +14,7 @@ const XPORTER_CONFIG = {
         responseAttempts: 6,
         maxConsecutiveFailures: 3, // includes the initial failed response
         maxNoProgressPages: 3,
+        maxSkippedPayloads: 12, // consecutive Top/unrelated-cursor responses before SEARCH_STALLED
         retryDelayMs: 1000,
         rateLimitPauseMs: 60000,
         recoveryRounds: 1,
@@ -27,8 +28,13 @@ const XPORTER_CONFIG = {
     // disabled; header-less adaptive requests use the mode-specific ranges below.
     REQUEST_DELAY: 3000,           // ms between API requests
     COOLDOWN_DURATION: 180000,     // 3 min cooldown after each batch
-    RATE_LIMIT_PAUSE: 60000,       // fixed 60s retry wait after a real 429/network failure
-    MAX_RETRIES: 5,                // max retry attempts per request
+    RATE_LIMIT_PAUSE: 60000,       // retry wait after a network failure
+    MAX_RETRIES: 5,                // max retry attempts per request (stale query id, network)
+    // A real 429 is cleared by X's rolling 15-minute window, nothing sooner.
+    // On 429 the limiter waits for the reset time X advertises (or the full
+    // window when unknown), retries once, and repeats while the user's wait
+    // budget (RATE_LIMIT_WAIT_RANGE_MINUTES) allows.
+    RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000,
     BATCH_SIZE: 20,                // requests before cooldown
 
     // Adaptive pacing — use current x-rate-limit-* headers when available, but
@@ -59,13 +65,17 @@ const XPORTER_CONFIG = {
     //                                no longer creates a scheduled reset wait
     //   fallbackScale              — multiplier on FALLBACK_REQUEST_DELAYS
     SPEED_PRESETS: {
+        ultra: {
+            adaptiveFloor: 300, adaptivePad: 0, budgetFraction: 1,
+            raceReserve: 2, fallbackScale: 0.075
+        },
         turbo: {
-            adaptiveFloor: 1500, adaptivePad: 500, budgetFraction: 1,
-            raceReserve: 2, fallbackScale: 0.5
+            adaptiveFloor: 500, adaptivePad: 500, budgetFraction: 1,
+            raceReserve: 2, fallbackScale: 0.25
         },
         fast: {
-            adaptiveFloor: 2500, adaptivePad: 500, budgetFraction: 1,
-            raceReserve: 3, fallbackScale: 0.75
+            adaptiveFloor: 1500, adaptivePad: 500, budgetFraction: 1,
+            raceReserve: 3, fallbackScale: 0.5
         },
         standard: {
             adaptiveFloor: 3000, adaptivePad: 1000, budgetFraction: 1,
@@ -127,7 +137,7 @@ const XPORTER_CONFIG = {
         turbo: 20
     },
     ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE: [1, 50, 5],
-    ABOUT_ACCOUNT_RETRY_RANGE: [1, 1440, 5],
+    RATE_LIMIT_WAIT_RANGE_MINUTES: [15, 1440, 15], // [min, max, default] total minutes to wait for X's limit; min = one full window
     STALE_RETRY_BASE_WAIT: 10000,        // base wait on STALE_QUERY_ID (multiplied by attempt)
     API_FETCH_TIMEOUT: 30000,            // ms per GraphQL/REST request — a hung fetch must fail visibly, not hang the export forever
     DISCOVERY_FETCH_TIMEOUT: 15000,      // ms per discovery fetch (x.com page / JS bundle)

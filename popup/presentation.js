@@ -12,12 +12,23 @@
         function positionViewportHelp(trigger) {
             const tooltip = trigger.querySelector(':scope > .help-pop');
             if (!tooltip) return;
-            const triggerRect = trigger.getBoundingClientRect();
-            const zoom = triggerRect.width / trigger.offsetWidth || 1;
-            const tabsRect = document.querySelector('.tabs')?.getBoundingClientRect();
+            const zoom = parseFloat(getComputedStyle(popup).zoom) || 1;
+            const measuredZoom = trigger.getBoundingClientRect().width / trigger.offsetWidth || 1;
+            // Before Chrome 128 DOMRects omit inherited CSS zoom. Detect the
+            // coordinate model from geometry, not a browser-version guess.
+            const coordinateScale = Math.abs(measuredZoom - zoom) < 0.02 ? 1 : zoom;
+            const viewportRect = element => {
+                const rect = element?.getBoundingClientRect();
+                return rect && {
+                    left: rect.left * coordinateScale, top: rect.top * coordinateScale,
+                    bottom: rect.bottom * coordinateScale
+                };
+            };
+            const triggerRect = viewportRect(trigger);
+            const tabsRect = viewportRect(document.querySelector('.tabs'));
             const safeTop = tabsRect && tabsRect.bottom > 0 && tabsRect.top < innerHeight
                 ? Math.max(8, tabsRect.bottom + 8) : 8;
-            const footerRect = document.querySelector('.footer')?.getBoundingClientRect();
+            const footerRect = viewportRect(document.querySelector('.footer'));
             const safeBottom = footerRect && footerRect.top > 0 && footerRect.top < innerHeight
                 ? footerRect.top - 8 : innerHeight - 8;
             const width = Math.max(0, Math.min(360 * zoom, innerWidth - 32));
@@ -50,6 +61,12 @@
             const tooltip = trigger.querySelector(':scope > .help-pop');
             if (!tooltip) return;
             clearTimeout(helpCloseTimer);
+            // Chrome 111–113 has no Popover API (including its CSS selector).
+            // Native help preserves the explanation without opening an unbounded overlay.
+            if (typeof tooltip.showPopover !== 'function' || typeof tooltip.hidePopover !== 'function') {
+                trigger.setAttribute('title', trigger.getAttribute('aria-label') || tooltip.textContent);
+                return;
+            }
             if (openHelp !== trigger) closeHelp();
             openHelp = trigger;
             tooltip.setAttribute('popover', 'manual');
@@ -194,3 +211,33 @@
     }
     root.XPorterPopupUI = Object.freeze({ mount });
 })(globalThis);
+
+// Home owns the shell height; longer tabs scroll within that same shell.
+function mountHomeSizing() {
+    const popup = document.getElementById('popup');
+    const home = document.getElementById('tab-home');
+    let pending = false;
+    function schedule() {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+            pending = false;
+            const scroller = document.getElementById('homeContent');
+            const scrollTop = scroller.scrollTop;
+            popup.classList.add('measuring-home');
+            const height = home.offsetHeight + popup.querySelector('.header').offsetHeight
+                + popup.querySelector('.tabs').offsetHeight;
+            popup.classList.remove('measuring-home');
+            popup.style.setProperty('--home-height', `${height}px`);
+            scroller.scrollTop = scrollTop;
+        });
+    }
+    new MutationObserver(schedule).observe(home, {
+        subtree: true, childList: true, characterData: true, attributes: true,
+        attributeFilter: ['class', 'style', 'hidden']
+    });
+    new MutationObserver(schedule).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+    new ResizeObserver(schedule).observe(popup.querySelector('.header'));
+    document.fonts.ready.then(schedule);
+    schedule();
+}

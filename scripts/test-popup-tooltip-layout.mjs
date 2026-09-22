@@ -145,6 +145,34 @@ async function main() {
       'an oversized tooltip must remain scrollable'
     );
 
+    // Exercise the unsupported-API branch in an actual extension document.
+    // This emulates API absence; it is not an installed historical Chromium.
+    const legacy = await context.newPage();
+    const errors = [];
+    legacy.on('pageerror', error => errors.push(error.message));
+    await legacy.addInitScript(() => {
+      Object.defineProperty(HTMLElement.prototype, 'showPopover', { value: undefined, configurable: true });
+      Object.defineProperty(HTMLElement.prototype, 'hidePopover', { value: undefined, configurable: true });
+      const matches = Element.prototype.matches;
+      Element.prototype.matches = function(selector) {
+        if (selector.includes(':popover-open')) throw new DOMException('Unsupported selector', 'SyntaxError');
+        return matches.call(this, selector);
+      };
+    });
+    await legacy.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+    const helper = legacy.locator('[data-i18n-tooltip]:visible').first();
+    await helper.locator('.help-pop').waitFor({ state: 'attached' });
+    await helper.hover();
+    assert.equal(await helper.getAttribute('title'), await helper.getAttribute('aria-label'));
+    assert.equal(await helper.locator('.help-pop').isVisible(), false);
+    await helper.focus();
+    await legacy.keyboard.press('Escape');
+    await legacy.locator('#tabBtnSettings').click();
+    assert.equal(await legacy.locator('#tab-settings').isVisible(), true);
+    await legacy.locator('#tabBtnAbout').click();
+    assert.equal(await legacy.locator('#tab-about').isVisible(), true);
+    assert.deepEqual(errors, [], 'unsupported Popover must never break popup navigation');
+    console.log('PASS native help fallback and tab navigation with Popover unavailable');
     console.log(JSON.stringify(layout, null, 2));
   } finally {
     await context.close();

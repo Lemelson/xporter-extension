@@ -486,7 +486,7 @@ async function loadSettings() {
         includeAboutAccountDetails: false,
         aboutAccountSpeed: 'standard',
         aboutAccountCustomBatchSize: C.ABOUT_ACCOUNT_CUSTOM_BATCH_RANGE?.[2] ?? 5,
-        aboutAccountMaxRetries: C.ABOUT_ACCOUNT_RETRY_RANGE?.[2] ?? 5,
+        aboutAccountMaxRetries: C.RATE_LIMIT_WAIT_RANGE_MINUTES?.[2] ?? 15, // minutes to wait for X's limit (historical key name)
         exportMode: 'posts',
         outputFormat: 'csv',
         quantityLimit: 500,
@@ -505,8 +505,12 @@ async function loadSettings() {
         cooldownDuration: C.COOLDOWN_DURATION || 180000,
         adaptivePacing: (C.ADAPTIVE_PACING !== false),
         theme: 'dark',
+        themePreset: null, // Legacy settings resolve to the matching classic theme.
         simplifiedDesign: false,
         uiScale: 100,
+        textScale: 100,
+        popupWidth: 100,
+        popupHeight: 100,
         autoExpireEnabled: true,
         autoExpireHours: 4,
         ladybugEnabled: true,
@@ -578,6 +582,7 @@ function defaultUsage() {
         // Engagement signals (anonymous): how many times the UI was opened and
         // how much time was actually spent looking at it. Together they tell
         // "installed but never really used" from "used a lot then left".
+        ladybugSquashes: 0,
         opens: 0,
         activeMs: 0,
         lastOpenAt: 0
@@ -617,6 +622,12 @@ function backfillInstalledAt() {
         if (usage.installedAt) return false;
         usage.installedAt = Date.now();
         usage.installedAtApprox = true;
+    });
+}
+
+function recordLadybugSquash() {
+    return mutateUsage(usage => {
+        usage.ladybugSquashes = (usage.ladybugSquashes || 0) + 1;
     });
 }
 
@@ -752,7 +763,7 @@ if (typeof globalThis !== 'undefined') {
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
         loadUsage, markInstalled, backfillInstalledAt,
-        recordOpen, addActiveMs,
+        recordOpen, recordLadybugSquash, addActiveMs,
         recordExportStart, recordExportPhase, recordFirstItem,
         recordExportComplete, recordExportStopped, recordExportError, recordDownload,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH

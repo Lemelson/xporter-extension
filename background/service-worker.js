@@ -15,9 +15,13 @@ importScripts(
     '../utils/columns-i18n.js',
     '../utils/csv.js',
     '../utils/storage.js',
+    '../utils/diagnostics.js',
+    '../utils/diagnostics-codec.js',
     '../utils/post-database.js',
     '../popup/i18n.js', // loadTranslations() — used to localize the in-page capture overlay
+    '../popup/theme-presets.js',
     './uninstall-feedback.js',
+    './download-diagnostics.js',
     './downloads.js'
 );
 
@@ -38,6 +42,30 @@ let searchCapture = null;
 let exportLoopPromise = null;
 let lastTransientStatus = null;
 let manualWaitUntil = null;
+
+// Optional in small VM fixtures; all production events use this failure-safe queue.
+function diagnose(type, data) {
+    return globalThis.XPorterDiagnostics?.record(type, data) || Promise.resolve(null);
+}
+
+diagnose('recover').then(() => globalThis.XPorterDownloadDiagnostics?.recover?.()).catch(() => {});
+
+async function diagnosticRejection(error, context = {}) {
+    await diagnose('rejected', { ...context, error });
+    return { error };
+}
+
+async function diagnoseStart(operation, context) {
+    await diagnose('attempt', context);
+    try {
+        const result = await operation();
+        if (result?.error) await diagnose('terminal', { result: 'rejected', error: result.error });
+        return result;
+    } catch (error) {
+        await diagnose('terminal', { result: 'rejected', error: error.message });
+        throw error;
+    }
+}
 
 // The three limiters belong to one export lifecycle even though they pace
 // different X endpoints. Keep lifecycle operations on this canonical list so
@@ -240,7 +268,11 @@ async function handleMessage(message, sender) {
             return await resumePostsOnly();
 
         case 'SAVE_SETTINGS':
-            if (!await XPorterStorage.saveSettings(message.settings)) {
+            const settingsPatch = { ...message.settings };
+            // Ignore obsolete sharing preferences from older popup instances.
+            delete settingsPatch.diagnosticsSharing;
+            delete settingsPatch.diagnosticsConsentVersion;
+            if (!await XPorterStorage.saveSettings(settingsPatch)) {
                 return { error: 'STORAGE_FULL' };
             }
             if (applyLivePacingSettings(message.settings)) {
@@ -254,6 +286,16 @@ async function handleMessage(message, sender) {
         case 'GET_SETTINGS':
             const settings = await XPorterStorage.loadSettings();
             return { settings };
+
+        case 'DIAGNOSTIC_CLIPBOARD_COPIED':
+            if (!sender?.url?.startsWith(chrome.runtime.getURL('popup/'))) return { error: 'INVALID_SENDER' };
+            await diagnose('clipboard');
+            return {success:true};
+        case 'DIAGNOSTIC_START_REJECTED':
+            if (!sender?.url?.startsWith(chrome.runtime.getURL('popup/'))) return { error: 'INVALID_SENDER' };
+            await diagnose('rejected', {mode:message.mode,format:message.format,error:message.error,
+                dateRange:message.dateRange === true,settings:await XPorterStorage.loadSettings()});
+            return {success:true};
 
         case 'CLEAR_EXPORT':
             if (exportOwnsDownloadData()) return { error: 'ALREADY_RUNNING' };
@@ -321,9 +363,15 @@ async function handleMessage(message, sender) {
                 ? { success: true }
                 : { error: 'STORAGE_FULL' };
 
+        case 'XP_LADYBUG_SQUASH':
+            await XPorterStorage.recordLadybugSquash();
+            await XPorterFeedback.refresh();
+            return { success: true };
+
         case 'XP_SESSION_OPEN':
             // Popup was opened — count it and refresh the snapshot.
             await XPorterStorage.recordOpen();
+            await diagnose('open');
             XPorterFeedback.refresh();
             return { success: true };
 
@@ -365,14 +413,18 @@ async function waitForLoopUnwind(ms = 8000) {
 async function startExport({ username, dateFrom, dateTo, exportMode, outputFormat }) {
     await waitForLoopUnwind();
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
-        return { error: 'ALREADY_RUNNING' };
+        return diagnosticRejection('ALREADY_RUNNING', { mode: exportMode, format: outputFormat });
     }
-    if (exportDataMutationStarting) return { error: 'ALREADY_RUNNING' };
-    if (downloadOwnsExportData()) return { error: 'DOWNLOAD_IN_PROGRESS' };
+    if (exportDataMutationStarting) return diagnosticRejection('ALREADY_RUNNING', { mode: exportMode, format: outputFormat });
+    if (downloadOwnsExportData()) return diagnosticRejection('DOWNLOAD_IN_PROGRESS', { mode: exportMode, format: outputFormat });
     exportStarting = true;
 
     try {
-        return await _startExportInner({ username, dateFrom, dateTo, exportMode, outputFormat });
+        return await diagnoseStart(
+            () => _startExportInner({ username, dateFrom, dateTo, exportMode, outputFormat }),
+            { mode: exportMode || 'posts', format: outputFormat || 'csv',
+                dateRange: !!(dateFrom || dateTo), settings: await XPorterStorage.loadSettings() }
+        );
     } finally {
         exportStarting = false;
     }
@@ -456,6 +508,7 @@ async function _startExportInner({ username, dateFrom, dateTo, exportMode, outpu
     }
 
     // Anonymous usage counter (for uninstall feedback) — fire and forget
+    await diagnose('started', {settings:currentExport.settings});
     XPorterStorage.recordExportStart(mode, outputFormat, {
         dateRange: !!(normalizedDateFrom || normalizedDateTo)
     }).then(XPorterFeedback.refresh).catch(() => {});
@@ -578,6 +631,8 @@ async function runExportLoop() {
         // Anonymous usage counter (for uninstall feedback) — fire and forget
         const itemsDelta = Math.max(0, currentExport.tweetCount - (currentExport.itemsRecordedBase || 0));
         XPorterStorage.recordExportComplete(itemsDelta).then(XPorterFeedback.refresh).catch(() => {});
+        diagnose('terminal', { result: 'complete', rows: currentExport.tweetCount,
+            completion: currentExport.completionReason });
 
         broadcastStatus({
             running: false,
@@ -593,6 +648,9 @@ async function runExportLoop() {
         if (error.message === 'ABORTED') {
             // Flush remaining buffer
             await flushExportBuffer();
+            if (aboutAccountCache) {
+                await XPorterStorage.saveAboutAccountCache(aboutAccountCache).catch(() => false);
+            }
             currentExport.running = false;
             currentExport.status = 'stopped';
             await saveCurrentState();
@@ -944,14 +1002,13 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0 
 
             if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
                 await flushExportBuffer();
+                await saveCurrentState({ bestEffort: true });
             }
             if (!hasMore) break;
         }
 
-        if (quantityLimitReached()) {
-            hasMore = false;
-            currentExport.completionReason = 'limit_reached';
-        }
+        const limitReachedThisPage = quantityLimitReached();
+        if (limitReachedThisPage) hasMore = false;
 
         // Forward progress is measured AFTER filtering and de-duplication. X
         // occasionally repeats a non-empty page with the same cursor; treating
@@ -964,6 +1021,7 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0 
         // Commit rows before mutating the cursor or completion reason.
         // On a failed write the error handler must persist the current page.
         await flushExportBuffer();
+        if (limitReachedThisPage) currentExport.completionReason = 'limit_reached';
 
         // Update cursor
         // Keep the current cursor when stopping on a quantity limit so resume
@@ -1045,6 +1103,10 @@ async function _fetchPostsByDateRangeLoop() {
     const rawQuery = buildDateRangeSearchQuery(currentExport.username, currentExport.dateFrom,
         new Date(dateExportUpperBound()));
     let previousCursor = null;
+    // A later clean terminal page cannot certify earlier partial responses.
+    // Resume replays the whole query, so only a clean replay clears this doubt.
+    let hasPartialSearchResults = false;
+    let skippedPayloads = 0;
     let stalledPages = 0;
     let badPages = 0;
     let failedPage = null;
@@ -1060,7 +1122,13 @@ async function _fetchPostsByDateRangeLoop() {
             // Only the initial response or the expected Bottom request can
             // advance this export or prove the downward source is exhausted.
             if (payload.requestCursor !== undefined && payload.requestCursor !== previousCursor) {
+                // Every ignored payload restarts the response budget, so bound
+                // consecutive skips: endless Top refreshes must not wait forever.
+                if (++skippedPayloads > XPORTER_CONFIG.SEARCH_CAPTURE.maxSkippedPayloads) {
+                    throw new Error('SEARCH_STALLED');
+                }
                 payload = await requestNextSearchCapturePayload();
+                if (!payload && currentExport.running) payload = await recoverStalledSearchCapture();
                 continue;
             }
             if (payload.error && payload.error !== 'SEARCH_NETWORK_ERROR') throw new Error(payload.error);
@@ -1107,6 +1175,8 @@ async function _fetchPostsByDateRangeLoop() {
             }
             badPages = 0;
             failedPage = null;
+            skippedPayloads = 0;
+            hasPartialSearchResults ||= parsed.hasPartialErrors === true;
             await setSearchPhase('collecting');
             const countBefore = currentExport.tweetCount;
             for (const tweet of parsed.tweets || []) {
@@ -1115,7 +1185,6 @@ async function _fetchPostsByDateRangeLoop() {
                 // Only fill display fields after author identity has been verified.
                 tweet.author_name ||= currentExport.userInfo?.name || '';
                 tweet.author_username ||= currentExport.userInfo?.screenName || currentExport.username || '';
-                noteSearchTimelineCoverage(tweet);
                 if (!postSelectionAllowsTweet(currentExport.settings, tweet)) continue;
                 if (seenIds.has(tweet.id)) {
                     if (currentExport.dateResume && searchCapture) searchCapture.resumeScanned++;
@@ -1134,6 +1203,7 @@ async function _fetchPostsByDateRangeLoop() {
             await flushExportBuffer();
             if (quantityLimitReached()) currentExport.completionReason = 'limit_reached';
             else if (parsed.sourceExhausted === true) {
+                if (hasPartialSearchResults) throw new Error('SEARCH_END_UNCONFIRMED');
                 currentExport.completionReason = currentExport.tweetCount ? 'source_exhausted' : 'no_matches';
             }
             const cursor = parsed.nextCursor;
@@ -1162,7 +1232,11 @@ async function _fetchPostsByDateRangeLoop() {
         if (currentExport.running && !currentExport.completionReason) throw new Error('SEARCH_STALLED');
     } catch (error) {
         // A later invalid row must not discard earlier validated rows in this page.
-        await flushExportBuffer();
+        try {
+            await flushExportBuffer();
+        } catch (flushError) {
+            XLog.error('Could not persist rows while handling search error:', flushError.message);
+        }
         throw error;
     } finally {
         await closeSearchCaptureTab();
@@ -1199,24 +1273,6 @@ function formatDateForSearch(date) {
     return date.toISOString().slice(0, 10);
 }
 
-// Approximate date coverage is display-only, never a termination condition.
-function computeDateCoveragePct() {
-    const fromMs = toEpochMs(currentExport?.dateFrom);
-    const toMs = dateExportUpperBound();
-    const oldest = searchCapture?.oldestCollectedMs;
-    if (!Number.isFinite(fromMs) || !Number.isFinite(oldest) || toMs <= fromMs) return null;
-    return Math.min(99, Math.max(0, ((toMs - oldest) / (toMs - fromMs)) * 100));
-}
-
-function noteSearchTimelineCoverage(tweet) {
-    const createdMs = toEpochMs(tweet?.created_at);
-    if (!Number.isFinite(createdMs) || !searchCapture) return;
-    searchCapture.oldestCollectedMs = Math.min(
-        searchCapture.oldestCollectedMs ?? Infinity,
-        createdMs
-    );
-}
-
 function buildSearchTimelinePageUrl(rawQuery) {
     return `https://x.com/search?q=${encodeURIComponent(rawQuery)}&src=typed_query&f=live`;
 }
@@ -1242,7 +1298,6 @@ async function openSearchCaptureTab(rawQuery) {
         resolver: null,
         seenUrls: new Set(),
         rawQuery,
-        oldestCollectedMs: null, // drives the overlay's date-based progress %
         resumeScanned: 0
     };
 
@@ -1617,10 +1672,8 @@ async function _fetchUsersLoop() {
             await appendUsersToExport(acceptedUsers);
         }
 
-        if (quantityLimitReached()) {
-            hasMore = false;
-            currentExport.completionReason = 'limit_reached';
-        }
+        const limitReachedThisPage = quantityLimitReached();
+        if (limitReachedThisPage) hasMore = false;
 
         const acceptedNew = currentExport.tweetCount - countBeforePage;
         const cursorAdvanced = !!result.nextCursor && result.nextCursor !== requestCursor;
@@ -1629,6 +1682,7 @@ async function _fetchUsersLoop() {
         // Commit rows before mutating the cursor or completion reason.
         // On a failed write the error handler must persist the current page.
         await flushExportBuffer();
+        if (limitReachedThisPage) currentExport.completionReason = 'limit_reached';
 
         // Update cursor
         if (hasMore && cursorAdvanced) {
@@ -1680,6 +1734,7 @@ async function appendUsersToExport(users) {
 
         if (currentExport.tweetBuffer.length >= XPorterStorage.MAX_TWEETS_PER_BATCH) {
             await flushExportBuffer();
+            await saveCurrentState({ bestEffort: true });
         }
     }
 }
@@ -1705,19 +1760,33 @@ async function enrichUsersWithAboutDetails(users, onBatch = null) {
         if (!currentExport.running) break;
         const batchSize = resolveAboutAccountBatchSize(currentExport.settings);
         const batch = users.slice(start, start + batchSize);
-        const batchResults = await aboutRateLimiter.executeWithRateLimit(async () => {
-            const settled = await Promise.allSettled(
-                batch.map(user => enrichUserWithAboutDetails(user))
-            );
-            const terminalFailure = settled.find(result =>
-                result.status === 'rejected' &&
-                ['RATE_LIMITED', 'ABORTED'].includes(result.reason?.message)
-            );
-            if (terminalFailure) throw terminalFailure.reason;
-            return settled.map((result, index) => result.status === 'fulfilled'
-                ? result.value
-                : { ...batch[index], ...aboutDetailsForUser() });
-        });
+        let batchResults;
+        try {
+            batchResults = await aboutRateLimiter.executeWithRateLimit(async () => {
+                const settled = await Promise.allSettled(
+                    batch.map(user => enrichUserWithAboutDetails(user))
+                );
+                const terminalFailure = settled.find(result =>
+                    result.status === 'rejected' &&
+                    ['RATE_LIMITED', 'ABORTED'].includes(result.reason?.message)
+                );
+                if (terminalFailure) {
+                    // Retries serve these users from aboutAccountCache, so they
+                    // are only appended once: when the limiter finally gives up.
+                    terminalFailure.reason.partialResults = settled
+                        .filter(result => result.status === 'fulfilled')
+                        .map(result => result.value);
+                    throw terminalFailure.reason;
+                }
+                return settled.map((result, index) => result.status === 'fulfilled'
+                    ? result.value
+                    : { ...batch[index], ...aboutDetailsForUser() });
+            });
+        } catch (error) {
+            const partial = Array.isArray(error?.partialResults) ? error.partialResults : [];
+            if (partial.length && onBatch && currentExport.running) await onBatch(partial);
+            throw error;
+        }
         enriched.push(...batchResults);
         if (onBatch) await onBatch(batchResults);
         start += batch.length;
@@ -1774,13 +1843,13 @@ async function stopExport() {
 async function resumeExport(extraItems) {
     await waitForLoopUnwind();
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
-        return { error: 'ALREADY_RUNNING' };
+        return diagnosticRejection('ALREADY_RUNNING', { resume: true });
     }
-    if (exportDataMutationStarting) return { error: 'ALREADY_RUNNING' };
-    if (downloadOwnsExportData()) return { error: 'DOWNLOAD_IN_PROGRESS' };
+    if (exportDataMutationStarting) return diagnosticRejection('ALREADY_RUNNING', { resume: true });
+    if (downloadOwnsExportData()) return diagnosticRejection('DOWNLOAD_IN_PROGRESS', { resume: true });
     exportStarting = true;
     try {
-        return await _resumeExportInner(extraItems);
+        return await diagnoseResume(() => _resumeExportInner(extraItems));
     } finally {
         exportStarting = false;
     }
@@ -1800,16 +1869,22 @@ function canFallbackWithoutReplies(state) {
 async function resumePostsOnly() {
     await waitForLoopUnwind();
     if (exportStarting || exportLoopPromise || (currentExport && currentExport.running)) {
-        return { error: 'ALREADY_RUNNING' };
+        return diagnosticRejection('ALREADY_RUNNING', { resume: true });
     }
-    if (exportDataMutationStarting) return { error: 'ALREADY_RUNNING' };
-    if (downloadOwnsExportData()) return { error: 'DOWNLOAD_IN_PROGRESS' };
+    if (exportDataMutationStarting) return diagnosticRejection('ALREADY_RUNNING', { resume: true });
+    if (downloadOwnsExportData()) return diagnosticRejection('DOWNLOAD_IN_PROGRESS', { resume: true });
     exportStarting = true;
     try {
-        return await _resumeExportInner(undefined, { postsOnlyFallback: true });
+        return await diagnoseResume(() => _resumeExportInner(undefined, { postsOnlyFallback: true }));
     } finally {
         exportStarting = false;
     }
+}
+
+async function diagnoseResume(operation) {
+    const state = await XPorterStorage.loadExportState();
+    return diagnoseStart(operation, { mode: state?.exportMode, format: state?.outputFormat,
+        resume: true, dateRange: !!(state?.dateFrom || state?.dateTo), settings: state?.settings || {} });
 }
 
 function applyLivePacingSettings(settingsPatch = {}) {
@@ -1956,6 +2031,7 @@ async function _resumeExportInner(extraItems, { postsOnlyFallback = false } = {}
         resume: true,
         dateRange: !!(currentExport.dateFrom || currentExport.dateTo)
     }).then(XPorterFeedback.refresh).catch(() => {});
+    await diagnose('started', {settings:currentExport.settings});
     _lastRecordedUsagePhase = 'fetching';
 
     launchExportLoop('Resume export error:');
@@ -1980,6 +2056,12 @@ async function getExportStatus() {
     if (!liveState && state.running) {
         state.running = false;
         state.status = 'stopped';
+        await XPorterStorage.saveExportState(state);
+    }
+    // Older builds could persist a count with no batches behind it; the popup
+    // then offers a Download that always answers "No data". Clamp it.
+    if (!liveState && !state.running && !state.totalBatches && state.tweetCount > 0) {
+        state.tweetCount = 0;
         await XPorterStorage.saveExportState(state);
     }
 
@@ -2044,6 +2126,7 @@ async function getExportStatus() {
 
 async function saveCurrentState({ bestEffort = false } = {}) {
     if (!currentExport) return;
+    diagnose('progress', {rows:currentExport.tweetCount,newItem:false});
 
     const saved = await XPorterStorage.saveExportState({
         schemaVersion: currentExport.schemaVersion,
@@ -2053,7 +2136,11 @@ async function saveCurrentState({ bestEffort = false } = {}) {
         cursor: currentExport.cursor,
         postFeedPlan: currentExport.postFeedPlan || null,
         postFeedIndex: currentExport.postFeedIndex || 0,
-        tweetCount: currentExport.tweetCount,
+        // Persist only rows that are actually on disk. A live-settings save can
+        // land mid-page while up to 49 counted rows still sit in tweetBuffer;
+        // persisting the in-memory count there is how "48 collected" ends up
+        // with 0 batches after a worker restart.
+        tweetCount: currentExport.tweetCount - (currentExport.tweetBuffer?.length || 0),
         totalBatches: currentExport.totalBatches,
         dateFrom: currentExport.dateFrom?.toISOString() || null,
         dateTo: currentExport.dateTo?.toISOString() || null,
@@ -2083,7 +2170,11 @@ async function applyAutoExpiration() {
 
     const maxAge = Math.max(1, Number(settings.autoExpireHours) || 4) * 60 * 60 * 1000;
     const state = currentExport?.running ? null : await XPorterStorage.loadExportState();
-    if (state?.updatedAt && Date.now() - state.updatedAt > maxAge) {
+    // A paused export (stopped by the user or by an X limit) is work in
+    // progress, not leftover data: the user was told to come back later and
+    // press Resume. Only finished exports expire.
+    const expirable = state?.status === 'complete';
+    if (expirable && state?.updatedAt && Date.now() - state.updatedAt > maxAge) {
         if (!exportDataMutationStarting && !exportStarting && !exportLoopPromise) {
             exportDataMutationStarting = true;
             try {
@@ -2205,6 +2296,22 @@ function launchExportLoop(logPrefix) {
             // this identity check is the final safety net.
             if (!currentExport || currentExport !== exportInstance) return;
 
+            // Rows are persisted in 50-row chunks; a loop that dies on a rate
+            // limit (or any other error) can still hold up to 49 collected
+            // rows in memory. Without this flush the status shows "48
+            // collected" while Download reports "No data".
+            try {
+                await flushExportBuffer();
+            } catch (flushError) {
+                XLog.error('Could not persist rows after export error:', flushError.message);
+            }
+            // Same for About lookups: they are only saved at page end, so an
+            // error mid-page would repeat every request on Resume — against the
+            // endpoint that just rate-limited us.
+            if (aboutAccountCache) {
+                await XPorterStorage.saveAboutAccountCache(aboutAccountCache).catch(() => false);
+            }
+
             // The user already pressed Stop — a late failure from the aborted
             // in-flight request must land as the 'stopped' they asked for,
             // not overwrite it with a scary terminal error.
@@ -2231,6 +2338,7 @@ function launchExportLoop(logPrefix) {
                 canFallbackWithoutReplies: canFallbackWithoutReplies(currentExport)
             });
             XPorterStorage.recordExportError(currentExport.error).then(XPorterFeedback.refresh).catch(() => {});
+            diagnose('terminal', { result: 'error', error: currentExport.error, rows: currentExport.tweetCount });
         })
         .finally(() => {
             if (exportLoopPromise === tracked) {
@@ -2261,6 +2369,7 @@ function recordExportStoppedOnce() {
     if (!currentExport || currentExport._stopRecorded) return;
     currentExport._stopRecorded = true;
     XPorterStorage.recordExportStopped().then(XPorterFeedback.refresh).catch(() => {});
+    diagnose('terminal', { result: 'stopped', rows: currentExport.tweetCount });
 }
 
 let _lastRecordedUsagePhase = '';
@@ -2269,6 +2378,7 @@ function recordUsagePhase(phase) {
     if (_lastRecordedUsagePhase === phase) return;
     _lastRecordedUsagePhase = phase;
     XPorterStorage.recordExportPhase(phase).then(XPorterFeedback.refresh).catch(() => {});
+    diagnose('phase', { phase });
 }
 
 function recordFirstItemOnce() {
@@ -2277,6 +2387,7 @@ function recordFirstItemOnce() {
     if (!currentExport || currentExport._firstItemRecorded) return;
     currentExport._firstItemRecorded = true;
     XPorterStorage.recordFirstItem().then(XPorterFeedback.refresh).catch(() => {});
+    diagnose('progress', { rows: currentExport.tweetCount });
 }
 
 // ==================== Auto-Resume on Startup ====================

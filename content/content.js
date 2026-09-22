@@ -380,6 +380,11 @@ function ensureXporterCaptureOverlay() {
             --xp-accent: #78c5ff;
             --xp-track: #516582;
             --xp-border: #5a7190;
+            --xp-hover: #293341;
+            --xp-danger: #ff8b95;
+            --xp-danger-bg: #3b242c;
+            --xp-danger-border: #c34e5c;
+            --xp-warning: #ffd166;
             --xp-scale: 1;
             position: fixed;
             inset-inline-end: 20px;
@@ -418,7 +423,7 @@ function ensureXporterCaptureOverlay() {
             cursor: pointer;
             font: 18px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-        #xporter-capture-overlay .xporter-capture-toggle:hover { background: #293341; color: #fff; }
+        #xporter-capture-overlay .xporter-capture-toggle:hover { background: var(--xp-hover); color: var(--xp-text); }
         #xporter-capture-overlay button:focus-visible { outline: 2px solid var(--xp-accent); outline-offset: 3px; }
         #xporter-capture-overlay .xporter-capture-title {
             padding-inline-end: 26px;
@@ -530,7 +535,7 @@ function ensureXporterCaptureOverlay() {
             font: 550 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             transition: background .15s ease, color .15s ease;
         }
-        #xporter-capture-overlay .xporter-capture-stop:hover { background: #3b242c; color: #ff8b95; border-color: #c34e5c; }
+        #xporter-capture-overlay .xporter-capture-stop:hover { background: var(--xp-danger-bg); color: var(--xp-danger); border-color: var(--xp-danger-border); }
         #xporter-capture-overlay .xporter-capture-stop:disabled { cursor: default; opacity: .6; }
         #xporter-capture-overlay.xporter-capture-collapsed { width: min(280px, calc(100vw / var(--xp-scale) - 32px)); padding: 12px 14px; }
         #xporter-capture-overlay.xporter-capture-collapsed .xporter-capture-subtitle,
@@ -544,6 +549,8 @@ function ensureXporterCaptureOverlay() {
             --xp-surface: linear-gradient(135deg, #d2e6ff, #e3dff5);
             --xp-text: #182b43; --xp-muted: #405975;
             --xp-accent: #0869b4; --xp-track: #b5c9df; --xp-border: #9ab1cd;
+            --xp-hover: #bfd3ec; --xp-danger: #a3202f; --xp-danger-bg: #fbe1e4; --xp-danger-border: #d98a94;
+            --xp-warning: #865308;
         }
         #xporter-capture-overlay.xporter-capture-simple {
             --xp-surface: #181e26; --xp-text: #eef2f7; --xp-muted: #a9b4c2;
@@ -554,7 +561,7 @@ function ensureXporterCaptureOverlay() {
             --xp-accent: #1268bc; --xp-track: #cbd4e0; --xp-border: #cbd4e0;
         }
         #xporter-capture-overlay.xporter-capture-light.xporter-capture-paused [data-xporter-subtitle],
-        #xporter-capture-overlay.xporter-capture-light.xporter-capture-paused .xporter-capture-pct { color: #865308; }
+        #xporter-capture-overlay.xporter-capture-light.xporter-capture-paused .xporter-capture-pct { color: var(--xp-warning); }
         @media (max-width: 420px) { #xporter-capture-overlay { inset-inline-end: 16px; bottom: 16px; max-height: calc(100dvh / var(--xp-scale) - 32px); } }
         @media (prefers-reduced-motion: reduce) {
             #xporter-capture-overlay .xporter-capture-bar span,
@@ -663,7 +670,7 @@ function updateXporterCaptureOverlay(status) {
     const i = status.i18n || {};
     overlay._xporterI18n = i;
     const appearance = i.appearance || {};
-    overlay.classList.toggle('xporter-capture-simple', appearance.simplifiedDesign === true);
+    overlay.classList.toggle('xporter-capture-simple', appearance.simplifiedDesign !== true);
     overlay.classList.toggle('xporter-capture-light', appearance.theme === 'light');
     const scale = [85, 100, 115, 130].includes(Number(appearance.uiScale)) ? Number(appearance.uiScale) / 100 : 1;
     overlay.style.setProperty('--xp-scale', String(scale));

@@ -1,6 +1,6 @@
 # Search completion fixtures
 
-`search-endings.synthetic.json` contains constructed regression cases, not captured X responses. It checks that missing cursors, partial instruction sets and alerts cannot become successful empty exports. An explicit `TimelineTerminateTimeline` with `direction: Bottom` is accepted as terminal. The separate live fixture below covers the observed cursor-only ending.
+`search-endings.synthetic.json` contains constructed regression cases, not captured X responses. It checks that missing cursors, partial instruction sets and alerts cannot become successful empty exports. Pages that carry rows beside partial GraphQL `errors` are accepted as nonterminal pages and leave the entire run unconfirmed even after a later clean terminal page; errors without rows stay failed pages. A clean Resume replay can restore completeness. Unknown instructions are filtered before both parsing and terminal detection. An explicit `TimelineTerminateTimeline` with `direction: Bottom` is accepted as terminal. The separate live fixture below covers the observed cursor-only ending.
 
 Live protocol compatibility remains unverified. In particular, this policy may leave a genuinely finished search with `SEARCH_END_UNCONFIRMED` if X omits an explicit terminal marker. Saved rows remain downloadable. Do not reintroduce absence-of-cursor or date-coverage completion merely to hide that state.
 

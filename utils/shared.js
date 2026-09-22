@@ -267,7 +267,11 @@ function applyI18nToDOM(translations) {
     document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-tooltip], [data-i18n-aria-label]').forEach(el => {
         const textKey = el.getAttribute('data-i18n');
         if (textKey && translations[textKey] !== undefined) {
-            el.textContent = translations[textKey];
+            if (el.hasAttribute('data-i18n-bold')) {
+                el.innerHTML = renderHelpMarkup(translations[textKey]);
+            } else {
+                el.textContent = translations[textKey];
+            }
         }
         const placeholderKey = el.getAttribute('data-i18n-placeholder');
         if (placeholderKey && translations[placeholderKey] !== undefined) {

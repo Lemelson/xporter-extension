@@ -3,13 +3,19 @@
 
 <head>
   <meta charset="UTF-8">
+  <script src="emoji-platform.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>XPorter</title>
   <link rel="stylesheet" href="popup.css">
   <link rel="stylesheet" href="rate-prompt.css">
+  <link rel="stylesheet" href="workspace.css">
+  <link rel="stylesheet" href="theme-presets.css">
+  <link rel="stylesheet" href="theme-picker.css">
+  <link rel="stylesheet" href="emoji.css">
 </head>
 
 <body>
+  <script src="theme-presets.js"></script>
   <script src="theme-init.js"></script>
 
   <div class="popup" id="popup">
@@ -50,7 +56,7 @@
               d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
           </svg>
         </a>
-        <button class="theme-toggle" id="themeToggle" data-i18n-title="toggleTheme" title="Toggle theme">
+        <button class="theme-toggle" id="themeToggle" type="button" data-i18n-title="themePickerTitle" title="Choose a theme" aria-haspopup="dialog" aria-controls="themePicker">
           <span class="theme-icon" id="themeIcon">
             <svg class="icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -105,6 +111,7 @@
 
     <!-- HOME TAB -->
     <div class="tab-content active" id="tab-home" role="tabpanel" aria-labelledby="tabBtnHome">
+      <div class="home-content" id="homeContent">
       <!-- Auth warning -->
       <div class="auth-warning hidden" id="authWarning">
         <span class="auth-warning-icon">
@@ -126,10 +133,10 @@
             <div class="status-title-row">
               <span class="status-phase-icon hidden" id="statusPhaseIcon" aria-hidden="true"></span>
               <span class="status-text" id="statusText" data-i18n="exporting">Exporting...</span>
-              <span class="date-help status-phase-help hidden" id="statusPhaseHelp" tabindex="0"
+              <span class="date-help status-phase-help hidden" role="button" id="statusPhaseHelp" tabindex="0"
                 aria-label="X has temporarily limited requests. Your collected data is saved. XPorter will retry when the countdown ends. If this happens often, try a slower export speed."
                 data-i18n-aria-label="statusRateLimitHelp"
-                data-i18n-tooltip="statusRateLimitHelp">!</span>
+                data-i18n-tooltip="statusRateLimitHelp"></span>
             </div>
             <p class="status-subtitle hidden" id="statusSubtitle"></p>
           </div>
@@ -215,16 +222,16 @@
       <div class="field">
         <div class="field-label-row">
           <label class="field-label" for="exportMode" data-i18n="exportMode">Export mode</label>
-          <span class="date-help help-viewport" tabindex="0"
+          <span class="date-help help-viewport" role="button" tabindex="0"
             aria-label="What each mode exports: 📝 Posts — the post types selected on Home, with available metrics and context. 🔖 Bookmarks — posts saved by the X account you are currently using. XPorter opens that account’s Bookmarks page. You cannot choose a different account in this mode. Some data may be unavailable. 👥 Followers — accounts that follow the selected profile. ➡️ Following — accounts the selected profile follows. ✓ Verified Followers — followers returned by X’s verified-follower list." data-i18n-aria-label="exportModeHelp"
-            data-i18n-tooltip="exportModeHelp">!</span>
+            data-i18n-tooltip="exportModeHelp"></span>
         </div>
         <select id="exportMode" class="select">
-          <option value="posts" data-i18n="modePosts">📝 Posts</option>
-          <option value="followers" data-i18n="modeFollowers">👥 Followers</option>
-          <option value="following" data-i18n="modeFollowing">➡️ Following</option>
-          <option value="verified_followers" data-i18n="modeVerifiedFollowers">✓ Verified followers</option>
-          <option value="bookmarks" data-i18n="modeBookmarks">🔖 Bookmarks</option>
+          <option value="posts" data-i18n="modePosts">Posts</option>
+          <option value="followers" data-i18n="modeFollowers">Followers</option>
+          <option value="following" data-i18n="modeFollowing">Following</option>
+          <option value="verified_followers" data-i18n="modeVerifiedFollowers">Verified followers</option>
+          <option value="bookmarks" data-i18n="modeBookmarks">Bookmarks</option>
         </select>
       </div>
 
@@ -248,14 +255,18 @@
         <div class="account-card account-card--editable" id="targetAccountCard">
           <div class="account-avatar">
             <img id="targetAccountAvatar" alt="" class="hidden">
-            <span id="targetAccountAvatarFallback" aria-hidden="true">👤</span>
+            <span id="targetAccountAvatarFallback" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="8" r="4" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+              </svg>
+            </span>
           </div>
           <div class="account-copy" id="targetAccountCopy">
             <strong class="account-name hidden" id="targetAccountName"></strong>
             <div class="account-meta account-meta--input account-handle-editor"
               id="targetAccountHandleEditor">
               <span class="account-input-prefix" id="usernamePrefix" aria-hidden="true">@</span>
-              <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername" placeholder="elonmusk"
+              <input type="text" id="usernameInput" data-i18n-placeholder="placeholderUsername" placeholder="username"
                 autocomplete="off" spellcheck="false" aria-describedby="usernameError">
               <span class="account-edit-icon" aria-hidden="true">
                 <svg data-tabler-icon="pencil" width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -277,7 +288,11 @@
           aria-labelledby="bookmarksAccountLabel">
           <div class="account-avatar">
             <img id="bookmarksAccountAvatar" alt="" class="hidden">
-            <span id="bookmarksAccountAvatarFallback" aria-hidden="true">👤</span>
+            <span id="bookmarksAccountAvatarFallback" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="8" r="4" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+              </svg>
+            </span>
           </div>
           <div class="account-copy">
             <strong class="account-name" id="bookmarksAccountName"
@@ -288,6 +303,11 @@
             </span>
           </div>
         </div>
+      </div>
+
+      <div id="accountContextNotice" class="account-context-notice hidden" role="status">
+        <p data-i18n="accountContextUnavailable">Cannot read this profile. Refresh the X tab to reconnect.</p>
+        <button type="button" id="reloadAccountTab" class="btn btn-secondary" data-i18n="reloadAccountTab">Refresh X tab</button>
       </div>
 
       <!-- Posts-only options (hidden when mode is followers/following) -->
@@ -319,7 +339,7 @@
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
               <button type="button" class="date-help post-type-help" aria-label="Posts published by this account that are not replies, quote posts, reposts, or articles. Select those types separately."
-                data-i18n-aria-label="postTypeOriginalsHelp" data-i18n-tooltip="postTypeOriginalsHelp">!</button>
+                data-i18n-aria-label="postTypeOriginalsHelp" data-i18n-tooltip="postTypeOriginalsHelp"></button>
             </div>
             <div class="post-type-row">
             <label class="post-choice post-type-choice">
@@ -338,7 +358,7 @@
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
               <button type="button" class="date-help post-type-help" aria-label="Posts that include another post with the author’s own comment. Sharing a post without a comment counts as a repost."
-                data-i18n-aria-label="postTypeQuotesHelp" data-i18n-tooltip="postTypeQuotesHelp">!</button>
+                data-i18n-aria-label="postTypeQuotesHelp" data-i18n-tooltip="postTypeQuotesHelp"></button>
             </div>
             <div class="post-type-row">
             <label class="post-choice post-type-choice">
@@ -358,7 +378,7 @@
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
               <button type="button" class="date-help post-type-help" aria-label="Replies by this account, including replies to other accounts and to its own posts. Replies by other people are not included."
-                data-i18n-aria-label="postTypeRepliesHelp" data-i18n-tooltip="postTypeRepliesHelp">!</button>
+                data-i18n-aria-label="postTypeRepliesHelp" data-i18n-tooltip="postTypeRepliesHelp"></button>
             </div>
             <div class="post-type-row">
             <label class="post-choice post-type-choice">
@@ -377,7 +397,7 @@
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
               <button type="button" class="date-help post-type-help" aria-label="Posts shared by this account without an added comment. Posts shared with a comment count as quote posts."
-                data-i18n-aria-label="postTypeRepostsHelp" data-i18n-tooltip="postTypeRepostsHelp">!</button>
+                data-i18n-aria-label="postTypeRepostsHelp" data-i18n-tooltip="postTypeRepostsHelp"></button>
             </div>
             <div class="post-type-row">
             <label class="post-choice post-type-choice">
@@ -398,7 +418,7 @@
               <span class="post-choice-check" aria-hidden="true"></span>
             </label>
               <button type="button" class="date-help post-type-help" aria-label="Posts published as X articles. XPorter exports the full article text when X makes it available. The length of an ordinary post does not make it an article."
-                data-i18n-aria-label="postTypeArticlesHelp" data-i18n-tooltip="postTypeArticlesHelp">!</button>
+                data-i18n-aria-label="postTypeArticlesHelp" data-i18n-tooltip="postTypeArticlesHelp"></button>
             </div>
           </div>
           <p class="post-selection-note" id="postSelectionNote" data-i18n="postSelectionMultiFeed">Only the post types you selected will be saved.</p>
@@ -414,7 +434,7 @@
               <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span data-i18n="dateRange">Date range</span>
             </label>
-            <span class="date-help" tabindex="0" aria-label="Dates use your browser’s time zone. The start and end dates are included. If you select today, only posts published before the export started are included; Resume keeps that same cutoff. X search may show posts from nearby dates, but XPorter saves only posts within your selected period. Keep the search tab open." data-i18n-aria-label="dateRangeHelp" data-i18n-tooltip="dateRangeHelp">!</span>
+            <span class="date-help" role="button" tabindex="0" aria-label="Dates use your browser’s time zone. The start and end dates are included. If you select today, only posts published before the export started are included; Resume keeps that same cutoff. X search may show posts from nearby dates, but XPorter saves only posts within your selected period. Keep the search tab open." data-i18n-aria-label="dateRangeHelp" data-i18n-tooltip="dateRangeHelp"></span>
           </div>
           <div class="date-fields hidden" id="dateFields">
             <div class="date-row">
@@ -434,7 +454,7 @@
         <div class="post-selection-heading">
           <div>
             <h2 id="xlsxPhotosTitle" data-i18n="xlsxPhotosTitle">Photos in Excel</h2>
-            <p id="xlsxPhotosHelp" data-i18n="xlsxPhotosHelp">Choose how to include photos in this Excel file.</p>
+            <p id="xlsxPhotosHelp" data-i18n="xlsxPhotosHelp">Save photo links only, or include images in the file.</p>
           </div>
         </div>
         <div class="post-selection-list">
@@ -452,10 +472,10 @@
             </span>
             <span class="post-choice-copy">
               <span class="xlsx-photo-choice-title">
-                <strong data-i18n="xlsxPhotoLinks">Keep photo links</strong>
+                <strong data-i18n="xlsxPhotoLinks">Links only</strong>
                 <span class="xlsx-photo-recommended-badge" data-i18n="xlsxPhotoRecommended">Recommended</span>
               </span>
-              <span data-i18n="xlsxPhotoLinksHelp">Creates the file faster and keeps it smaller. Photos are included as links.</span>
+              <span data-i18n="xlsxPhotoLinksHelp">Saves links without the images. Creates a smaller file faster.</span>
             </span>
             <span class="post-choice-check" aria-hidden="true"></span>
           </label>
@@ -472,8 +492,8 @@
               </svg>
             </span>
             <span class="post-choice-copy">
-              <strong data-i18n="xlsxPhotoEmbed">Embed photo previews</strong>
-              <span data-i18n="xlsxPhotoEmbedHelp">Adds smaller copies of photos to a separate sheet named Media.</span>
+              <strong data-i18n="xlsxPhotoEmbed">Photos in the file</strong>
+              <span data-i18n="xlsxPhotoEmbedHelp">Adds small photo previews to the Media sheet. Takes longer and makes the file larger.</span>
             </span>
             <span class="post-choice-check" aria-hidden="true"></span>
           </label>
@@ -481,7 +501,14 @@
       </section>
 
       <!-- Action buttons -->
+      </div>
       <div class="actions">
+        <a class="btn btn-primary" id="signInBtn" href="https://x.com/login" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M3 12h12m-4-4 4 4-4 4" />
+          </svg>
+          <span data-i18n="authLink">Log in to X</span>
+        </a>
         <button class="btn btn-primary" id="startBtn">
           <svg class="icon icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -495,31 +522,6 @@
 
     <!-- SETTINGS TAB -->
     <div class="tab-content" id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings">
-      <section class="appearance-settings" aria-labelledby="appearanceTitle">
-        <h2 class="sr-only" id="appearanceTitle" data-i18n="appearanceTitle">Appearance</h2>
-        <div class="field">
-          <div class="date-toggle-row">
-            <label class="toggle-label">
-              <input type="checkbox" id="simplifiedDesign" class="toggle-input">
-              <span class="toggle-track"><span class="toggle-knob"></span></span>
-              <span data-i18n="simplifiedDesign">Simplified design</span>
-            </label>
-            <button type="button" class="date-help" data-i18n-tooltip="simplifiedDesignHelp"
-              data-i18n-aria-label="simplifiedDesignHelp" aria-label="Uses neutral colors and flat controls. Turn this off to return to the blue glass effect.">!</button>
-          </div>
-        </div>
-        <div class="field">
-          <div class="field-label-row">
-            <label for="uiScale" class="field-label" data-i18n="uiScale">Interface scale</label>
-            <button type="button" class="date-help" data-i18n-tooltip="uiScaleHelp"
-              data-i18n-aria-label="uiScaleHelp" aria-label="Changes the size of text and controls and the width of the popup.">!</button>
-          </div>
-          <select id="uiScale" class="select">
-            <option value="85">85%</option><option value="100" selected>100%</option>
-            <option value="115">115%</option><option value="130">130%</option>
-          </select>
-        </div>
-      </section>
       <div class="mode-settings-group hidden" id="settingsBookmarksOnly">
         <div class="mode-settings-heading" data-i18n="bookmarksSettingsHeading">Bookmarks</div>
         <div class="field">
@@ -529,10 +531,10 @@
               <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span data-i18n="includeBookmarkReplyContext">Include the posts that bookmarked replies respond to</span>
             </label>
-            <span class="date-help help-viewport help-below" tabindex="0"
+            <span class="date-help help-viewport help-below" role="button" tabindex="0"
               aria-label="If a bookmark is a reply, includes the post it responds to in the same export record. This does not increase the bookmark count, but requires extra requests to X. Some posts may be unavailable because they were deleted or access is restricted."
               data-i18n-aria-label="includeBookmarkReplyContextHelp"
-              data-i18n-tooltip="includeBookmarkReplyContextHelp">!</span>
+              data-i18n-tooltip="includeBookmarkReplyContextHelp"></span>
           </div>
         </div>
         <div class="field">
@@ -542,10 +544,10 @@
               <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span data-i18n="includeBookmarkArticles">Include article text</span>
             </label>
-            <span class="date-help help-long" tabindex="0"
+            <span class="date-help help-long" role="button" tabindex="0"
               aria-label="Includes article titles, links, and the article text available from X. This also applies to articles in quoted posts and posts that a bookmarked reply responds to. If X provides only a preview, only that preview is saved."
               data-i18n-aria-label="includeBookmarkArticlesHelp"
-              data-i18n-tooltip="includeBookmarkArticlesHelp">!</span>
+              data-i18n-tooltip="includeBookmarkArticlesHelp"></span>
           </div>
         </div>
       </div>
@@ -553,7 +555,7 @@
         <div class="field">
           <div class="field-label-row">
             <label class="field-label" id="quantityLimitLabel" for="quantityLimit" data-i18n="exportQuantityLimit">Export limit</label>
-            <span class="date-help" tabindex="0" aria-label="The maximum number of posts or accounts to collect. For example, 500 stops the export after 500 items. Without a date filter, X usually makes about 3,200 recent posts available, even if the profile shows more. Choosing no limit does not remove this restriction. Date-filtered exports use X search, whose results may also be incomplete. Availability varies for follower and following lists." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp">!</span>
+            <span class="date-help" role="button" tabindex="0" aria-label="The maximum number of posts or accounts to collect. For example, 500 stops the export after 500 items. Without a date filter, X usually makes about 3,200 recent posts available, even if the profile shows more. Choosing no limit does not remove this restriction. Date-filtered exports use X search, whose results may also be incomplete. Availability varies for follower and following lists." data-i18n-aria-label="quantityLimitHelp" data-i18n-tooltip="quantityLimitHelp"></span>
           </div>
           <select id="quantityLimit" class="select">
             <option value="0" data-i18n="unlimited">No limit (posts: about 3,200)</option>
@@ -572,15 +574,16 @@
         <div class="field">
         <div class="field-label-row">
           <label class="field-label" id="exportSpeedLabel" for="exportSpeed" data-i18n="postsExportSpeed">Post and bookmark export speed</label>
-          <span class="date-help" tabindex="0" aria-label="Sets the interval between requests for posts and bookmarks: about 2, 3, 4, 7, or 12 seconds. Standard uses 4 seconds. Choose Custom to enter another interval. If X limits requests, XPorter saves progress and retries automatically. If retries are exhausted, it pauses until you resume." data-i18n-aria-label="postsExportSpeedHelp" data-i18n-tooltip="postsExportSpeedHelp">!</span>
+          <span class="date-help" role="button" tabindex="0" aria-label="Sets the interval between requests for posts and bookmarks: about 2, 3, 4, 7, or 12 seconds. Standard uses 4 seconds. Choose Custom to enter another interval. If X limits requests, XPorter saves progress and retries automatically. If retries are exhausted, it pauses until you resume." data-i18n-aria-label="postsExportSpeedHelp" data-i18n-tooltip="postsExportSpeedHelp"></span>
         </div>
         <select id="exportSpeed" class="select">
-          <option value="turbo" data-i18n="speedTurbo">🚀 Turbo — ≈2 sec.</option>
-          <option value="fast" data-i18n="speedFast">Fast — ≈3 sec.</option>
+          <option value="ultra" data-i18n="speedUltra">⚠️ Ultra Fast — ≈0.3 sec. (Caution)</option>
+          <option value="turbo" data-i18n="speedTurbo">⚠️ Turbo — ≈1 sec.</option>
+          <option value="fast" data-i18n="speedFast">Fast — ≈2 sec.</option>
           <option value="standard" data-i18n="speedStandard">Standard — ≈4 sec.</option>
           <option value="careful" data-i18n="speedCareful">Careful — ≈7 sec.</option>
-          <option value="turtle" data-i18n="speedTurtle">🐢 Turtle — ≈12 sec.</option>
-          <option value="custom" data-i18n="speedCustom">⚠️ Custom interval</option>
+          <option value="turtle" data-i18n="speedTurtle">Turtle — ≈12 sec.</option>
+          <option value="custom" data-i18n="speedCustom">Custom interval</option>
         </select>
         <div class="custom-speed hidden" id="customSpeedRows">
           <div class="cooldown-row">
@@ -598,10 +601,10 @@
               <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span data-i18n="postSafetyBreaks">Scheduled breaks</span>
             </label>
-            <span class="date-help help-local" tabindex="0"
+            <span class="date-help help-local" role="button" tabindex="0"
               aria-label="Pauses the export after a set number of requests, then resumes automatically. These breaks are optional and do not replace X’s request limits."
               data-i18n-aria-label="safetyBreakHelp"
-              data-i18n-tooltip="safetyBreakHelp">!</span>
+              data-i18n-tooltip="safetyBreakHelp"></span>
           </div>
           <div class="custom-speed safety-break-rows hidden" id="postSafetyBreakRows">
             <label class="safety-break-field" for="postSafetyBreakMin">
@@ -623,15 +626,15 @@
         <div class="field">
         <div class="field-label-row">
           <label class="field-label" id="userExportSpeedLabel" for="userExportSpeed" data-i18n="userListsExportSpeed">User list export speed</label>
-          <span class="date-help" tabindex="0" aria-label="Sets the interval between requests for followers, following, and verified followers. Start with Standard, or choose Custom to enter another interval. X may apply different limits to each list. XPorter saves progress and retries automatically; if retries are exhausted, you can resume later." data-i18n-aria-label="userListsExportSpeedHelp" data-i18n-tooltip="userListsExportSpeedHelp">!</span>
+          <span class="date-help" role="button" tabindex="0" aria-label="Sets the interval between requests for followers, following, and verified followers. Start with Standard, or choose Custom to enter another interval. X may apply different limits to each list. XPorter saves progress and retries automatically; if retries are exhausted, you can resume later." data-i18n-aria-label="userListsExportSpeedHelp" data-i18n-tooltip="userListsExportSpeedHelp"></span>
         </div>
         <select id="userExportSpeed" class="select">
-          <option value="turbo" data-i18n="listSpeedTurbo">🚀 Turbo — fastest</option>
+          <option value="turbo" data-i18n="listSpeedTurbo">Turbo — fastest</option>
           <option value="fast" data-i18n="listSpeedFast">Fast — quicker</option>
           <option value="standard" data-i18n="listSpeedStandard">Standard — recommended</option>
           <option value="careful" data-i18n="listSpeedCareful">Careful — slower</option>
-          <option value="turtle" data-i18n="listSpeedTurtle">🐢 Turtle — slowest</option>
-          <option value="custom" data-i18n="listSpeedCustom">⚠️ Custom interval</option>
+          <option value="turtle" data-i18n="listSpeedTurtle">Turtle — slowest</option>
+          <option value="custom" data-i18n="listSpeedCustom">Custom interval</option>
         </select>
         <div class="custom-speed hidden" id="userCustomSpeedRows">
           <div class="cooldown-row">
@@ -649,10 +652,10 @@
               <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span data-i18n="userSafetyBreaks">Scheduled breaks</span>
             </label>
-            <span class="date-help help-local" tabindex="0"
+            <span class="date-help help-local" role="button" tabindex="0"
               aria-label="Pauses the export after a set number of requests, then resumes automatically. These breaks are optional and do not replace X’s request limits."
               data-i18n-aria-label="safetyBreakHelp"
-              data-i18n-tooltip="safetyBreakHelp">!</span>
+              data-i18n-tooltip="safetyBreakHelp"></span>
           </div>
           <div class="custom-speed safety-break-rows hidden" id="userSafetyBreakRows">
             <label class="safety-break-field" for="userSafetyBreakMin">
@@ -678,10 +681,10 @@
               <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span data-i18n="includeAboutAccountDetails">Include “About this Account” details</span>
             </label>
-            <span class="date-help help-local help-tall" tabindex="0"
+            <span class="date-help help-local help-tall" role="button" tabindex="0"
               aria-label="Adds the available “About this Account” fields: country or region, Premium date, connection source, affiliated account, number of username changes, and date of the last change. This requires extra requests: exporting 500 accounts can add up to 500 requests. It takes longer and may trigger X request limits or temporary account restrictions. Enable it only if you need these fields."
               data-i18n-aria-label="includeAboutAccountDetailsHelp"
-              data-i18n-tooltip="includeAboutAccountDetailsHelp">!</span>
+              data-i18n-tooltip="includeAboutAccountDetailsHelp"></span>
           </div>
         </div>
         <div class="about-settings-options hidden" id="aboutAccountOptions">
@@ -689,18 +692,18 @@
             <div class="field-label-row">
               <label class="field-label" id="aboutAccountSpeedLabel" for="aboutAccountSpeed"
                 data-i18n="aboutAccountSpeed">“About this Account” request speed</label>
-              <span class="date-help help-long" tabindex="0"
+              <span class="date-help help-long" role="button" tabindex="0"
                 aria-label="Sets how many “About this Account” requests run at once. Standard uses 5 simultaneous requests; Turtle uses 1. More simultaneous requests can be faster but may reach X’s limits sooner. Custom allows 1 to 50 simultaneous requests."
                 data-i18n-aria-label="aboutAccountSpeedHelp"
-                data-i18n-tooltip="aboutAccountSpeedHelp">!</span>
+                data-i18n-tooltip="aboutAccountSpeedHelp"></span>
             </div>
             <select id="aboutAccountSpeed" class="select">
-              <option value="turbo" data-i18n="aboutSpeedTurbo">🚀 Turbo — 20 requests</option>
+              <option value="turbo" data-i18n="aboutSpeedTurbo">Turbo — 20 requests</option>
               <option value="fast" data-i18n="aboutSpeedFast">Fast — 10 requests</option>
               <option value="standard" data-i18n="aboutSpeedStandard">Standard — 5 requests</option>
               <option value="careful" data-i18n="aboutSpeedCareful">Careful — 3 requests</option>
-              <option value="turtle" data-i18n="aboutSpeedTurtle">🐢 Turtle — 1 request</option>
-              <option value="custom" data-i18n="aboutSpeedCustom">⚠️ Custom request count</option>
+              <option value="turtle" data-i18n="aboutSpeedTurtle">Turtle — 1 request</option>
+              <option value="custom" data-i18n="aboutSpeedCustom">Custom request count</option>
             </select>
             <div class="custom-speed hidden" id="aboutAccountCustomRows">
               <div class="cooldown-row">
@@ -710,22 +713,22 @@
               </div>
             </div>
           </div>
-          <div class="field" id="aboutAccountRetriesField">
-            <div class="field-label-row">
-              <label class="field-label" id="aboutAccountRetriesLabel" for="aboutAccountMaxRetries"
-                data-i18n="aboutAccountRetries">Retries after X limits requests</label>
-              <span class="date-help help-long" tabindex="0"
-                aria-label="Sets how many times to retry an “About this Account” request after X rejects it, with one minute between attempts. A successful request resets the counter. The maximum is 1,440 retries, or roughly 24 hours of waiting if requests keep failing."
-                data-i18n-aria-label="aboutAccountRetriesHelp"
-                data-i18n-tooltip="aboutAccountRetriesHelp">!</span>
-            </div>
-            <div class="cooldown-row">
-              <input type="number" id="aboutAccountMaxRetries" value="5" min="1" max="1440"
-                class="input-small about-retries-input"
-                aria-labelledby="aboutAccountRetriesLabel aboutRetryEveryMinuteLabel">
-              <span id="aboutRetryEveryMinuteLabel" data-i18n="aboutRetryEveryMinute">retries · 1 min apart</span>
-            </div>
-          </div>
+        </div>
+      </div>
+      <div class="field" id="aboutAccountRetriesField">
+        <div class="field-label-row">
+          <label class="field-label" id="aboutAccountRetriesLabel" for="aboutAccountMaxRetries"
+            data-i18n="aboutAccountRetries">Wait for X to lift its limit</label>
+          <span class="date-help help-long" role="button" tabindex="0"
+            aria-label="How long XPorter waits for X to lift a rate limit before pausing the export. When X limits requests it blocks them for a rolling window of about 15 minutes; nothing can shorten that, so the minimum is 15 minutes. XPorter waits until the reset time X reports, retries once, and repeats while this budget lasts. Progress is saved the whole time; if the budget runs out you can press Resume later. The maximum is 1,440 minutes, or 24 hours."
+            data-i18n-aria-label="aboutAccountRetriesHelp"
+            data-i18n-tooltip="aboutAccountRetriesHelp"></span>
+        </div>
+        <div class="cooldown-row">
+          <input type="number" id="aboutAccountMaxRetries" value="15" min="15" max="1440" step="1"
+            class="input-small about-retries-input"
+            aria-labelledby="aboutAccountRetriesLabel aboutRetryEveryMinuteLabel">
+          <span id="aboutRetryEveryMinuteLabel" data-i18n="aboutRetryEveryMinute">minutes</span>
         </div>
       </div>
       <div class="field">
@@ -735,7 +738,7 @@
             <span class="toggle-track"><span class="toggle-knob"></span></span>
             <span data-i18n="autoExpireState">Automatically delete saved export data</span>
           </label>
-          <span class="date-help" tabindex="0" aria-label="Deletes locally saved export data after the selected number of hours to free space. Entries remain in export history, but their deleted data can no longer be downloaded from XPorter. Files you have already downloaded are not affected." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp">!</span>
+          <span class="date-help" role="button" tabindex="0" aria-label="Deletes locally saved export data after the selected number of hours to free space. Only finished exports are deleted; a paused export that can still be resumed is kept until you finish or discard it. Entries remain in export history, but their deleted data can no longer be downloaded from XPorter. Posts from your feeds have their own Clear button and are not affected. Files you have already downloaded are not affected." data-i18n-aria-label="autoExpireHelp" data-i18n-tooltip="autoExpireHelp"></span>
         </div>
         <div class="cooldown-row" id="autoExpireRow">
           <span id="autoExpireLabel" data-i18n="autoExpireAfter">Clear after</span>
@@ -752,7 +755,7 @@
             <span class="toggle-track"><span class="toggle-knob"></span></span>
             <span data-i18n="localizeHeaders">Translate column headers</span>
           </label>
-          <span class="date-help" tabindex="0" aria-label="Uses the interface language for supported CSV and XLSX column headers. Turn this off to keep the original field names, which can be useful for scripts and spreadsheet templates. JSON keys and TXT labels remain in English." data-i18n-aria-label="localizeHeadersHelp" data-i18n-tooltip="localizeHeadersHelp">!</span>
+          <span class="date-help" role="button" tabindex="0" aria-label="Uses the interface language for supported CSV and XLSX column headers. Turn this off to keep the original field names, which can be useful for scripts and spreadsheet templates. JSON keys and TXT labels remain in English." data-i18n-aria-label="localizeHeadersHelp" data-i18n-tooltip="localizeHeadersHelp"></span>
         </div>
       </div>
       <!-- Ladybug Easter-egg toggle -->
@@ -760,9 +763,144 @@
         <label class="toggle-label">
           <input type="checkbox" id="ladybugEnabled" class="toggle-input" checked>
           <span class="toggle-track toggle-track--bug"><span class="toggle-knob"></span></span>
-          <span data-i18n="showLadybug">Show ladybug</span>
+          <span><span data-i18n="showLadybug">Show ladybug</span> <span id="ladybugSquashCount">(0)</span></span>
         </label>
       </div>
+      <div class="field theme-settings-field">
+        <button type="button" class="theme-settings-button" id="openThemePicker"><span id="themeSettingsIcon" aria-hidden="true"></span><strong data-i18n="themePickerTitle">Choose a theme</strong></button>
+      </div>
+      <details class="appearance-settings" id="sizeSettings">
+        <summary class="history-toggle size-settings-toggle">
+          <svg class="size-settings-icon" data-tabler-icon="resize" aria-hidden="true" focusable="false"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M4 11v8a1 1 0 0 0 1 1h8m-9 -14v-1a1 1 0 0 1 1 -1h1m5 0h2m5 0h1a1 1 0 0 1 1 1v1m0 5v2m0 5v1a1 1 0 0 1 -1 1h-1" />
+  <path d="M4 12h7a1 1 0 0 1 1 1v7" />
+</svg>
+          <span class="size-settings-copy"><strong data-i18n="sizeSettings">Window &amp; content size</strong><span data-i18n="sizeSettingsDescription">Width, height, elements and text</span></span>
+          <span class="size-settings-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="size-settings-body">
+          <div class="field size-control size-control--popupWidth">
+            <div class="size-control-heading">
+              <svg class="size-control-icon" data-tabler-icon="arrows-horizontal" aria-hidden="true" focusable="false"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M7 8l-4 4l4 4" />
+  <path d="M17 8l4 4l-4 4" />
+  <path d="M3 12l18 0" />
+</svg>
+              <div class="field-label-row"><label for="popupWidth" class="field-label" data-i18n="popupWidth">Window width</label>
+              <button type="button" class="date-help size-setting-help" data-i18n-tooltip="popupWidthHelp" data-i18n-aria-label="popupWidthHelp" aria-label="Changes window width without resizing text or controls. 100% is the standard width.">i</button></div>
+              <output id="popupWidthValue" for="popupWidth">100%</output>
+            </div>
+            <div class="text-scale-control" dir="ltr">
+
+              <input id="popupWidth" class="text-scale-slider" type="range" min="80" max="150" step="5" value="100" aria-valuetext="100%">
+              <div class="text-scale-ticks" aria-hidden="true"><span style="--tick-position: 0%">80%</span><span style="--tick-position: 7.14286%"></span><span style="--tick-position: 14.2857%"></span><span style="--tick-position: 21.4286%"></span><span style="--tick-position: 28.5714%" class="scale-default-tick">100%</span><span style="--tick-position: 35.7143%"></span><span style="--tick-position: 42.8571%"></span><span style="--tick-position: 50%"></span><span style="--tick-position: 57.1429%"></span><span style="--tick-position: 64.2857%"></span><span style="--tick-position: 71.4286%"></span><span style="--tick-position: 78.5714%"></span><span style="--tick-position: 85.7143%"></span><span style="--tick-position: 92.8571%"></span><span style="--tick-position: 100%">150%</span></div>
+            </div>
+          </div>
+          <div class="field size-control size-control--popupHeight">
+            <div class="size-control-heading">
+              <svg class="size-control-icon" data-tabler-icon="arrows-vertical" aria-hidden="true" focusable="false"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M8 7l4 -4l4 4" />
+  <path d="M8 17l4 4l4 -4" />
+  <path d="M12 3l0 18" />
+</svg>
+              <div class="field-label-row"><label for="popupHeight" class="field-label" data-i18n="popupHeight">Window height</label>
+              <button type="button" class="date-help size-setting-help" data-i18n-tooltip="popupHeightHelp" data-i18n-aria-label="popupHeightHelp" aria-label="100% fits the Home page, up to the browser limit. Larger values are disabled to avoid empty space; smaller values add scrolling.">i</button></div>
+              <output id="popupHeightValue" for="popupHeight">100%</output>
+            </div>
+            <div class="text-scale-control" dir="ltr">
+
+              <input id="popupHeight" class="text-scale-slider" type="range" min="50" max="100" step="5" value="100" aria-valuetext="100%">
+              <div class="text-scale-ticks" aria-hidden="true"><span style="--tick-position: 0%">50%</span><span style="--tick-position: 10%"></span><span style="--tick-position: 20%"></span><span style="--tick-position: 30%"></span><span style="--tick-position: 40%"></span><span style="--tick-position: 50%"></span><span style="--tick-position: 60%"></span><span style="--tick-position: 70%"></span><span style="--tick-position: 80%"></span><span style="--tick-position: 90%"></span><span style="--tick-position: 100%" class="scale-default-tick">100%</span></div>
+            </div>
+          </div>
+          <div class="field size-control size-control--uiScale">
+            <div class="size-control-heading">
+              <svg class="size-control-icon" data-tabler-icon="resize" aria-hidden="true" focusable="false"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M4 11v8a1 1 0 0 0 1 1h8m-9 -14v-1a1 1 0 0 1 1 -1h1m5 0h2m5 0h1a1 1 0 0 1 1 1v1m0 5v2m0 5v1a1 1 0 0 1 -1 1h-1" />
+  <path d="M4 12h7a1 1 0 0 1 1 1v7" />
+</svg>
+              <div class="field-label-row"><label for="uiScale" class="field-label" data-i18n="uiScale">Element size</label>
+              <button type="button" class="date-help size-setting-help" data-i18n-tooltip="uiScaleHelp" data-i18n-aria-label="uiScaleHelp" aria-label="Resizes buttons, icons and spacing without changing text size or window width.">i</button></div>
+              <output id="uiScaleValue" for="uiScale">100%</output>
+            </div>
+            <div class="text-scale-control" dir="ltr">
+
+              <input id="uiScale" class="text-scale-slider" type="range" min="80" max="130" step="5" value="100" aria-valuetext="100%">
+              <div class="text-scale-ticks" aria-hidden="true"><span style="--tick-position: 0%">80%</span><span style="--tick-position: 10%"></span><span style="--tick-position: 20%"></span><span style="--tick-position: 30%"></span><span style="--tick-position: 40%" class="scale-default-tick">100%</span><span style="--tick-position: 50%"></span><span style="--tick-position: 60%"></span><span style="--tick-position: 70%"></span><span style="--tick-position: 80%"></span><span style="--tick-position: 90%"></span><span style="--tick-position: 100%">130%</span></div>
+            </div>
+          </div>
+          <div class="field size-control size-control--textScale">
+            <div class="size-control-heading">
+              <svg class="size-control-icon" data-tabler-icon="text-size" aria-hidden="true" focusable="false"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M3 7v-2h13v2" />
+  <path d="M10 5v14" />
+  <path d="M12 19h-4" />
+  <path d="M15 13v-1h6v1" />
+  <path d="M18 12v7" />
+  <path d="M17 19h2" />
+</svg>
+              <div class="field-label-row"><label for="textScale" class="field-label" data-i18n="textScale">Text size</label>
+              <button type="button" class="date-help size-setting-help" data-i18n-tooltip="textScaleHelp" data-i18n-aria-label="textScaleHelp" aria-label="Changes only text size. Each 5% step on the slider changes text by 3% of its base size.">i</button></div>
+              <output id="textScaleValue" for="textScale">100%</output>
+            </div>
+            <div class="text-scale-control" dir="ltr">
+
+              <input id="textScale" class="text-scale-slider" type="range" min="80" max="130" step="5" value="100" aria-valuetext="100%">
+              <div class="text-scale-ticks" aria-hidden="true"><span style="--tick-position: 0%">80%</span><span style="--tick-position: 10%"></span><span style="--tick-position: 20%"></span><span style="--tick-position: 30%"></span><span style="--tick-position: 40%" class="scale-default-tick">100%</span><span style="--tick-position: 50%"></span><span style="--tick-position: 60%"></span><span style="--tick-position: 70%"></span><span style="--tick-position: 80%"></span><span style="--tick-position: 90%"></span><span style="--tick-position: 100%">130%</span></div>
+            </div>
+          </div>
+        </div>
+      </details>
       <!-- Export History (collapsible) -->
       <div class="field history-field">
         <button class="history-toggle" id="historyToggle" aria-expanded="false">
@@ -828,60 +966,36 @@
         <h2>XPorter</h2>
         <p class="about-desc" data-i18n="aboutDesc">Free export of X (Twitter) data to CSV, JSON, XLSX, or TXT.</p>
 
-        <!-- Prominent, always-available way to rate the extension -->
-        <button type="button" class="about-rate-cta" id="rateAboutBtn">
-          <span class="about-rate-stars" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>
-          </span>
-          <span class="about-rate-label" data-i18n="rateAbout">Rate XPorter</span>
-        </button>
+        <!-- Always available review invitation. -->
+        <section class="about-review" aria-labelledby="aboutReviewTitle">
+          <div class="about-review-heading">
+            <span class="xrp-stars" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg><svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg></span>
+            <h3 id="aboutReviewTitle" data-i18n="rateTitle">Like XPorter? Help it grow.</h3>
+          </div>
+          <p class="about-review-body" data-i18n="rateAboutBody" data-i18n-bold>If XPorter <strong>saved you time or made your work easier</strong>, I’d appreciate a review. Tell others what you use it for and what you liked. I keep adding features, fixing bugs, and answering your questions while keeping XPorter <strong>free</strong>. <strong>Your review supports that work</strong> and helps others discover a useful tool.</p>
+          <button type="button" class="about-rate-cta" id="rateAboutBtn">
+            <span class="about-rate-label" data-i18n="rateAbout">Leave a review</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>
+          </button>
+        </section>
 
         <!-- Contact & support -->
         <div class="about-contact">
           <!-- Easter egg: a little ladybug ("a bug") that slowly wanders the top-right corner -->
-          <span class="ladybug" aria-hidden="true">
-            <span class="lb-shadow"></span>
-            <svg class="lb-body" viewBox="0 0 40 40" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <radialGradient id="lbDome" cx="38%" cy="26%" r="78%">
-                  <stop offset="0%" stop-color="#ff7e72" />
-                  <stop offset="42%" stop-color="#ef3b30" />
-                  <stop offset="100%" stop-color="#a81b13" />
-                </radialGradient>
-              </defs>
-              <g class="lb-legs" stroke-width="1.5" stroke-linecap="round">
-                <path class="leg leg-l1" d="M12 16 L4 12" />
-                <path class="leg leg-l2" d="M11 22 L3 22" />
-                <path class="leg leg-l3" d="M12 28 L4 32" />
-                <path class="leg leg-r1" d="M28 16 L36 12" />
-                <path class="leg leg-r2" d="M29 22 L37 22" />
-                <path class="leg leg-r3" d="M28 28 L36 32" />
-              </g>
-              <g class="lb-antennae" stroke-width="1.4" stroke-linecap="round">
-                <path d="M16 7 L12 2" />
-                <path d="M24 7 L28 2" />
-              </g>
-              <circle class="lb-ink" cx="12" cy="2" r="1.4" />
-              <circle class="lb-ink" cx="28" cy="2" r="1.4" />
-              <ellipse class="lb-head" cx="20" cy="10" rx="6" ry="5" />
-              <circle class="lb-eye" cx="17.4" cy="9" r="1.1" opacity="0.92" />
-              <circle class="lb-eye" cx="22.6" cy="9" r="1.1" opacity="0.92" />
-              <ellipse cx="20" cy="22" rx="11.5" ry="12.5" fill="url(#lbDome)" />
-              <path d="M20 11 L20 33.5" stroke="#7a120c" stroke-width="1.3" stroke-linecap="round" />
-              <g fill="#1c0a08">
-                <circle cx="13.5" cy="18" r="2.1" />
-                <circle cx="26.5" cy="18" r="2.1" />
-                <circle cx="14.5" cy="26.5" r="2.4" />
-                <circle cx="25.5" cy="26.5" r="2.4" />
-                <circle cx="20" cy="30.5" r="1.7" />
-              </g>
-              <ellipse cx="15.5" cy="16.5" rx="3.6" ry="2.4" fill="#fff" opacity="0.26" />
-            </svg>
-          </span>
+          <button type="button" class="ladybug" aria-label="Squash ladybug" data-i18n-aria-label="squashLadybug">
+            <span class="lb-heading"><span class="lb-body">
+              <svg class="lb-limbs" viewBox="0 0 40 40" width="22" height="22" aria-hidden="true">
+                <g class="leg leg-l1"><path d="M12 15 L6 12"/><g class="leg-lower"><path d="M6 12 L4 8 L2.5 8.5"/></g></g>
+                <g class="leg leg-l2"><path d="M11 22 L5 23"/><g class="leg-lower"><path d="M5 23 L3 27 L1.5 27"/></g></g>
+                <g class="leg leg-l3"><path d="M12 28 L7 32"/><g class="leg-lower"><path d="M7 32 L4 36 L2.5 35.5"/></g></g>
+                <g class="leg leg-r1"><path d="M28 15 L34 12"/><g class="leg-lower"><path d="M34 12 L36 8 L37.5 8.5"/></g></g>
+                <g class="leg leg-r2"><path d="M29 22 L35 23"/><g class="leg-lower"><path d="M35 23 L37 27 L38.5 27"/></g></g>
+                <g class="leg leg-r3"><path d="M28 28 L33 32"/><g class="leg-lower"><path d="M33 32 L36 36 L37.5 35.5"/></g></g>
+                <g class="lb-antennae"><path d="M16 8 Q13 6 12 2.5"/><path d="M24 8 Q27 6 28 2.5"/></g>
+              </svg>
+              <img class="lb-shell" src="ladybug-shell.webp" width="22" height="22" alt="" draggable="false">
+            </span></span>
+          </button>
           <div class="contact-header">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1131,6 +1245,42 @@
                   <path d="M12 7v5l3 2" />
                 </svg>
               </span>
+              <span class="detail-title update-title" data-i18n="update200Title">A new look and smoother exports</span>
+              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="detail-body">
+              <div class="detail-body-inner update-body">
+                <p data-i18n="update200Body">• New interface: clearer navigation, progress, buttons and help.
+• Light, dark and colorful themes with a visual theme picker.
+• Separate controls for window width and height, element size and text size.
+• Improved date-range exports, partial-result handling, stopping and resuming.
+• A reload button restores the account connection after extension updates.
+• Clearer interface text and translations across all 14 languages.
+• A new ladybug with a domed shell, smooth routes and jointed legs. It returns from the side after the splat fades; Settings keeps the squash count.
+• Removed optional usage-statistics sharing and the diagnostic-report button. Uninstall feedback remains.
+• Fixed saved export counts and downloads, rate-limit waiting, and preservation of paused exports during automatic cleanup. Improved emoji alignment on Windows and Linux.</p>
+                <div class="update-meta">
+                  <time data-release-date datetime="2026-09-20">September 20, 2026</time>
+                  <span class="update-meta-separator" aria-hidden="true">·</span>
+                  <span class="update-meta-version">v2.0.1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-item update-item">
+            <button type="button" class="detail-head" aria-expanded="false">
+              <span class="detail-icon update-icon update-icon--previous">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              </span>
               <span class="detail-title update-title" data-i18n="update165Title">Reliable date exports</span>
               <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1141,8 +1291,6 @@
               <div class="detail-body-inner update-body">
                 <p data-i18n="update165Body">Fixed date-range exports that could stop incorrectly. Collected results are kept, and exports can resume without skipping or duplicating posts. Filenames now use the selected dates.</p>
                 <div class="update-meta">
-                  <span data-i18n="updateReleased">Released</span>
-                  <span class="update-meta-separator" aria-hidden="true">·</span>
                   <time data-release-date datetime="2026-09-06">September 6, 2026</time>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
                   <span class="update-meta-version">v1.6.5</span>
@@ -1153,7 +1301,7 @@
 
           <div class="detail-item update-item">
             <button type="button" class="detail-head" aria-expanded="false">
-              <span class="detail-icon update-icon update-icon--previous">
+              <span class="detail-icon update-icon update-icon--archive">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
@@ -1171,41 +1319,9 @@
               <div class="detail-body-inner update-body">
                 <p data-i18n="update164Body">The progress indicator and item count are easier to read. The Stop button takes less space, and TXT exports show Download and Copy side by side.</p>
                 <div class="update-meta">
-                  <span data-i18n="updateReleased">Released</span>
-                  <span class="update-meta-separator" aria-hidden="true">·</span>
                   <time data-release-date datetime="2026-08-25">August 25, 2026</time>
                   <span class="update-meta-separator" aria-hidden="true">·</span>
                   <span class="update-meta-version">v1.6.4</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="detail-item update-item">
-            <button type="button" class="detail-head" aria-expanded="false">
-              <span class="detail-icon update-icon update-icon--archive">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                  <path d="M3 3v5h5" />
-                  <path d="M12 7v5l3 2" />
-                </svg>
-              </span>
-              <span class="detail-title update-title" data-i18n="update151Title">Bookmark export and files without empty fields</span>
-              <svg class="detail-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-            <div class="detail-body">
-              <div class="detail-body-inner update-body">
-                <p data-i18n="update151Body">You can now export your bookmarks to CSV, JSON, XLSX, or TXT, with quoted posts, replied-to posts, article text, metrics, and optional photo previews. Empty fields and columns are omitted. TXT files identify which post each metric belongs to. Export retries, resuming, and popup help were also improved.</p>
-                <div class="update-meta">
-                  <span data-i18n="updateReleased">Released</span>
-                  <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <time data-release-date datetime="2026-08-17">August 17, 2026</time>
-                  <span class="update-meta-separator" aria-hidden="true">·</span>
-                  <span class="update-meta-version">v1.6.1</span>
                 </div>
               </div>
             </div>
@@ -1233,6 +1349,7 @@
           </svg>
         </a>
 
+        <p class="about-disclaimer"><a href="emoji/attribution.html" target="_blank" rel="noopener">Emoji: Noto · Twemoji · Emojitwo · Fluent</a></p>
         <div class="about-disclaimer" data-i18n="notAffiliated">Not affiliated with X Corp.</div>
       </div>
     </div>
@@ -1241,7 +1358,7 @@
     <footer class="footer">
       <span id="extensionVersion">v0.0.0</span>
       <span class="footer-separator">·</span>
-      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Sep 6, 2026</span></span>
+      <span class="footer-date"><span data-i18n="lastUpdated">Last update:</span> <span class="footer-build-date">Sep 20, 2026</span></span>
     </footer>
   </div>
 
@@ -1287,11 +1404,20 @@
     </div>
   </div>
 
+  <dialog id="themePicker" class="theme-picker" aria-labelledby="themePickerTitle">
+    <div class="theme-picker-heading">
+      <div><h2 id="themePickerTitle" data-i18n="themePickerTitle">Choose a theme</h2></div>
+      <button type="button" class="theme-picker-close" id="closeThemePicker" data-i18n-aria-label="themePickerClose" aria-label="Close">×</button>
+    </div>
+    <div id="themePickerOptions" class="theme-picker-options"></div>
+  </dialog>
+
   <script src="../utils/config.js"></script>
   <script src="../utils/shared.js"></script>
   <script src="../utils/rolling-counter.js"></script>
   <script src="../utils/usage-tracker.js"></script>
   <script src="i18n.js"></script>
+  <script src="theme-picker.js"></script>
   <script src="theme.js"></script>
   <script src="rate-prompt.js"></script>
   <script src="history.js"></script>
@@ -1304,6 +1430,7 @@
   <script src="account-fields.js"></script>
   <script src="settings-form.js"></script>
   <script src="popup.js"></script>
+  <script src="ladybug-motion.js"></script>
   <script src="ladybug.js"></script>
 </body>
 

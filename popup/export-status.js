@@ -232,12 +232,15 @@
                             statusMessage.append(loginLink);
                             const suffix = t('authSuffix');
                             statusMessage.append(`${suffix ? ' ' + suffix : ''}, ${t('thenTryAgain')}`);
+                        } else if (state.error === 'SEARCH_END_UNCONFIRMED') {
+                            // Resume restarts the same search; do not promise that it fixes this.
+                            statusMessage.textContent = `${itemCount > 0 ? t('partialSaved') + ' ' : ''}${formatError(state.error, t)}`;
                         } else if (String(state.error || '').startsWith('SEARCH_')) {
                             statusMessage.textContent = `${itemCount > 0 ? t('partialSaved') + ' ' : ''}${t('searchResumeHint')}`;
                         } else {
                             statusMessage.textContent = state.error === 'REPLIES_UNAVAILABLE'
                                 ? t('repliesUnavailableBody')
-                                : ((state.error === 'RATE_LIMITED' && state.canResume)
+                                : ((['RATE_LIMITED', 'MAX_RETRIES_EXCEEDED'].includes(state.error) && state.canResume)
                                     ? t('rateLimitedResumeHint')
                                     : formatError(state.error, t));
                         }

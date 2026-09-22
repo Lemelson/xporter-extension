@@ -49,3 +49,30 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Size controls use Tabler Icons (MIT): arrows-horizontal, arrows-vertical, resize, text-size.
+Source: https://github.com/tabler/tabler-icons/tree/main/icons/outline
+
+Theme controls use Tabler Icons (MIT): palette.
+Source: https://github.com/tabler/tabler-icons/blob/main/icons/outline/palette.svg
+
+Ladybug shell artwork (popup/ladybug-shell.webp) was generated for XPorter. Leg artwork and animation are part of the XPorter source.
+
+Selected emoji artwork
+----------------------
+Google Noto: 14 flags, memo and right arrow. Copyright Google LLC;
+image artwork under Apache-2.0, with region flag exceptions described in
+popup/emoji/licenses/noto-README.md and noto-flags-README.md.
+Source: https://github.com/googlefonts/noto-emoji
+Twemoji: warning and followers. Copyright Twitter, Inc. and contributors.
+Source: https://github.com/jdecked/twemoji/tree/v17.0.3
+Emojitwo: bookmark. Artwork by EmojiOne (Ranks.com) and Emojitwo contributors.
+Source: https://github.com/EmojiTwo/emojitwo
+Twemoji and Emojitwo artwork: CC BY 4.0, https://creativecommons.org/licenses/by/4.0/
+Full legal text: popup/emoji/LICENSE-GRAPHICS.txt
+Microsoft Fluent Color: globe with meridians. Copyright Microsoft Corporation, MIT.
+Source: https://github.com/microsoft/fluentui-emoji
+Licenses: popup/emoji/licenses/. Exact source URLs and SHA-256 hashes:
+popup/emoji/manifest.json. Images are resized/rasterized to 72px and embedded
+in a subset sbix/WOFF2 font with custom metrics; artwork colors/shapes unchanged.
+Apple platforms keep the installed system font; no Apple artwork is distributed.

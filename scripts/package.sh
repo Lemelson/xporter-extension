@@ -49,12 +49,13 @@ for d in "${INCLUDE_DIRS[@]}"; do
   [[ -d "$d" ]] || { echo "ERROR: required directory missing: $d" >&2; exit 1; }
 done
 
+# Nested manifest.json files are build metadata, not extension manifests.
 # Collect regular files from the allowed directories, dropping junk
 # (dotfiles like .DS_Store and any stray markdown) even inside allowed dirs.
 FILES=("${INCLUDE_FILES[@]}")
 while IFS= read -r -d '' f; do
   FILES+=("${f#./}")
-done < <(find "${INCLUDE_DIRS[@]}" -type f ! -name '.*' ! -name '*.md' -print0 | sort -z)
+done < <(find "${INCLUDE_DIRS[@]}" -type f ! -name '.*' ! -name '*.md' ! -iname 'manifest.json' -print0 | sort -z)
 
 OUT_DIR="$(dirname "$OUT")"
 OUT_NAME="$(basename "$OUT")"
@@ -73,6 +74,13 @@ EXPECTED_ENTRIES="$(printf '%s\n' "${FILES[@]}")"
 ACTUAL_ENTRIES="$(zipinfo -1 "$TEMP_OUT")"
 if [[ "$ACTUAL_ENTRIES" != "$EXPECTED_ENTRIES" ]]; then
   echo "ERROR: package contents do not match the runtime allowlist" >&2
+  exit 1
+fi
+
+# Chrome Web Store rejects a package with any second manifest.json.
+MANIFEST_ENTRIES="$(zipinfo -1 "$TEMP_OUT" | awk 'tolower($0) ~ /(^|\/)manifest\.json$/')"
+if [[ "$MANIFEST_ENTRIES" != "manifest.json" ]]; then
+  echo "ERROR: package must contain only the root manifest.json" >&2
   exit 1
 fi
 

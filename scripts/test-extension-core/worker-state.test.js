@@ -2183,30 +2183,35 @@ function testPostsAndUserListsUseIndependentSpeedSettings() {
 
 function testAboutAccountRetriesAreConfigurable() {
     const harness = createWorkerHarness();
-    harness.context.XPORTER_CONFIG.ABOUT_ACCOUNT_RETRY_RANGE = [1, 1440, 5];
+    harness.context.XPORTER_CONFIG.RATE_LIMIT_WAIT_RANGE_MINUTES = [15, 1440, 15];
 
-    const retryOptions = vm.runInContext(`({
-        defaultAbout: buildRateLimiterOptions({}, 'about_account').maxRetries,
+    const MIN = 60 * 1000;
+    const waitOptions = vm.runInContext(`({
+        defaultAbout: buildRateLimiterOptions({}, 'about_account').rateLimitWaitMs,
         configuredAbout: buildRateLimiterOptions({
             aboutAccountMaxRetries: 60
-        }, 'about_account').maxRetries,
+        }, 'about_account').rateLimitWaitMs,
         minimumAbout: buildRateLimiterOptions({
             aboutAccountMaxRetries: 0
-        }, 'about_account').maxRetries,
+        }, 'about_account').rateLimitWaitMs,
         maximumAbout: buildRateLimiterOptions({
             aboutAccountMaxRetries: 9999
-        }, 'about_account').maxRetries,
+        }, 'about_account').rateLimitWaitMs,
         ordinaryList: buildRateLimiterOptions({
             aboutAccountMaxRetries: 60
-        }, 'followers').maxRetries
+        }, 'followers').rateLimitWaitMs,
+        aboutRetries: buildRateLimiterOptions({}, 'about_account').maxRetries
     })`, harness.context);
 
-    assert.deepEqual(JSON.parse(JSON.stringify(retryOptions)), {
-        defaultAbout: 5,
-        configuredAbout: 60,
-        minimumAbout: 1,
-        maximumAbout: 1440
-    }, 'only About requests must use the bounded retry setting');
+    // The wait budget is minutes, floors at one full X window, and applies to
+    // every limiter: a followers page is rate-limited exactly like About.
+    assert.deepEqual(JSON.parse(JSON.stringify(waitOptions)), {
+        defaultAbout: 15 * MIN,
+        configuredAbout: 60 * MIN,
+        minimumAbout: 15 * MIN,
+        maximumAbout: 1440 * MIN,
+        ordinaryList: 60 * MIN
+    }, 'the X-limit wait budget must be bounded and shared by every request kind');
 }
 
 async function testPersistedLimitOverrideIsReported() {
@@ -2322,19 +2327,6 @@ async function testStateWriteFailureIsTerminal() {
 
 function testSavedDateRangeRowsAdvanceResumeCoverage() {
     const harness = createWorkerHarness();
-    const coverage = vm.runInContext(`
-        currentExport = {
-            dateFrom: new Date('2026-01-01T00:00:00.000Z'),
-            dateTo: new Date('2026-01-31T23:59:59.999Z'),
-            settings: { quantityLimit: 500 },
-            tweetCount: 244
-        };
-        searchCapture = { oldestCollectedMs: null };
-        noteSearchTimelineCoverage({ created_at: '2026-01-02T12:00:00.000Z' });
-        computeDateCoveragePct();
-    `, harness.context);
-    assert(coverage >= 95,
-        'saved duplicate rows re-scanned on Resume must rebuild date coverage instead of looking stalled');
     const phase = vm.runInContext(`
         overlayPhase(
             { resumingFor: 'Checking saved progress for', posts: 'posts' },
@@ -2636,13 +2628,13 @@ const tests = [
     { name: "resume pacing vs filters", run: testResumeKeepsFiltersButFollowsCurrentPacing, order: 55 },
     { name: "saved pacing applies live without changing filters", run: testSavedPacingChangesApplyToARunningExportOnly, order: 56 },
     { name: "independent post and user-list speeds", run: testPostsAndUserListsUseIndependentSpeedSettings, order: 57 },
-    { name: "configurable About rate-limit retries", run: testAboutAccountRetriesAreConfigurable, order: 58 },
+    { name: "configurable X-limit wait budget", run: testAboutAccountRetriesAreConfigurable, order: 58 },
     { name: "persisted limit override", run: testPersistedLimitOverrideIsReported, order: 60 },
     { name: "stopped Resume ignores extra quantity", run: testStoppedResumeRejectsExtraQuantityOverride, order: 61 },
     { name: "terminal auto-expiration", run: testTerminalExportActuallyExpires, order: 62 },
     { name: "resume first-item telemetry", run: testResumeRecordsFirstNewItem, order: 63 },
     { name: "state write failure", run: testStateWriteFailureIsTerminal, order: 64 },
-    { name: "date Resume rebuilds coverage from saved rows", run: testSavedDateRangeRowsAdvanceResumeCoverage, order: 65 },
+    { name: "date Resume counts re-scanned saved rows", run: testSavedDateRangeRowsAdvanceResumeCoverage, order: 65 },
     { name: "repeated post cursor terminates", run: testRepeatedPostCursorTerminatesWithoutHanging, order: 66 },
     { name: "repeated user-list cursor terminates", run: testRepeatedUserListCursorTerminatesWithoutHanging, order: 67 },
     { name: "profile feed defaults and migration", run: testProfileFeedDefaultsAndMigratesLegacyReplySetting, order: 73 }

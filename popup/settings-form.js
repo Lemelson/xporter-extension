@@ -91,7 +91,7 @@
                 customQuantityRow.classList.remove('hidden');
                 customQuantity.value = String(savedLimit);
             }
-            exportSpeed.value = ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom'].includes(currentSettings.exportSpeed)
+            exportSpeed.value = ['ultra', 'turbo', 'fast', 'standard', 'careful', 'turtle', 'custom'].includes(currentSettings.exportSpeed)
                 ? currentSettings.exportSpeed
                 : 'standard';
             customDelaySec.value = currentSettings.customDelaySec || 5;
@@ -117,8 +117,10 @@
             aboutAccountCustomBatchSize.value =
                 currentSettings.aboutAccountCustomBatchSize || 5;
             aboutAccountMaxRetries.value =
-                currentSettings.aboutAccountMaxRetries || 5;
-            lastAcceptedAboutRetries = clampToInput(aboutAccountMaxRetries, 5);
+                currentSettings.aboutAccountMaxRetries || 15;
+            lastAcceptedAboutRetries = clampToInput(aboutAccountMaxRetries, 15);
+            // Show the value that autosave would persist, never an out-of-range stored one.
+            aboutAccountMaxRetries.value = String(lastAcceptedAboutRetries);
             syncAboutAccountSpeedVisibility();
             autoExpireEnabled.checked = currentSettings.autoExpireEnabled !== false;
             autoExpireHours.value = currentSettings.autoExpireHours || 4;
@@ -284,7 +286,7 @@
         });
         aboutAccountSpeed.addEventListener('change', syncAboutAccountSpeedVisibility);
         aboutAccountMaxRetries.addEventListener('change', () => {
-            const nextRetries = clampToInput(aboutAccountMaxRetries, 5);
+            const nextRetries = clampToInput(aboutAccountMaxRetries, 15);
             aboutAccountMaxRetries.value = String(nextRetries);
             if (nextRetries > ABOUT_RETRY_WARNING_THRESHOLD &&
                 nextRetries !== lastAcceptedAboutRetries) {

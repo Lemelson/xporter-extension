@@ -1,8 +1,8 @@
 // XPorter Popup — Logic (optimized, multi-mode)
 document.addEventListener('DOMContentLoaded', async () => {
+    mountHomeSizing();
     // ==================== Elements ====================
     const popup = document.getElementById('popup');
-    const themeToggle = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');
     const usernameInput = document.getElementById('usernameInput');
     const usernameError = document.getElementById('usernameError');
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('photoPermissionCountdownStatus');
     const PHOTO_EMBED_ORIGIN = 'https://pbs.twimg.com/*';
     const PHOTO_PERMISSION_INTRO_KEY = 'xporter_photo_permission_intro_seen';
-    const PHOTO_PERMISSION_INTRO_SECONDS = 3;
+    const PHOTO_PERMISSION_INTRO_SECONDS = 5;
 
     // Settings tab — posts-only elements
     const settingsBookmarksOnly = document.getElementById('settingsBookmarksOnly');
@@ -212,6 +212,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeTabs[0]?.id &&
         /^https:\/\/(?:www\.)?(?:x|twitter)\.com\//i.test(activeTabs[0].url || '')
     );
+    // Reloading the extension disconnects content scripts in already-open X
+    // tabs. Keep URL-based export available, but never silently hide recovery.
+    const accountContextNotice = document.getElementById('accountContextNotice');
+    accountContextNotice.classList.toggle('hidden',
+        !activeTabSupportsAccountContext || Boolean(liveAccountContext));
+    const reloadAccountTab = document.getElementById('reloadAccountTab');
+    reloadAccountTab.addEventListener('click', async () => {
+        const tabId = activeTabs[0]?.id;
+        if (!activeTabSupportsAccountContext || !tabId) return;
+        reloadAccountTab.disabled = true;
+        try {
+            await chrome.tabs.reload(tabId);
+            window.close();
+        } catch (_) {
+            reloadAccountTab.disabled = false;
+            showToast(t('accountContextUnavailable'), 'error');
+        }
+    });
     const detectedCurrentAccount = liveAccountContext
         ? (liveAccountContext.currentAccount || null)
         : (activeTabSupportsAccountContext ? null : (currentAccountResult?.account || null));
@@ -223,20 +241,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ==================== Theme & Design ====================
-    initTheme(currentSettings.theme, themeIcon);
+    initTheme(XPorterThemes.resolve(currentSettings).mode, themeIcon);
     mountAppearanceSettings({ currentSettings, t, showToast });
-
-    themeToggle.addEventListener('click', async () => {
-        const previousTheme = currentSettings.theme || 'dark';
-        const nextTheme = toggleTheme(themeIcon);
-        // Send only the changed key — a full snapshot would revert newer
-        // settings saved elsewhere (the SW merge is shallow/partial).
-        const result = await persistSettingsPatch(currentSettings, { theme: nextTheme });
-        if (result?.success !== true) {
-            initTheme(previousTheme, themeIcon);
-            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
-        }
-    });
+    mountThemePicker({ currentSettings, t, showToast });
 
     // ==================== Export Mode Switching ====================
     function modeEmbedsXlsxPhotos(mode = exportMode.value) {
@@ -516,21 +523,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         langDropdown.classList.remove('hidden');
         langBtn.classList.add('active');
         langBtn.setAttribute('aria-expanded', 'true');
-        requestAnimationFrame(() => {
-            const dropdownRect = langDropdown.getBoundingClientRect();
-            const popupRect = popup.getBoundingClientRect();
-            const neededHeight = dropdownRect.bottom - popupRect.top + 20;
-            if (neededHeight > popupRect.height) {
-                popup.style.minHeight = neededHeight + 'px';
-            }
-        });
+        // The menu scrolls within the fixed workspace height (workspace.css).
+        // Growing the native action window here would clip its bottom controls.
     }
 
     function closeLangDropdown() {
         langDropdown.classList.add('hidden');
         langBtn.classList.remove('active');
         langBtn.setAttribute('aria-expanded', 'false');
-        popup.style.minHeight = '';
     }
 
     langBtn.addEventListener('click', (e) => {
@@ -779,9 +779,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Start Export ====================
     startBtn.addEventListener('click', async () => {
+        const rejectedStart = error => sendMessage({ type:'DIAGNOSTIC_START_REJECTED',
+            error, mode:exportMode.value, format:outputFormat.value,
+            dateRange:exportMode.value === 'posts' && dateCheck.checked });
         try {
             const mode = exportMode.value;
-            if (mode === 'posts' && !settingsForm.validatePostSelection()) return;
+            if (mode === 'posts' && !settingsForm.validatePostSelection()) {
+                rejectedStart('NO_POST_TYPES_SELECTED'); return;
+            }
             // extractUsernameFromInput returns '' for anything that is not a
             // valid username or X profile URL — never submit garbage.
             const username = mode === 'bookmarks'
@@ -795,6 +800,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // A silent red flash left first-time users stranded (churn
                 // rows: opened popup, never started an export). Say what to do.
                 showToast(t('errEnterUsername'), 'error');
+                rejectedStart('INVALID_USERNAME');
                 return;
             }
             targetAccountCard.classList.remove('is-invalid');
@@ -807,6 +813,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // settings for this export.
             const settingsSave = await settingsForm.flush();
             if (settingsSave?.success !== true) {
+                rejectedStart(settingsSave?.error || 'STORAGE_FULL');
                 showToast(formatError(settingsSave?.error || 'STORAGE_FULL', t), 'error');
                 return;
             }
@@ -878,6 +885,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         copyBtn.disabled = false;
         if (copied) {
+            sendMessage({ type: 'DIAGNOSTIC_CLIPBOARD_COPIED' });
             showToast(t('contactCopied'), 'success');
         } else {
             showToast(result?.error ? formatError(result.error, t) : t('errCopyFailed'), 'error');

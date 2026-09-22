@@ -388,7 +388,9 @@ const tests = [
     ['Stop prevents a post-abort context request', testStopDuringContextWaitPreventsLaterRequest]
 ];
 
-(async () => {
+module.exports = { createWorkerHarness, setRunningExport, setLimiterBindings };
+
+if (require.main === module) (async () => {
     const failures = [];
     for (const [name, test] of tests) {
         try {

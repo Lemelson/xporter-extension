@@ -69,7 +69,7 @@ try {
   });
 
   await check('pending autosave cannot accept an unconfirmed retry increase', async () => {
-    await reset({ includeAboutAccountDetails: true, aboutAccountMaxRetries: 5 });
+    await reset({ includeAboutAccountDetails: true, aboutAccountMaxRetries: 15 });
     await page.evaluate(() => {
       for (const [id, value] of [['quantityLimit', '100'], ['aboutAccountMaxRetries', '120']]) {
         const control = document.getElementById(id);
@@ -79,33 +79,33 @@ try {
     });
     await page.locator('#aboutRiskDialog').waitFor({ state: 'visible' });
     await page.waitForTimeout(700);
-    assert.equal((await saved()).aboutAccountMaxRetries, 5);
+    assert.equal((await saved()).aboutAccountMaxRetries, 15);
     await page.locator('#aboutRiskCancel').click();
-    assert.equal(await page.locator('#aboutAccountMaxRetries').inputValue(), '5');
+    assert.equal(await page.locator('#aboutAccountMaxRetries').inputValue(), '15');
   });
 
   await check('typing retries cannot enter autosave before blur and confirmation', async () => {
-    await reset({ includeAboutAccountDetails: true, aboutAccountMaxRetries: 5 });
+    await reset({ includeAboutAccountDetails: true, aboutAccountMaxRetries: 15 });
     await page.locator('#aboutAccountMaxRetries').focus();
     await change('quantityLimit', 100);
     await page.locator('#aboutAccountMaxRetries').fill('120');
     await page.waitForTimeout(700);
     assert.equal((await saved()).quantityLimit, 100, 'the unrelated autosave must actually run');
-    assert.equal((await saved()).aboutAccountMaxRetries, 5);
+    assert.equal((await saved()).aboutAccountMaxRetries, 15);
     await page.locator('#aboutAccountMaxRetries').press('Tab');
     await page.locator('#aboutRiskDialog').waitFor({ state: 'visible' });
     await page.locator('#aboutRiskCancel').click();
-    assert.equal(await page.locator('#aboutAccountMaxRetries').inputValue(), '5');
+    assert.equal(await page.locator('#aboutAccountMaxRetries').inputValue(), '15');
 
     await page.locator('#aboutAccountMaxRetries').fill('120');
     await page.locator('#aboutAccountMaxRetries').press('Tab');
     await page.locator('#aboutRiskConfirm').click({ timeout: 10000 });
     await page.waitForFunction(async () =>
       (await chrome.storage.local.get('xporter_settings')).xporter_settings.aboutAccountMaxRetries === 120);
-    await page.locator('#aboutAccountMaxRetries').fill('10');
+    await page.locator('#aboutAccountMaxRetries').fill('30');
     await page.locator('#aboutAccountMaxRetries').press('Tab');
     await page.waitForFunction(async () =>
-      (await chrome.storage.local.get('xporter_settings')).xporter_settings.aboutAccountMaxRetries === 10);
+      (await chrome.storage.local.get('xporter_settings')).xporter_settings.aboutAccountMaxRetries === 30);
     assert.equal(await page.locator('#aboutRiskDialog').isVisible(), false);
   });
 

@@ -25,8 +25,8 @@
 ## Release status
 
 The `v1.6.4` tag matches the package released through the Chrome Web Store.
-The `main` branch now reports version `1.6.5`, packaged on September 6, 2026,
-with verified date-range capture, completion, partial downloads and Resume fixes.
+The `main` branch now reports version `2.0.1`, packaged on September 9, 2026,
+with a redesigned interface, theme picker, sizing controls, export fixes and a persistent ladybug counter.
 This package is separate from the 1.6.4 Store release; Store publication is not implied.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
@@ -59,7 +59,7 @@ for the complete change list, incident explanation, and safer permission design.
 - **Pause and resume** — stop mid-export and continue later with zero data loss
 - **Smart rate limiting** — six Export Speed modes plus live quota-aware pauses and retries
 - **100% local processing** — everything happens in your browser; your exported data is never transmitted anywhere
-- **Dark and light themes** — blue styling with a one-click toggle; optional simplified styling and 85–130% interface scale in Settings → Design
+- **11 visual themes** — choose from dark and light presets using the palette button; previews show panels, text, checkboxes and the main action. Your selection saves automatically. Size controls remain separate in Settings.
 - **14 languages** — auto-detects Chrome's UI language on first launch
 - **Dynamic API discovery** — extracts fresh GraphQL query IDs from X's JS bundles at runtime; gracefully falls back to hardcoded IDs
 - **Clear export status** — animated collected counts, a full-width Stop button, and matching result controls. The date-export panel shows a percentage only against your selected post limit; without a limit it shows activity. Animations respect reduced-motion preferences.
@@ -226,7 +226,9 @@ xporter/
 │   └── interceptor.js        # Page-context hook for GraphQL IDs and seen-post capture
 ├── popup/                    # Compact popup UI
 │   ├── popup.html/.css/.js   # Markup, dark + light styles, logic
-│   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + toggle
+│   ├── theme-presets.js/.css  # Curated dark/light palettes
+│   ├── theme-picker.js/.css   # Accessible preset selector
+│   ├── theme-init.js/theme.js# Theme bootstrap (anti-FOUC) + size controls
 │   ├── i18n.js               # In-app translation engine
 │   ├── rate-prompt.js/.css   # "Rate XPorter" prompt
 │   ├── history.js            # Export-history UI
@@ -266,7 +268,8 @@ xporter/
 - No third-party analytics, advertising, or tracking SDKs
 - No extension-owned backend; normal export traffic goes only to X.com
 - Export requests use your existing X session to communicate with X. XPorter does not send your credentials to a separate extension service.
-- Opening the uninstall feedback page sends usage statistics. Exported X content is not included automatically; any text or contact details you submit are sent with your feedback. See the [live privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html) for details.
+- Technical usage statistics are not uploaded while using the extension.
+- Opening the uninstall feedback page sends limited, pseudonymous product diagnostics. Exported X content is not included automatically; any text or contact details you submit are sent with your feedback. See the [live privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html) for details.
 
 ## Contributing
 
@@ -321,3 +324,5 @@ See [LICENSE](LICENSE) for full terms.
 <p align="center">
   Built by <a href="https://github.com/Lemelson">Lemelson</a>
 </p>
+
+Diagnostic semantics, backward compatibility and collector deployment: [backend/README.md](backend/README.md).

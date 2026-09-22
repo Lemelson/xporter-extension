@@ -308,6 +308,10 @@ async function fetchWithBearerFallback(url, buildOptions) {
 // exp_started=1, exp_err=0, items=0). Timeouts convert a hang into
 // NETWORK_TIMEOUT, which the rate limiter retries visibly.
 async function fetchTimed(url, options = {}, timeoutMs) {
+  const diagnosticAttemptId = globalThis.XPorterDiagnostics?.currentId;
+  const metric = key => {
+    if (diagnosticAttemptId) globalThis.XPorterDiagnostics?.record('metric', {key,attemptId:diagnosticAttemptId});
+  };
   const ms = timeoutMs || _C.API_FETCH_TIMEOUT || 30000;
   const controller = new AbortController();
   const request = { aborted: false, timedOut: false, hasResponse: false };
@@ -320,6 +324,7 @@ async function fetchTimed(url, options = {}, timeoutMs) {
   };
   const timer = setTimeout(() => {
     request.timedOut = true;
+    metric('timeouts');
     controller.abort();
   }, ms);
   if (externalSignal?.aborted) {
@@ -328,8 +333,10 @@ async function fetchTimed(url, options = {}, timeoutMs) {
     externalSignal?.addEventListener('abort', abortFromExternal, { once: true });
   }
   activeRequests.set(controller, request);
+  metric('requests');
   try {
     const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+    if (response.status === 429) metric('rateLimits');
     request.hasResponse = true;
     responseRequests.set(response, {
       controller,
@@ -346,6 +353,7 @@ async function fetchTimed(url, options = {}, timeoutMs) {
     if (request.timedOut || (err && err.name === 'TimeoutError')) {
       throw new Error('NETWORK_TIMEOUT');
     }
+    metric('networkErrors');
     throw err;
   } finally {
     // Successful responses stay cancellable until their body has been read.

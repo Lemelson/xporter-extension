@@ -6,7 +6,15 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const SUITES = [
+    'scripts/test-emoji-assets.js',
+    'scripts/test-ladybug.js',
+    'scripts/test-settings-telemetry.js',
+    'scripts/test-diagnostics.js',
+    'scripts/test-diagnostics-codec.js',
+    'scripts/test-feedback-collector.js',
+    'scripts/test-usage-upload.js',
     'scripts/check-capture-bundle.js',
+    'scripts/test-theme-presets.cjs',
     'scripts/test-static-contracts.js',
     'scripts/test-i18n-runtime.js',
     'scripts/test-extension-core.js',
@@ -16,6 +24,7 @@ const SUITES = [
     'scripts/test-storage-concurrency.js',
     'scripts/test-download-transaction.js',
     'scripts/test-bookmark-context-lifecycle.js',
+    'scripts/test-export-persistence.js',
     'scripts/test-api-discovery-cancellation.js',
     'scripts/test-capture-contract.js',
     'scripts/test-export-policy.js'

@@ -1,0 +1,205 @@
+{
+  "description": "User-selected UI artwork; native Apple emoji remain on Apple platforms.",
+  "emoji": [
+    {
+      "emoji": "🇺🇸",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1fa_1f1f8/512.png",
+      "sourceFile": "sources/1f1fa-1f1f8.png",
+      "file": "1f1fa-1f1f8.png",
+      "sourceSha256": "81ac3523f22a79f565b195319da8c7b544e974cc5a81fe5e972f0510079e821c",
+      "sha256": "a8751e2272a4840c634b6a4d93429f8f78e3da9d5f606c1780ca8d6655e83389"
+    },
+    {
+      "emoji": "🇨🇳",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1e8_1f1f3/512.png",
+      "sourceFile": "sources/1f1e8-1f1f3.png",
+      "file": "1f1e8-1f1f3.png",
+      "sourceSha256": "0fccb9103509ed003a81fbba87fce521165cf88a930261c2103ca0516fa1b047",
+      "sha256": "c030978ef3bd26f4332ca086327e6984affd1069f1acc74c29f29425f744c4b9"
+    },
+    {
+      "emoji": "🇯🇵",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1ef_1f1f5/512.png",
+      "sourceFile": "sources/1f1ef-1f1f5.png",
+      "file": "1f1ef-1f1f5.png",
+      "sourceSha256": "82274c8f3c0277142d4f6e405eb2f4bd53c9094be41026c6b24ed9a8abe85333",
+      "sha256": "ddf5a02a73cb5b44abb44b5c14089fc15dcd766f56aa83ced630d6c5a23fc811"
+    },
+    {
+      "emoji": "🇪🇸",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1ea_1f1f8/512.png",
+      "sourceFile": "sources/1f1ea-1f1f8.png",
+      "file": "1f1ea-1f1f8.png",
+      "sourceSha256": "49107d42d9d0aedb48f69b74b9861d14876f4fe9c45f2663fbe870199db2a3d1",
+      "sha256": "68099786a9be385ec2603b8cbe7b15da9a4d5d39d0892fbf083d2d7e28e3a48b"
+    },
+    {
+      "emoji": "🇰🇷",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1f0_1f1f7/512.png",
+      "sourceFile": "sources/1f1f0-1f1f7.png",
+      "file": "1f1f0-1f1f7.png",
+      "sourceSha256": "be8b32d565a00d4d3413b9604ea4c9d7db7b2d8ac705adead77b61eb5feb9eb4",
+      "sha256": "ba86861283f935afbe656d87019248a8589e1cf7c7adbf10488654d96af19140"
+    },
+    {
+      "emoji": "🇷🇺",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1f7_1f1fa/512.png",
+      "sourceFile": "sources/1f1f7-1f1fa.png",
+      "file": "1f1f7-1f1fa.png",
+      "sourceSha256": "0e55b109af72361cf83eae2fc6d8e4dfd935cf9fa0fd8ae0413494e674cba599",
+      "sha256": "08b66a0750fd37a316efab8b56df40fb69f0c4e335e4c14563ad0123a50307f6"
+    },
+    {
+      "emoji": "🇮🇹",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1ee_1f1f9/512.png",
+      "sourceFile": "sources/1f1ee-1f1f9.png",
+      "file": "1f1ee-1f1f9.png",
+      "sourceSha256": "b5b4788355d84afdf0c2a3b3fe622c21eed9b7ce32ac336586c4dd904ccfcf1a",
+      "sha256": "849df58d11429de94e65dcd3e6d52f8d1c6f8c298eb31c68c6776c67aaebe729"
+    },
+    {
+      "emoji": "🇧🇷",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1e7_1f1f7/512.png",
+      "sourceFile": "sources/1f1e7-1f1f7.png",
+      "file": "1f1e7-1f1f7.png",
+      "sourceSha256": "5f67b0ca66e5680327483b0fc17858935f92145697b3b2c59e8a7abfa3e4ff0d",
+      "sha256": "fd75f887d0d36a39d3759a22eb91a8645780250df2f18fe76f6070deb0e47943"
+    },
+    {
+      "emoji": "🇹🇷",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1f9_1f1f7/512.png",
+      "sourceFile": "sources/1f1f9-1f1f7.png",
+      "file": "1f1f9-1f1f7.png",
+      "sourceSha256": "b94609a6dcd652efa1c4bb8c4fceaa809fa55df41abfc6d8918ba7de0660aeb5",
+      "sha256": "ee99faf53bd65a69d19d8b5e617af7b711ba7868e029b84012d34173b65b694c"
+    },
+    {
+      "emoji": "🇩🇪",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1e9_1f1ea/512.png",
+      "sourceFile": "sources/1f1e9-1f1ea.png",
+      "file": "1f1e9-1f1ea.png",
+      "sourceSha256": "f93f65f948e5dbc3ce00a85cd5b8d5d177559a4225667921ddfc4d3d177e53e0",
+      "sha256": "6b3759c553fb0fb2a94aa2c3808d79a73bc02fcabaaf91a7c1e200ac123c79fb"
+    },
+    {
+      "emoji": "🇸🇦",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1f8_1f1e6/512.png",
+      "sourceFile": "sources/1f1f8-1f1e6.png",
+      "file": "1f1f8-1f1e6.png",
+      "sourceSha256": "1a358b76d8f1e8b5235a7c12057830a3bb0c37cd5fa0f8d8bf55ddb8b938b5a6",
+      "sha256": "1ace85daff8454a0d17436ed85286789e66489529413802c29b36c568b6f9d70"
+    },
+    {
+      "emoji": "🇫🇷",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1eb_1f1f7/512.png",
+      "sourceFile": "sources/1f1eb-1f1f7.png",
+      "file": "1f1eb-1f1f7.png",
+      "sourceSha256": "2f50c6d7f340c2afbe01604ef968a45f99a02907780304f2ff018de8f695b03f",
+      "sha256": "8a1dc7fe1cf18a3cb3d485b8274af971623397f86a1e0f00965726ee038cfe26"
+    },
+    {
+      "emoji": "🇮🇳",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1ee_1f1f3/512.png",
+      "sourceFile": "sources/1f1ee-1f1f3.png",
+      "file": "1f1ee-1f1f3.png",
+      "sourceSha256": "0a057605dd28b83e36e14862c6e052789ed18eeaf175ca0ec3eb5dee9c673163",
+      "sha256": "22e1d2bcb290ed82b3a1d7bd8790c8975adf46914f410f241b22ecde62b178b3"
+    },
+    {
+      "emoji": "🇮🇩",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f1ee_1f1e9/512.png",
+      "sourceFile": "sources/1f1ee-1f1e9.png",
+      "file": "1f1ee-1f1e9.png",
+      "sourceSha256": "4eb04e453e7151841c40d22a56bbc4750b4a354cbb326421b50dd30e9c5e43f5",
+      "sha256": "74066724affffa6ea2082b236425d29020929b3d45bb5a7f5d6907e01384a572"
+    },
+    {
+      "emoji": "⚠️",
+      "vendor": "Twemoji",
+      "license": "CC-BY-4.0",
+      "source": "https://raw.githubusercontent.com/jdecked/twemoji/v17.0.3/assets/72x72/26a0.png",
+      "sourceFile": "sources/26a0.png",
+      "file": "26a0.png",
+      "sourceSha256": "7a03a74a92cb2f04b7f3e0338f51a3c4dfc1491a8f046b722f8a951502a7740e",
+      "sha256": "9d1994fdea59767033fbd0c5643cd6298c8ff47f964d499f9b6851ba0c1c285e"
+    },
+    {
+      "emoji": "📝",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/1f4dd/512.png",
+      "sourceFile": "sources/1f4dd.png",
+      "file": "1f4dd.png",
+      "sourceSha256": "9485605e3fb1c8446f6552a38c8879febe4b162997ea5aaca7b25b4de999aaa1",
+      "sha256": "5235ed1c73a62d392be5fef89e3f066077631e81b1ec0fc34b1bf76b6c1cbc1f"
+    },
+    {
+      "emoji": "🔖",
+      "vendor": "Emojitwo",
+      "license": "CC-BY-4.0",
+      "source": "https://raw.githubusercontent.com/EmojiTwo/emojitwo/311eff547b3ff4a61fdbae897dd09d41416048fc/svg/1f516.svg",
+      "sourceFile": "sources/1f516.svg",
+      "file": "1f516.png",
+      "sourceSha256": "51832e9630d3e1fd6f8d354b3327427bc2ebedad7cf3361912dc3bdfd4bc525f",
+      "sha256": "94f843869b35b78f4de255758b802e4743240c086c5fb7d2387fa5db12f86f15"
+    },
+    {
+      "emoji": "👥",
+      "vendor": "Twemoji",
+      "license": "CC-BY-4.0",
+      "source": "https://raw.githubusercontent.com/jdecked/twemoji/v17.0.3/assets/72x72/1f465.png",
+      "sourceFile": "sources/1f465.png",
+      "file": "1f465.png",
+      "sourceSha256": "196e790d4c65af5ce8748d6d2587b44cd76cf6f3bc379ee22f186d489c71242c",
+      "sha256": "bf547ebf4f9cb4ed665125ce031ac8d057fdf0b6c3a919dd2c238ee52a714523"
+    },
+    {
+      "emoji": "➡️",
+      "vendor": "Google Noto",
+      "license": "Apache-2.0 / region flag exceptions",
+      "source": "https://fonts.gstatic.com/s/e/notoemoji/latest/27a1/512.png",
+      "sourceFile": "sources/27a1.png",
+      "file": "27a1.png",
+      "sourceSha256": "de550a61e0226213657dad3e4c48776c6a9b30636c09037713aff83031b5baf7",
+      "sha256": "203a99b136a92bc9a337d74f7e66272472d2fb3780cfdbd9a3a81c9962444eb9"
+    },
+    {
+      "emoji": "🌐",
+      "vendor": "Microsoft Fluent Color",
+      "license": "MIT",
+      "source": "https://raw.githubusercontent.com/microsoft/fluentui-emoji/1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets/Globe%20with%20meridians/Color/globe_with_meridians_color.svg",
+      "sourceFile": "sources/1f310.svg",
+      "file": "1f310.png",
+      "sourceSha256": "ec4450ca111a3a6f017771ac89bfff1e2acd96fef494c5896d30622fcae49158",
+      "sha256": "777d7fd3f6a0b3f674c0292e5f81589592cdc29dfd33ab67cab9aededffa494a"
+    }
+  ]
+}

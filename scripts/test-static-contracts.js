@@ -37,6 +37,13 @@ assert(Number.parseInt(manifest.minimum_chrome_version, 10) >= 110,
     'download keepalive relies on Chrome 110+ extension API calls resetting the MV3 idle timer');
 
 const requiredDeterministicSuites = [
+    'scripts/test-emoji-assets.js',
+    'scripts/test-ladybug.js',
+    'scripts/test-settings-telemetry.js',
+    'scripts/test-diagnostics.js',
+    'scripts/test-diagnostics-codec.js',
+    'scripts/test-feedback-collector.js',
+    'scripts/test-usage-upload.js',
     'scripts/test-static-contracts.js',
     'scripts/test-i18n-runtime.js',
     'scripts/test-extension-core.js',
@@ -46,6 +53,7 @@ const requiredDeterministicSuites = [
     'scripts/test-storage-concurrency.js',
     'scripts/test-download-transaction.js',
     'scripts/test-bookmark-context-lifecycle.js',
+    'scripts/test-export-persistence.js',
     'scripts/test-api-discovery-cancellation.js',
     'scripts/test-capture-contract.js',
     'scripts/test-export-policy.js'
@@ -428,7 +436,9 @@ assert.doesNotMatch(popupHtml, /id=["']settingsPostsOnly["']/,
 assert(!manifest.host_permissions.includes('https://pbs.twimg.com/*'),
     'photo host access must never be a required permission — that is what disabled every 1.5.8 installation');
 assert.deepEqual(manifest.optional_host_permissions, ['https://pbs.twimg.com/*'],
-    'photo embedding must request pbs.twimg.com access optionally, from a user gesture');
+    'only photo embedding requires optional, gesture-granted hosts');
+assert(!manifest.host_permissions.some(host => host.includes('script.google')),
+    'diagnostic sharing must not add required permissions to existing installs');
 
 const popupRefs = [
     ...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi),
@@ -439,7 +449,7 @@ for (const file of popupRefs) assertFile(file, 'popup asset');
 
 const popupScripts = [...popupHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
     .map((match) => match[1]);
-assert.equal(popupScripts[0], 'theme-init.js', 'theme-init.js must remain the first popup script');
+assert.deepEqual(popupScripts.slice(0, 3), ['emoji-platform.js', 'theme-presets.js', 'theme-init.js'], 'emoji platform runs before paint; theme catalog precedes early theme application');
 for (const script of ['history.js', 'seen-posts.js', 'guarded-dialog.js', 'export-status.js',
     'presentation.js', 'account-fields.js', 'settings-form.js']) {
     assert(popupScripts.indexOf(script) >= 0 && popupScripts.indexOf(script) < popupScripts.indexOf('popup.js'),
@@ -469,21 +479,21 @@ assert.match(
     new RegExp(`<span class="update-meta-version">v${manifest.version.replace(/\./g, '\\.')}</span>`),
     'the first About update must describe the packaged manifest version'
 );
-assert.match(updateEntries[0], /data-i18n=["']updateReleased["']/,
-    'the packaged version must be labelled Released');
-assert.match(updateEntries[1], /data-i18n=["']updateReleased["']/,
-    'the previous public version must be labelled Released');
+assert.match(updateEntries[0], /<time data-release-date datetime=/,
+    'release history must retain its date without requiring a Released prefix');
+assert.match(updateEntries[1], /<time data-release-date datetime=/,
+    'release history must retain its date without requiring a Released prefix');
 assert.match(
     updateEntries[1],
-    /<span class="update-meta-version">v1\.6\.4<\/span>/,
-    'the most recent Store release must be v1.6.4'
+    /<span class="update-meta-version">v1\.6\.5<\/span>/,
+    'the previous build must be v1.6.5'
 );
-assert.match(updateEntries[2], /data-i18n=["']updateReleased["']/,
-    'the older public version must be labelled Released');
+assert.match(updateEntries[2], /<time data-release-date datetime=/,
+    'release history must retain its date without requiring a Released prefix');
 assert.match(
     updateEntries[2],
-    /<span class="update-meta-version">v1\.6\.1<\/span>/,
-    'the older public release must be v1.6.1'
+    /<span class="update-meta-version">v1\.6\.4<\/span>/,
+    'the older public release must be v1.6.4'
 );
 const currentBuildDate = /<time data-release-date datetime="([^"]+)"/.exec(updateEntries[0])?.[1];
 const footerBuildDate = /footer-build-date">([^<]+)</.exec(popupHtml)?.[1];
@@ -581,7 +591,7 @@ assert.match(
     /canContinueComplete\s*=\s*status\s*===\s*['"]complete['"]\s*&&\s*itemCount\s*>\s*0/,
     'zero-item complete exports must not offer a pointless Resume loop'
 );
-assert.match(read('popup/theme-init.js'), /theme === ['"]light['"]/,
+assert.match(read('popup/theme-init.js'), /XPorterThemes\.apply/,
     'the early theme bootstrap must only opt into light when explicitly saved');
 assert.doesNotMatch(workerSource.split('chrome.runtime.onInstalled.addListener', 2)[1], /saveSettings\(/,
     'install must use read-time defaults, never overwrite the first popup edit with an initial snapshot');
@@ -716,8 +726,8 @@ assert.match(
 );
 assert.match(
     popupHtml,
-    /id=["']aboutAccountMaxRetries["'][^>]*\bmin=["']1["'][^>]*\bmax=["']1440["']/,
-    'About rate-limit retries must be configurable from one minute up to one day'
+    /id=["']aboutAccountMaxRetries["'][^>]*\bmin=["']15["'][^>]*\bmax=["']1440["']/,
+    'the X-limit wait must cover one full 15-minute window and go up to one day'
 );
 assert.match(
     popupRuntime,
@@ -731,8 +741,8 @@ assert.match(
 );
 assert.match(
     read('utils/storage.js'),
-    /aboutAccountMaxRetries:\s*C\.ABOUT_ACCOUNT_RETRY_RANGE\?\.\[2\]\s*\?\?\s*5/,
-    'missing settings must default to five one-minute About retries'
+    /aboutAccountMaxRetries:\s*C\.RATE_LIMIT_WAIT_RANGE_MINUTES\?\.\[2\]\s*\?\?\s*15/,
+    'missing settings must default to waiting one full 15-minute X window'
 );
 assert.match(
     popupRuntime,
@@ -955,8 +965,8 @@ assert.match(english.aboutDesc, /TXT/, 'English About summary must advertise TXT
 assert.match(english.detailFormatsBody, /TXT/, 'English format details must include TXT');
 assert.match(
     popupRuntime,
-    /PHOTO_PERMISSION_INTRO_SECONDS\s*=\s*3/,
-    'the mandatory photo-permission explanation must guard Continue for three seconds'
+    /PHOTO_PERMISSION_INTRO_SECONDS\s*=\s*5/,
+    'the mandatory photo-permission explanation must guard Continue for five seconds'
 );
 assert.match(
     popupRuntime,

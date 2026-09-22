@@ -109,9 +109,13 @@
         return v;
     }
 
-    function resolveAboutAccountMaxRetries(settings = {}) {
+    // Total minutes to wait for X to lift a rate limit before the export
+    // pauses with a resumable error. Stored under the historical key
+    // aboutAccountMaxRetries (it began as an About-only retry count); it now
+    // applies to every X limit the export can hit.
+    function resolveRateLimitWaitMinutes(settings = {}) {
         const [min, max, fallback] =
-            XPORTER_CONFIG.ABOUT_ACCOUNT_RETRY_RANGE || [1, 1440, 5];
+            XPORTER_CONFIG.RATE_LIMIT_WAIT_RANGE_MINUTES || [15, 1440, 15];
         const requested = Number.parseInt(settings.aboutAccountMaxRetries, 10);
         const value = Number.isFinite(requested) ? requested : fallback;
         return Math.max(min, Math.min(max, value));
@@ -188,9 +192,7 @@
             raceReserve: preset.raceReserve,
             alwaysBatchCooldown: safetyBreak.alwaysBatchCooldown,
             adaptivePacing,
-            maxRetries: mode === 'about_account'
-                ? resolveAboutAccountMaxRetries(settings)
-                : undefined,
+            rateLimitWaitMs: resolveRateLimitWaitMinutes(settings) * 60 * 1000,
             fallbackMinDelay,
             fallbackMaxDelay,
             rateLimitProvider: () => (
@@ -249,7 +251,7 @@
         postSelectionAllowsTweet,
         rateLimitKeyForMode,
         clampCustomSpeed,
-        resolveAboutAccountMaxRetries,
+        resolveRateLimitWaitMinutes,
         resolveSpeedPreset,
         resolveSafetyBreak,
         buildRateLimiterOptions,

@@ -304,7 +304,11 @@ async function testLocaleLoadsShareRequestsAndRetryFailures() {
 function testGuardedDialogKeepsConfirmationSynchronousAndCancelsStaleFocus() {
     const frames = [];
     const timers = new Map();
-    const document = { activeElement: null };
+    const documentListeners = {};
+    const document = {
+        activeElement: null,
+        addEventListener(type, handler) { documentListeners[type] = handler; }
+    };
     let nextTimer = 0;
     function element() {
         const listeners = {};
@@ -332,6 +336,7 @@ function testGuardedDialogKeepsConfirmationSynchronousAndCancelsStaleFocus() {
     const cancelButton = element();
     const confirmButton = element();
     const trigger = element();
+    dialog.contains = node => [dialog, cancelButton, confirmButton].includes(node);
     const controller = context.XPorterGuardedDialog.mount({
         popup, dialog, cancelButton, confirmButton, countdownStatus: element()
     });
@@ -345,15 +350,30 @@ function testGuardedDialogKeepsConfirmationSynchronousAndCancelsStaleFocus() {
     const flushFrames = () => { while (frames.length) frames.shift()(); };
     open(5);
     flushFrames();
-    assert.equal(document.activeElement, cancelButton);
+    assert.equal(document.activeElement, dialog);
     assert.equal(popup.inert, true);
+    assert.equal(cancelButton.disabled, true);
     confirmButton.dispatch('click');
-    assert.equal(confirmed, 0, 'disabled confirmation cannot run even through a synthetic click');
-    dialog.dispatch('keydown', { key: 'Tab', shiftKey: true, preventDefault() {} });
-    assert.equal(document.activeElement, cancelButton, 'countdown leaves only Cancel focusable');
-    dialog.dispatch('keydown', { key: 'Escape', preventDefault() {} });
-    assert.equal(cancelled, 1);
-    assert.equal(timers.size, 0, 'dismissal must cancel the countdown');
+    cancelButton.dispatch('click');
+    assert.equal(confirmed, 0, 'disabled confirmation cannot run through a synthetic click');
+    documentListeners.keydown({ key: 'Tab', shiftKey: true, preventDefault() {} });
+    assert.equal(document.activeElement, dialog, 'focus stays on the dialog while actions are locked');
+    document.activeElement = null;
+    documentListeners.keydown({ key: 'Tab', preventDefault() {} });
+    assert.equal(document.activeElement, dialog);
+    documentListeners.keydown({ key: 'Escape', preventDefault() {} });
+    assert.equal(cancelled, 0, 'Escape and Cancel cannot dismiss during the countdown');
+    for (let second = 1; second <= 5; second++) {
+        const [id, tick] = timers.entries().next().value;
+        timers.delete(id);
+        tick();
+        if (second < 5) assert.equal(cancelButton.disabled, true);
+    }
+    assert.equal(cancelButton.disabled, false);
+    assert.equal(confirmButton.disabled, false);
+    documentListeners.keydown({ key: 'Escape', preventDefault() {} });
+    assert.equal(cancelled, 1, 'Escape dismisses after five seconds');
+    assert.equal(timers.size, 0);
     assert.equal(popup.inert, false);
     open(0);
     flushFrames();
@@ -364,7 +384,112 @@ function testGuardedDialogKeepsConfirmationSynchronousAndCancelsStaleFocus() {
     assert.equal(document.activeElement, trigger);
 }
 
+function testHelpWithoutPopoverKeepsTabsUsable() {
+    const element = () => {
+        const classes = new Set();
+        const attributes = new Map();
+        return {
+            events: {}, dataset: {},
+            classList: {
+                add: name => classes.add(name), remove: name => classes.delete(name),
+                contains: name => classes.has(name),
+                toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }
+            },
+            setAttribute: (name, value) => attributes.set(name, value),
+            getAttribute: name => attributes.get(name),
+            addEventListener(type, handler) { this.events[type] = handler; }
+        };
+    };
+    const home = element(), settings = element(), trigger = element(), tooltip = element();
+    home.dataset.tab = 'home'; settings.dataset.tab = 'settings';
+    trigger.setAttribute('aria-label', 'Localized help without markup');
+    tooltip.textContent = 'Localized help without markup';
+    // Chrome 111 rejects the selector and has neither Popover method.
+    tooltip.matches = () => { throw new SyntaxError('Unsupported :popover-open'); };
+    trigger.querySelector = () => tooltip;
+    const contents = { 'tab-home': element(), 'tab-settings': element() };
+    const document = {
+        querySelectorAll(selector) {
+            return selector === '.tab' ? [home, settings]
+                : selector === '.tab-content' ? Object.values(contents)
+                : selector === '[data-i18n-tooltip]' ? [trigger] : [];
+        },
+        querySelector: () => home,
+        getElementById: id => contents[id],
+        addEventListener() {}
+    };
+    const context = vm.createContext({ document, window: { addEventListener() {} }, clearTimeout, setTimeout });
+    vm.runInContext(source('popup/presentation.js'), context);
+    context.XPorterPopupUI.mount({ popup: element(), t: value => value });
+    trigger.events.pointerenter();
+    assert.equal(trigger.getAttribute('title'), 'Localized help without markup');
+    assert.equal(trigger.classList.contains('help-open'), false, 'native help must not expose an unpositioned overlay');
+    settings.events.click();
+    assert.equal(contents['tab-settings'].classList.contains('active'), true);
+    trigger.events.focus();
+    trigger.events.keydown({ key: 'Escape', preventDefault() {} });
+    home.events.click();
+    assert.equal(contents['tab-home'].classList.contains('active'), true);
+    trigger.setAttribute('aria-label', 'Updated translation');
+    trigger.events.pointerenter();
+    assert.equal(trigger.getAttribute('title'), 'Updated translation', 'fallback follows language changes');
+}
+
+function testHelpCoordinatesMatchLegacyAndStandardZoom() {
+    for (const legacy of [false, true]) for (const zoom of [0.85, 1, 1.15, 1.3]) {
+        const element = () => ({
+            events: {}, dataset: {}, setAttribute() {},
+            classList: { add() {}, remove() {}, toggle() {} },
+            addEventListener(type, handler) { this.events[type] = handler; }
+        });
+        const home = element(), content = element(), popup = element(), trigger = element();
+        home.dataset.tab = 'home';
+        const properties = {};
+        let open = false;
+        const tooltip = {
+            scrollHeight: 200,
+            style: { setProperty(key, value) { properties[key] = parseFloat(value); } },
+            setAttribute() {}, matches: () => open,
+            showPopover() { open = true; }, hidePopover() { open = false; }
+        };
+        trigger.querySelector = () => tooltip;
+        trigger.offsetWidth = 16;
+        // Both models represent the same painted trigger near the bottom.
+        const divisor = legacy ? zoom : 1;
+        trigger.getBoundingClientRect = () => ({
+            left: 200 / divisor, top: 450 / divisor,
+            bottom: (450 + 16 * zoom) / divisor, width: 16 * zoom / divisor
+        });
+        const document = {
+            querySelectorAll(selector) {
+                return selector === '.tab' ? [home] : selector === '.tab-content' ? [content]
+                    : selector === '[data-i18n-tooltip]' ? [trigger] : [];
+            },
+            querySelector: selector => selector === '.tab.active' ? home : null,
+            getElementById: () => content, addEventListener() {}
+        };
+        const width = 350 * zoom;
+        const context = vm.createContext({
+            document, window: { addEventListener() {} }, innerWidth: width, innerHeight: 600,
+            clearTimeout, setTimeout,
+            getComputedStyle: el => el === popup ? { zoom: String(zoom) }
+                : { borderTopWidth: '1', borderBottomWidth: '1' }
+        });
+        vm.runInContext(source('popup/presentation.js'), context);
+        context.XPorterPopupUI.mount({ popup, t: key => key });
+        trigger.events.pointerenter();
+        assert.equal(open, true);
+        const near = (actual, expected) => assert(Math.abs(actual - expected) < 0.01,
+            `${legacy ? 'legacy' : 'standard'}/${zoom}: ${actual} != ${expected}`);
+        near(properties['--help-pop-left'] * zoom, 16);
+        near(properties['--help-pop-width'] * zoom, width - 32);
+        near(properties['--help-pop-safe-top'] * zoom + 202 * zoom, 442);
+    }
+}
+
 const tests = [
+    { name: "help coordinates match legacy and standard zoom", run: testHelpCoordinatesMatchLegacyAndStandardZoom, order: 106 },
+    { name: "help without Popover keeps tabs usable", run: testHelpWithoutPopoverKeepsTabsUsable, order: 101 },
     { name: "theme restore", run: testThemeInitializationCanRevertToDark, order: 70 },
     { name: "signed-in account navigation detection", run: testContentScriptDetectsSignedInAccountFromXNavigation, order: 71 },
     { name: "acknowledgement countdown", run: testAcknowledgementCountdownRequiresFiveFullTicks, order: 72 },

@@ -1,5 +1,5 @@
 // XPorter — Rate Prompt
-// A self-contained "Enjoying XPorter? leave a review" overlay for the popup.
+// A self-contained review invitation overlay for the popup.
 // State lives directly in
 // chrome.storage.local (no new service-worker message types). Strings come
 // from popup/locales/*.json via the page's loaded translations, with an
@@ -10,7 +10,7 @@
 // So "clicked Rate" is treated as rated (we stop asking).
 //
 // Public API (window.XPorterRatePrompt):
-//   maybeShow({ translations, onReportBug })  — show only if gating passes
+//   maybeShow({ translations })  — show only if gating passes
 //   incrementExports()                        — call once per completed export
 //   rateNow()                                 — open store + mark rated (no UI)
 (function () {
@@ -25,6 +25,7 @@
 
         // First ask: after this many completed exports since install.
         INITIAL_EXPORTS: 5,
+        DISMISS_DELAY_SECONDS: 5,
         // Days to wait before the 2nd, 3rd and 4th prompt — one entry per
         // shown prompt, each also requires at least one new export before re-asking.
         // Schedule grows so we ask less and less often.
@@ -38,16 +39,18 @@
 
     // English fallback for the overlay strings (locale files override these).
     const EN = {
-        rateTitle: 'Enjoying XPorter?',
-        rateBody: "XPorter is **free** and **unlimited**. I'm always adding new features and fixing bugs. If it's helping you, please leave **5 stars**. It really supports the project and helps others find it.",
-        rateCta: 'Rate on the Web Store',
-        rateLater: 'Maybe later',
+        rateTitle: "Like XPorter? Help it grow.",
+        rateBody: "If XPorter **saved you time or made your work easier**, I’d appreciate a review. Tell others what you use it for and what you liked. I keep adding features, fixing bugs, and answering your questions while keeping XPorter **free**. **Your review supports that work** and helps others discover a useful tool.",
+        rateCta: "Leave a review",
+        rateLater: "Maybe later",
+        acknowledgementCountdown: '{action} ({seconds})',
         rateReport: 'Report a problem',
         rateClose: 'Close',
         rateThanks: 'Thank you!'
     };
 
-    const STAR_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.94l-5.91 3.11 1.13-6.57-4.77-4.65 6.6-.96z"/></svg>';
+    const STAR_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg>';
+    const ARROW_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg>';
     const X_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     const HEART_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.8 5.1a5.4 5.4 0 0 0-7.7 0l-1.1 1.1-1.1-1.1a5.4 5.4 0 1 0-7.7 7.7l1.1 1.1 7.7 7.6 7.7-7.6 1.1-1.1a5.4 5.4 0 0 0 0-7.7z"/></svg>';
 
@@ -135,6 +138,7 @@
     function closeOverlay(overlay, prevFocus) {
         if (!overlay || overlay._closing) return;
         overlay._closing = true;
+        overlay._dismissTimer?.cancel();
         overlay.classList.remove('xrp-in');
         if (overlay._onKey) document.removeEventListener('keydown', overlay._onKey);
         const remove = () => {
@@ -175,7 +179,7 @@
         card.querySelector('.xrp-thanks-title').textContent = t('rateThanks');
     }
 
-    function buildOverlay(t, onReportBug) {
+    function buildOverlay(t) {
         const prevFocus = document.activeElement;
 
         const overlay = document.createElement('div');
@@ -183,20 +187,17 @@
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
         overlay.setAttribute('aria-labelledby', 'xrp-title');
+        overlay.setAttribute('aria-describedby', 'xrp-body');
         overlay.innerHTML =
             '<div class="xrp-card" role="document">' +
             '<button type="button" class="xrp-close"></button>' +
-            '<div class="xrp-glow" aria-hidden="true"></div>' +
             '<div class="xrp-stars" aria-hidden="true">' + STAR_SVG.repeat(5) + '</div>' +
             '<h3 class="xrp-title" id="xrp-title"></h3>' +
-            '<p class="xrp-body"></p>' +
-            '<button type="button" class="xrp-btn xrp-btn-primary xrp-rate">' + STAR_SVG + '<span class="xrp-rate-label"></span></button>' +
+            '<p class="xrp-body" id="xrp-body"></p>' +
+            '<button type="button" class="xrp-btn xrp-btn-primary xrp-rate">' + '<span class="xrp-rate-label"></span>' + ARROW_SVG + '</button>' +
             '<button type="button" class="xrp-later"></button>' +
-            '<button type="button" class="xrp-report"></button>' +
             '</div>';
 
-        overlay.querySelectorAll('.xrp-stars svg').forEach((s) => s.classList.add('xrp-star'));
-        overlay.querySelector('.xrp-rate svg').classList.add('xrp-cta-star');
 
         const closeBtn = overlay.querySelector('.xrp-close');
         closeBtn.innerHTML = X_SVG;
@@ -205,11 +206,13 @@
         overlay.querySelector('.xrp-body').innerHTML = mdBold(t('rateBody'));
         overlay.querySelector('.xrp-rate-label').textContent = t('rateCta');
         overlay.querySelector('.xrp-later').textContent = t('rateLater');
-        overlay.querySelector('.xrp-report').textContent = t('rateReport');
 
         const card = overlay.querySelector('.xrp-card');
+        const laterBtn = overlay.querySelector('.xrp-later');
+        let canDismiss = false;
 
         const later = async () => {
+            if (!canDismiss || overlay._deferResolved) return;
             await markDeferred(overlay);
             closeOverlay(overlay, prevFocus);
         };
@@ -218,6 +221,7 @@
             // Resolve the overlay first so another dismissal event cannot race
             // this explicit "rated" choice.
             overlay._deferResolved = true;
+            overlay._dismissTimer?.cancel();
             // Persist BEFORE opening the tab: in the popup, the new tab closes
             // the popup and could otherwise drop the in-flight storage write.
             await patchState({ status: 'rated' });
@@ -228,15 +232,6 @@
         overlay.querySelector('.xrp-later').addEventListener('click', later);
         closeBtn.addEventListener('click', later);
 
-        // Deflect unhappy users to the bug channel instead of a 1-star review.
-        // Treated as a deferral, not a permanent dismissal.
-        overlay.querySelector('.xrp-report').addEventListener('click', async () => {
-            await markDeferred(overlay);
-            closeOverlay(overlay, prevFocus);
-            if (typeof onReportBug === 'function') onReportBug();
-            else openBugChannel();
-        });
-
         // Click on the backdrop (outside the card) = treat as "later".
         overlay.addEventListener('click', (e) => { if (e.target === overlay) later(); });
 
@@ -244,7 +239,7 @@
         overlay._onKey = (e) => {
             if (e.key === 'Escape') { e.preventDefault(); later(); return; }
             if (e.key === 'Tab') {
-                const f = overlay.querySelectorAll('button');
+                const f = overlay.querySelectorAll('button:not(:disabled)');
                 if (!f.length) return;
                 const first = f[0], last = f[f.length - 1];
                 if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -255,6 +250,17 @@
 
         document.body.appendChild(overlay);
         activeOverlay = overlay;
+        overlay._dismissTimer = XPorterAcknowledgementTimer.start(laterBtn, {
+            seconds: CONFIG.DISMISS_DELAY_SECONDS,
+            readyLabel: t('rateLater'),
+            waitingLabel: (action, seconds) => t('acknowledgementCountdown')
+                .replace('{action}', action)
+                .replace('{seconds}', new Intl.NumberFormat(document.documentElement.lang || 'en').format(seconds)),
+            onChange({ ready }) {
+                canDismiss = ready;
+                closeBtn.disabled = !ready;
+            }
+        });
         // Trigger the fade/slide-in. The rAF path runs first when the tab is
         // visible; the timeout is a fallback for throttled rAF (idempotent).
         requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('xrp-in')));
@@ -272,7 +278,7 @@
         // Persist the show before rendering. Every shown prompt consumes one
         // slot in the re-ask schedule, including a silently closed popup.
         await patchState({ ...deferPatch(state), lastShownAt: Date.now() });
-        buildOverlay(makeT(o.translations), o.onReportBug);
+        buildOverlay(makeT(o.translations));
         return true;
     }
 

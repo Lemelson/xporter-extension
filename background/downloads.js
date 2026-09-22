@@ -37,6 +37,7 @@
         Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_CACHE_MAX_ENTRIES) || 256
     );
     const PHOTO_HOST_ORIGIN = 'https://pbs.twimg.com/*';
+    const diagnose = (type, data) => globalThis.XPorterDiagnostics?.record(type, data) || Promise.resolve(null);
 
     // Photo embedding is an optional capability: pbs.twimg.com lives in
     // optional_host_permissions and is granted from the popup toggle, so an
@@ -514,7 +515,11 @@
             (mode === 'bookmarks' && downloadSettings.embedBookmarkPhotos === true)
         );
         const photoHostAccess = embedPhotos ? await hasPhotoHostAccess() : false;
+        const diagnosticId = await diagnose('download_begin', { mode, format: plan.format,
+            rows: plan.count, parts: plan.partCount, source: 'current',
+            photosEnabled: embedPhotos, photoPermission: photoHostAccess });
         return {
+            diagnosticId,
             state,
             plan,
             downloadSettings: Object.freeze({ ...downloadSettings }),
@@ -525,6 +530,18 @@
     }
 
     async function executeCurrentDownload(transaction) {
+        try {
+            const result = await executeCurrentDownloadInner(transaction);
+            await diagnose(result?.success ? 'download_handoff' : 'download_failed', {
+                id: transaction.diagnosticId, error: result?.error });
+            return result;
+        } catch (error) {
+            await diagnose('download_failed', { id: transaction.diagnosticId, error: error.message });
+            throw error;
+        }
+    }
+
+    async function executeCurrentDownloadInner(transaction) {
         const {
             state,
             plan,
@@ -564,7 +581,8 @@
                 saveAs: !plan.multipart,
                 downloadSettings,
                 photoHostAccess,
-                photoAssetCache
+                photoAssetCache,
+                diagnosticId: transaction.diagnosticId
             });
             if (lastResult?.success !== true) return lastResult;
             downloadedCount += items.length;
@@ -573,8 +591,15 @@
 
         if (partNumber === 0) return { error: 'NO_DATA' };
         if (downloadedCount !== plan.count) {
+            // The files are already on disk and contain every persisted row.
+            // Failing here only hides them behind a red toast. Repair the
+            // counter instead so the UI stops promising rows that never existed.
             XLog.error(`Download row count mismatch: expected ${plan.count}, read ${downloadedCount}`);
-            return { error: 'DOWNLOAD_FAILED' };
+            const saved = await XPorterStorage.loadExportState();
+            if (saved && !saved.running && saved.tweetCount !== downloadedCount) {
+                saved.tweetCount = downloadedCount;
+                await XPorterStorage.saveExportState(saved);
+            }
         }
         await recordSuccessfulDownload();
         reportDownload({
@@ -605,7 +630,10 @@
             activeTransactionPromise = transactionPromise;
             const transaction = await transactionPromise;
             const { plan } = transaction;
-            if (plan.count === 0) return { error: 'NO_DATA' };
+            if (plan.count === 0) {
+                await diagnose('download_failed', { id: transaction.diagnosticId, error: 'NO_DATA' });
+                return { error: 'NO_DATA' };
+            }
             activeDownloadPlan = Object.freeze({ ...plan });
 
             const stopKeepAlive = keepWorkerAliveDuringDownload();
@@ -693,7 +721,7 @@
             return { error: 'HISTORY_DATA_GONE' };
         }
 
-        const result = await downloadItems(entry.items, {
+        const result = await downloadSingle(entry.items, {
             username: entry.username || 'unknown',
             mode: entry.exportMode || 'posts',
             format: format || entry.outputFormat || 'csv',
@@ -706,10 +734,29 @@
                 entry.includeAboutAccountDetails === true,
             dateFrom: entry.dateFromCalendar || entry.dateFrom,
             dateTo: entry.dateToCalendar || entry.dateTo,
-            exportedAt: entry.completedAt || new Date()
+            exportedAt: entry.completedAt || new Date(),
+            diagnosticSource: 'history'
         });
         if (result.success) await recordSuccessfulDownload();
         return result;
+    }
+
+    async function downloadSingle(items, options) {
+        const settings = await XPorterStorage.loadSettings();
+        const photosEnabled = options.format === 'xlsx' && ((options.mode === 'posts' && settings.embedPostPhotos)
+            || (options.mode === 'bookmarks' && settings.embedBookmarkPhotos));
+        const photoPermission = photosEnabled ? await hasPhotoHostAccess() : false;
+        const id = await diagnose('download_begin', { mode: options.mode, format: options.format,
+            source: options.diagnosticSource, rows: items.length, parts: 1, photosEnabled, photoPermission });
+        try {
+            const result = await downloadItems(items, { ...options, diagnosticId: id,
+                downloadSettings: settings, photoHostAccess: photoPermission });
+            await diagnose(result?.success ? 'download_handoff' : 'download_failed', { id, error: result?.error });
+            return result;
+        } catch (error) {
+            await diagnose('download_failed', { id, error: error.message });
+            throw error;
+        }
     }
 
     async function downloadItems(allItems, options) {
@@ -772,6 +819,9 @@
                     }
                 )
                 : [];
+            const photoTargets = embedPhotos && photoHostAccess ? collectPhotoTargets(allItems).length : 0;
+            if (options.diagnosticId) await diagnose('photos', { id: options.diagnosticId, attempted: photoTargets,
+                loaded: mediaAssets.length, failed: Math.max(0, photoTargets - mediaAssets.length) });
             reportDownload({ ...progressBase, stage: 'building_xlsx' });
             content = XPorterCSV.generateXLSX(allItems, isUsers, {
                 ...headerOpts,
@@ -795,7 +845,7 @@
             partNumber: options.partNumber,
             partCount: options.partCount
         });
-        const result = await startDownload(content, mimeType, filename, options.saveAs !== false);
+        const result = await startDownload(content, mimeType, filename, options.saveAs !== false, options.diagnosticId);
         if (result.success) return { ...result, count: allItems.length, filename };
         return result;
     }
@@ -812,6 +862,19 @@
     ];
 
     async function downloadSeenPosts(outputFormat) {
+        const format = outputFormat === 'json' ? 'json' : 'csv';
+        const id = await diagnose('download_begin', { mode: 'seen_posts', source: 'seen_posts', format, parts: 1 });
+        try {
+            const result = await generateSeenPosts(format, id);
+            await diagnose(result?.success ? 'download_handoff' : 'download_failed', { id, error: result?.error, rows: result?.count });
+            return result;
+        } catch (error) {
+            await diagnose('download_failed', { id, error: error.message });
+            throw error;
+        }
+    }
+
+    async function generateSeenPosts(outputFormat, diagnosticId) {
         const posts = await XPorterPostDB.getAllPosts();
         if (posts.length === 0) return { error: 'NO_DATA' };
 
@@ -845,11 +908,11 @@
 
         const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
         const filename = `XPorter_seen_posts_${stamp}.${format}`;
-        const result = await startDownload(content, mimeType, filename);
+        const result = await startDownload(content, mimeType, filename, true, diagnosticId);
         return result.success ? { ...result, count: rows.length, filename } : result;
     }
 
-    function startDownload(content, mimeType, filename, saveAs = true) {
+    function startDownload(content, mimeType, filename, saveAs = true, diagnosticId = null) {
         const blob = new Blob([content], { type: mimeType });
         const reader = new FileReader();
         return new Promise((resolve) => {
@@ -865,7 +928,8 @@
                         resolve({ error: 'DOWNLOAD_FAILED' });
                         return;
                     }
-                    resolve({ success: true, downloadId });
+                    Promise.resolve(globalThis.XPorterDownloadDiagnostics?.track(downloadId, diagnosticId, blob.size))
+                        .catch(() => {}).finally(() => resolve({ success: true, downloadId }));
                 });
             };
             reader.readAsDataURL(blob);

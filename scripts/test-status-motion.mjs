@@ -89,7 +89,7 @@ try {
    await page.setViewportSize({width,height:600});
    if(uiScale===100 && language==='en') {
     await page.locator('#authWarning').evaluate(el=>el.classList.add('hidden'));
-    await page.evaluate(()=>window.scrollTo(0,0));
+    await page.evaluate(()=>(window.scrollTo(0,0), document.getElementById('homeContent').scrollTop = 0));
     await page.screenshot({path:path.join(output,`running-${theme}-${simplifiedDesign?'simple':'blue'}.png`)});
     if(theme==='dark' && !simplifiedDesign) fs.writeFileSync(path.join(output,'running.html'),await capturePreview());
    }

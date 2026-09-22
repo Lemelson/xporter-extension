@@ -9,6 +9,15 @@ class RateLimitManager {
         this.cooldownDuration = options.cooldownDuration || C.COOLDOWN_DURATION || 180000;
         this.rateLimitPause = options.rateLimitPause || C.RATE_LIMIT_PAUSE || 60000;
         this.maxRetries = options.maxRetries || C.MAX_RETRIES || 5;
+        // A real 429 is only ever cleared by X's rolling window. Wait for the
+        // reset X advertises (or the whole window), retry, and give up only
+        // once the user's total wait budget is spent. The budget can never be
+        // shorter than one window: a shorter wait always gives up too early.
+        this.rateLimitWindow = C.RATE_LIMIT_WINDOW_MS || 900000;
+        this.rateLimitWaitBudget = Math.max(
+            this.rateLimitWindow,
+            Number(options.rateLimitWaitMs) || this.rateLimitWindow
+        );
 
         // Adaptive pacing: when a provider hands us X's live x-rate-limit-*
         // budget, use it only to confirm that the selected pace is current.
@@ -74,6 +83,9 @@ class RateLimitManager {
         setPositive('cooldownDuration');
         setPositive('rateLimitPause');
         setPositive('maxRetries');
+        if (Number.isFinite(Number(options.rateLimitWaitMs)) && Number(options.rateLimitWaitMs) > 0) {
+            this.rateLimitWaitBudget = Math.max(this.rateLimitWindow, Number(options.rateLimitWaitMs));
+        }
         setPositive('adaptiveFloor');
         setPositive('adaptiveHeaderTtl');
         setPositive('fallbackMinDelay');
@@ -130,10 +142,15 @@ class RateLimitManager {
      * No polling — uses a single event listener for abort.
      */
     async _wait(ms) {
+        const diagnosticAttemptId = globalThis.XPorterDiagnostics?.currentId;
+        const waitStarted = Date.now();
+        globalThis.XPorterDiagnostics?.record('metric', { key: 'pauses', attemptId: diagnosticAttemptId });
         this.waitUntil = Date.now() + ms;
         try {
             return await this._waitInner(ms);
         } finally {
+            globalThis.XPorterDiagnostics?.record('metric', { key: 'pauseMs',
+                value: Date.now() - waitStarted, attemptId: diagnosticAttemptId });
             this.waitUntil = null;
         }
     }
@@ -310,10 +327,12 @@ class RateLimitManager {
         // Execute with retry logic
         let lastError = null;
         let retryReason = null;
-        for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+        let rateLimitedSince = null;
+        for (let attempt = 0; ; attempt++) {
             if (this._aborted) throw new Error('ABORTED');
 
             try {
+                if (attempt > 0) globalThis.XPorterDiagnostics?.record('metric', { key: 'retries' });
                 this._emitStatus(attempt === 0 ? 'fetching' : 'retrying', {
                     // User-facing batch = the API page currently being fetched.
                     // The internal cooldown group remains requestInBatch.
@@ -330,11 +349,13 @@ class RateLimitManager {
                 lastError = error;
 
                 if (error.message === 'RATE_LIMITED') {
-                    if (attempt >= this.maxRetries) {
+                    if (rateLimitedSince === null) rateLimitedSince = Date.now();
+                    const budgetLeft = this.rateLimitWaitBudget - (Date.now() - rateLimitedSince);
+                    if (budgetLeft < 5000) {
                         this._recordRequestAttempt();
                         break;
                     }
-                    const waitTime = this.rateLimitPause;
+                    const waitTime = this._rateLimitWaitTime(budgetLeft);
                     retryReason = 'RATE_LIMITED';
                     this._emitStatus('rate_limited', {
                         error: 'RATE_LIMITED',
@@ -405,6 +426,26 @@ class RateLimitManager {
         }
 
         throw lastError || new Error('MAX_RETRIES_EXCEEDED');
+    }
+
+    /**
+     * How long to wait after a 429 before the single retry. X tells us the
+     * exact reset moment in x-rate-limit-reset (captured from the 429 itself);
+     * without it, assume one full window. Never longer than the budget left,
+     * never shorter than a few seconds. The UI shows this whole wait, so the
+     * countdown is the honest "X allows requests again in".
+     */
+    _rateLimitWaitTime(budgetLeft) {
+        let wait = this.rateLimitWindow;
+        let rl = null;
+        try { rl = this.rateLimitProvider ? this.rateLimitProvider() : null; } catch (_) { rl = null; }
+        const reset = Number(rl?.reset);
+        const fresh = !Number.isFinite(Number(rl?.at)) || (Date.now() - Number(rl.at)) <= this.adaptiveHeaderTtl;
+        if (Number.isFinite(reset) && reset > 0 && fresh) {
+            const msLeft = reset * 1000 - Date.now();
+            if (msLeft > 0) wait = Math.min(wait, msLeft + this.adaptivePad);
+        }
+        return Math.max(5000, Math.min(wait, budgetLeft));
     }
 
     /**

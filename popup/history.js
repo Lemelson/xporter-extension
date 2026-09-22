@@ -136,6 +136,8 @@
                     result?.success === true ? t('downloadStarted') : formatError(result?.error || 'DOWNLOAD_FAILED', t),
                     result?.success === true ? 'success' : 'error'
                 );
+                // The payload can expire while the list is open; drop the stale button.
+                if (result?.error === 'HISTORY_DATA_GONE') await loadAndRender();
             });
             return button;
         }

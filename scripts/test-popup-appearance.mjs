@@ -16,6 +16,11 @@ const context = await chromium.launchPersistentContext(profile, {
 try {
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   const page = await context.newPage();
+  const placeAt = (locator, top) => locator.evaluate((el, top) => {
+    const scroller = el.closest('.home-content, .tab-content') || document.scrollingElement;
+    const zoom = Number(document.body.style.getPropertyValue('--ui-scale')) || 1;
+    scroller.scrollTop += (el.getBoundingClientRect().top - top) / zoom;
+  }, top);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({ width: 350, height: 600 });
@@ -34,10 +39,10 @@ try {
   const help = page.locator('[data-i18n-tooltip="autoExpireHelp"]');
   assert.equal(await help.count(), 1);
   await page.setViewportSize({ width: 350, height: 300 });
-  await help.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 220));
+  await placeAt(help, 220);
   await help.hover();
   // Hover may scroll the trigger into view; position the bottom-edge fixture afterwards.
-  await help.evaluate(el => window.scrollBy(0, el.getBoundingClientRect().top - 220));
+  await placeAt(help, 220);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const tooltip = help.locator('.help-pop');
   await tooltip.waitFor({ state: 'visible' });
@@ -52,37 +57,42 @@ try {
   const output = process.env.XPORTER_APPEARANCE_OUTPUT || '/private/tmp/xporter-appearance-qa';
   fs.mkdirSync(output, { recursive: true });
   const readSettings = () => page.evaluate(async () => (await chrome.storage.local.get('xporter_settings')).xporter_settings);
-  await page.locator('#simplifiedDesign').scrollIntoViewIfNeeded();
-  assert.equal(await page.locator('#simplifiedDesign').isChecked(), false, 'blue design is the default');
+  await page.locator('#openThemePicker').scrollIntoViewIfNeeded();
+  assert.equal(await page.locator('body').getAttribute('data-theme-preset'), 'classic-dark', 'classic theme is the default');
+  assert(await page.locator('body').evaluate(e => e.classList.contains('simplified')), 'default appearance must be neutral');
   assert.equal(await page.locator('#uiScale').inputValue(), '100');
   await page.evaluate(async () => {
     const stored = await chrome.storage.local.get('xporter_settings');
     await chrome.storage.local.set({xporter_settings:{...stored.xporter_settings,quantityLimit:777}});
   });
-  await page.locator('label:has(#simplifiedDesign)').click();
-  await page.waitForFunction(() => document.body.classList.contains('simplified'));
+  await page.locator('#openThemePicker').click();
+  await page.locator('[data-preset="glass-dark"]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-preset="glass-dark"]').disabled);
+  await page.keyboard.press('Escape');
   assert.equal((await readSettings()).quantityLimit, 777, 'appearance saves must preserve newer settings from another surface');
   await page.setViewportSize({ width: 403, height: 600 });
-  await page.locator('#uiScale').selectOption('115');
+  await page.locator('#sizeSettings').evaluate(el => { el.open = true; });
+  await page.locator('#uiScale').fill('115');
+  await page.locator('#uiScale').dispatchEvent('change');
   await page.waitForFunction(() => document.body.style.getPropertyValue('--ui-scale') === '1.15');
   assert.equal((await readSettings()).uiScale, 115);
   const overlayAppearance = await worker.evaluate(async () => (await getOverlayI18n()).appearance);
-  assert.equal(overlayAppearance.simplifiedDesign, true);
+  assert.equal(overlayAppearance.theme, 'dark');
   assert.equal(overlayAppearance.uiScale, 115);
   const scaledWidth = (await page.locator('body').boundingBox()).width;
-  assert(Math.abs(scaledWidth - 402.5) < 1, `115% should produce a 402.5px popup, got ${scaledWidth}`);
+  assert(Math.abs(scaledWidth - 350) < 1, `Element size must preserve the 350px window, got ${scaledWidth}`);
   await page.reload();
   await page.waitForFunction(() => document.getElementById('postSelectionCount').textContent.includes('5'));
-  assert.equal(await page.locator('#simplifiedDesign').isChecked(), true);
+  assert.equal(await page.locator('body').getAttribute('data-theme-preset'), 'glass-dark');
   assert.equal(await page.locator('#uiScale').inputValue(), '115');
   console.log('PASS live scale/design changes, reopening and independent settings persistence');
 
   const languages = process.env.XPORTER_APPEARANCE_LANGUAGES?.split(',') || fs.readdirSync(path.join(root, 'popup/locales')).filter(name => name.endsWith('.json')).map(name => name.slice(0,-5));
   let cases = 0;
   for (const language of languages) for (const theme of ['dark','light']) for (const simplifiedDesign of [false,true]) {
-    const scales = [85,100,115,130];
+    const scales = [80,85,90,95,100,105,110,115,120,125,130];
     for (const uiScale of scales) {
-      const width = Math.round(350 * uiScale / 100);
+      const width = 350;
       const tag = `${language}-${theme}-${simplifiedDesign ? 'simple' : 'blue'}-${uiScale}`;
       await page.setViewportSize({width,height:600});
       await page.evaluate(async settings => {
@@ -107,7 +117,7 @@ try {
       assert.equal(await page.locator('.post-type-help .help-pop strong').count(), 5,
         `${tag}: every post type has a highlighted explanation`);
       const fontHeight = await page.locator('.post-choice-copy strong').first().evaluate(el => el.getBoundingClientRect().height);
-      assert(fontHeight >= 14 * uiScale / 100, `${tag}: text must scale with controls`);
+      assert(fontHeight >= 14, `${tag}: text remains readable independently of controls`);
       for (const testWidth of [width,320]) {
         await page.setViewportSize({width:testWidth,height:600});
         const overflow = await page.evaluate(() => ({
@@ -146,7 +156,7 @@ try {
         }
       }
       const autoHelp = page.locator('[data-i18n-tooltip="autoExpireHelp"]');
-      await autoHelp.evaluate(el=>window.scrollBy(0,el.getBoundingClientRect().top-520));
+      await placeAt(autoHelp, 520);
       await autoHelp.focus();
       await page.keyboard.press('Enter');
       await autoHelp.locator('.help-pop').waitFor({state:'visible'});
@@ -154,12 +164,12 @@ try {
       assert(autoRect.y >= -1 && autoRect.y+autoRect.height <= 600+1, `${tag}: Auto-clear help must fit at scale`);
       await page.keyboard.press('Escape');
       if (language === 'ru' && [100,130].includes(uiScale)) {
-        await page.locator('#simplifiedDesign').scrollIntoViewIfNeeded();
+        await page.locator('#openThemePicker').scrollIntoViewIfNeeded();
         await page.screenshot({path:path.join(output,`settings-${tag}.png`)});
         await page.locator('#tabBtnHome').click();
         await page.locator('#authWarning').evaluate(el=>el.classList.add('hidden'));
         await page.locator('#usernameInput').fill('AteoBreaking');
-        await page.evaluate(()=>window.scrollTo(0,0));
+        await page.evaluate(()=>{ window.scrollTo(0,0); document.getElementById('homeContent').scrollTop=0; });
         await page.screenshot({path:path.join(output,`popup-${tag}.png`)});
       }
       cases++;

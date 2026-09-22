@@ -80,8 +80,9 @@ async function run() {
     // small post exports run at 2/3/4/7/12 s instead of silently stretching to
     // ~20 s as the rate-limit window gets older.
     const expectedPresetDelays = {
-        turbo: 2000,
-        fast: 3000,
+        ultra: 300,
+        turbo: 1000,
+        fast: 2000,
         standard: 4000,
         careful: 7000,
         turtle: 12000
@@ -143,7 +144,7 @@ async function run() {
         ['fetching', 'rate_limited', 'retrying'],
         'a rate-limit retry must never fall back to the generic fetching label'
     );
-    assert.equal(retryEvents[1]?.retryIn, 30000);
+    assert.equal(retryEvents[1]?.retryIn, XPORTER_CONFIG.RATE_LIMIT_WINDOW_MS, 'without a reset header a 429 waits one full window');
     assert.equal(retryEvents[1]?.kind, 'window');
     assert.equal(retryEvents[2]?.attempt, 1);
     assert.equal(retryEvents[2]?.batch, 1);
@@ -368,7 +369,7 @@ async function run() {
     const waits = [];
     const retry = new RateLimitManager({
         rateLimitProvider: () => budget({ remaining: 0, resetInMs: 600000 }),
-        rateLimitPause: 60000,
+        adaptivePad: 2000,
         maxRetries: 1
     });
     retry._wait = async (ms) => waits.push(ms);
@@ -377,30 +378,41 @@ async function run() {
         return 'ok';
     });
     assert.equal(result, 'ok');
-    assert.deepEqual(
-        waits,
-        [60000],
-        'an actual 429 must retry after one minute instead of waiting for the advertised reset'
-    );
+    assert.equal(waits.length, 1);
+    assert(Math.abs(waits[0] - 602000) < 1000,
+        `a 429 must wait until the reset X advertises (+pad), got ${waits[0]}`);
 
+    // "16 minutes means 16 minutes": the budget bounds the total wait, and a
+    // second 429 only gets whatever is left of it.
     let repeatedAttempts = 0;
     const repeatedWaits = [];
-    const repeated429 = new RateLimitManager({
-        rateLimitPause: 60000,
-        maxRetries: 2
-    });
-    repeated429._wait = async (ms) => repeatedWaits.push(ms);
-    const repeatedResult = await repeated429.executeWithRateLimit(async () => {
-        repeatedAttempts += 1;
-        if (repeatedAttempts < 3) throw new Error('RATE_LIMITED');
-        return 'ok';
-    });
-    assert.equal(repeatedResult, 'ok');
-    assert.deepEqual(
-        repeatedWaits,
-        [60000, 60000],
-        'each repeated 429 must retry on the same one-minute cadence'
-    );
+    const repeated429 = new RateLimitManager({ rateLimitWaitMs: 16 * 60000, maxRetries: 2 });
+    let fakeNow = 1_000_000;
+    const realNow = Date.now;
+    Date.now = () => fakeNow;
+    try {
+        repeated429._wait = async (ms) => { repeatedWaits.push(ms); fakeNow += ms; };
+        const repeatedResult = await repeated429.executeWithRateLimit(async () => {
+            repeatedAttempts += 1;
+            if (repeatedAttempts < 3) throw new Error('RATE_LIMITED');
+            return 'ok';
+        });
+        assert.equal(repeatedResult, 'ok');
+        assert.deepEqual(repeatedWaits, [15 * 60000, 60000],
+            'one full window, then only the remaining minute of the 16-minute budget');
+
+        // Budget spent and still limited → give up with RATE_LIMITED (resumable).
+        const spent = new RateLimitManager({ rateLimitWaitMs: 5 * 60000 });
+        const spentWaits = [];
+        spent._wait = async (ms) => { spentWaits.push(ms); fakeNow += ms; };
+        await assert.rejects(
+            spent.executeWithRateLimit(async () => { throw new Error('RATE_LIMITED'); }),
+            /RATE_LIMITED/
+        );
+        assert.deepEqual(spentWaits, [15 * 60000], 'a budget below one window is raised to the window');
+    } finally {
+        Date.now = realNow;
+    }
 
     let networkAttempts = 0;
     const networkWaits = [];
@@ -424,12 +436,20 @@ async function run() {
     const finalFailureWaits = [];
     const finalFailure = new RateLimitManager({ maxRetries: 1 });
     finalFailure._wait = async (ms) => finalFailureWaits.push(ms);
-    await assert.rejects(
-        finalFailure.executeWithRateLimit(async () => {
-            throw new Error('RATE_LIMITED');
-        }),
-        /RATE_LIMITED/
-    );
+    let finalNow = 5_000_000;
+    Date.now = () => finalNow;
+    try {
+        finalFailure._wait = async (ms) => { finalFailureWaits.push(ms); finalNow += ms; };
+        await assert.rejects(
+            finalFailure.executeWithRateLimit(async () => {
+                throw new Error('RATE_LIMITED');
+            }),
+            /RATE_LIMITED/
+        );
+    } finally {
+        Date.now = realNow;
+    }
+    assert.equal(finalFailure.rateLimitWaitBudget, XPORTER_CONFIG.RATE_LIMIT_WINDOW_MS, 'default budget is one window');
     assert.equal(finalFailureWaits.length, 1, 'must not sleep after the final failed attempt');
 
     const exhaustedStaleWaits = [];
