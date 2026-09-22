@@ -1,0 +1,6 @@
+# Project reference. On GitHub Pages crawlers read /robots.txt at the HOST root,
+# not /xporter-extension/robots.txt. See deployment/SEO.md before installing.
+User-agent: *
+Allow: /
+
+Sitemap: https://lemelson.github.io/xporter-extension/sitemap.xml

@@ -1,0 +1,18 @@
+# XPorter
+
+> Free desktop Chrome extension for exporting accessible X (Twitter) posts, personal bookmarks and account lists. Files are generated locally. No API key or subscription.
+
+Current Store version verified on 2026-09-10: 2.0.0, updated 2026-09-09.
+X rate limits and data availability apply. Completeness is not guaranteed.
+This is an independent product, not an official X product.
+
+## Product documentation
+- [English homepage](https://lemelson.github.io/xporter-extension/): Capabilities, formats, setup, limits and FAQ.
+- [Russian homepage](https://lemelson.github.io/xporter-extension/ru/): Russian product information.
+- [Full plain-text reference](https://lemelson.github.io/xporter-extension/llms-full.txt): Product facts in English and Russian.
+- [Privacy policy](https://lemelson.github.io/xporter-extension/privacy-policy.html): Local data, permissions and uninstall diagnostics.
+- [Chrome Web Store](https://chromewebstore.google.com/detail/jghmghialodmkmbcpfnhkgllkmjafmja): Current published package and installation.
+- [Source repository](https://github.com/Lemelson/xporter-extension): Source code; the main branch version may differ from the Store.
+
+## Historical data
+- [Growth snapshot](https://lemelson.github.io/xporter-extension/assets/growth-forecast.json): Weekly users through July 16, 2026, and model scenarios. These are not current user counts.

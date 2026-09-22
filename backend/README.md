@@ -54,3 +54,11 @@ Deterministic/fixture browser tests do not prove live X API compatibility or tha
 Ladybug telemetry: `XP_LADYBUG_SQUASH` records one live-bug squash in the worker-serialized `ladybugSquashes` usage counter and immediately refreshes the uninstall URL. `ladybug_squashes` is appended to the compact codec and collector schema; missing historical values remain unknown. Counts start with this feature, not the original installation. After the splat fully fades, a replacement enters from a random viewport side at contact-card walking height; reduced motion uses a static replacement. Collector and Pages changes must be published to receive this field in production.
 
 Uninstall field `theme_preset` records the selected catalog ID (for example `obsidian` or `glass-dark`); `theme` remains light/dark. The worker loads `popup/theme-presets.js` before `uninstall-feedback.js` to resolve legacy settings exactly like the UI. Codec fields are appended, and the collector validates catalog IDs. Older reports stay blank. Publish the matching Pages codec and Apps Script collector to receive this new column in production.
+# September 10 compatibility fix
+
+The published decoder accepts the 83 positional fields shipped in extension 2.0.0,
+including `ladybug_squashes` and `theme_preset`. Replace the existing bound Apps
+Script code with `apps-script.gs`, then edit the existing web-app deployment and
+select a new version. Keep its URL unchanged. Existing rows are preserved; new
+columns are added when received. The feedback compatibility test covers the
+released 83-field payload, its 81-field predecessor, and legacy query parameters.
