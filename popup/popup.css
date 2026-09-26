@@ -509,6 +509,10 @@ body.light .input-small {
      the Resume row equals the gap between the buttons. */
   margin-bottom: 8px;
   display: grid;
+  /* One column that never grows past the card: a wide child (the Resume row
+     in long locales or large text) must shrink instead of pushing every
+     action beyond the card edge. */
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: 12px;
 }
@@ -750,9 +754,15 @@ input[type="number"] {
 /* Resume row */
 .resume-row {
   display: flex;
+  /* Too narrow for count, label and button (large text, long locales):
+     the button takes its own full-width line instead of leaving the card. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
+
+.result-actions { min-width: 0; }
 
 .replies-fallback-actions {
   display: grid;
@@ -816,11 +826,15 @@ body.light .date-row input[type="date"]:hover {
 .resume-label {
   font-size: calc(13px * var(--text-scale, 1));
   color: var(--text-secondary);
-  white-space: nowrap;
+  /* Wraps onto two lines before the row can overflow its card. */
+  flex: 1 1 3.5em;
+  min-width: 0;
+  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 .btn-resume {
-  flex: 1;
+  flex: 1 0 auto;
   padding: 10px 16px;
 }
 
@@ -3717,12 +3731,15 @@ body.light .lb-limbs { stroke: #242b25; }
 
 .contact-email-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: stretch;
 }
 
+/* Equal halves while both labels fit; otherwise each takes a full line. */
 .email-action {
-  flex: 1;
+  flex: 1 1 calc(50% - 4px);
+  min-width: max-content;
   display: inline-flex;
   align-items: center;
   justify-content: center;

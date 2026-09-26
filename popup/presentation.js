@@ -132,6 +132,7 @@
         // ==================== Tabs ====================
         function activateTab(tab, focus = false) {
             closeHelp();
+            const previous = document.querySelector('.tab.active');
             tabs.forEach(t => {
                 const selected = t === tab;
                 t.classList.toggle('active', selected);
@@ -139,7 +140,9 @@
                 t.tabIndex = selected ? 0 : -1;
             });
             tabContents.forEach(c => c.classList.remove('active'));
-            document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            const panel = document.getElementById('tab-' + tab.dataset.tab);
+            panel.classList.add('active');
+            root.XPorterMotion?.tabChanged(previous, tab, panel);
             if (focus) tab.focus();
         }
 
@@ -202,6 +205,7 @@
                 const item = head.closest('.detail-item');
                 const isOpen = item.classList.toggle('open');
                 head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                root.XPorterMotion?.disclosureChanged(item, isOpen);
             });
         });
 
@@ -223,8 +227,12 @@ function mountHomeSizing() {
             const scroller = document.getElementById('homeContent');
             const scrollTop = scroller.scrollTop;
             popup.classList.add('measuring-home');
+            // Size the window for where running disclosures end, not mid-way.
+            const measure = () => home.offsetHeight;
+            const homeHeight = globalThis.XPorterMotion
+                ? XPorterMotion.withFinalLayout(home, measure) : measure();
             const headerHeight = popup.querySelector('.header').offsetHeight;
-            const height = home.offsetHeight + headerHeight
+            const height = homeHeight + headerHeight
                 + popup.querySelector('.tabs').offsetHeight;
             popup.classList.remove('measuring-home');
             popup.style.setProperty('--home-height', `${height}px`);

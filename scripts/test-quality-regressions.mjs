@@ -106,7 +106,7 @@ try {
     await page.locator('#aboutAccountMaxRetries').press('Tab');
     await page.waitForFunction(async () =>
       (await chrome.storage.local.get('xporter_settings')).xporter_settings.aboutAccountMaxRetries === 30);
-    assert.equal(await page.locator('#aboutRiskDialog').isVisible(), false);
+    await page.locator('#aboutRiskDialog').waitFor({ state: 'hidden', timeout: 1000 }); // after its exit fade
   });
 
   await check('pending autosave cannot enable unconfirmed photo embedding', async () => {

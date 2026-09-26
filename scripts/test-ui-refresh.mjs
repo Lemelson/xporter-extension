@@ -70,7 +70,8 @@ try {
         await page.locator('label:has(#includeQuotes)').click();
         assert.equal(await page.locator('#includeQuotes').isChecked(), true);
         await page.locator('label:has(#dateCheck)').click();
-        assert.equal(await page.locator('#dateFields').isVisible(), true);
+        // The fields open from zero height; wait for the disclosure.
+        await page.locator('#dateFields').waitFor({ state: 'visible', timeout: 1000 });
         await page.locator('label:has(#dateCheck)').click();
         await page.evaluate(() => (window.scrollTo(0, 0), document.getElementById('homeContent').scrollTop = 0));
         const overflow = await page.evaluate(() => ({

@@ -179,7 +179,7 @@ async function main() {
     assert.equal(await popup.locator('#xlsxPhotoLinks').isChecked(), true);
     await popup.locator('#exportMode').selectOption('followers');
     assert.equal(await txtOption.isDisabled(), true, 'posts-only TXT must be disabled for user-list exports');
-    assert.equal(await popup.locator('#xlsxPhotoOptions').isVisible(), false);
+    await popup.locator('#xlsxPhotoOptions').waitFor({ state: 'hidden', timeout: 1000 }); // after its collapse
     await popup.locator('#exportMode').selectOption('bookmarks');
     assert.equal(await popup.locator('#xlsxPhotoOptions').isVisible(), true);
     await popup.locator('#exportMode').selectOption('posts');

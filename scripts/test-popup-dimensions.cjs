@@ -48,6 +48,8 @@ const root = process.env.XPORTER_WORKSPACE_ROOT || process.cwd();
     await page.locator('#tabBtnSettings').click();
     assert.equal(await page.locator('#sizeSettings').getAttribute('open'), null);
     await page.locator('#sizeSettings summary').click();
+    // Hit-testing needs the opened disclosure at rest, not mid-expansion.
+    await page.waitForFunction(() => !document.getAnimations().some(a => a.id === 'xp-motion'));
     assert.equal(await page.locator('#textScale').inputValue(), '130');
     for (const id of ['popupWidth', 'popupHeight', 'uiScale', 'textScale']) {
       const slider = page.locator(`#${id}`);

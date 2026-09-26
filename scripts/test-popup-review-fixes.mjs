@@ -187,13 +187,15 @@ try {
     await page.keyboard.press('End');
     assert.equal(await page.evaluate(() => document.activeElement.lang), 'id');
     await page.keyboard.press('Escape');
-    assert.equal(await page.isVisible('#langDropdown'), false);
+    // The menu fades out briefly; it is already inert while it does.
+    await page.locator('#langDropdown').waitFor({ state: 'hidden', timeout: 1000 });
     assert.equal(await page.evaluate(() => document.activeElement.id), 'langBtn', 'Escape returns focus');
     assert.equal(await page.getAttribute('#langBtn', 'aria-expanded'), 'false');
     await page.keyboard.press('Enter');
     assert.equal(await page.isVisible('#langDropdown'), true);
     await page.keyboard.press('Tab');
-    assert.equal(await page.isVisible('#langDropdown'), false, 'Tab closes the menu');
+    assert.equal(await page.getAttribute('#langBtn', 'aria-expanded'), 'false', 'Tab closes the menu');
+    await page.locator('#langDropdown').waitFor({ state: 'hidden', timeout: 1000 });
     await page.close();
   }
 

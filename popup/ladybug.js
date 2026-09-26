@@ -177,26 +177,40 @@
   }
 
 
-  const observer = new MutationObserver(() => { updateVisibility(); if (active()) syncBolts(); });
+  // An About tab can be active while its contact card is scrolled out of view.
+  // Watch that only while About is shown with the ladybug enabled: in Chrome a
+  // live IntersectionObserver makes every running animation in the popup
+  // (export progress, interface transitions) tick on the main thread.
+  let viewObserver = null;
+  function watchView() {
+    const wanted = enabled && tab.classList.contains('active') && typeof IntersectionObserver === 'function';
+    if (wanted && !viewObserver) {
+      viewObserver = new IntersectionObserver(entries => {
+        inView = entries[entries.length - 1].isIntersecting;
+        updateVisibility();
+      });
+      viewObserver.observe(card);
+    } else if (!wanted && viewObserver) {
+      viewObserver.disconnect();
+      viewObserver = null;
+      inView = true;
+    }
+  }
+
+  const observer = new MutationObserver(() => { watchView(); updateVisibility(); if (active()) syncBolts(); });
   observer.observe(tab, { attributes: true, attributeFilter: ['class'] });
   document.addEventListener('visibilitychange', updateVisibility);
   window.addEventListener('pagehide', despawn);
   media.addEventListener('change', () => { if (active()) spawn(); });
-  // An About tab can be active while its contact card is scrolled out of view.
-  if (typeof IntersectionObserver === 'function') {
-    new IntersectionObserver(entries => {
-      inView = entries[0].isIntersecting;
-      updateVisibility();
-    }).observe(card);
-  }
   if (typeof ResizeObserver === 'function') {
     new ResizeObserver(() => { if (active() && state !== 'squashed') spawn(); }).observe(card);
   }
   bug.addEventListener('pointerdown', squash);
   bug.addEventListener('click', e => { if (e.detail === 0) squash(e); });
   window.XPorterLadybug = {
-    setEnabled(on) { enabled = !!on; updateVisibility(); }
+    setEnabled(on) { enabled = !!on; watchView(); updateVisibility(); }
   };
+  watchView();
   updateVisibility();
   if (active()) syncBolts();
 })();

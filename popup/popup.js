@@ -348,6 +348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'hidden',
             !isPostRows || outputFormat.value !== 'txt'
         );
+        window.XPorterMotion?.modeChanged(mode);
     }
 
     function refreshQuantityLabels() {
@@ -611,7 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeLangDropdown({ returnFocus });
         if (code === previousLang) return;
         currentLang = code;
-        await renderLanguage(code);
+        await (window.XPorterMotion?.viewTransition(() => renderLanguage(code)) ?? renderLanguage(code));
 
         const result = await persistSettingsPatch(currentSettings, { language: code });
         if (result?.success !== true) {
@@ -1275,5 +1276,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         confirmAction,
         getLanguage: () => currentLang
     });
-
+    // Later state changes are user-driven and may animate (motion.js).
+    document.dispatchEvent(new Event('xporter:ready'));
 });

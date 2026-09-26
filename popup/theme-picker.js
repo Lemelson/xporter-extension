@@ -11,6 +11,8 @@ function mountThemePicker({ currentSettings, t, showToast }) {
     document.getElementById('themeIcon').innerHTML = paletteIcon;
     document.getElementById('themeSettingsIcon').innerHTML = paletteIcon;
 
+    const closePicker = () => window.XPorterMotion
+        ? XPorterMotion.closeDialog(dialog) : dialog.close();
     function markSelected(id) {
         for (const button of options.querySelectorAll('.theme-card')) {
             button.setAttribute('aria-pressed', String(button.dataset.preset === id));
@@ -19,11 +21,16 @@ function mountThemePicker({ currentSettings, t, showToast }) {
     }
     async function choose(preset) {
         if (saving) return;
-        if (XPorterThemes.resolve(currentSettings).id === preset.id) { dialog.close(); return; }
+        if (XPorterThemes.resolve(currentSettings).id === preset.id) { closePicker(); return; }
         saving = true;
         const patch = { themePreset: preset.id, theme: preset.mode };
-        XPorterThemes.apply(document.body, patch);
-        markSelected(preset.id);
+        const preview = () => {
+            XPorterThemes.apply(document.body, patch);
+            markSelected(preset.id);
+        };
+        // The crossfade applies the preview asynchronously; save only after it.
+        if (window.XPorterMotion) await XPorterMotion.viewTransition(preview);
+        else preview();
         let result;
         try {
             result = await persistSettingsPatch(currentSettings, patch);
@@ -36,7 +43,7 @@ function mountThemePicker({ currentSettings, t, showToast }) {
         if (result?.success !== true) {
             showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
         } else {
-            dialog.close();
+            closePicker();
         }
     }
     function render() {
@@ -90,13 +97,17 @@ function mountThemePicker({ currentSettings, t, showToast }) {
     }
     trigger.addEventListener('click', open);
     settingsTrigger.addEventListener('click', open);
-    close.addEventListener('click', () => dialog.close());
+    close.addEventListener('click', closePicker);
+    dialog.addEventListener('cancel', event => {
+        event.preventDefault();
+        closePicker();
+    });
     dialog.addEventListener('close', () => opener.focus({ preventScroll: true }));
     dialog.addEventListener('click', event => {
         if (event.target !== dialog) return;
         const bounds = dialog.getBoundingClientRect();
         if (event.clientX < bounds.left || event.clientX > bounds.right ||
-            event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
+            event.clientY < bounds.top || event.clientY > bounds.bottom) closePicker();
     });
     options.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
