@@ -18,6 +18,8 @@ const codec=codecContext.XPorterDiagnosticsCodec;
 const browser=await chromium.launch({headless:true,executablePath:process.env.XPORTER_BROWSER_EXECUTABLE});
 const failures=[],packets=[];
 let receiptResponse = null;
+let abortDetailPost = false;
+let receiptRequests = 0;
 const langs=['en','ru','de','fr','es','it','pt','tr','ar','hi','ja','ko','zh','id'];
 try {
   const context=await browser.newContext({locale:'en-US',reducedMotion:'reduce'});
@@ -34,9 +36,12 @@ try {
       if(request.method()==='POST') {
         const payload=JSON.parse(request.postData());packets.push(payload);
         const result=collector.post(payload);assert(result.ok,JSON.stringify(result));
+        // Reproduce a response lost after Apps Script has persisted the detail.
+        if (abortDetailPost && payload.type === 'detail') return route.abort('failed');
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(result)});
       }
       if(url.searchParams.has('callback')) {
+        receiptRequests++;
         const result=receiptResponse ? await receiptResponse()
           : collector.ctx.findReceipt(url.searchParams.get('sessionId'),url.searchParams.get('receipt_id'));
         return route.fulfill({contentType:'application/javascript',body:url.searchParams.get('callback')+'('+JSON.stringify(result)+');'});
@@ -82,6 +87,38 @@ try {
   assert.equal(clearedRow[sheetRows[0].indexOf('detail')],'','Back and empty Send clears the saved comment');
   await page.emulateMedia({reducedMotion:'reduce'});
   console.log('PASS clear-and-resubmit with normal-motion success screen');
+  // An opaque POST may reject after the server has saved the answer. Only the
+  // matching receipt, not transport success/failure, decides the success screen.
+  abortDetailPost = true;
+  for (const accepted of [true,false]) {
+    receiptResponse = accepted ? null : () => ({ok:false});
+    await page.goto('http://localhost/feedback.html?live=1&aborted-post-case='+accepted);
+    await page.locator('[data-reason="r_other"]').click();
+    const text = 'Synthetic saved detail with lost POST response '+accepted;
+    await page.locator('#detail').fill(text);
+    const receiptsBefore = receiptRequests;
+    await page.locator('#submitBtn').click();
+    await page.waitForFunction(() => !document.querySelector('#submitBtn').disabled
+      || document.querySelector('#thanks').classList.contains('show'));
+    const posted = packets.filter(item => item.type === 'detail').at(-1);
+    assert.equal(collector.ctx.findReceipt(posted.sessionId,posted.receipt_id).ok,true,
+      'the harness persisted this detail before losing its POST response');
+    assert.equal(receiptRequests,receiptsBefore+1,
+      'a rejected POST must still check the matching persistence receipt');
+    if (accepted) await page.locator('#thanks.show').waitFor();
+    else {
+      assert.equal(await page.locator('#thanks.show').count(),0,
+        'a false receipt must never show success after a rejected POST');
+      assert.equal(await page.locator('#submitBtn').isDisabled(),false);
+      assert.equal(await page.locator('#detail').inputValue(),text,
+        'failed confirmation preserves the editable answer');
+      assert(await page.locator('#toast').textContent(), 'failed confirmation explains the retry');
+      assert(await page.locator('#toast').evaluate(el => el.classList.contains('show')));
+    }
+    console.log('PASS saved detail with aborted POST response and receipt '+accepted);
+  }
+  abortDetailPost = false;
+  receiptResponse = null;
   for(const lang of langs) {
     const stats={schema_version:2,v:'1.6.5',ui_lang:lang,install_id:'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       s_colorful:1,s_ladybug:0,s_window_width:125,s_window_height:75,s_element_size:110,s_text_size:120,

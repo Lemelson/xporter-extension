@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-mJyXrKRuh0ta7Qvm+DHdvTNg7LTAOx0O19hhTGUgLkM=' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'sha256-QHEu2EAiC9MkSOAz6W5rVOqmfc6dOk3htg37cvSzhHA='; img-src 'self'; font-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; worker-src blob:; base-uri 'none'; form-action 'none'; object-src 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-wBCNwxJ5TVPECbu97BMaFYy5v3wvGahoXTYyzahzlnM=' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'sha256-QHEu2EAiC9MkSOAz6W5rVOqmfc6dOk3htg37cvSzhHA='; img-src 'self'; font-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; worker-src blob:; base-uri 'none'; form-action 'none'; object-src 'none'" />
   <script src="assets/emoji-platform.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, follow" />
@@ -2127,6 +2127,8 @@
       // text/plain keeps this a simple request.
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
+      // A lost or timed-out POST response can follow a successful sheet write.
+      // Confirm explicit Send by its receipt even when the transport rejects.
       return fetch(ENDPOINT, {
         method: "POST",
         mode: "no-cors",
@@ -2134,9 +2136,9 @@
         body: JSON.stringify(payload),
         keepalive: true,
         signal: controller.signal
-      }).then(() => payload.type === 'detail'
+      }).then(() => true, () => false).then(responseReceived => payload.type === 'detail'
         ? XPorterFeedbackReceipt.check(ENDPOINT, payload.sessionId, payload.receipt_id, payload.test)
-        : true).catch(() => false).finally(() => clearTimeout(timeout));
+        : responseReceived).catch(() => false).finally(() => clearTimeout(timeout));
     }
 
     const actionCollapsedFrame = {
