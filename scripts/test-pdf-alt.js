@@ -57,6 +57,50 @@ test('ALT survives existing JSON, CSV, XLSX and repaired TXT for primary/reply/q
     }
     assert(txt.includes('https://pbs.twimg.com/media/image.jpg'));
 });
+test('GraphQL media ALT survives timeline parsing, reply attachment and every post export format', () => {
+    const c = serializer();
+    c.XLog = { log() {} };
+    vm.runInContext(script('utils/api-parsers.js'), c, { filename:'utils/api-parsers.js' });
+    const alts = ['Primary гора 中文 جبل', 'Parent montagne 山', 'Parent quote وصف', 'Quoted озеро 湖'];
+    const tweet = (id, alt, extra = {}) => ({
+        __typename:'Tweet', rest_id:id,
+        core:{ user_results:{ result:{ rest_id:'42', core:{ name:'Ada', screen_name:'ada' } } } },
+        legacy:{
+            id_str:id, full_text:'Post '+id, created_at:'Wed Sep 30 12:00:00 +0000 2026',
+            extended_entities:{ media:[
+                { type:'photo', media_url_https:'https://pbs.twimg.com/media/'+id+'-1.jpg', ext_alt_text:alt },
+                { type:'photo', media_url_https:'https://pbs.twimg.com/media/'+id+'-2.jpg' }
+            ] }
+        }, ...extra
+    });
+    const parent = tweet('100', alts[1], { quoted_status_result:{ result:tweet('101', alts[2]) } });
+    const reply = tweet('200', alts[0], { quoted_status_result:{ result:tweet('201', alts[3]) } });
+    reply.legacy.in_reply_to_status_id_str = '100';
+    reply.legacy.in_reply_to_screen_name = 'ada';
+    const response = { data:{ bookmark_timeline_v2:{ timeline:{ instructions:[{
+        type:'TimelineAddEntries', entries:[parent, reply].map(result => ({
+            entryId:'tweet-'+result.rest_id,
+            content:{ itemContent:{ tweet_results:{ result } } }
+        }))
+    }] } } } };
+    const parsed = c.XPorterApiParsers.parseBookmarksResponse(response);
+    const row = parsed.tweets.find(item => item.id === '200');
+    assert(row, 'the reply is parsed from the timeline payload');
+    assert.equal(row.media_alt_texts, alts[0]+' | ', 'a missing second description keeps its position');
+    assert.equal(row.reply_to_post.media_alt_texts, alts[1]+' | ');
+    assert.equal(row.reply_to_post.quoted_post.media_alt_texts, alts[2]+' | ');
+    assert.equal(row.quoted_post.media_alt_texts, alts[3]+' | ');
+    const outputs = {
+        json:JSON.stringify(c.XPorterCSV.compactExportData([row])),
+        csv:c.XPorterCSV.generateCSV([row]),
+        xlsx:new TextDecoder().decode(c.XPorterCSV.generateXLSX([row])),
+        txt:c.XPorterCSV.generatePostsText([row], {}, { mode:'bookmarks' }),
+        pdf:c.XPorterPDF.generate([row], {}, { mode:'bookmarks', lang:'en', translations:locale })
+    };
+    for (const [format, output] of Object.entries(outputs)) {
+        for (const alt of alts) assert(output.includes(alt), format+' retains '+alt);
+    }
+});
 function downloadHarness(batches, options={}) {
     const generated=[];
     const events=[];
