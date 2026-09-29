@@ -14,7 +14,8 @@
         'diag_first_start_ms', 'diag_first_item_ms', 'diag_first_download_ms', 'diag_attempts',
         'diag_downloads', 'diag_totals', 'transport_omitted_attempts', 'transport_omitted_downloads',
         'diag_revision', 'consent_version', 'transport_summary_only',
-        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt', 'ladybug_squashes', 'theme_preset'
+        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt', 'ladybug_squashes', 'theme_preset',
+        'ui_diag_version', 'ui_diag_since', 'ui_start_clicks', 'ui_start_sent', 'ui_start_accepted', 'ui_start_invalid', 'ui_start_worker_error', 'ui_no_session_views', 'ui_status_read_errors', 'ui_theme_changes', 'ui_speed_changes', 'ui_settings_views', 'ui_about_views', 'f_pdf'
     ];
     const settingFields = ['includeOriginalPosts', 'includeQuotes', 'includeReplies', 'includeRetweets',
         'includeArticles', 'includeBookmarkReplyContext', 'includeBookmarkArticles', 'embedPostPhotos',
@@ -37,7 +38,7 @@
         'rate_limit', 'generating', 'download', 'pending', 'complete', 'stopped', 'error', 'rejected',
         'interrupted', 'handed_off', 'limit_reached', 'source_exhausted', 'no_matches', 'current', 'history',
         'ultra', 'turbo', 'fast', 'standard', 'careful', 'turtle', 'custom', 'NETWORK_TIMEOUT', 'RATE_LIMITED',
-        'UNKNOWN', 'WORKER_RESTART', 'DOWNLOAD_FAILED', 'USER_CANCELED'];
+        'UNKNOWN', 'WORKER_RESTART', 'DOWNLOAD_FAILED', 'USER_CANCELED', 'pdf'];
     // Strings use a tagged [dictionaryIndex] to keep numeric measurements unambiguous.
     const encodeValue = value => typeof value === 'string' && dictionary.includes(value)
         ? [dictionary.indexOf(value)] : value;

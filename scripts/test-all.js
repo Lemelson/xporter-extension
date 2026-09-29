@@ -8,6 +8,7 @@ const ROOT = path.join(__dirname, '..');
 const SUITES = [
     'scripts/test-site.cjs',
     'scripts/test-feedback-v2-compat.cjs',
+    'scripts/test-feedback-clarifications.cjs',
     'scripts/check-capture-bundle.js',
     'scripts/test-static-contracts.js',
     'scripts/test-extension-core.js',
