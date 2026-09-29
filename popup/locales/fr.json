@@ -87,7 +87,7 @@
   "unlimited": "Sans limite (publications : env. 3 200)",
   "posts": "publications",
   "postsExportSpeed": "Vitesse d’export des publications et signets",
-  "postsExportSpeedHelp": "**Définit l’intervalle entre les requêtes de publications et de signets :** environ 2, 3, 4, 7 ou 12 secondes. Standard utilise 4 secondes. Choisissez Personnalisé pour saisir un autre intervalle. Si X limite les requêtes, XPorter enregistre la progression et réessaie automatiquement. Une fois les tentatives épuisées, l’export reste en pause jusqu’à votre reprise.",
+  "postsExportSpeedHelp": "**Définit l’intervalle entre les requêtes de publications et de signets :** environ 0.3, 1, 2, 4, 7 ou 12 secondes. Standard utilise 4 secondes. Choisissez Personnalisé pour saisir un autre intervalle. Si X limite les requêtes, XPorter enregistre la progression et réessaie automatiquement. Une fois les tentatives épuisées, l’export reste en pause jusqu’à votre reprise.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 s (Prudence)",
   "speedTurbo": "⚠️ Turbo — ≈1 s",
   "speedFast": "Rapide — ≈2 s",

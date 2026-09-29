@@ -87,7 +87,7 @@
   "unlimited": "Sem limite (posts: cerca de 3.200)",
   "posts": "publicações",
   "postsExportSpeed": "Velocidade de posts e itens salvos",
-  "postsExportSpeedHelp": "**Define o intervalo entre solicitações de posts e itens salvos:** cerca de 2, 3, 4, 7 ou 12 segundos. Padrão usa 4 segundos. Escolha Personalizado para definir outro intervalo. Se o X limitar as solicitações, o XPorter salva o progresso e tenta novamente automaticamente. Se as tentativas se esgotarem, pausa até você retomar.",
+  "postsExportSpeedHelp": "**Define o intervalo entre solicitações de posts e itens salvos:** cerca de 0.3, 1, 2, 4, 7 ou 12 segundos. Padrão usa 4 segundos. Escolha Personalizado para definir outro intervalo. Se o X limitar as solicitações, o XPorter salva o progresso e tenta novamente automaticamente. Se as tentativas se esgotarem, pausa até você retomar.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 s (Cuidado)",
   "speedTurbo": "⚠️ Turbo — ≈1 s",
   "speedFast": "Rápido — ≈2 s",

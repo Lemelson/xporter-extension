@@ -77,7 +77,7 @@
             + (post.article_title ? `<h3 class="article-title" dir="auto">${escape(post.article_title)}</h3>` : '')
             + paragraphs(post.article_text,'article-text') + block('article_url',post.article_url,true);
         const context = (post,key,depth=0) => !post ? ''
-            : `<aside class="context"><div class="context-heading"><h3>${escape(label(key))}</h3>${authorHeader(post)}</div>${body(post)}${details(post)}`
+            : `<aside class="context${JSON.stringify(post).length <= 3000 ? ' short-post' : ''}"><div class="context-heading"><h3>${escape(label(key))}</h3>${authorHeader(post)}</div>${body(post)}${details(post)}`
                 + (depth < 1 ? context(post.quoted_post,'quoted_post',depth+1) : '') + '</aside>';
         const title = options.mode === 'bookmarks' ? t('bookmarksSettingsHeading','Bookmarks') : label('tweet_count');
         const part = options.partCount > 1 ? ` · ${options.partNumber} / ${options.partCount}` : '';
@@ -87,12 +87,16 @@
             sourceSize(post);
             // Short records stay together. Long records must remain fragmentable,
             // especially ALT and source links that can be longer than a page.
-            const className = JSON.stringify(post).length <= 900 ? 'post short-post' : 'post';
+            // API metadata and several media URLs easily exceed 900 characters
+            // even for an ordinary short post. Keep these records together too;
+            // larger articles/ALT remain free to span pages.
+            const className = JSON.stringify(post).length <= 3000 ? 'post short-post' : 'post';
             return `<article class="${className}">${authorHeader(post,start+index)}${body(post)}${details(post)}`
                 + context(post.reply_to_post,'reply_to_post') + context(post.quoted_post,'quoted_post') + '</article>';
         }).join('\n');
-        const profileBlock = options.mode === 'bookmarks' || !(profile.name || profile.screenName || profile.username || profile.bio) ? ''
-            : `<section class="profile"><h2 dir="auto">${escape(profile.name || '')} <bdi>${escape(profile.screenName || profile.username || '')}</bdi></h2>${paragraphs(profile.bio,'profile-bio')}</section>`;
+        const profileUsername = String(profile.screenName || profile.username || '').replace(/^@+/, '');
+        const profileBlock = options.mode === 'bookmarks' || !(profile.name || profileUsername || profile.bio) ? ''
+            : `<section class="profile"><h2 dir="auto">${escape(profile.name || '')}${profileUsername ? ` <bdi class="author-handle">@${escape(profileUsername)}</bdi>` : ''}</h2>${paragraphs(profile.bio,'profile-bio')}</section>`;
         const status = options.exportStatus && options.exportStatus !== 'complete'
             ? `<p class="partial">${escape(t('pdfPartial','These are the rows collected so far. The source export is unfinished.'))}</p>` : '';
         return `<!doctype html><html lang="${escape(lang)}" dir="${lang === 'ar' ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'unsafe-inline'; script-src 'sha256-${PRINT_SCRIPT_HASH}'"><title>XPorter · ${escape(title+part)}</title><style>

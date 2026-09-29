@@ -189,6 +189,15 @@ test('archive presentation puts identity before content and preserves localized 
     assert(html.includes('@bottom-right{direction:ltr;unicode-bidi:isolate;'), 'page numbering must not reverse in an RTL archive');
     assert(!html.includes('grid-template-columns'), 'long ALT must be fragmentable, not an unsplittable metadata grid');
 });
+test('a normal post with four media links stays together and profile handles are recognizable',()=>{
+    const c=serializer();
+    const post={id:'2103636549359526064',text:'Congratulations to the award recipients.',author_name:'NASA',author_username:'NASA',tweet_url:'https://x.com/NASA/status/2103636549359526064',conversation_id:'2103636549359526064',language:'en',media_type:'photo',media_urls:Array.from({length:4},(_,i)=>`https://pbs.twimg.com/media/${'image'.repeat(40)}${i}.jpg`).join(', ')};
+    const html=c.XPorterPDF.generate([post],{name:'NASA',screenName:'@NASA'}, {mode:'posts'});
+    assert(html.includes('class="post short-post"'), 'ordinary media metadata must not leave a references-only page');
+    assert(html.includes('<bdi class="author-handle">@NASA</bdi></h2>'), 'profile handles need a single @ and the same treatment as post handles');
+    const withQuote=c.XPorterPDF.generate([{...post,quoted_post:{text:'A short quoted post',tweet_url:'https://x.com/NASA/status/1',media_type:'photo'}}],{}, {mode:'posts'});
+    assert(withQuote.includes('class="context short-post"'), 'short quote context should not leave its source URL alone on another page');
+});
 test('long ALT, URL and article paragraphs are complete, isolated and allowed to flow across pages',()=>{
     const c=serializer();
     const alt=('وصف الصورة 中文 описание '.repeat(900))+'ALT_END';

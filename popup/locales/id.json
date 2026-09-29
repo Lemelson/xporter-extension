@@ -87,7 +87,7 @@
   "unlimited": "Tanpa batas (postingan: ±3.200)",
   "posts": "postingan",
   "postsExportSpeed": "Kecepatan ekspor postingan & markah",
-  "postsExportSpeedHelp": "**Mengatur interval permintaan postingan dan markah:** sekitar 2, 3, 4, 7, atau 12 detik. Standar memakai 4 detik. Pilih Kustom untuk interval lain. Jika X membatasi permintaan, XPorter menyimpan progres dan mencoba ulang otomatis. Setelah semua percobaan habis, ekspor dijeda sampai Anda melanjutkannya.",
+  "postsExportSpeedHelp": "**Mengatur interval permintaan postingan dan markah:** sekitar 0.3, 1, 2, 4, 7, atau 12 detik. Standar memakai 4 detik. Pilih Kustom untuk interval lain. Jika X membatasi permintaan, XPorter menyimpan progres dan mencoba ulang otomatis. Setelah semua percobaan habis, ekspor dijeda sampai Anda melanjutkannya.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 dtk. (Hati-hati)",
   "speedTurbo": "⚠️ Turbo — ≈1 dtk.",
   "speedFast": "Cepat — ≈2 dtk.",

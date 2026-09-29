@@ -87,7 +87,7 @@
   "unlimited": "Ohne Limit (Beiträge: ca. 3.200)",
   "posts": "Beiträge",
   "postsExportSpeed": "Exporttempo für Beiträge und Lesezeichen",
-  "postsExportSpeedHelp": "**Legt den Abstand zwischen Anfragen für Beiträge und Lesezeichen fest:** etwa 2, 3, 4, 7 oder 12 Sekunden. Standard verwendet 4 Sekunden. Unter „Benutzerdefiniert“ können Sie einen anderen Abstand eingeben. Begrenzt X die Anfragen, speichert XPorter den Fortschritt und versucht es automatisch erneut. Nach dem letzten erfolglosen Versuch pausiert der Export, bis Sie ihn fortsetzen.",
+  "postsExportSpeedHelp": "**Legt den Abstand zwischen Anfragen für Beiträge und Lesezeichen fest:** etwa 0.3, 1, 2, 4, 7 oder 12 Sekunden. Standard verwendet 4 Sekunden. Unter „Benutzerdefiniert“ können Sie einen anderen Abstand eingeben. Begrenzt X die Anfragen, speichert XPorter den Fortschritt und versucht es automatisch erneut. Nach dem letzten erfolglosen Versuch pausiert der Export, bis Sie ihn fortsetzen.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 Sek. (Vorsicht)",
   "speedTurbo": "⚠️ Turbo — ≈1 Sek.",
   "speedFast": "Schnell — ≈2 Sek.",

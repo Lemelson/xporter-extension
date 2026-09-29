@@ -87,7 +87,7 @@
   "unlimited": "No limit (posts: about 3,200)",
   "posts": "posts",
   "postsExportSpeed": "Post and bookmark export speed",
-  "postsExportSpeedHelp": "**Sets the interval between requests for posts and bookmarks:** about 2, 3, 4, 7, or 12 seconds. Standard uses 4 seconds. Choose Custom to enter another interval. If X limits requests, XPorter saves progress and retries automatically. If retries are exhausted, it pauses until you resume.",
+  "postsExportSpeedHelp": "**Sets the interval between requests for posts and bookmarks:** about 0.3, 1, 2, 4, 7, or 12 seconds. Standard uses 4 seconds. Choose Custom to enter another interval. If X limits requests, XPorter saves progress and retries automatically. If retries are exhausted, it pauses until you resume.",
   "speedUltra": "⚠️ Ultra Fast — ≈0.3 sec. (Caution)",
   "speedTurbo": "⚠️ Turbo — ≈1 sec.",
   "speedFast": "Fast — ≈2 sec.",

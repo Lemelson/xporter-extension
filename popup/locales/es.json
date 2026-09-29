@@ -87,7 +87,7 @@
   "unlimited": "Sin límite (publicaciones: unas 3.200)",
   "posts": "publicaciones",
   "postsExportSpeed": "Velocidad de publicaciones y marcadores",
-  "postsExportSpeedHelp": "**Define el intervalo entre solicitudes de publicaciones y marcadores:** unos 2, 3, 4, 7 o 12 segundos. Estándar usa 4 segundos. Elige Personalizado para introducir otro intervalo. Si X limita las solicitudes, XPorter guarda el progreso y reintenta automáticamente. Si se agotan los reintentos, se pausa hasta que lo reanudes.",
+  "postsExportSpeedHelp": "**Define el intervalo entre solicitudes de publicaciones y marcadores:** unos 0.3, 1, 2, 4, 7 o 12 segundos. Estándar usa 4 segundos. Elige Personalizado para introducir otro intervalo. Si X limita las solicitudes, XPorter guarda el progreso y reintenta automáticamente. Si se agotan los reintentos, se pausa hasta que lo reanudes.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 s (Precaución)",
   "speedTurbo": "⚠️ Turbo — ≈1 s",
   "speedFast": "Rápido — ≈2 s",

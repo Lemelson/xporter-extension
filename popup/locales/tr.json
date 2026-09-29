@@ -87,7 +87,7 @@
   "unlimited": "Sınırsız (gönderi: yaklaşık 3.200)",
   "posts": "gönderi",
   "postsExportSpeed": "Gönderi ve yer işareti dışa aktarma hızı",
-  "postsExportSpeedHelp": "**Gönderi ve yer işareti istekleri arasındaki süreyi ayarlar:** yaklaşık 2, 3, 4, 7 veya 12 saniye. Standart 4 saniyedir. Başka bir süre için Özel'i seçin. X istekleri sınırlarsa XPorter ilerlemeyi kaydeder ve otomatik yeniden dener. Denemeler tükenirse siz devam ettirene kadar duraklar.",
+  "postsExportSpeedHelp": "**Gönderi ve yer işareti istekleri arasındaki süreyi ayarlar:** yaklaşık 0.3, 1, 2, 4, 7 veya 12 saniye. Standart 4 saniyedir. Başka bir süre için Özel'i seçin. X istekleri sınırlarsa XPorter ilerlemeyi kaydeder ve otomatik yeniden dener. Denemeler tükenirse siz devam ettirene kadar duraklar.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 sn (Dikkat)",
   "speedTurbo": "⚠️ Turbo — ≈1 sn",
   "speedFast": "Hızlı — ≈2 sn",

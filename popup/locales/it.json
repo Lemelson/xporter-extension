@@ -87,7 +87,7 @@
   "unlimited": "Nessun limite (post: circa 3.200)",
   "posts": "post",
   "postsExportSpeed": "Velocità di esportazione di post e segnalibri",
-  "postsExportSpeedHelp": "**Imposta l’intervallo tra le richieste di post e segnalibri:** circa 2, 3, 4, 7 o 12 secondi. Standard usa 4 secondi. Scegli Personalizzato per inserire un altro intervallo. Se X limita le richieste, XPorter salva i progressi e riprova automaticamente. Esauriti i tentativi, resta in pausa finché non riprendi.",
+  "postsExportSpeedHelp": "**Imposta l’intervallo tra le richieste di post e segnalibri:** circa 0.3, 1, 2, 4, 7 o 12 secondi. Standard usa 4 secondi. Scegli Personalizzato per inserire un altro intervallo. Se X limita le richieste, XPorter salva i progressi e riprova automaticamente. Esauriti i tentativi, resta in pausa finché non riprendi.",
   "speedUltra": "⚠️ Ultra Fast — ≈0,3 s (Attenzione)",
   "speedTurbo": "⚠️ Turbo — ≈1 s",
   "speedFast": "Veloce — ≈2 s",
