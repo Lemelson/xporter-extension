@@ -20,6 +20,7 @@
   "authLink": "log in to X",
   "authRequired": "Please {link} first.",
   "authRequiredRetry": "Please {link} first, then try again.",
+  "authCheckUnavailable": "Could not check your X session. Reopen XPorter and try again.",
   "fieldUsername": "X username",
   "placeholderUsername": "username",
   "dateRange": "Date range",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Print → Save as PDF)",
+  "pdfDownload": "Download printable HTML",
+  "pdfFormatHelp": "Downloads HTML files for posts and bookmarks. Open each file in your browser, choose Print, then Save as PDF. Text, links and image descriptions are preserved; images are linked, not embedded.",
+  "pdfDownloadStarted": "Printable HTML downloaded. Open each file and choose Print → Save as PDF.",
+  "pdfPrint": "Print / Save as PDF",
+  "pdfPrintHelp": "Use your browser’s Print dialog and choose Save as PDF. For large exports, save each part separately.",
+  "errPdfPostTooLarge": "This post is too large for the printable export. Choose TXT or JSON to preserve its full content.",
+  "errFormatUnsupported": "This format is available only for posts and bookmarks.",
+  "pdfPartial": "These are the rows collected so far. The source export is unfinished."
 }

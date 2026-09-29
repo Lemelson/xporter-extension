@@ -339,7 +339,8 @@ function sanitizeSeenPost(post) {
         is_quote: post.is_quote === true,
         is_retweet: post.is_retweet === true,
         media_count: count(post.media_count),
-        media_types: text(post.media_types, 80)
+        media_types: text(post.media_types, 80),
+        media_alt_texts: text(post.media_alt_texts, 8000)
     };
 }
 

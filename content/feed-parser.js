@@ -66,7 +66,10 @@
       is_quote: Boolean(result.quoted_status_result),
       is_retweet: Boolean(options.isRetweet),
       media_count: media.length,
-      media_types: [...new Set(media.map(item => item?.type).filter(Boolean))].join(',')
+      media_types: [...new Set(media.map(item => item?.type).filter(Boolean))].join(','),
+      media_alt_texts: media.some(item => item?.ext_alt_text)
+        ? media.map(item => typeof item?.ext_alt_text === 'string' ? item.ext_alt_text : '').join(' | ')
+        : ''
     };
   }
 

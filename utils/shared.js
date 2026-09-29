@@ -74,9 +74,14 @@ async function persistSettingsPatch(currentSettings, patch) {
  */
 async function checkAuth() {
     return new Promise((resolve) => {
-        chrome.cookies.get({ url: 'https://x.com', name: 'auth_token' }, (cookie) => {
-            resolve(!!cookie);
-        });
+        try {
+            chrome.cookies.get({ url: 'https://x.com', name: 'auth_token' }, (cookie) => {
+                // An unavailable cookie API is unknown, not evidence of logout.
+                resolve(chrome.runtime.lastError ? null : !!cookie);
+            });
+        } catch (_) {
+            resolve(null);
+        }
     });
 }
 
@@ -108,6 +113,8 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'errHistoryDataGone',
         'STORAGE_FULL': 'errStorageFull',
         'DOWNLOAD_FAILED': 'errDownloadFailed',
+        'PDF_POST_TOO_LARGE': 'errPdfPostTooLarge',
+        'FORMAT_UNSUPPORTED': 'errFormatUnsupported',
         'STORAGE_READ_FAILED': 'errStorageReadFailed',
         // Temporary X-side failures (5xx, transient GraphQL, unreadable JSON)
         'GRAPHQL_TRANSIENT': 'errXTemporary',
@@ -157,6 +164,8 @@ function formatError(error, t) {
         'HISTORY_DATA_GONE': 'The saved data for this export is no longer available. Start a new export to download it again.',
         'STORAGE_FULL': 'Storage is full — export stopped early. Download what was collected.',
         'DOWNLOAD_FAILED': 'Download failed — please try again',
+        'PDF_POST_TOO_LARGE': 'This post is too large for the printable export. Choose TXT or JSON to preserve its full content.',
+        'FORMAT_UNSUPPORTED': 'This format is available only for posts and bookmarks.',
         'STORAGE_READ_FAILED': 'XPorter could not read the saved export data. Please try again.',
         'GRAPHQL_TRANSIENT': 'X is having temporary problems. Your progress is saved. Wait a few minutes, then select Resume.',
         'API_SERVER_ERROR': 'X is having temporary problems. Your progress is saved. Wait a few minutes, then select Resume.',

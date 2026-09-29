@@ -7,7 +7,7 @@ const { source } = require('./support.js');
 // batches through getSavedBatches(), but runtime reads never share those objects.
 const copy = value => value == null ? value : JSON.parse(JSON.stringify(value));
 
-function createWorkerHarness() {
+function createWorkerHarness({ importStorage = false } = {}) {
     let runtimeListener;
     let startupListener;
     let savedState = null;
@@ -35,7 +35,11 @@ function createWorkerHarness() {
         clearTimeout,
         setInterval,
         clearInterval,
-        importScripts() {},
+        importScripts(...paths) {
+            if (importStorage && paths.includes('../utils/storage.js')) {
+                vm.runInContext(source('utils/storage.js'), context, { filename: 'utils/storage.js' });
+            }
+        },
         XPORTER_CONFIG: { SPEED_PRESETS: { standard: {} } },
         XLog: { log() {}, warn() {}, error() {}, info() {} },
         XPorterAPI: {

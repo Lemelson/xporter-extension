@@ -434,10 +434,11 @@
     function getPartLimit(format, mode, settings = {}) {
         const group = (mode === 'posts' || mode === 'bookmarks') ? 'posts' : 'users';
         const configured = XPORTER_CONFIG?.DOWNLOAD_PART_LIMITS?.[group]?.[format];
-        const fallback = group === 'posts' ? 10000 : 50000;
+        const fallback = format === 'pdf' ? 250 : group === 'posts' ? 10000 : 50000;
         const ordinaryLimit = Number.isFinite(configured) && configured > 0
             ? configured
             : fallback;
+        if (format === 'pdf') return Math.min(250, ordinaryLimit);
         if (!embedsPhotos(format, mode, settings)) return ordinaryLimit;
         const photoLimit = Number(XPORTER_CONFIG?.EMBEDDED_PHOTO_XLSX_PART_LIMIT) || 250;
         return Math.min(ordinaryLimit, photoLimit);
@@ -445,6 +446,9 @@
 
     function buildPlan(state, requestedFormat) {
         const format = requestedFormat || state?.outputFormat || 'csv';
+        if (format === 'pdf' && !['posts', 'bookmarks'].includes(state?.exportMode || 'posts')) {
+            throw new Error('FORMAT_UNSUPPORTED');
+        }
         const count = Math.max(0, Number(state?.tweetCount) || 0);
         const partSize = getPartLimit(
             format,
@@ -480,7 +484,7 @@
             XPorterStorage.loadExportState(),
             XPorterStorage.loadSettings()
         ]);
-        return buildPlan({
+        const plan = buildPlan({
             ...state,
             settings: {
                 ...(state?.settings || {}),
@@ -488,12 +492,20 @@
                 embedBookmarkPhotos: settings.embedBookmarkPhotos === true
             }
         }, format);
+        return refinePdfPlan(state, plan);
+    }
+
+    async function refinePdfPlan(state, plan) {
+        if (plan.format !== 'pdf' || !state?.totalBatches || !plan.count) return plan;
+        let parts = 0;
+        for await (const _ of loadCurrentParts(state, plan.partSize, true)) parts++;
+        return { ...plan, partCount: Math.max(1, parts), multipart: parts > 1 };
     }
 
     // Batch reads reject (STORAGE_READ_FAILED) instead of yielding an empty
     // batch, so a failed read can never become a short file reported as done.
-    async function* loadCurrentBatches(state) {
-        const readSize = Math.max(1, Number(XPORTER_CONFIG?.STORAGE_BATCH_READ_SIZE) || 100);
+    async function* loadCurrentBatches(state, readSizeOverride) {
+        const readSize = readSizeOverride || Math.max(1, Number(XPORTER_CONFIG?.STORAGE_BATCH_READ_SIZE) || 100);
         for (let start = 0; start < (state.totalBatches || 0); start += readSize) {
             const count = Math.min(readSize, state.totalBatches - start);
             const batches = await XPorterStorage.loadTweetBatches(start, count);
@@ -512,15 +524,24 @@
         return [...populated];
     }
 
-    async function* loadCurrentParts(state, partSize) {
+    async function* loadCurrentParts(state, partSize, printable = false) {
         let part = [];
+        let chars = 0;
 
-        for await (const batch of loadCurrentBatches(state)) {
+        for await (const batch of loadCurrentBatches(state, printable ? 1 : undefined)) {
             for (const item of batch) {
+                const size = printable ? XPorterPDF.sourceSize(item) : 0;
+                if (part.length && printable && chars + size > XPorterPDF.MAX_SOURCE_CHARS) {
+                    yield part;
+                    part = [];
+                    chars = 0;
+                }
                 part.push(item);
+                chars += size;
                 if (part.length === partSize) {
                     yield part;
                     part = [];
+                    chars = 0;
                 }
             }
         }
@@ -546,14 +567,14 @@
             XPorterStorage.loadExportState(),
             XPorterStorage.loadSettings()
         ]);
-        const plan = buildPlan({
+        const plan = await refinePdfPlan(state, buildPlan({
             ...state,
             settings: {
                 ...(state?.settings || {}),
                 embedPostPhotos: downloadSettings.embedPostPhotos === true,
                 embedBookmarkPhotos: downloadSettings.embedBookmarkPhotos === true
             }
-        }, format);
+        }, format));
         const mode = state?.exportMode || 'posts';
         const embedPhotos = embedsPhotos(plan.format, mode, downloadSettings);
         const photoHostAccess = embedPhotos ? await hasPhotoHostAccess() : false;
@@ -604,7 +625,7 @@
         let downloadedCount = 0;
         let lastResult = null;
         const filenames = [];
-        for await (const items of loadCurrentParts(state, plan.partSize)) {
+        for await (const items of loadCurrentParts(state, plan.partSize, plan.format === 'pdf')) {
             partNumber++;
             reportDownload({
                 type: 'DOWNLOAD_PROGRESS',
@@ -628,6 +649,8 @@
                 exportedAt,
                 partNumber,
                 partCount: plan.partCount,
+                startNumber: downloadedCount + 1,
+                exportStatus: state.partialReason ? 'partial' : state.status,
                 saveAs: !plan.multipart,
                 downloadSettings,
                 photoHostAccess,
@@ -786,7 +809,8 @@
             dateTo: entry.dateToCalendar || entry.dateTo,
             exportedAt: entry.completedAt || new Date(),
             source: 'history',
-            diagnosticSource: 'history'
+            diagnosticSource: 'history',
+            exportStatus: entry.partialReason ? 'partial' : entry.status || (entry.completedAt ? 'complete' : 'unknown')
         });
         if (result.success) await recordSuccessfulDownload();
         return result;
@@ -796,11 +820,34 @@
         const settings = await XPorterStorage.loadSettings();
         const photosEnabled = embedsPhotos(options.format, options.mode, settings);
         const photoPermission = photosEnabled ? await hasPhotoHostAccess() : false;
+        const parts = [];
+        if (options.format === 'pdf') {
+            if (!['posts', 'bookmarks'].includes(options.mode || 'posts')) return { error: 'FORMAT_UNSUPPORTED' };
+            const rowLimit = getPartLimit('pdf', options.mode, settings);
+            let part = [], chars = 0;
+            for (const item of items) {
+                const size = XPorterPDF.sourceSize(item);
+                if (part.length && (part.length >= rowLimit || chars + size > XPorterPDF.MAX_SOURCE_CHARS)) {
+                    parts.push(part); part = []; chars = 0;
+                }
+                part.push(item); chars += size;
+            }
+            if (part.length) parts.push(part);
+        } else parts.push(items);
         const id = await diagnose('download_begin', { mode: options.mode, format: options.format,
-            source: options.diagnosticSource, rows: items.length, parts: 1, photosEnabled, photoPermission });
+            source: options.diagnosticSource, rows: items.length, parts: parts.length, photosEnabled, photoPermission });
         try {
-            const result = await downloadItems(items, { ...options, diagnosticId: id,
-                downloadSettings: settings, photoHostAccess: photoPermission });
+            const filenames = [];
+            let count = 0, result;
+            for (let index = 0; index < parts.length; index++) {
+                result = await downloadItems(parts[index], { ...options, diagnosticId: id,
+                    downloadSettings: settings, photoHostAccess: photoPermission,
+                    partNumber: index + 1, partCount: parts.length, startNumber: count + 1,
+                    saveAs: parts.length === 1 });
+                if (!result?.success) break;
+                count += parts[index].length; filenames.push(result.filename);
+            }
+            if (result?.success && parts.length > 1) result = { success: true, count, partCount: parts.length, filenames };
             await diagnose(result?.success ? 'download_handoff' : 'download_failed', { id, error: result?.error });
             return result;
         } catch (error) {
@@ -831,7 +878,16 @@
             ...(options.populatedHeaders ? { populatedHeaders: options.populatedHeaders } : {})
         };
 
-        if (format === 'txt' && isPostRows) {
+        if (format === 'pdf') {
+            if (!isPostRows) return { error: 'FORMAT_UNSUPPORTED' };
+            const translations = typeof loadTranslations === 'function'
+                ? await loadTranslations(headerOpts.lang) : {};
+            content = XPorterPDF.generate(allItems, options.profile || {}, {
+                ...options, lang: headerOpts.lang, translations
+            });
+            mimeType = 'text/html;charset=utf-8;';
+            extension = 'html';
+        } else if (format === 'txt' && isPostRows) {
             content = XPorterCSV.generatePostsText(allItems, options.profile || {}, {
                 mode,
                 postSelection: options.postSelection || null
@@ -910,7 +966,7 @@
         'first_view_count', 'first_bookmark_count', 'first_favorite_count',
         'first_retweet_count', 'first_reply_count', 'first_quote_count',
         'first_seen_at', 'last_seen_at', 'seen_count', 'last_surface',
-        'is_quote', 'is_retweet', 'media_count', 'media_types'
+        'is_quote', 'is_retweet', 'media_count', 'media_types', 'media_alt_texts'
     ];
 
     async function downloadSeenPosts(outputFormat) {

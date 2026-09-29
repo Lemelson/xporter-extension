@@ -53,6 +53,7 @@ function tweetResult(id, options = {}) {
 }
 
 const original = tweetResult('1111111111111111111', { quoted: true });
+original.legacy.extended_entities = {media:[{type:'photo',ext_alt_text:'Гора 中文 جبل'},{type:'photo'}]};
 const reply = tweetResult('2222222222222222222', { replyTo: '1111111111111111111' });
 const response = {
     data: {
@@ -77,6 +78,7 @@ assert.strictEqual(posts[1].id, '9999999999999999999');
 assert.strictEqual(posts[0].author_followers_count, 1234);
 assert.strictEqual(posts[0].reply_count, 3);
 assert.strictEqual(posts[0].view_count, 100);
+assert.strictEqual(posts[0].media_alt_texts, 'Гора 中文 جبل | ');
 assert.strictEqual(parser.extractPosts('{invalid').length, 0);
 
 const repostWrapper = tweetResult('3333333333333333333');
@@ -104,6 +106,7 @@ const existing = {
     id: posts[0].id,
     text: posts[0].text,
     author_username: 'ada',
+    media_alt_texts: 'Saved accessible description',
     author_followers_count: 1234,
     first_author_followers_count: 1234,
     view_count: 100,
@@ -116,6 +119,7 @@ const merged = database.mergePost(existing, {
     ...existing,
     text: '',
     author_username: '',
+    media_alt_texts: '',
     author_followers_count: 1300,
     view_count: 150,
     first_seen_at: 2000,
@@ -125,6 +129,7 @@ const merged = database.mergePost(existing, {
 
 assert.strictEqual(merged.text, posts[0].text, 'missing later text does not erase stored text');
 assert.strictEqual(merged.author_username, 'ada');
+assert.strictEqual(merged.media_alt_texts, 'Saved accessible description', 'a later sighting without ALT retains the supplied description');
 assert.strictEqual(merged.view_count, 150);
 assert.strictEqual(merged.first_view_count, 100);
 assert.strictEqual(merged.author_followers_count, 1300);

@@ -76,7 +76,7 @@
         }
         const choices = {
             s_mode: ['exportMode', ['posts', 'bookmarks', 'followers', 'following', 'verified_followers', 'seen_posts']],
-            s_format: ['outputFormat', ['csv', 'json', 'xlsx', 'txt']],
+            s_format: ['outputFormat', ['csv', 'json', 'xlsx', 'txt', 'pdf']],
             s_about_speed: ['aboutAccountSpeed', ['turbo', 'fast', 'standard', 'careful', 'turtle', 'custom']]
         };
         for (const [field, [key, allowed]] of Object.entries(choices)) {
@@ -85,7 +85,22 @@
         // Use the same fallback as the theme picker for older saved settings.
         if (globalThis.XPorterThemes) params.theme_preset = XPorterThemes.resolve(settings).id;
         params.f_txt = formats.txt || 0;
+        params.f_pdf = formats.pdf || 0;
         params.ladybug_squashes = usage.ladybugSquashes || 0;
+        // These counters begin at an explicit observation baseline; absence in
+        // older installations is unknown rather than zero lifetime activity.
+        const ui = usage.uiDiagnostics;
+        if (ui?.version === 1 && Number.isFinite(ui.since) && ui.since > 0) {
+            params.ui_diag_version = 1;
+            params.ui_diag_since = new Date(ui.since).toISOString();
+            const uiFields = { ui_start_clicks:'startClicks', ui_start_sent:'startSent', ui_start_accepted:'startAccepted',
+                ui_start_invalid:'startInvalid', ui_start_worker_error:'startWorkerError', ui_no_session_views:'noSessionViews',
+                ui_status_read_errors:'statusReadErrors', ui_theme_changes:'themeChanges', ui_speed_changes:'speedChanges',
+                ui_settings_views:'settingsViews', ui_about_views:'aboutViews' };
+            for (const [field, key] of Object.entries(uiFields)) {
+                if (Number.isSafeInteger(ui[key]) && ui[key] >= 0 && ui[key] <= 1e12) params[field] = ui[key];
+            }
+        }
         if (usage.installedAtApprox) params.inst_approx = 1;
         if (globalThis.XPorterDiagnostics) {
             const diagnostics = await XPorterDiagnostics.load();

@@ -356,6 +356,44 @@ async function testRejectedWriteDoesNotPoisonLaterPatch() {
     await usageFailure.storage.recordOpen();
     assert.equal(usageFailure.usage().opens, 43);
     assert.equal(usageFailure.usage().downloads, 17);
+
+    const ui = createStorageHarness({}, { usage: { opens: 42, exportsStarted: 3 } });
+    assert.equal(ui.usage().uiDiagnostics, undefined, 'legacy counters must not acquire a fake historical UI baseline');
+    await ui.storage.recordUIEvent('user-name-or-untrusted-event');
+    assert.equal(ui.usage().uiDiagnostics, undefined, 'unknown event must not write diagnostics');
+    await ui.storage.recordUIEvent('init');
+    const since = ui.usage().uiDiagnostics.since;
+    await Promise.all(Array.from({ length: 20 }, () => ui.storage.recordUIEvent('startClicks')));
+    await ui.storage.recordUIEvent('init');
+    assert.equal(ui.usage().uiDiagnostics.startClicks, 20, 'concurrent UI counters must not lose clicks');
+    assert.equal(ui.usage().uiDiagnostics.startAccepted, 0);
+    assert.equal(ui.usage().uiDiagnostics.since, since, 'worker restarts must not reset the observed baseline');
+    assert.equal(ui.usage().exportsStarted, 3, 'UI clicks must not masquerade as started exports');
+
+    const uiReadFailure = createStorageHarness({}, { usage: { opens: 42 }, failUsageRead: true });
+    await assert.rejects(uiReadFailure.storage.recordUIEvent('init'), /usage read rejection/);
+    assert.deepEqual(uiReadFailure.usage(), { opens: 42 });
+    await uiReadFailure.storage.recordUIEvent('startClicks');
+    assert.equal(uiReadFailure.usage().uiDiagnostics.startClicks, 1);
+
+    const choices = createStorageHarness({ theme: 'dark', exportSpeed: 'standard' });
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'popup/theme-presets.js'), 'utf8'), choices.context);
+    await choices.storage.saveSettings({ themePreset: 'classic-dark' });
+    assert.equal(choices.usage().uiDiagnostics, undefined, 'saving default-resolved theme is not a switch');
+    await choices.storage.saveSettings({ themePreset: 'obsidian' });
+    await choices.storage.saveSettings({ themePreset: 'obsidian' });
+    await choices.storage.saveSettings({ userExportSpeed: 'turbo' });
+    await choices.storage.saveSettings({ userExportSpeed: 'turbo' });
+    assert.equal(choices.usage().uiDiagnostics.themeChanges, 1);
+    assert.equal(choices.usage().uiDiagnostics.speedChanges, 1);
+    const failedChoice = createStorageHarness({ themePreset: 'classic-dark', exportSpeed: 'standard' }, { failFirstSet: true });
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'popup/theme-presets.js'), 'utf8'), failedChoice.context);
+    assert.equal(await failedChoice.storage.saveSettings({ themePreset: 'obsidian', exportSpeed: 'turbo' }), false);
+    assert.equal(failedChoice.usage().uiDiagnostics, undefined, 'failed preference writes must not count as committed choices');
+    assert.equal(failedChoice.settings().themePreset, 'classic-dark');
+    assert.equal(await failedChoice.storage.saveSettings({ themePreset: 'obsidian', exportSpeed: 'turbo' }), true);
+    assert.equal(failedChoice.usage().uiDiagnostics.themeChanges, 1);
+    assert.equal(failedChoice.usage().uiDiagnostics.speedChanges, 1);
     console.log('Storage concurrency tests passed');
 })().catch((error) => {
     console.error(error);

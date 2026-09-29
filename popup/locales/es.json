@@ -20,6 +20,7 @@
   "authLink": "inicia sesión en X",
   "authRequired": "Por favor, {link} primero.",
   "authRequiredRetry": "Por favor, {link} y luego inténtalo de nuevo.",
+  "authCheckUnavailable": "No se pudo comprobar tu sesión de X. Vuelve a abrir XPorter e inténtalo de nuevo.",
   "fieldUsername": "Nombre de usuario de X",
   "placeholderUsername": "username",
   "dateRange": "Rango de fechas",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Imprimir → Guardar como PDF)",
+  "pdfDownload": "Descargar HTML para imprimir",
+  "pdfFormatHelp": "Descarga archivos HTML de publicaciones y marcadores. Abre cada archivo en el navegador, selecciona Imprimir y luego Guardar como PDF. Conserva textos, enlaces y descripciones de imágenes; las imágenes se incluyen como enlaces.",
+  "pdfDownloadStarted": "HTML para imprimir descargado. Abre cada archivo y selecciona Imprimir → Guardar como PDF.",
+  "pdfPrint": "Imprimir / Guardar como PDF",
+  "pdfPrintHelp": "En el diálogo de impresión del navegador, selecciona Guardar como PDF. Guarda por separado cada parte de las exportaciones grandes.",
+  "errPdfPostTooLarge": "Esta publicación es demasiado grande para la exportación imprimible. Elige TXT o JSON para conservar todo el contenido.",
+  "errFormatUnsupported": "Este formato solo está disponible para publicaciones y marcadores.",
+  "pdfPartial": "Estas son las filas recopiladas hasta ahora. La exportación de origen no ha terminado."
 }

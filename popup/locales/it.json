@@ -20,6 +20,7 @@
   "authLink": "accedi a X",
   "authRequired": "Per favore, prima {link}.",
   "authRequiredRetry": "Per favore, prima {link}, poi riprova.",
+  "authCheckUnavailable": "Impossibile verificare la sessione X. Riapri XPorter e riprova.",
   "fieldUsername": "Nome utente X",
   "placeholderUsername": "username",
   "dateRange": "Intervallo date",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Stampa → Salva come PDF)",
+  "pdfDownload": "Scarica HTML stampabile",
+  "pdfFormatHelp": "Scarica file HTML di post e segnalibri. Apri ogni file nel browser, scegli Stampa e poi Salva come PDF. Testo, link e descrizioni delle immagini vengono conservati; le immagini sono disponibili tramite link.",
+  "pdfDownloadStarted": "HTML stampabile scaricato. Apri ogni file e scegli Stampa → Salva come PDF.",
+  "pdfPrint": "Stampa / Salva come PDF",
+  "pdfPrintHelp": "Nella finestra di stampa del browser scegli Salva come PDF. Salva separatamente ogni parte delle esportazioni grandi.",
+  "errPdfPostTooLarge": "Questo post è troppo grande per il file stampabile. Scegli TXT o JSON per conservarne tutto il contenuto.",
+  "errFormatUnsupported": "Questo formato è disponibile solo per post e segnalibri.",
+  "pdfPartial": "Queste sono le righe raccolte finora. L’esportazione originale non è ancora terminata."
 }

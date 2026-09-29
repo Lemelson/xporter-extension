@@ -20,6 +20,7 @@
   "authLink": "faça login no X",
   "authRequired": "Primeiro, {link}.",
   "authRequiredRetry": "Primeiro, {link} e depois tente novamente.",
+  "authCheckUnavailable": "Não foi possível verificar sua sessão no X. Abra o XPorter novamente e tente outra vez.",
   "fieldUsername": "Nome de usuário no X",
   "placeholderUsername": "username",
   "dateRange": "Intervalo de datas",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Imprimir → Salvar como PDF)",
+  "pdfDownload": "Baixar HTML para impressão",
+  "pdfFormatHelp": "Baixa arquivos HTML de posts e itens salvos. Abra cada arquivo no navegador, escolha Imprimir e depois Salvar como PDF. Textos, links e descrições de imagens são preservados; as imagens são fornecidas por links.",
+  "pdfDownloadStarted": "HTML para impressão baixado. Abra cada arquivo e escolha Imprimir → Salvar como PDF.",
+  "pdfPrint": "Imprimir / Salvar como PDF",
+  "pdfPrintHelp": "Na janela de impressão do navegador, escolha Salvar como PDF. Salve separadamente cada parte de exportações grandes.",
+  "errPdfPostTooLarge": "Este post é grande demais para a exportação imprimível. Escolha TXT ou JSON para preservar todo o conteúdo.",
+  "errFormatUnsupported": "Este formato está disponível apenas para posts e itens salvos.",
+  "pdfPartial": "Estas são as linhas coletadas até agora. A exportação original ainda não terminou."
 }

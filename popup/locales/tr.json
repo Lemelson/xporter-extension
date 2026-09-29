@@ -20,6 +20,7 @@
   "authLink": "X'e giriş yapın",
   "authRequired": "Lütfen önce {link}.",
   "authRequiredRetry": "Lütfen önce {link}, sonra tekrar deneyin.",
+  "authCheckUnavailable": "X oturumunuz kontrol edilemedi. XPorter’ı yeniden açıp tekrar deneyin.",
   "fieldUsername": "X kullanıcı adı",
   "placeholderUsername": "username",
   "dateRange": "Tarih aralığı",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Yazdır → PDF olarak kaydet)",
+  "pdfDownload": "Yazdırılabilir HTML indir",
+  "pdfFormatHelp": "Gönderi ve yer işaretlerini HTML dosyaları olarak indirir. Her dosyayı tarayıcıda açın, Yazdır ve PDF olarak kaydet seçeneğini seçin. Metin, bağlantılar ve görsel açıklamaları korunur; görseller bağlantı olarak sunulur.",
+  "pdfDownloadStarted": "Yazdırılabilir HTML indirildi. Her dosyayı açın ve Yazdır → PDF olarak kaydet seçeneğini seçin.",
+  "pdfPrint": "Yazdır / PDF olarak kaydet",
+  "pdfPrintHelp": "Tarayıcının yazdırma penceresinde PDF olarak kaydet seçeneğini seçin. Büyük dışa aktarımların her bölümünü ayrı kaydedin.",
+  "errPdfPostTooLarge": "Bu gönderi yazdırılabilir dışa aktarım için çok büyük. Tam içeriği korumak için TXT veya JSON seçin.",
+  "errFormatUnsupported": "Bu biçim yalnızca gönderiler ve yer işaretleri için kullanılabilir.",
+  "pdfPartial": "Bunlar şimdiye kadar toplanan satırlardır. Kaynak dışa aktarımı henüz tamamlanmadı."
 }

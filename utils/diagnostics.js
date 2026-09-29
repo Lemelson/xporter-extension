@@ -4,7 +4,7 @@
     'use strict';
     const KEY = 'xporter_diagnostics_v2';
     const MODES = ['posts', 'bookmarks', 'followers', 'following', 'verified_followers', 'seen_posts'];
-    const FORMATS = ['csv', 'json', 'xlsx', 'txt', 'clipboard'];
+    const FORMATS = ['csv', 'json', 'xlsx', 'txt', 'clipboard', 'pdf'];
     const RESULTS = ['complete', 'stopped', 'error', 'rejected', 'interrupted'];
     const PHASES = ['requested', 'resolving_user', 'fetching', 'rate_limit', 'generating', 'download'];
     const COMPLETIONS = ['limit_reached', 'source_exhausted', 'no_matches'];

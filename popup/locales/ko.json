@@ -20,6 +20,7 @@
   "authLink": "X에 로그인",
   "authRequired": "먼저 {link}해 주세요.",
   "authRequiredRetry": "먼저 {link}한 다음 다시 시도하세요.",
+  "authCheckUnavailable": "X 로그인 상태를 확인할 수 없습니다. XPorter를 다시 열고 시도해 주세요.",
   "fieldUsername": "X 사용자 이름",
   "placeholderUsername": "username",
   "dateRange": "날짜 범위",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (인쇄 → PDF로 저장)",
+  "pdfDownload": "인쇄용 HTML 다운로드",
+  "pdfFormatHelp": "게시물과 북마크를 HTML 파일로 다운로드합니다. 브라우저에서 각 파일을 열고 인쇄, PDF로 저장을 선택하세요. 텍스트, 링크, 이미지 설명은 보존되며 이미지는 링크로 제공됩니다.",
+  "pdfDownloadStarted": "인쇄용 HTML을 다운로드했습니다. 각 파일을 열고 인쇄 → PDF로 저장을 선택하세요.",
+  "pdfPrint": "인쇄 / PDF로 저장",
+  "pdfPrintHelp": "브라우저의 인쇄 대화상자에서 PDF로 저장을 선택하세요. 대용량 내보내기는 각 부분을 따로 저장하세요.",
+  "errPdfPostTooLarge": "이 게시물은 인쇄용 내보내기에 너무 큽니다. 전체 내용을 보존하려면 TXT 또는 JSON을 선택하세요.",
+  "errFormatUnsupported": "이 형식은 게시물과 북마크에서만 사용할 수 있습니다.",
+  "pdfPartial": "지금까지 수집한 기록입니다. 원본 내보내기는 아직 완료되지 않았습니다."
 }

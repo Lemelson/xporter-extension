@@ -20,6 +20,7 @@
   "authLink": "masuk ke X",
   "authRequired": "Silakan {link} terlebih dahulu.",
   "authRequiredRetry": "Silakan {link} terlebih dahulu, lalu coba lagi.",
+  "authCheckUnavailable": "Sesi X Anda tidak dapat diperiksa. Buka kembali XPorter dan coba lagi.",
   "fieldUsername": "Nama pengguna X",
   "placeholderUsername": "username",
   "dateRange": "Rentang tanggal",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Cetak → Simpan sebagai PDF)",
+  "pdfDownload": "Unduh HTML untuk dicetak",
+  "pdfFormatHelp": "Mengunduh file HTML untuk postingan dan markah. Buka setiap file di browser, pilih Cetak, lalu Simpan sebagai PDF. Teks, tautan, dan deskripsi gambar dipertahankan; gambar tersedia sebagai tautan.",
+  "pdfDownloadStarted": "HTML untuk dicetak telah diunduh. Buka setiap file dan pilih Cetak → Simpan sebagai PDF.",
+  "pdfPrint": "Cetak / Simpan sebagai PDF",
+  "pdfPrintHelp": "Pilih Simpan sebagai PDF pada dialog cetak browser. Simpan setiap bagian ekspor besar secara terpisah.",
+  "errPdfPostTooLarge": "Postingan ini terlalu besar untuk ekspor cetak. Pilih TXT atau JSON untuk mempertahankan seluruh isinya.",
+  "errFormatUnsupported": "Format ini hanya tersedia untuk postingan dan markah.",
+  "pdfPartial": "Ini adalah baris yang terkumpul sejauh ini. Ekspor sumber belum selesai."
 }

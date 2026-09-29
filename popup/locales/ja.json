@@ -20,6 +20,7 @@
   "authLink": "Xにログイン",
   "authRequired": "まず{link}してください。",
   "authRequiredRetry": "まず{link}してから、もう一度お試しください。",
+  "authCheckUnavailable": "Xへのログインを確認できませんでした。XPorterを開き直して、もう一度お試しください。",
   "fieldUsername": "Xユーザー名",
   "placeholderUsername": "username",
   "dateRange": "日付範囲",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF（印刷 → PDF に保存）",
+  "pdfDownload": "印刷用 HTML をダウンロード",
+  "pdfFormatHelp": "投稿とブックマークを HTML ファイルで保存します。各ファイルをブラウザで開き、「印刷」から「PDF に保存」を選んでください。テキスト、リンク、画像の説明を保持し、画像はリンクで提供します。",
+  "pdfDownloadStarted": "印刷用 HTML を保存しました。各ファイルを開き、印刷 → PDF に保存を選んでください。",
+  "pdfPrint": "印刷 / PDF に保存",
+  "pdfPrintHelp": "ブラウザの印刷画面で「PDF に保存」を選んでください。大きなエクスポートは各パートを個別に保存してください。",
+  "errPdfPostTooLarge": "この投稿は印刷用ファイルには大きすぎます。全文を保存するには TXT または JSON を選んでください。",
+  "errFormatUnsupported": "この形式は投稿とブックマークでのみ使用できます。",
+  "pdfPartial": "ここまでに取得した記録です。元のエクスポートはまだ完了していません。"
 }

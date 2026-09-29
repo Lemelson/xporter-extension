@@ -96,6 +96,7 @@
             is_retweet: Boolean(post.is_retweet),
             media_count: finiteCount(post.media_count) || 0,
             media_types: cleanText(post.media_types, 80),
+            media_alt_texts: cleanText(post.media_alt_texts, 8000),
             first_seen_at: seenAt,
             last_seen_at: seenAt,
             seen_count: 1,
@@ -114,7 +115,7 @@
         const next = { ...existing, ...incoming };
         for (const field of [
             'text', 'tweet_url', 'language', 'created_at',
-            'author_id', 'author_name', 'author_username', 'media_types'
+            'author_id', 'author_name', 'author_username', 'media_types', 'media_alt_texts'
         ]) {
             if (!incoming[field]) next[field] = existing[field] || incoming[field];
         }

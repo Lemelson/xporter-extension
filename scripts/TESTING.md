@@ -76,3 +76,8 @@ not verification on an actual Windows host. No Apple artwork is distributed.
 
 `node scripts/capture-emoji-comparison.cjs` captures 12 paired screens under
 `../outputs/emoji-selected/`, including all 20 glyphs and warning dialogs.
+
+
+UI funnel checks live in the storage concurrency and worker lifecycle suites: legacy missing baselines, rejected reads, concurrent clicks, no-op/failed settings changes, sender allowlists and worker-certified acceptance. Cookie read failure/absent-cookie/present-cookie are separate outcomes in the i18n runtime suite. Telemetry fixture tests verify all new counts survive compressed transport/collector and remain absent from historical payloads. Browser tests use synthetic disposable installs and must not write production feedback.
+
+`scripts/test-pdf-alt.js` covers Unicode, safe markup/links/CSP, ALT across all post formats, bounded multipart history/current exports and partial status. `scripts/test-pdf-browser.mjs` uses disposable Helium with generated content to check the explicit print button, no automatic printing, zero external requests and horizontal overflow, and writes an inspectable PDF. Browser printing does not prove an installed user's Save operation or live-X article completeness. Arabic PDF text extraction can use shaped glyphs/visual order despite readable rendering.

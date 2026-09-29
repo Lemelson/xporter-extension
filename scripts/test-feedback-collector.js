@@ -65,6 +65,28 @@ const legacyNumbers=h.post({sessionId:'numeric-legacy',source:'uninstall',type:'
 assert(legacyNumbers.ok);
 assert.equal(rowOf('Sheet1','numeric-legacy').exp_ok,7,'numeric URL stats keep Sheets number parsing');
 assert.equal(rowOf('Sheet1','numeric-legacy').v,'1.6.5');
+// Delayed packets must not roll back any cells belonging to the URL snapshot.
+const snapshotEvent={sessionId:'snapshot-order',source:'uninstall',type:'open',stats:{schema_version:2,
+  snapshot_at:'2026-09-29T12:00:00Z',diag_revision:8,s_colorful:1,exp_started:8,
+  diag_totals:{attempts:8},diag_attempts:[{mode:'bookmarks',result:'complete',rows:80}]}};
+assert(h.post(snapshotEvent).ok);
+assert(h.post({...snapshotEvent,type:'detail',reason:'r_other',detail:'new feedback',feedback_seq:1,
+  stats:{...snapshotEvent.stats,snapshot_at:'2026-09-29T11:00:00Z',diag_revision:7,s_colorful:0,
+    exp_started:7,diag_totals:{attempts:7},diag_attempts:[{mode:'posts',result:'stopped',rows:7}],page_s:12}}).ok);
+const ordered=rowOf('Sheet1','snapshot-order');
+assert.equal(ordered.diag_revision,8);
+assert.equal(ordered.s_colorful,1,'stale URL preferences must not replace the newer snapshot');
+assert.equal(ordered.exp_started,8);
+assert.equal(ordered.d_attempts,8);
+assert.equal(ordered.last_attempt_mode,'bookmarks');
+assert.equal(ordered.snapshot_at,'2026-09-29T12:00:00Z');
+assert.equal(ordered.detail,'new feedback','feedback revisions remain independent of URL snapshot freshness');
+assert.equal(ordered.page_s,12);
+// Settings can change without incrementing diagnostics; snapshot time orders them.
+assert(h.post({...snapshotEvent,stats:{...snapshotEvent.stats,snapshot_at:'2026-09-29T13:00:00Z',s_colorful:0}}).ok);
+assert.equal(rowOf('Sheet1','snapshot-order').s_colorful,0);
+assert(h.post({...snapshotEvent,stats:{...snapshotEvent.stats,snapshot_at:'2026-09-29T12:30:00Z',s_colorful:1}}).ok);
+assert.equal(rowOf('Sheet1','snapshot-order').s_colorful,0);
 const digitsId='123456789012345678901';
 assert(h.post({sessionId:digitsId,source:'direct',type:'open'}).ok);
 assert(h.post({sessionId:digitsId,source:'direct',stats:{page_s:2}}).ok);

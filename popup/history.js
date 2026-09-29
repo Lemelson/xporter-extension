@@ -141,7 +141,7 @@
                 }, HISTORY_DOWNLOAD_TIMEOUT);
                 button.disabled = false;
                 showToast(
-                    result?.success === true ? t('downloadStarted') : formatError(result?.error || 'DOWNLOAD_FAILED', t),
+                    result?.success === true ? t(entry.outputFormat === 'pdf' ? 'pdfDownloadStarted' : 'downloadStarted') : formatError(result?.error || 'DOWNLOAD_FAILED', t),
                     result?.success === true ? 'success' : 'error'
                 );
                 // The payload can expire while the list is open; drop the stale button.

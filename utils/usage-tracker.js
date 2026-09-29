@@ -29,6 +29,11 @@
         } catch (_) { /* ignore */ }
     }
 
+    // Shared by popup controllers; enum-only, no form values or user content.
+    globalThis.XPorterUsage = {
+        track(event) { send({ type: 'XP_UI_EVENT', event }); }
+    };
+
     // Only the visible AND focused page counts — two visible XPorter pages
     // must not both accumulate the same wall-clock second.
     function isActive() {

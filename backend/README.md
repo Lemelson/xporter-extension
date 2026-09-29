@@ -37,6 +37,10 @@ Uninstall URL `d2` uses append-only positional fields, dictionary codes, DEFLATE
 
 The form prefers normalized extension language, then browser language, then English. `language_source` records that choice or a manual switch. Reasons/subreasons use stable codes; English label columns are convenience text. Reloads reuse a session, initial open does not clear prior answers, event sequence prevents delayed feedback replacing newer choices, and dwell time is monotonic. Explicit Send displays success only after an unguessable server receipt confirms persistence. Unconfirmed receipt does not prove the POST failed. Client labels and IDs are untrusted and can be fabricated; public traffic is not authenticated proof of uninstall.
 
+Collector merges preserve the complete newer URL snapshot when an incoming `snapshot_at` or `diag_revision` is older. This includes current preferences, lifetime counters, diagnostic JSON and expanded `d_*`/`last_attempt_*`/`last_download_*` cells. Feedback revisions and page dwell still update independently. A URL describes its refresh time, not necessarily the uninstall time; use `snapshot_at` to assess freshness.
+
+UI observation version 1 appends `ui_diag_version`, `ui_diag_since`, `ui_start_clicks`, `ui_start_sent`, `ui_start_accepted`, `ui_start_invalid`, `ui_start_worker_error`, `ui_no_session_views`, `ui_status_read_errors`, `ui_theme_changes`, `ui_speed_changes`, `ui_settings_views` and `ui_about_views`. These are local cumulative event counts since the explicit `ui_diag_since` baseline, sent only through uninstall feedback. Repeated views/clicks count separately. Missing baseline or counters remain unknown in old reports; never fill them with zero or treat them as lifetime measurements. No account names, preference values, event histories or per-event timestamps are added. Publish the collector and Pages codec before distributing an extension with the longer payload.
+
 ## Deploy and verify
 
 1. Run `node scripts/test-all.js` and `git diff --check`.
@@ -62,3 +66,5 @@ Script code with `apps-script.gs`, then edit the existing web-app deployment and
 select a new version. Keep its URL unchanged. Existing rows are preserved; new
 columns are added when received. The feedback compatibility test covers the
 released 83-field payload, its 81-field predecessor, and legacy query parameters.
+
+`f_pdf` counts PDF-selected starts, analogous to `f_txt`; printable HTML handoff and browser Save as PDF are separate actions. This counter does not prove a PDF was saved. Missing older values remain unknown.

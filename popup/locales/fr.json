@@ -20,6 +20,7 @@
   "authLink": "vous connecter à X",
   "authRequired": "Veuillez d’abord {link}.",
   "authRequiredRetry": "Veuillez d’abord {link}, puis réessayez.",
+  "authCheckUnavailable": "Impossible de vérifier votre connexion à X. Rouvrez XPorter et réessayez.",
   "fieldUsername": "Nom d’utilisateur X",
   "placeholderUsername": "username",
   "dateRange": "Plage de dates",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Imprimer → Enregistrer en PDF)",
+  "pdfDownload": "Télécharger le HTML à imprimer",
+  "pdfFormatHelp": "Télécharge des fichiers HTML de posts et de signets. Ouvrez chaque fichier dans le navigateur, choisissez Imprimer puis Enregistrer en PDF. Textes, liens et descriptions des images sont conservés ; les images sont proposées sous forme de liens.",
+  "pdfDownloadStarted": "HTML à imprimer téléchargé. Ouvrez chaque fichier et choisissez Imprimer → Enregistrer en PDF.",
+  "pdfPrint": "Imprimer / Enregistrer en PDF",
+  "pdfPrintHelp": "Dans la fenêtre d’impression du navigateur, choisissez Enregistrer en PDF. Enregistrez séparément chaque partie des exports volumineux.",
+  "errPdfPostTooLarge": "Ce post est trop volumineux pour l’export imprimable. Choisissez TXT ou JSON pour conserver tout le contenu.",
+  "errFormatUnsupported": "Ce format est réservé aux posts et aux signets.",
+  "pdfPartial": "Voici les lignes collectées jusqu’ici. L’export d’origine n’est pas encore terminé."
 }

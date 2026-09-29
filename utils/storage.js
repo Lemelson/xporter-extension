@@ -454,13 +454,29 @@ async function saveSettingsPatch(settings) {
         profileFeed: _legacyProfileFeed,
         ...currentSettings
     } = current;
-    return safeSet({
+    const saved = await safeSet({
         [STORAGE_KEYS.SETTINGS]: {
             ...currentSettings,
             ...migratedPostSelection,
             ...settings
         }
     });
+    if (saved) {
+        // Count committed choices, not previews or failed saves. Defaults are
+        // display values: saving the default for the first time is not a change.
+        const themeBefore = typeof XPorterThemes !== 'undefined'
+            ? XPorterThemes.resolve(current).id : (current.themePreset || current.theme || 'dark');
+        const themeAfter = typeof XPorterThemes !== 'undefined'
+            ? XPorterThemes.resolve({ ...current, ...settings }).id
+            : (settings.themePreset || settings.theme || themeBefore);
+        const changedSpeed = ['exportSpeed', 'userExportSpeed', 'customDelaySec', 'userCustomDelaySec']
+            .some(key => Object.hasOwn(settings, key) && settings[key] !==
+                (current[key] ?? (key.endsWith('DelaySec') ? 5 : 'standard')));
+        // Optional diagnostics must never turn a successful settings save into a failure.
+        if (themeAfter !== themeBefore) await recordUIEvent('themeChanges').catch(() => {});
+        if (changedSpeed) await recordUIEvent('speedChanges').catch(() => {});
+    }
+    return saved;
 }
 
 function normalizePostSelection(saved = {}) {
@@ -605,7 +621,7 @@ function defaultUsage() {
         exportsErr: 0,
         exportsStopped: 0,
         byMode: { posts: 0, bookmarks: 0, followers: 0, following: 0, verifiedFollowers: 0 },
-        byFormat: { csv: 0, json: 0, xlsx: 0 },
+        byFormat: { csv: 0, json: 0, xlsx: 0, txt: 0, pdf: 0 },
         dateRangeExports: 0,
         resumes: 0,
         downloads: 0,
@@ -670,8 +686,35 @@ function recordLadybugSquash() {
 /** Count one open of the popup / export UI. */
 function recordOpen() {
     return mutateUsage(usage => {
+        ensureUIDiagnostics(usage);
         usage.opens = (usage.opens || 0) + 1;
         usage.lastOpenAt = Date.now();
+    });
+}
+
+// This baseline starts when the new instrumentation is actually observed.
+// Legacy missing counters stay unknown until that point, never lifetime zero.
+const UI_DIAGNOSTIC_EVENTS = new Set(['startClicks', 'startSent', 'startAccepted',
+    'startInvalid', 'startWorkerError', 'noSessionViews', 'statusReadErrors',
+    'themeChanges', 'speedChanges', 'settingsViews', 'aboutViews']);
+
+function ensureUIDiagnostics(usage) {
+    if (usage.uiDiagnostics?.version === 1 && Number.isFinite(usage.uiDiagnostics.since)
+        && usage.uiDiagnostics.since > 0) return usage.uiDiagnostics;
+    usage.uiDiagnostics = { version: 1, since: Date.now() };
+    for (const event of UI_DIAGNOSTIC_EVENTS) usage.uiDiagnostics[event] = 0;
+    return usage.uiDiagnostics;
+}
+
+function recordUIEvent(event) {
+    if (event !== 'init' && !UI_DIAGNOSTIC_EVENTS.has(event)) return Promise.resolve(null);
+    return mutateUsage(usage => {
+        const existing = usage.uiDiagnostics?.version === 1 && usage.uiDiagnostics.since > 0;
+        const diagnostics = ensureUIDiagnostics(usage);
+        if (event === 'init') return !existing;
+        const previous = Number.isSafeInteger(diagnostics[event]) && diagnostics[event] >= 0
+            ? diagnostics[event] : 0;
+        diagnostics[event] = Math.min(1e12, previous + 1);
     });
 }
 
@@ -803,7 +846,7 @@ if (typeof globalThis !== 'undefined') {
         deleteExportHistoryEntry, clearExportHistory,
         checkStorageQuota,
         loadUsage, markInstalled, backfillInstalledAt,
-        recordOpen, recordLadybugSquash, addActiveMs,
+        recordOpen, recordLadybugSquash, recordUIEvent, addActiveMs,
         recordExportStart, recordExportPhase, recordFirstItem,
         recordExportComplete, recordExportStopped, recordExportError, recordDownload,
         STORAGE_KEYS, MAX_TWEETS_PER_BATCH

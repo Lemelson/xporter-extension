@@ -20,6 +20,7 @@
   "authLink": "bei X anmelden",
   "authRequired": "Bitte zuerst {link}.",
   "authRequiredRetry": "Bitte zuerst {link} und es dann erneut versuchen.",
+  "authCheckUnavailable": "Deine X-Sitzung konnte nicht geprüft werden. Öffne XPorter erneut und versuche es noch einmal.",
   "fieldUsername": "X-Benutzername",
   "placeholderUsername": "username",
   "dateRange": "Datumsbereich",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (Drucken → Als PDF speichern)",
+  "pdfDownload": "Druckbares HTML herunterladen",
+  "pdfFormatHelp": "Lädt HTML-Dateien für Beiträge und Lesezeichen herunter. Öffne jede Datei im Browser, wähle Drucken und dann Als PDF speichern. Text, Links und Bildbeschreibungen bleiben erhalten; Bilder sind verlinkt.",
+  "pdfDownloadStarted": "Druckbares HTML heruntergeladen. Öffne jede Datei und wähle Drucken → Als PDF speichern.",
+  "pdfPrint": "Drucken / Als PDF speichern",
+  "pdfPrintHelp": "Wähle im Druckdialog des Browsers Als PDF speichern. Speichere bei großen Exporten jeden Teil einzeln.",
+  "errPdfPostTooLarge": "Dieser Beitrag ist zu groß für den druckbaren Export. Wähle TXT oder JSON, um den vollständigen Inhalt zu erhalten.",
+  "errFormatUnsupported": "Dieses Format ist nur für Beiträge und Lesezeichen verfügbar.",
+  "pdfPartial": "Dies sind die bisher gesammelten Einträge. Der ursprüngliche Export ist noch nicht abgeschlossen."
 }

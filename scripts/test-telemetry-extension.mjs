@@ -31,6 +31,9 @@ try {
  await page.evaluate(()=>chrome.runtime.sendMessage({type:'DIAGNOSTIC_START_REJECTED',mode:'posts',format:'csv',error:'INVALID_USERNAME'}));
  const report={report:await worker.evaluate(()=>XPorterFeedback.snapshot())};
  assert.equal(report.report.diag_attempts.at(-1).error,'INVALID_USERNAME');
+ assert.equal(report.report.ui_diag_version,1);assert(Date.parse(report.report.ui_diag_since)>0);
+ assert.equal(report.report.ui_start_invalid,1);assert.equal(report.report.ui_start_accepted,0);
+ assert.equal(report.report.ui_settings_views,1);
  assert.equal(await worker.evaluate(()=>testUploads.length),0);
  assert.equal(await worker.evaluate(()=>typeof XPorterUsageUpload),'undefined');
  // Real downloads API + real diagnostics module, using one synthetic local seen post.
@@ -51,6 +54,8 @@ try {
   finally {chrome.runtime.setUninstallURL=original;}
  });
  assert(uninstallProof.length<=1023);assert.equal(uninstallProof.stats.ui_lang,'zh');
+ assert.equal(uninstallProof.stats.ui_diag_version,1);assert.equal(uninstallProof.stats.ui_start_invalid,1);
+ assert.equal(uninstallProof.stats.ui_theme_changes,1);assert.equal(uninstallProof.stats.ui_settings_views,1);
  for(const [key,value] of Object.entries({theme_preset:'obsidian',s_colorful:1,s_ladybug:0,s_window_width:125,s_window_height:75,s_element_size:110,s_text_size:120,s_auto_expire:0,s_auto_expire_hours:8,s_mode:'bookmarks',s_format:'txt'})) assert.equal(uninstallProof.stats[key],value);assert.equal(uninstallProof.stats.diag_downloads.at(-1).result,'complete');
  for(const language of ['en','ru','zh','ar']){
   await worker.evaluate(language=>XPorterStorage.saveSettings({language}),language);await page.reload();await page.locator('#tabBtnSettings').click();

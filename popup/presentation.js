@@ -167,6 +167,10 @@
         function activateTab(tab, focus = false) {
             closeHelp();
             const previous = document.querySelector('.tab.active');
+            if (previous !== tab) {
+                if (tab.dataset.tab === 'settings') root.XPorterUsage?.track('settingsViews');
+                if (tab.dataset.tab === 'about') root.XPorterUsage?.track('aboutViews');
+            }
             tabs.forEach(t => {
                 const selected = t === tab;
                 t.classList.toggle('active', selected);

@@ -28,7 +28,8 @@ var STAT_FIELDS = ['schema_version','v','os','days','installed_at','ui_lang','th
   's_user_speed','s_user_safety','diag_historical','diag_active_days','diag_first_attempt_ms','diag_first_start_ms',
   'diag_first_item_ms','diag_first_download_ms','diag_attempts','diag_downloads','diag_totals',
   'transport_omitted_attempts','transport_omitted_downloads','diag_revision','consent_version','transport_summary_only',
-        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt', 'ladybug_squashes', 'theme_preset'];
+        's_colorful', 's_ladybug', 's_window_width', 's_window_height', 's_element_size', 's_text_size', 's_auto_expire', 's_auto_expire_hours', 's_mode', 's_format', 's_originals', 's_quotes', 's_bookmark_context', 's_bookmark_articles', 's_post_photos', 's_bookmark_photos', 's_about', 's_about_speed', 's_about_batch', 's_about_retries', 'f_txt', 'ladybug_squashes', 'theme_preset',
+  'ui_diag_version', 'ui_diag_since', 'ui_start_clicks', 'ui_start_sent', 'ui_start_accepted', 'ui_start_invalid', 'ui_start_worker_error', 'ui_no_session_views', 'ui_status_read_errors', 'ui_theme_changes', 'ui_speed_changes', 'ui_settings_views', 'ui_about_views', 'f_pdf'];
 var FORM_FIELDS = ['src','page_s','subreasons','subreason_labels','reason_history','subreasons_all',
   'subreason_labels_all','transport_error','form_version','language_source','page_opened_at'];
 var ATTEMPT_FIELDS = ['id','at','version','mode','format','resume','dateRange','settings','phase','result',
@@ -93,14 +94,19 @@ var CURRENT_BOOL_FIELDS = ['s_colorful','s_ladybug','s_auto_expire','s_originals
   's_bookmark_context','s_bookmark_articles','s_post_photos','s_bookmark_photos','s_about'];
 var CURRENT_NUMBER_FIELDS = {
   s_window_width:[80,150,5],s_window_height:[50,100,5],s_element_size:[80,130,5],s_text_size:[80,130,5],
-  s_auto_expire_hours:[1,48,1],s_about_batch:[1,50,1],s_about_retries:[1,1440,1],f_txt:[0,1e12,1],ladybug_squashes:[0,1e12,1]
+  s_auto_expire_hours:[1,48,1],s_about_batch:[1,50,1],s_about_retries:[1,1440,1],f_txt:[0,1e12,1],f_pdf:[0,1e12,1],ladybug_squashes:[0,1e12,1]
 };
 var CURRENT_CHOICE_FIELDS = {
   theme_preset:['classic-dark', 'classic-light', 'glass-dark', 'glass-light', 'obsidian', 'signal', 'cobalt', 'forest', 'bordeaux', 'porcelain', 'iris'],
   s_mode:['posts','bookmarks','followers','following','verified_followers','seen_posts'],
-  s_format:['csv','json','xlsx','txt'],s_about_speed:['turbo','fast','standard','careful','turtle','custom']
+  s_format:['csv','json','xlsx','txt','pdf'],s_about_speed:['turbo','fast','standard','careful','turtle','custom']
 };
+var UI_COUNTER_FIELDS = ['ui_start_clicks','ui_start_sent','ui_start_accepted','ui_start_invalid','ui_start_worker_error',
+  'ui_no_session_views','ui_status_read_errors','ui_theme_changes','ui_speed_changes','ui_settings_views','ui_about_views'];
 function cleanStat(key, value) {
+  if (key === 'ui_diag_version') return value === 1 ? 1 : '';
+  if (key === 'ui_diag_since') return typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/.test(value) && Number.isFinite(Date.parse(value)) ? value : '';
+  if (UI_COUNTER_FIELDS.indexOf(key)>=0) return typeof value === 'number' && Number.isSafeInteger(value) && value>=0 && value<=1e12 ? value : '';
   if (CURRENT_BOOL_FIELDS.indexOf(key)>=0) return value===0 || value===1 ? value : '';
   if (Object.prototype.hasOwnProperty.call(CURRENT_NUMBER_FIELDS,key)) {
     var range=CURRENT_NUMBER_FIELDS[key];
@@ -170,6 +176,10 @@ function mergeRow(headers, previous, flat) {
   var freshFeedback=hasFeedback && (!Number.isFinite(incomingSequence) || old.feedback_seq === '' || old.feedback_seq === undefined || incomingSequence >= oldSequence);
   var feedbackFields=['reason','detail','subreasons','subreason_labels','reason_history','subreasons_all','subreason_labels_all','feedback_seq','detail_receipt'];
   var ranks={open:1,reason:2,reason_update:2,detail:3};
+  var incomingSnapshot=Date.parse(flat.snapshot_at), oldSnapshot=Date.parse(old.snapshot_at);
+  var olderSnapshot=Number.isFinite(incomingSnapshot) && Number.isFinite(oldSnapshot) && incomingSnapshot<oldSnapshot;
+  var olderRevision=flat.diag_revision !== undefined && old.diag_revision !== '' && old.diag_revision !== undefined
+    && Number(flat.diag_revision)<Number(old.diag_revision);
   return headers.map(function(key,i) {
     var incoming=flat[key]; var prior=previous[i] === undefined ? '' : previous[i];
     // Never reinterpret a legacy row, or claim a newly observed first timestamp
@@ -181,7 +191,10 @@ function mergeRow(headers, previous, flat) {
     // empty value after Back. Passive dwell/reason events retain the comment.
     if (key === 'detail' && flat.lastType === 'detail') return incoming;
     if (key === 'page_s') return Math.max(Number(prior)||0,Number(incoming)||0);
-    if (key === 'diag_revision' && Number(incoming)<Number(prior)) return prior;
+    // The URL is one snapshot: do not combine its older preferences, counters
+    // or expanded diagnostic records with a newer revision already stored.
+    // Feedback fields and page dwell are independently ordered above.
+    if ((olderSnapshot || olderRevision) && (STAT_FIELDS.indexOf(key)>=0 || /^d_|^last_attempt_|^last_download_/.test(key))) return prior;
     return incoming !== undefined && incoming !== null && incoming !== '' ? incoming : prior;
   });
 }
@@ -350,6 +363,10 @@ function schemaDefinitions() {
     ['s_colorful / s_ladybug','2','Current colorful appearance and ladybug settings','0/1','Colorful is enabled when the legacy simplifiedDesign storage flag is true.'],
     ['s_window_width / s_window_height / s_element_size / s_text_size','2','Saved window/content slider choices','percent','Chosen percentages, not measured pixels; text slider is not the rendered font multiplier.'],
     ['s_auto_expire / s_auto_expire_hours','2','Automatic data deletion toggle and saved duration','0/1 and hours','Duration remains saved when disabled.'],
+    ['ui_diag_version / ui_diag_since','UI 1','Start of local UI-funnel observation','1 and ISO UTC','Missing means unknown; counters cover only this window, not lifetime.'],
+    ['ui_start_clicks / ui_start_sent / ui_start_accepted / ui_start_invalid / ui_start_worker_error','UI 1','Observed Start funnel','count','Clicks, submitted worker messages, accepted starts, validation failures and worker errors are separate stages.'],
+    ['ui_no_session_views / ui_status_read_errors','UI 1','Observed unavailable session/status UI states','count','Views/events, not distinct users or installations.'],
+    ['ui_theme_changes / ui_speed_changes / ui_settings_views / ui_about_views','UI 1','Observed preference interaction and tab visits','count','No change values, account identifiers or interaction timestamps are recorded.'],
     ['s_mode / s_format','2','Current saved mode and format','','May differ from last_attempt_mode/format; no export required.'],
     ['browser_family / browser_major','2','Coarse browser family and main version','','No full User-Agent. Chromium forks may report chromium/chrome.'],
     ['install_id','2','Random ID scoped to browser installation','UUID','Pseudonymous; reset on reinstall. Never a username or device fingerprint.'],
@@ -378,7 +395,7 @@ function fieldMeaning(key) {
     s_post_photos:'Current post photo embedding',s_bookmark_photos:'Current bookmark photo embedding',
     s_about:'Current About Account details enabled',s_about_speed:'Current About Account speed',
     s_about_batch:'Current About Account custom batch',s_about_retries:'Current About Account retry limit',
-    ladybug_squashes:'Lifetime ladybugs squashed',f_txt:'TXT-selected starts',f_json:'JSON-selected starts',f_xlsx:'XLSX-selected starts',last_days:'Days since last terminal export event',
+    f_pdf:'PDF-selected starts (printable HTML; does not confirm a saved PDF)',ladybug_squashes:'Lifetime ladybugs squashed',f_txt:'TXT-selected starts',f_json:'JSON-selected starts',f_xlsx:'XLSX-selected starts',last_days:'Days since last terminal export event',
     s_retweets:'Include reposts',s_replies:'Include replies',s_articles:'Include Articles',s_limit:'Selected quantity limit',
     s_localize:'Localize export headers',s_speed:'Posts speed',s_user_speed:'User-list speed',s_adaptive:'Adaptive pacing',
     inst_approx:'Install timestamp is approximate',install_v:'First-install version when known',snapshot_at:'Snapshot creation time UTC',

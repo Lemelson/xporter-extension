@@ -250,6 +250,10 @@ function generatePostsText(items, profile = {}, opts = {}) {
             lines.push(`Article text: ${cleanTxtValue(item.article_text)}`);
         }
         if (item.article_url) lines.push(`Article URL: ${item.article_url}`);
+        const media = formatContextMedia(item);
+        if (media) lines.push(`Media: ${media}`);
+        const altText = cleanTxtValue(item.media_alt_texts);
+        if (altText) lines.push(`Media descriptions (alt text): ${altText}`);
         const createdAt = formatTxtDate(item.created_at);
         if (createdAt) lines.push(`Date: ${createdAt}`);
         if (item.tweet_url) lines.push(`Post URL: ${item.tweet_url}`);
@@ -399,6 +403,8 @@ function appendContextPost(lines, label, post, indent = '') {
     }
     const media = formatContextMedia(post);
     if (media) lines.push(`${detailIndent}Media: ${media}`);
+    const altText = cleanTxtValue(post.media_alt_texts);
+    if (altText) lines.push(`${detailIndent}Media descriptions (alt text): ${altText}`);
     const articleTitle = cleanTxtValue(post.article_title);
     const articleText = cleanTxtValue(post.article_text);
     if (articleTitle) lines.push(`${detailIndent}Article title: ${articleTitle}`);

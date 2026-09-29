@@ -109,7 +109,7 @@ const XPORTER_CONFIG = {
     // into one JS array/string. Posts use a smaller ceiling because article and
     // text fields can be much larger than user-list rows.
     DOWNLOAD_PART_LIMITS: {
-        posts: { csv: 10000, json: 10000, xlsx: 10000, txt: 10000 },
+        posts: { csv: 10000, json: 10000, xlsx: 10000, txt: 10000, pdf: 250 },
         users: { csv: 100000, json: 50000, xlsx: 25000 }
     },
     EMBEDDED_PHOTO_XLSX_PART_LIMIT: 250,

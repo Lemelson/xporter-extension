@@ -20,6 +20,7 @@
   "authLink": "تسجيل الدخول إلى X",
   "authRequired": "يرجى {link} أولاً.",
   "authRequiredRetry": "يرجى {link} أولاً، ثم حاول مرة أخرى.",
+  "authCheckUnavailable": "تعذّر التحقق من تسجيل الدخول إلى X. أعد فتح XPorter وحاول مرة أخرى.",
   "fieldUsername": "اسم المستخدم على X",
   "placeholderUsername": "username",
   "dateRange": "نطاق التاريخ",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (طباعة ← حفظ بتنسيق PDF)",
+  "pdfDownload": "تنزيل HTML للطباعة",
+  "pdfFormatHelp": "ينزّل ملفات HTML للمنشورات والعلامات المرجعية. افتح كل ملف في المتصفح، واختر طباعة ثم حفظ بتنسيق PDF. تُحفظ النصوص والروابط وأوصاف الصور؛ تُدرج الصور كروابط.",
+  "pdfDownloadStarted": "تم تنزيل HTML للطباعة. افتح كل ملف واختر طباعة ثم حفظ بتنسيق PDF.",
+  "pdfPrint": "طباعة / حفظ بتنسيق PDF",
+  "pdfPrintHelp": "اختر حفظ بتنسيق PDF في نافذة الطباعة بالمتصفح. احفظ كل جزء من التصديرات الكبيرة على حدة.",
+  "errPdfPostTooLarge": "هذا المنشور كبير جدًا للتصدير القابل للطباعة. اختر TXT أو JSON للحفاظ على المحتوى كاملًا.",
+  "errFormatUnsupported": "هذا التنسيق متاح للمنشورات والعلامات المرجعية فقط.",
+  "pdfPartial": "هذه هي السجلات التي جُمعت حتى الآن. لم يكتمل تصدير المصدر بعد."
 }

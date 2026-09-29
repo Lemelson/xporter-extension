@@ -15,6 +15,7 @@ importScripts(
     '../utils/rateLimit.js',
     '../utils/columns-i18n.js',
     '../utils/csv.js',
+    '../utils/pdf.js',
     '../utils/storage.js',
     '../utils/diagnostics.js',
     '../utils/diagnostics-codec.js',
@@ -48,6 +49,13 @@ let manualWaitUntil = null;
 function diagnose(type, data) {
     return globalThis.XPorterDiagnostics?.record(type, data) || Promise.resolve(null);
 }
+
+function recordUIEventSafely(event) {
+    // No account/input text is accepted by this bounded, local-only counter.
+    return Promise.resolve().then(() => XPorterStorage.recordUIEvent?.(event)).catch(() => null);
+}
+
+recordUIEventSafely('init').then(() => globalThis.XPorterFeedback?.maybeRefresh(true)).catch(() => {});
 
 diagnose('recover').then(() => globalThis.XPorterDownloadDiagnostics?.recover?.()).catch(() => {});
 
@@ -261,8 +269,19 @@ async function handleMessage(message, sender) {
                 account: await XPorterStorage.loadCurrentAccount()
             };
 
-        case 'START_EXPORT':
-            return await startExport(message);
+        case 'START_EXPORT': {
+            await recordUIEventSafely('startSent');
+            try {
+                const result = await startExport(message);
+                await recordUIEventSafely(result?.error ? 'startWorkerError' : 'startAccepted');
+                XPorterFeedback.maybeRefresh(true);
+                return result;
+            } catch (error) {
+                await recordUIEventSafely('startWorkerError');
+                XPorterFeedback.maybeRefresh(true);
+                throw error;
+            }
+        }
 
         case 'STOP_EXPORT':
             return stopExport();
@@ -323,9 +342,23 @@ async function handleMessage(message, sender) {
             return {success:true};
         case 'DIAGNOSTIC_START_REJECTED':
             if (!sender?.url?.startsWith(chrome.runtime.getURL('popup/'))) return { error: 'INVALID_SENDER' };
+            if (['INVALID_USERNAME', 'INVALID_DATE_RANGE', 'NO_POST_TYPES_SELECTED'].includes(message.error)) {
+                await recordUIEventSafely('startInvalid');
+            }
             await diagnose('rejected', {mode:message.mode,format:message.format,error:message.error,
                 dateRange:message.dateRange === true,settings:await XPorterStorage.loadSettings()});
             return {success:true};
+
+        case 'XP_UI_EVENT': {
+            const events = new Set(['startClicks', 'noSessionViews', 'statusReadErrors',
+                'settingsViews', 'aboutViews']);
+            if (!sender?.url?.startsWith(chrome.runtime.getURL('popup/')) || !events.has(message.event)) {
+                return { error: 'INVALID_UI_EVENT' };
+            }
+            await recordUIEventSafely(message.event);
+            XPorterFeedback.maybeRefresh(true);
+            return { success: true };
+        }
 
         case 'CLEAR_EXPORT':
             if (exportOwnsDownloadData()) return { error: 'ALREADY_RUNNING' };

@@ -182,8 +182,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (lastExportState) updateUI(lastExportState);
             window.XPorterMotion?.downloadDone(downloadBtn);
             showToast(
-                message.partCount > 1
-                    ? templateText('downloadPartsStarted', { count: message.partCount })
+                message.format === 'pdf' ? t('pdfDownloadStarted')
+                    : message.partCount > 1 ? templateText('downloadPartsStarted', { count: message.partCount })
                     : t('downloadStarted'),
                 'success'
             );
@@ -341,18 +341,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             settingsBookmarksOnly.classList.toggle('hidden', !isBookmarksMode);
         }
         accountFields.applyMode(mode);
-        const txtOption = outputFormat.querySelector('option[value="txt"]');
-        if (txtOption) txtOption.disabled = !isPostRows;
-        if (!isPostRows && outputFormat.value === 'txt') outputFormat.value = 'csv';
+        for (const format of ['txt', 'pdf']) {
+            const option = outputFormat.querySelector(`option[value="${format}"]`);
+            if (option) option.disabled = !isPostRows;
+        }
+        if (!isPostRows && ['txt', 'pdf'].includes(outputFormat.value)) outputFormat.value = 'csv';
         xlsxPhotoOptions.classList.toggle(
             'hidden',
             !isPostRows || outputFormat.value !== 'xlsx'
         );
         syncXlsxPhotoChoice(mode);
-        outputFormatHint.classList.toggle(
-            'hidden',
-            !isPostRows || outputFormat.value !== 'txt'
-        );
+        outputFormatHint.dataset.i18n = outputFormat.value === 'pdf' ? 'pdfFormatHelp' : 'txtFormatHelp';
+        outputFormatHint.textContent = t(outputFormatHint.dataset.i18n);
+        outputFormatHint.classList.toggle('hidden', !isPostRows || !['txt', 'pdf'].includes(outputFormat.value));
         window.XPorterMotion?.modeChanged(mode);
     }
 
@@ -547,13 +548,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!plan?.multipart) {
             downloadPlanEl.classList.add('hidden');
             downloadPlanEl.textContent = '';
-            if (!downloadInProgress) label.textContent = templateText('downloadRows', { count: formatNumber(plan?.count ?? lastItemCount, currentLang) });
+            if (!downloadInProgress) label.textContent = outputFormat.value === 'pdf' ? t('pdfDownload') : templateText('downloadRows', { count: formatNumber(plan?.count ?? lastItemCount, currentLang) });
             return;
         }
 
         const hint = templateText('multipartDownloadHint', {
             count: formatNumber(plan.partCount, currentLang),
-            format: String(plan.format || outputFormat.value).toUpperCase(),
+            format: (plan.format || outputFormat.value) === 'pdf' ? 'HTML → PDF' : String(plan.format || outputFormat.value).toUpperCase(),
             partSize: formatNumber(plan.partSize, currentLang)
         });
         downloadPlanEl.textContent = plan.format === 'csv'
@@ -561,7 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             : `${hint} ${t('largeExportCsvTip')}`;
         downloadPlanEl.classList.remove('hidden');
         if (!downloadInProgress) {
-            label.textContent = templateText('downloadRows', { count: formatNumber(plan.count ?? lastItemCount, currentLang) });
+            label.textContent = outputFormat.value === 'pdf' ? t('pdfDownload') : templateText('downloadRows', { count: formatNumber(plan.count ?? lastItemCount, currentLang) });
         }
         if (outputFormat.value === 'txt') copyBtn.classList.add('hidden');
     }
@@ -927,6 +928,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Apply Auth Result ====================
     if (!authResult) {
         authWarning.classList.remove('hidden');
+        if (authResult === false) globalThis.XPorterUsage?.track('noSessionViews');
+        else {
+            const notice = authWarning.querySelector('[data-i18n-template="authRequired"]');
+            notice.removeAttribute('data-i18n-template');
+            notice.setAttribute('data-i18n', 'authCheckUnavailable');
+            notice.textContent = t('authCheckUnavailable');
+        }
     }
 
     // ==================== Apply Export Status ====================
@@ -940,6 +948,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (status?.status) {
         updateUI(status);
     } else {
+        globalThis.XPorterUsage?.track('statusReadErrors');
         showToast(formatError(status?.error || 'MESSAGING_ERROR', t), 'error');
     }
     if (bufferedDownloadUpdate) {
@@ -1031,6 +1040,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==================== Start Export ====================
     startBtn.addEventListener('click', async () => {
         if (startBtn.disabled) return;
+        globalThis.XPorterUsage?.track('startClicks');
         const rejectedStart = error => sendMessage({ type:'DIAGNOSTIC_START_REJECTED',
             error, mode:exportMode.value, format:outputFormat.value,
             dateRange:exportMode.value === 'posts' && dateCheck.checked });

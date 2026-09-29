@@ -25,6 +25,7 @@ const SUITES = [
     'scripts/test-tooling-policy.js',
     'scripts/test-storage-concurrency.js',
     'scripts/test-download-transaction.js',
+    'scripts/test-pdf-alt.js',
     'scripts/test-bookmark-context-lifecycle.js',
     'scripts/test-export-persistence.js',
     'scripts/test-api-discovery-cancellation.js',

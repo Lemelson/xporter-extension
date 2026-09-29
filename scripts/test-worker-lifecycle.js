@@ -197,8 +197,8 @@ async function testDateSearch429UsesUserWaitBudget() {
     vm.runInContext(`
         (() => {
             let offset = 0;
-            const realNow = Date.now;
-            Date.now = () => realNow() + offset;
+            const baseNow = Date.now();
+            Date.now = () => baseNow + offset;
             swSleep = async (ms) => { __sleeps.push(ms); offset += ms; };
         })();
         currentExport.settings.aboutAccountMaxRetries = 60;
@@ -803,6 +803,45 @@ async function testPartialPagesCommitBeforeResumableError() {
 }
 
 const tests = [
+    ['real classic storage import cannot bypass optional UI failure isolation', async () => {
+        const harness = createWorkerHarness({ importStorage: true });
+        harness.context.chrome.runtime.getURL = (path = '') => EXTENSION_ROOT + path;
+        harness.context.chrome.storage.local.get = async () => { throw new Error('usage read failed'); };
+        let starts = 0;
+        harness.context.startExport = async () => { starts++; return { success: true }; };
+        const result = await harness.dispatchRuntime({ type: 'START_EXPORT' },
+            { id: 'test-extension', url: EXTENSION_ROOT + 'popup/popup.html' });
+        assert.equal(result.success, true, 'a real importScripts must retain the safe worker boundary');
+        assert.equal(starts, 1, 'optional usage read failure must not prevent the operation');
+    }],
+    ['UI counters separate rejected clicks from accepted exports and enforce the sender boundary', async () => {
+        const harness = createWorkerHarness();
+        harness.context.chrome.runtime.getURL = (path = '') => EXTENSION_ROOT + path;
+        const events = [];
+        harness.context.XPorterStorage.recordUIEvent = async event => { events.push(event); };
+        const sender = { id: 'test-extension', url: EXTENSION_ROOT + 'popup/popup.html' };
+        await harness.dispatchRuntime({ type: 'XP_UI_EVENT', event: 'startClicks' }, sender);
+        assert(events.includes('startClicks'));
+        const before = events.length;
+        assert.equal((await harness.dispatchRuntime({ type: 'XP_UI_EVENT', event: 'startAccepted' }, sender)).error,
+            'INVALID_UI_EVENT', 'client must not certify worker acceptance');
+        assert.equal((await harness.dispatchRuntime({ type: 'XP_UI_EVENT', event: 'startClicks' },
+            { id: 'test-extension', url: 'https://x.com/test' })).error, 'FORBIDDEN');
+        assert.equal(events.length, before);
+        await harness.dispatchRuntime({ type: 'DIAGNOSTIC_START_REJECTED', error: 'INVALID_USERNAME' }, sender);
+        await harness.dispatchRuntime({ type: 'DIAGNOSTIC_START_REJECTED', error: 'STORAGE_FULL' }, sender);
+        assert.equal(events.filter(event => event === 'startInvalid').length, 1,
+            'a settings write failure is not invalid user input');
+        harness.context.startExport = async () => ({ error: 'NOT_LOGGED_IN' });
+        await harness.dispatchRuntime({ type: 'START_EXPORT' }, sender);
+        assert.deepEqual(events.slice(-2), ['startSent', 'startWorkerError']);
+        harness.context.startExport = async () => ({ success: true });
+        await harness.dispatchRuntime({ type: 'START_EXPORT' }, sender);
+        assert.deepEqual(events.slice(-2), ['startSent', 'startAccepted']);
+        harness.context.XPorterStorage.recordUIEvent = async () => { throw new Error('storage unavailable'); };
+        assert.equal((await harness.dispatchRuntime({ type: 'START_EXPORT' }, sender)).success, true,
+            'optional diagnostics must not block a real export');
+    }],
     ['startup survives a storage read failure', async () => {
         const harness = createWorkerHarness();
         const badges = [];

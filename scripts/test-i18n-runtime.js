@@ -25,6 +25,23 @@ test('all locale templates keep the English interpolation variables', () => {
     }
 });
 
+test('cookie read failures stay unknown instead of claiming the user logged out', async () => {
+    for (const [cookie, error, expected] of [[null, null, false], [{ value: 'private' }, null, true],
+        [null, { message: 'read unavailable' }, null]]) {
+        const auth = vm.createContext({ chrome: {
+            runtime: { lastError: error },
+            cookies: { get(_options, callback) { callback(cookie); } }
+        } });
+        vm.runInContext(fs.readFileSync(path.join(root, 'utils/shared.js'), 'utf8'), auth);
+        assert.equal(await auth.checkAuth(), expected);
+    }
+    const auth = vm.createContext({ chrome: {
+        runtime: {}, cookies: { get() { throw new Error('API unavailable'); } }
+    } });
+    vm.runInContext(fs.readFileSync(path.join(root, 'utils/shared.js'), 'utf8'), auth);
+    assert.equal(await auth.checkAuth(), null);
+});
+
 test('extension connection and resume errors use the selected language', () => {
     const keys = {
         TIMEOUT: 'errExtensionTimeout',

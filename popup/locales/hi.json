@@ -20,6 +20,7 @@
   "authLink": "X पर लॉग इन करें",
   "authRequired": "कृपया पहले {link}।",
   "authRequiredRetry": "कृपया पहले {link}, फिर पुनः प्रयास करें।",
+  "authCheckUnavailable": "X में आपका लॉगिन जाँचा नहीं जा सका। XPorter फिर खोलें और दोबारा कोशिश करें।",
   "fieldUsername": "X यूज़रनेम",
   "placeholderUsername": "username",
   "dateRange": "तारीख सीमा",
@@ -330,5 +331,14 @@
   "themeForest": "British green",
   "themeBordeaux": "Bordeaux",
   "themePorcelain": "Rose",
-  "themeIris": "Electric iris"
+  "themeIris": "Electric iris",
+  "formatPdf": "PDF (प्रिंट → PDF के रूप में सहेजें)",
+  "pdfDownload": "प्रिंट करने योग्य HTML डाउनलोड करें",
+  "pdfFormatHelp": "पोस्ट और बुकमार्क की HTML फ़ाइलें डाउनलोड करता है। प्रत्येक फ़ाइल ब्राउज़र में खोलें, प्रिंट चुनें और फिर PDF के रूप में सहेजें। टेक्स्ट, लिंक और चित्रों के विवरण सुरक्षित रहते हैं; चित्र लिंक के रूप में उपलब्ध हैं।",
+  "pdfDownloadStarted": "प्रिंट करने योग्य HTML डाउनलोड हो गया। प्रत्येक फ़ाइल खोलें और प्रिंट → PDF के रूप में सहेजें चुनें।",
+  "pdfPrint": "प्रिंट / PDF के रूप में सहेजें",
+  "pdfPrintHelp": "ब्राउज़र के प्रिंट संवाद में PDF के रूप में सहेजें चुनें। बड़े निर्यात के प्रत्येक भाग को अलग से सहेजें।",
+  "errPdfPostTooLarge": "यह पोस्ट प्रिंट करने योग्य निर्यात के लिए बहुत बड़ी है। पूरा कंटेंट सुरक्षित रखने के लिए TXT या JSON चुनें।",
+  "errFormatUnsupported": "यह फ़ॉर्मैट केवल पोस्ट और बुकमार्क के लिए उपलब्ध है।",
+  "pdfPartial": "ये अब तक एकत्र किए गए रिकॉर्ड हैं। मूल निर्यात अभी पूरा नहीं हुआ है।"
 }
