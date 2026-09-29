@@ -15,6 +15,7 @@ const SUITES = [
     'scripts/test-usage-upload.js',
     'scripts/test-site.cjs',
     'scripts/test-feedback-v2-compat.cjs',
+    'scripts/test-feedback-clarifications.cjs',
     'scripts/check-capture-bundle.js',
     'scripts/test-theme-presets.cjs',
     'scripts/test-static-contracts.js',

@@ -130,3 +130,41 @@ test('oversize single rows fail explicitly without truncation or partial files; 
     await assert.rejects(users.context.XPorterDownloads.downloadCurrent('pdf'),/FORMAT_UNSUPPORTED/);
     assert.equal(users.generated.length,0);
 });
+
+test('archive presentation puts identity before content and preserves localized dates, zero metrics and paragraphs',()=>{
+    const c=serializer();
+    const html=c.XPorterPDF.generate([{...fixture,text:'First paragraph.\n\nSecond paragraph.',created_at:'2026-09-30T12:34:56Z',favorite_count:0}],{}, {mode:'bookmarks',lang:'ru',translations:locale});
+    assert(html.indexOf('class="author"')<html.indexOf('First paragraph.'));
+    assert(html.includes('datetime="2026-09-30T12:34:56.000Z"'));
+    assert(html.includes('<bdi>UTC</bdi>'));
+    assert(html.includes('Посты: 1'), 'the localized label plus count must not reuse an uninflected status suffix');
+    assert(html.includes('<div class="metrics">') || html.includes('<dl class="metrics">'));
+    assert(html.includes('<dd dir="auto">0</dd>'));
+    assert(html.includes('<p dir="auto">First paragraph.</p><p dir="auto">Second paragraph.</p>'));
+    assert(html.includes('counter(page)'));
+    assert(html.includes('@bottom-right{direction:ltr;unicode-bidi:isolate;'), 'page numbering must not reverse in an RTL archive');
+    assert(!html.includes('grid-template-columns'), 'long ALT must be fragmentable, not an unsplittable metadata grid');
+});
+test('long ALT, URL and article paragraphs are complete, isolated and allowed to flow across pages',()=>{
+    const c=serializer();
+    const alt=('وصف الصورة 中文 описание '.repeat(900))+'ALT_END';
+    const url='https://example.org/'+('segment'.repeat(500))+'URL_END';
+    const html=c.XPorterPDF.generate([{id:'1',text:'نص عربي',author_name:'ليلى',author_username:'layla',media_alt_texts:alt,media_urls:url,article_text:'Article one.\n\nArticle two.'}],{}, {mode:'bookmarks',lang:'ar',translations:locale});
+    assert(html.includes(alt));assert(html.includes(url));
+    assert(html.includes('ALT_END'));assert(html.includes('URL_END'));
+    assert(html.includes('class="post"'));
+    assert(html.includes('<bdi class="author-handle">@layla</bdi>'));
+    assert(html.includes('class="detail-block"'));
+    assert(html.includes('.detail-block{break-inside:auto}'));
+    assert(html.includes('<p dir="auto">Article one.</p><p dir="auto">Article two.</p>'));
+});
+
+test('real API tweet types and comma-separated link fields become localized, separately clickable links',()=>{
+    const c=serializer();
+    const ru=JSON.parse(script('popup/locales/ru.json'));
+    const html=c.XPorterPDF.generate([{type:'tweet',text:'Links',urls:'https://example.org/a,b, https://example.org/second?q=x,y',media_urls:'https://pbs.twimg.com/media/a.jpg, https://pbs.twimg.com/media/b.jpg'}],{}, {mode:'bookmarks',lang:'ru',translations:ru});
+    assert(html.includes(ru.postTypeOriginals));
+    for(const url of ['https://example.org/a,b','https://example.org/second?q=x,y','https://pbs.twimg.com/media/a.jpg','https://pbs.twimg.com/media/b.jpg']) {
+        assert(html.includes(`href="${url}"`),url);
+    }
+});

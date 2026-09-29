@@ -51,6 +51,21 @@ try {
         for (let index = 0; index < await reasons.count(); index++) {
             await reasons.nth(index).click();
             await scan(`detail-${index}`);
+            if (await reasons.nth(index).getAttribute('data-reason') === 'r_missing') {
+                await page.locator('[data-subreason="sr_missing_different_format"]').click();
+                await page.locator('#formatBlock:not([hidden])').waitFor();
+                await page.locator('[data-subreason="sr_missing_format_pdf"]').click();
+                await page.locator('[data-subreason="sr_missing_format_html"]').click();
+                assert.equal(await page.locator('#formatOptions [aria-pressed="true"]').count(), 2);
+                await scan('requested-formats', width === 350 && theme === 'dark');
+                // Native button keyboard activation is part of the multiselect contract.
+                await page.locator('[data-subreason="sr_missing_format_json"]').focus();
+                await page.keyboard.press('Space');
+                assert.equal(await page.locator('[data-subreason="sr_missing_format_json"]').getAttribute('aria-pressed'), 'true');
+                await page.locator('[data-subreason="sr_missing_different_format"]').click();
+                assert(await page.locator('#formatBlock').evaluate(el => el.hidden));
+                assert.equal(await page.locator('#formatOptions button').count(), 0);
+            }
         }
         await page.locator('#detail').fill('Local layout preview');
         await page.locator('#submitBtn').click();

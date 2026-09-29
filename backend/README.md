@@ -13,7 +13,7 @@ Legacy `dl` means a download was handed to the browser, not proof of a saved fil
 
 ## New measurements
 
-`schema_version=2` identifies extension semantics, `collector_version=2` identifies the first collector, and `form_version=2` identifies the website. `schema_since` is when new measurement began locally. All `diag_first_*_ms` milestones are first **observed since that time**, not reconstructed lifetime firsts. `diag_historical` flags known older export history. Null is unknown/unobserved; zero is a measured zero. Approximate install dates stay flagged by `inst_approx`.
+`schema_version=2` identifies extension semantics and `collector_version=2` identifies the first collector. `form_version=3` identifies the optional window/download and requested-format clarifications; older website rows retain `form_version=2`. New question choices use the existing `subreasons`, canonical English labels and reason-history fields, without changing exported-format counters. `schema_since` is when new measurement began locally. All `diag_first_*_ms` milestones are first **observed since that time**, not reconstructed lifetime firsts. `diag_historical` flags known older export history. Null is unknown/unobserved; zero is a measured zero. Approximate install dates stay flagged by `inst_approx`.
 
 `diag_attempts` retains up to five recent launch attempts, including early rejections. It records mode, format, settings at launch, resume/date-range flags, version, phase, terminal result/error/completion reason, row count, first-new-item latency, duration, and request/retry/429/timeout/network-error/pause measurements. Settings may change during a run; the stored settings describe launch. Worker restart marks an unfinished attempt interrupted with unknown duration. Requests outside an active export are excluded; counters describe instrumented API/limiter paths, not every browser request.
 
@@ -23,7 +23,7 @@ Legacy `dl` means a download was handed to the browser, not proof of a saved fil
 
 ## Current settings (additive schema-2 fields)
 
-`s_colorful` is the current Colorful appearance choice (the legacy storage key `simplifiedDesign=true` now means colorful). `s_ladybug` records Show ladybug. `s_window_width`, `s_window_height`, `s_element_size` and `s_text_size` are the saved slider percentages, not screen pixels or measured rendered text scale. `s_auto_expire` and `s_auto_expire_hours` retain both the toggle and saved duration, including when disabled.
+`s_colorful` is the legacy `simplifiedDesign` appearance flag; it does not measure use of the colorful theme catalog. Use `theme_preset` for the final selected preset and `ui_theme_changes` for observed committed changes. `s_ladybug` records Show ladybug. `s_window_width`, `s_window_height`, `s_element_size` and `s_text_size` are the saved slider percentages, not screen pixels or measured rendered text scale. `s_auto_expire` and `s_auto_expire_hours` retain both the toggle and saved duration, including when disabled.
 
 `s_mode` and `s_format` describe the current saved selection, independently of the last attempt. `s_originals`, `s_quotes`, `s_bookmark_context`, `s_bookmark_articles`, `s_post_photos`, `s_bookmark_photos`, `s_about`, `s_about_speed`, `s_about_batch` and `s_about_retries` complement existing current export preferences. `f_txt` counts lifetime TXT-selected starts, matching the existing format counters. No change history or custom background colors are sent. Missing or invalid preferences remain unknown; old rows are not backfilled.
 
