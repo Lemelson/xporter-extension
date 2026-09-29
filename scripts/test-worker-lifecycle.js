@@ -670,18 +670,20 @@ async function testRuntimeMessagesEnforceSenderPolicy() {
 
 async function testStopDuringPageCommitKeepsUnprocessedRowsResumable() {
     for (const nextCursor of [null, 'next-page']) {
-        for (const mode of ['date', 'followers']) {
+        for (const mode of ['date', 'followers', 'posts', 'bookmarks']) {
             const rows = [{ id: '1' }, { id: '2' }];
             const harness = mode === 'date'
                 ? createSearchHarness([searchPage(rows, nextCursor)])
                 : createWorkerHarness();
             harness.context.__limiter = passThroughLimiter();
-            if (mode === 'followers') {
+            if (mode !== 'date') {
                 harness.context.XPorterAPI.fetchFollowers = async () => ({ users: rows, nextCursor });
+                harness.context.XPorterAPI.fetchUserTweets = async () => ({ tweets: rows, nextCursor });
+                harness.context.XPorterAPI.fetchBookmarks = async () => ({ tweets: rows, nextCursor });
                 vm.runInContext(`
                     rateLimiter=__limiter;
-                    currentExport={running:true,status:'fetching',exportMode:'followers',username:'test',
-                        userId:'1',userInfo:{id:'1',screenName:'test'},settings:{quantityLimit:500},
+                    currentExport={running:true,status:'fetching',exportMode:'${mode}',username:'test',
+                        userId:'1',userInfo:{id:'1',screenName:'test'},settings:{quantityLimit:500,includeBookmarkReplyContext:false},
                         tweetBuffer:[],tweetCount:0,totalBatches:0,cursor:'current-page',completionReason:null};
                 `, harness.context);
             }
@@ -704,11 +706,98 @@ async function testStopDuringPageCommitKeepsUnprocessedRowsResumable() {
             harness.context.XPorterStorage.saveTweetBatch = saveBatch;
             harness.context.createRateLimiter = () => passThroughLimiter();
             if (mode === 'date') harness.context.__pages = [searchPage(rows)];
-            else harness.context.XPorterAPI.fetchFollowers = async () => ({ users: rows, nextCursor: null });
+            else {
+                harness.context.XPorterAPI.fetchFollowers = async () => ({ users: rows, nextCursor: null });
+                harness.context.XPorterAPI.fetchUserTweets = async () => ({ tweets: rows, nextCursor: null });
+                harness.context.XPorterAPI.fetchBookmarks = async () => ({ tweets: rows, nextCursor: null });
+            }
             await vm.runInContext('_resumeExportInner().then(() => exportLoopPromise)', harness.context);
             assert.equal(harness.getSavedState().status, 'complete', `${mode}: replay completes normally`);
             assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['1', '2'],
                 `${mode}: Resume saves the unread row without duplicating the committed row`);
+        }
+    }
+}
+
+async function testLiveUserQuantityCutsPendingAboutPage() {
+    const harness = createWorkerHarness();
+    const rows = [{ id: '1', username: 'one' }, { id: '2', username: 'two' }, { id: '3', username: 'three' }];
+    harness.context.XPorterAPI.fetchFollowers = async () => ({ users: rows, nextCursor: null });
+    harness.context.XPorterAPI.getAccountAbout = async () => {
+        vm.runInContext('applyLivePacingSettings({quantityLimit:1})', harness.context);
+        return {};
+    };
+    harness.context.__limiter = passThroughLimiter();
+    harness.context.createRateLimiter = () => passThroughLimiter();
+    vm.runInContext(`currentExport={running:true,status:'fetching',exportMode:'followers',username:'test',
+        userId:'1',userInfo:{id:'1',screenName:'test'},settings:{quantityLimit:3,includeAboutAccountDetails:true},
+        tweetBuffer:[],tweetCount:0,totalBatches:0,cursor:'current-page',completionReason:null};rateLimiter=__limiter;`, harness.context);
+    await vm.runInContext('launchExportLoop("test:");exportLoopPromise', harness.context);
+    assert.equal(harness.getSavedState().tweetCount, 1, 'an updated target applies to the pending About page');
+    assert.equal(harness.getSavedState().cursor, 'current-page', 'the cut page must replay on +N Resume');
+    harness.context.XPorterAPI.getAccountAbout = async () => ({});
+    await vm.runInContext('_resumeExportInner(2).then(()=>exportLoopPromise)', harness.context);
+    assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['1', '2', '3']);
+}
+
+async function testResumeDedupReadFailurePreservesRows() {
+    const harness = createWorkerHarness();
+    harness.getSavedBatches().push([{ id:'1' }]);
+    harness.context.XPorterStorage.loadTweetBatch = async () => { throw new Error('STORAGE_READ_FAILED'); };
+    vm.runInContext(`currentExport={running:true,exportMode:'posts',settings:{quantityLimit:2},
+        tweetBuffer:[],tweetCount:1,totalBatches:1,cursor:'current-page'};`, harness.context);
+    await assert.rejects(vm.runInContext('preloadSeenIds(new Set())', harness.context), /STORAGE_READ_FAILED/);
+    assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['1']);
+}
+
+async function testPartialPagesCommitBeforeResumableError() {
+    for (const mode of ['posts', 'bookmarks', 'followers']) {
+        for (const nextCursor of [null, 'next-page']) {
+            const harness = createWorkerHarness();
+            harness.context.__limiter = passThroughLimiter();
+            vm.runInContext(`currentExport={running:true,status:'fetching',exportMode:'${mode}',username:'test',
+                userId:'1',userInfo:{id:'1',screenName:'test'},settings:{quantityLimit:500},
+                tweetBuffer:[],tweetCount:0,totalBatches:0,cursor:'current-page',completionReason:null};rateLimiter=__limiter;`, harness.context);
+            const row = { id:'1', type:'tweet' };
+            harness.context.__page = { tweets:[row], users:[row], nextCursor, partialError:'GRAPHQL_TRANSIENT' };
+            harness.context.XPorterAPI.fetchFollowers = async () => harness.context.__page;
+            const run = mode === 'followers' ? '_fetchUsersLoop()' : '_fetchPostTimelineLoop(async()=>__page,()=>true)';
+            await assert.rejects(vm.runInContext(run, harness.context), /GRAPHQL_TRANSIENT/);
+            assert.deepEqual(harness.getSavedBatches().flat().map(row => row.id), ['1']);
+            assert.equal(vm.runInContext('currentExport.cursor', harness.context), 'current-page');
+            assert.equal(vm.runInContext('currentExport.completionReason', harness.context), null);
+
+            // Exercise the public lifecycle with a partial FIRST page: null is
+            // the replay cursor, not proof that the source already finished.
+            const integration = createWorkerHarness();
+            integration.context.__limiter = passThroughLimiter();
+            integration.context.createRateLimiter = () => passThroughLimiter();
+            const requestCursors = [];
+            let partial = true;
+            const fetchPage = async (_userId, cursor) => {
+                requestCursors.push(cursor);
+                const rows = partial ? [{ id:'1', type:'tweet' }]
+                    : [{ id:'1', type:'tweet' }, { id:'2', type:'tweet' }];
+                return { tweets:rows, users:rows, nextCursor:partial ? nextCursor : null,
+                    ...(partial ? { partialError:'GRAPHQL_TRANSIENT' } : {}) };
+            };
+            integration.context.XPorterAPI.fetchFollowers = fetchPage;
+            integration.context.XPorterAPI.fetchUserTweets = fetchPage;
+            integration.context.XPorterAPI.fetchBookmarks = cursor => fetchPage(null, cursor);
+            vm.runInContext(`currentExport={running:true,status:'fetching',exportMode:'${mode}',username:'test',
+                userId:'1',userInfo:{id:'1',screenName:'test'},settings:{quantityLimit:500,includeBookmarkReplyContext:false},
+                tweetBuffer:[],tweetCount:0,totalBatches:0,cursor:null,completionReason:null};rateLimiter=__limiter;`, integration.context);
+            await vm.runInContext('launchExportLoop("test:");exportLoopPromise', integration.context);
+            assert.equal(integration.getSavedState().status, 'error', 'partial first page persists as an error');
+            assert.equal(integration.getSavedState().error, 'GRAPHQL_TRANSIENT');
+            assert.equal(integration.getSavedState().cursor, null, 'first page remains replayable');
+            assert.equal(integration.getSavedState().completionReason, null);
+            partial = false;
+            await vm.runInContext('_resumeExportInner().then(()=>exportLoopPromise)', integration.context);
+            assert.equal(integration.getSavedState().status, 'complete');
+            assert.deepEqual(requestCursors, [null, null], 'Resume replays the first request');
+            assert.deepEqual(integration.getSavedBatches().flat().map(row => row.id), ['1','2'],
+                'Resume preserves accepted rows and appends missing rows without duplication');
         }
     }
 }
@@ -729,6 +818,9 @@ const tests = [
         assert.deepEqual(badges, [], 'unreadable state is not an empty state');
         assert(warnings.some(line => line.includes('STORAGE_READ_FAILED')));
     }],
+    ['live quantity cuts pending About page', testLiveUserQuantityCutsPendingAboutPage],
+    ['resume dedup reads are required', testResumeDedupReadFailurePreservesRows],
+    ['partial pages commit before resumable error', testPartialPagesCommitBeforeResumableError],
     ['Stop during page commit preserves unread rows', testStopDuringPageCommitKeepsUnprocessedRowsResumable],
     ['replies-only selection never offers posts-only fallback', testRepliesOnlySelectionNeverOffersPostsOnlyFallback],
     ['bookmark reply context runs outside the primary limiter', testBookmarkReplyContextRunsOutsidePrimaryLimiter],

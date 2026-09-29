@@ -1031,6 +1031,7 @@ body.light .progress-fill.stopped {
   to { background-position: 31px 0; }
 }
 
+
 /* Glass footer */
 .footer {
   margin-block-start: auto;
@@ -2046,8 +2047,8 @@ body.light .post-choice:hover {
   content: "";
   inline-size: 8px;
   block-size: 4px;
-  border-inline-start: 2px solid #08223a;
-  border-block-end: 2px solid #08223a;
+  border-left: 2px solid #08223a;
+  border-bottom: 2px solid #08223a;
   transform: translateY(-1px) rotate(-45deg);
 }
 
@@ -2180,8 +2181,8 @@ body.light .post-type-icon--article {
   content: "";
   inline-size: 8px;
   block-size: 4px;
-  border-inline-start: 2px solid #08223a;
-  border-block-end: 2px solid #08223a;
+  border-left: 2px solid #08223a;
+  border-bottom: 2px solid #08223a;
   transform: translateY(-1px) rotate(-45deg);
 }
 
@@ -3888,6 +3889,20 @@ html {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* Success and error toasts lead with a small status glyph. */
+.toast:has(.toast-icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: start;
+}
+.toast-icon { display: flex; flex: 0 0 auto; }
+.toast-icon svg { width: 18px; height: 18px; }
+
+/* A download in progress stays legible; it is busy, not unavailable. */
+#downloadBtn.is-busy:disabled { opacity: 0.85; cursor: progress; }
 
 /* Solid, high-contrast status toasts (the translucent versions blended into
    the popup background and were hard to read). */

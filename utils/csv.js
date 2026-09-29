@@ -262,7 +262,7 @@ function generatePostsText(items, profile = {}, opts = {}) {
 }
 
 function selectedPostTypeLabels(settings = {}) {
-    if (settings.postSelectionVersion !== 1) return [];
+    if (settings?.postSelectionVersion !== 1) return [];
     const labels = [];
     if (settings.includeOriginalPosts === true) labels.push('Original posts');
     if (settings.includeQuotes === true) labels.push('Quotes');

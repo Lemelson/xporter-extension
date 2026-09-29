@@ -11,6 +11,7 @@
         try {
             const items = await chrome.downloads.search({ id });
             if (items[0]) await observe(items[0]);
+            else await diagnostics()?.record('download_missing', { downloadId: id });
         } catch (_) { /* retry on next worker start; no invented success */ }
     }
     async function track(id, transaction, bytes) {

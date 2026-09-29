@@ -71,12 +71,32 @@
   .theme-card:hover:not(:disabled) { transform: translateY(-2px); }
   .theme-card:active:not(:disabled) { transform: scale(0.97); transition-duration: 60ms; }
 
-  /* Toasts arrive with a slight lift and leave quickly. */
-  .toast {
-    transform: translateY(12px) scale(0.96);
-    transition: opacity 0.2s ease, transform 0.36s cubic-bezier(0.34, 1.35, 0.64, 1);
+  /* Toast entry, exit and stacking are driven by motion.js. */
+  .toast { transition: none; }
+
+  /* Press wave (motion.js) stays inside the button. */
+  .export-status .btn, #startBtn { position: relative; overflow: hidden; }
+  .xp-ripple {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    background: currentColor; opacity: 0;
   }
-  .toast.toast-show { transform: none; }
+
+  /* While a file is prepared: light sweeps the button and the status dot
+     breathes (compositor-only; an SVG bob would run on the main thread). */
+  #downloadBtn.is-busy { position: relative; overflow: hidden; }
+  #downloadBtn.is-busy::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 25%, color-mix(in srgb, currentColor 16%, transparent) 50%, transparent 75%);
+    animation: xpSweep 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .export-status.is-downloading .status-dot { animation: dotPulse 1.1s ease-in-out infinite; }
+  .xp-ping { animation: xpPing 0.7s ease-out; }
+
+  /* Completion glint across the progress bar (motion.js). */
+  .xp-glint {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  }
 
   /* A rejected account field shakes once, like a head shake. */
   .account-card--editable.is-invalid { animation: xpShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
@@ -125,4 +145,73 @@
   20%, 80% { transform: translateX(3px); }
   30%, 50%, 70% { transform: translateX(-5px); }
   40%, 60% { transform: translateX(5px); }
+}
+
+@keyframes xpSweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes xpPing {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  to { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+/* Hover cues: each icon answers the pointer with a gesture of its own.
+   Pointer devices only; keyboard focus and touch stay still. */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  .post-type-icon svg,
+  .xlsx-photo-icon svg,
+  .detail-icon svg,
+  .contact-tg-logo svg,
+  .about-rate-cta svg,
+  a.email-action svg,
+  #githubLink svg,
+  #themeToggle svg,
+  #themeSettingsIcon svg,
+  .history-toggle-left > svg,
+  .tab > svg {
+    transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .post-type-choice:hover .post-type-icon svg { transform: translateY(-1px) scale(1.14); }
+  .post-type-choice:hover [data-post-type-icon="original"] svg { transform: scale(1.12) rotate(-14deg); }
+  .post-type-choice:hover [data-post-type-icon="quote"] svg { transform: translateY(-2px) scale(1.14); }
+  .post-type-choice:hover [data-post-type-icon="reply"] svg { transform: translateX(-2px) scale(1.12); }
+  [dir="rtl"] .post-type-choice:hover [data-post-type-icon="reply"] svg { transform: translateX(2px) scale(1.12); }
+  .post-type-choice:hover [data-post-type-icon="repost"] svg { transform: rotate(180deg) scale(1.08); transition-duration: 0.6s; }
+  .post-type-choice:hover [data-post-type-icon="article"] svg { transform: translateY(-2px) rotate(-6deg) scale(1.1); }
+  .xlsx-photo-choice:hover [data-xlsx-photo-icon="links"] svg { transform: rotate(-22deg) scale(1.12); }
+  .xlsx-photo-choice:hover [data-xlsx-photo-icon="embed"] svg { transform: translateY(-1px) rotate(5deg) scale(1.14); }
+
+  .date-help { transition: scale 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .date-help:hover { scale: 1.2; }
+
+  .tab:not(.active):hover > svg { transform: translateY(-2px); }
+  #githubLink:hover svg { transform: rotate(-10deg) scale(1.1); }
+  #themeToggle:hover svg,
+  .theme-settings-button:hover #themeSettingsIcon svg { transform: rotate(-16deg) scale(1.06); }
+  .history-toggle:hover .history-toggle-left > svg { transform: scale(1.14); }
+
+  .detail-head:hover .detail-icon svg { transform: scale(1.14) rotate(-8deg); }
+  .contact-btn--telegram:hover .contact-tg-logo svg { transform: rotate(-12deg) scale(1.06); }
+  .about-rate-cta:hover svg,
+  a.email-action:hover svg { transform: translate(2px, -2px); }
+
+  /* The editable handle invites a pencil stroke. */
+  .account-edit-icon svg { transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .account-card--editable:hover .account-edit-icon svg { transform: rotate(-18deg) translateY(-1px); }
+
+  /* Export history: the entry lifts, its actions arrive and answer. */
+  .history-card { transition: border-color 0.2s, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+  .history-card:hover { transform: translateY(-1px); }
+  .history-del-btn {
+    scale: 0.7;
+    transition: color 0.2s, background 0.2s, opacity 0.2s, scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .history-card:hover .history-del-btn,
+  .history-card:focus-within .history-del-btn { scale: 1; }
+  .history-dl-btn svg,
+  .history-del-btn svg { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .history-dl-btn:hover svg { transform: translateY(2px); }
+  .history-del-btn:hover svg { transform: rotate(90deg); }
 }

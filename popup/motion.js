@@ -13,6 +13,7 @@
     const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)';
     const EASE_SPRING = 'cubic-bezier(0.34, 1.35, 0.64, 1)';
     const EASE_EXIT = 'cubic-bezier(0.4, 0, 1, 1)';
+    const EASE_POP = 'cubic-bezier(0.2, 1.4, 0.4, 1)';
 
     // Programmatic changes during initial rendering must not replay as motion.
     let armed = false;
@@ -252,7 +253,7 @@
     };
 
     const WATCHED = [
-        ['#downloadBtn, #copyBtn, #newExportBtn, #targetAccountAvatar, #bookmarksAccountAvatar', 'pop'],
+        ['#downloadBtn, #copyBtn, #newExportBtn, #stopBtn, #targetAccountAvatar, #bookmarksAccountAvatar', 'pop'],
         ['#dateFields, #xlsxPhotoOptions, #accountContextNotice, #exportStatus, #postSelectionError,' +
             '#usernameError, #outputFormatHint, #downloadPlan, #resumeRow, #repliesFallbackActions,' +
             '#customQuantityRow, #customSpeedRows, #userCustomSpeedRows, #postSafetyBreakRows,' +
@@ -356,7 +357,19 @@
         summary.addEventListener('click', event => {
             if (!allowed()) return;
             event.preventDefault();
-            if (closing) return;
+            if (closing) {
+                // A second click while folding: the latest intent wins, and
+                // the body grows back from wherever it is.
+                closing = false;
+                details.classList.remove('is-closing');
+                const from = getComputedStyle(body);
+                const height = from.height, opacity = from.opacity;
+                releaseExit(body);
+                clipDuring(body, tagged(play(body, [{ height }, { height: getComputedStyle(body).height }],
+                    { duration: 260 })));
+                tagged(play(body, [{ opacity }, { opacity: 1 }], { duration: 200 }));
+                return;
+            }
             if (!details.open) {
                 details.open = true;
                 expand(body, 300);
@@ -454,6 +467,10 @@
         mountStatusTitle();
         mountActionIcons();
         mountHistoryCascade();
+        mountTextSwap(document.getElementById('statusMessage'));
+        mountTextSwap(document.querySelector('#downloadBtn [data-i18n="download"]'));
+        mountStatusDot();
+        mountRipples();
     }
 
     // A new status title (searching → exporting → done) replaces the old one
@@ -479,21 +496,234 @@
                 { opacity: 1, transform: 'none' }
             ], { duration: 460, easing: EASE_SPRING });
             const strokes = [...icon.querySelectorAll('path, circle, polyline')];
-            const tick = strokes[strokes.length - 1];
-            if (strokes.length > 1 && typeof tick?.getTotalLength === 'function') {
-                const length = tick.getTotalLength();
-                tick.style.strokeDasharray = String(length);
-                const draw = play(tick, [{ strokeDashoffset: length }, { strokeDashoffset: 0 }],
-                    { duration: 360, delay: 180, fill: 'backwards', easing: 'ease-out' });
-                const clear = () => tick.style.removeProperty('stroke-dasharray');
-                if (draw) {
-                    draw.addEventListener('finish', clear);
-                    draw.addEventListener('cancel', clear);
-                } else {
-                    clear();
-                }
+            if (strokes.length > 1) drawStroke(strokes[strokes.length - 1], { delay: 180 });
+            const card = document.getElementById('exportStatus');
+            if (card && !card.classList.contains('is-running') && !card.classList.contains('phase-stopped')) {
+                glint(card.querySelector('.progress-bar'));
             }
         }).observe(title, { childList: true, characterData: true, subtree: true });
+    }
+
+    // Draws an SVG stroke from its start, as if written once.
+    function drawStroke(path, { delay = 0, duration = 360 } = {}) {
+        if (typeof path?.getTotalLength !== 'function') return;
+        const length = path.getTotalLength();
+        path.style.strokeDasharray = String(length);
+        const draw = play(path, [{ strokeDashoffset: length }, { strokeDashoffset: 0 }],
+            { duration, delay, fill: 'backwards', easing: 'ease-out' });
+        const clear = () => path.style.removeProperty('stroke-dasharray');
+        if (draw) {
+            draw.addEventListener('finish', clear);
+            draw.addEventListener('cancel', clear);
+        } else {
+            clear();
+        }
+    }
+
+    // One pass of light across a finished progress bar.
+    function glint(bar) {
+        if (!bar || bar.offsetParent === null || !allowed()) return;
+        const light = document.createElement('span');
+        light.className = 'xp-glint';
+        light.setAttribute('aria-hidden', 'true');
+        bar.append(light);
+        const animation = play(light, [{ transform: 'translateX(-120%)' }, { transform: 'translateX(320%)' }],
+            { duration: 900, delay: 120, easing: 'cubic-bezier(0.45, 0, 0.2, 1)', fill: 'backwards' });
+        if (animation) animation.addEventListener('finish', () => light.remove());
+        else light.remove();
+    }
+
+    // Short status lines (and the Download label) replace their text with a
+    // rise. Counting updates (countdowns, part numbers) never replay it.
+    function mountTextSwap(element) {
+        if (!element) return;
+        const shape = text => text.replace(/[\d\s.,:/\u2026]+/g, '#');
+        let previous = element.textContent;
+        new MutationObserver(() => {
+            const text = element.textContent;
+            if (text === previous) return;
+            const counting = shape(text) === shape(previous);
+            previous = text;
+            if (!armed || counting || element.offsetParent === null) return;
+            cancelOwn(element);
+            tagged(play(element, [
+                { opacity: 0, transform: 'translateY(6px)' },
+                { opacity: 1, transform: 'none' }
+            ], { duration: 320 }));
+        }).observe(element, { childList: true, characterData: true, subtree: true });
+    }
+
+    // The status dot answers a change of state (not every re-render).
+    function mountStatusDot() {
+        const dot = document.getElementById('statusIndicator');
+        if (!dot) return;
+        const colorOf = () => /status-([\w-]+)/.exec(dot.className)?.[1] || '';
+        let previous = colorOf();
+        new MutationObserver(() => {
+            const color = colorOf();
+            if (color === previous) return;
+            previous = color;
+            if (!armed || dot.offsetParent === null) return;
+            play(dot, [
+                { transform: 'scale(0.2)' },
+                { transform: 'scale(1.45)', offset: 0.55 },
+                { transform: 'scale(1)' }
+            ], { duration: 460, easing: 'ease-out' });
+        }).observe(dot, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // ==================== Download ====================
+    // After the browser accepts the file, the arrow turns into a check for a
+    // moment and the button pings once.
+    function downloadDone(button) {
+        if (!button || !armed || !allowed()) return;
+        const icon = button.querySelector('svg:not(.xp-done-check)');
+        if (!icon || button.querySelector('.xp-done-check')) return;
+        const check = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        check.setAttribute('class', 'xp-done-check');
+        check.setAttribute('viewBox', '0 0 24 24');
+        check.setAttribute('aria-hidden', 'true');
+        check.innerHTML = '<path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+        icon.style.display = 'none';
+        icon.after(check);
+        play(check, [{ transform: 'scale(0.5)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+            { duration: 380, easing: EASE_POP });
+        drawStroke(check.firstChild, { delay: 60, duration: 320 });
+        button.classList.remove('xp-ping');
+        void button.offsetWidth;
+        button.classList.add('xp-ping');
+        button.addEventListener('animationend', () => button.classList.remove('xp-ping'), { once: true });
+        const restore = () => {
+            if (!check.isConnected) return;
+            check.remove();
+            icon.style.removeProperty('display');
+            play(icon, [{ transform: 'translateY(-7px)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+                { duration: 300, easing: EASE_OUT });
+        };
+        setTimeout(() => {
+            const out = play(check, [{ transform: 'none', opacity: 1 }, { transform: 'scale(0.6)', opacity: 0 }],
+                { duration: 160, easing: EASE_EXIT, fill: 'forwards' });
+            if (out) out.addEventListener('finish', restore);
+            else restore();
+        }, 1400);
+        // A new download never shows a stale check.
+        new MutationObserver((_, watcher) => {
+            if (!button.classList.contains('is-busy')) return;
+            watcher.disconnect();
+            restore();
+        }).observe(button, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // A soft wave from the point of contact on primary and status actions.
+    function mountRipples() {
+        document.addEventListener('pointerdown', event => {
+            const button = event.target.closest?.('.export-status .btn, #startBtn');
+            if (!button || button.disabled || !allowed() || event.button !== 0) return;
+            const rect = button.getBoundingClientRect();
+            const zoom = button.offsetWidth ? rect.width / button.offsetWidth : 1;
+            const x = (event.clientX - rect.left) / zoom, y = (event.clientY - rect.top) / zoom;
+            const size = Math.hypot(Math.max(x, button.offsetWidth - x), Math.max(y, button.offsetHeight - y)) * 2;
+            const ripple = document.createElement('span');
+            ripple.className = 'xp-ripple';
+            ripple.setAttribute('aria-hidden', 'true');
+            ripple.style.cssText = `width:${size}px;height:${size}px;left:${x - size / 2}px;top:${y - size / 2}px`;
+            button.append(ripple);
+            const wave = play(ripple, [
+                { transform: 'scale(0)', opacity: 0.28 },
+                { transform: 'scale(1)', opacity: 0 }
+            ], { duration: 620, easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)' });
+            if (wave) wave.addEventListener('finish', () => ripple.remove());
+            else ripple.remove();
+        });
+    }
+
+    // ==================== Toasts ====================
+    // Entering toasts rise with a small overshoot while earlier ones glide to
+    // make room; the icon draws (success) or gives one shake (error).
+    function slideFrom(elements, tops) {
+        elements.forEach((element, index) => {
+            const rect = element.getBoundingClientRect();
+            const zoom = element.offsetHeight ? rect.height / element.offsetHeight : 1;
+            const dy = (tops[index] - rect.top) / zoom;
+            if (Math.abs(dy) < 0.5) return;
+            play(element, [{ transform: `translateY(${dy}px)` }, { transform: 'none' }],
+                { duration: 380, composite: 'add' });
+        });
+    }
+    function toastEnter(container, toast) {
+        const earlier = [...container.children];
+        const tops = allowed() ? earlier.map(element => element.getBoundingClientRect().top) : null;
+        container.appendChild(toast);
+        if (!tops) return;
+        slideFrom(earlier, tops);
+        play(toast, [
+            { opacity: 0, transform: 'translateY(18px) scale(0.9)' },
+            { opacity: 1, transform: 'none' }
+        ], { duration: 520, easing: EASE_POP });
+        const icon = toast.querySelector('.toast-icon svg');
+        if (!icon) return;
+        play(icon, [
+            { opacity: 0, transform: 'scale(0.3) rotate(-40deg)' },
+            { opacity: 1, transform: 'none' }
+        ], { duration: 440, delay: 110, fill: 'backwards', easing: EASE_POP });
+        if (toast.classList.contains('toast-success')) {
+            drawStroke(icon.querySelector('path'), { delay: 260, duration: 340 });
+        } else if (toast.classList.contains('toast-error')) {
+            play(icon, [
+                { transform: 'rotate(0deg)' }, { transform: 'rotate(-16deg)', offset: 0.2 },
+                { transform: 'rotate(13deg)', offset: 0.45 }, { transform: 'rotate(-8deg)', offset: 0.7 },
+                { transform: 'rotate(0deg)' }
+            ], { duration: 460, delay: 560, easing: 'ease-in-out' });
+        }
+    }
+    function toastLeave(toast) {
+        if (!allowed()) {
+            toast.classList.remove('toast-show');
+            setTimeout(() => toast.remove(), 250);
+            return;
+        }
+        const out = play(toast, [
+            { opacity: 1, transform: 'none' },
+            { opacity: 0, transform: 'translateY(10px) scale(0.94)' }
+        ], { duration: 220, easing: EASE_EXIT, fill: 'forwards' });
+        const remove = () => {
+            const container = toast.parentElement;
+            const rest = container ? [...container.children].filter(element => element !== toast) : [];
+            const tops = rest.map(element => element.getBoundingClientRect().top);
+            toast.remove();
+            slideFrom(rest, tops);
+        };
+        if (out) out.addEventListener('finish', remove);
+        else remove();
+    }
+
+    // ==================== Help ====================
+    // Help grows out of its trigger, from above or below, and fades back.
+    function helpShown(tooltip) {
+        if (!allowed()) return;
+        const reopening = tooltip.classList.contains('motion-leaving');
+        const opacity = reopening ? getComputedStyle(tooltip).opacity : 0;
+        releaseExit(tooltip);
+        const below = tooltip.style.getPropertyValue('--help-placement') !== 'above';
+        tooltip.style.transformOrigin = `var(--help-origin-x, 50%) ${below ? 'top' : 'bottom'}`;
+        tagged(play(tooltip, [
+            { opacity, transform: `translateY(${below ? -8 : 8}px) scale(0.92)` },
+            { opacity: 1, transform: 'none' }
+        ], { duration: 280, easing: 'cubic-bezier(0.2, 1.2, 0.4, 1)' }));
+    }
+    function helpHidden(tooltip, hide) {
+        if (!allowed()) {
+            hide();
+            return;
+        }
+        cancelOwn(tooltip);
+        holdVisible(tooltip, 'block');
+        const below = tooltip.style.getPropertyValue('--help-placement') !== 'above';
+        const out = tagged(play(tooltip, [
+            { opacity: 1, transform: 'none' },
+            { opacity: 0, transform: `translateY(${below ? -4 : 4}px) scale(0.97)` }
+        ], { duration: 150, easing: EASE_EXIT, fill: 'forwards' }));
+        finishExit(tooltip, out, hide);
     }
 
     // Each action's own glyph acknowledges the press in the direction of what
@@ -561,6 +791,7 @@
     setTimeout(arm, 3000);
 
     root.XPorterMotion = Object.freeze({
-        tabChanged, modeChanged, disclosureChanged, closeDialog, viewTransition, withFinalLayout
+        tabChanged, modeChanged, disclosureChanged, closeDialog, viewTransition, withFinalLayout,
+        helpShown, helpHidden, toastEnter, toastLeave, downloadDone
     });
 })(globalThis);

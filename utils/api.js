@@ -14,8 +14,10 @@ let activeBearerToken = DEFAULT_BEARER_TOKEN;
 // real timeout in retry/error handling.
 const activeRequests = new Map();
 const responseRequests = new WeakMap();
+let requestCancellationEpoch = 0;
 
 function abortActiveRequests() {
+  requestCancellationEpoch++;
   for (const [controller, request] of activeRequests) {
     request.aborted = true;
     controller.abort();
@@ -512,10 +514,12 @@ function getRateLimit(endpointKey) {
  * Falls back to hardcoded values if discovery fails.
  */
 async function discoverEndpoints(forceRefresh = false, requiredOperation = null) {
+  const cancellationEpoch = requestCancellationEpoch;
   // Try the persisted cache first when memory was wiped by a worker restart.
   if (!forceRefresh && !discoveredEndpoints) {
     await _hydrateEndpoints();
   }
+  if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
 
   // Return cached if still valid (unless explicitly forcing a refresh). An
   // operation recently proven absent from the bundles is satisfied by its
@@ -545,6 +549,7 @@ async function discoverEndpoints(forceRefresh = false, requiredOperation = null)
     }
     return await _discoveryInFlight;
   } catch (error) {
+    if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
     // A newer pass committed while this one was failing: keep its result.
     if (_endpointsCommitSeq !== commitSeqAtStart && discoveredEndpoints) {
       return discoveredEndpoints;
@@ -789,7 +794,9 @@ async function getAuthTokens() {
 // ==================== GraphQL Request ====================
 
 async function graphqlRequest(endpoint, variables, features, fieldToggles) {
+  const cancellationEpoch = requestCancellationEpoch;
   const auth = await getAuthTokens();
+  if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
   const nativeTemplate = endpoint.nativeTemplate || null;
   const effectiveFeatures = nativeTemplate ? nativeTemplate.features : features;
   // A native template keeps X's own field toggles, but content XPorter
@@ -824,6 +831,7 @@ async function graphqlRequest(endpoint, variables, features, fieldToggles) {
     url += `&fieldToggles=${encodeURIComponent(JSON.stringify(effectiveFieldToggles))}`;
   }
 
+  if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
   const response = await fetchWithBearerFallback(url, (bearerToken) => ({
     method: 'GET',
     headers: {
@@ -897,6 +905,16 @@ function rejectEmptyGraphqlResults(jsonData, items) {
   }
 }
 
+// A nonempty partial page must reach storage before its failure is surfaced.
+// Keep the cursor as evidence, but callers must replay this request cursor
+// rather than advancing past rows X failed to return.
+function markPartialPage(jsonData, page) {
+  if (hasGraphqlErrors(jsonData)) {
+    page.partialError = classifyGraphqlErrors(jsonData.errors).code;
+  }
+  return page;
+}
+
 const GRAPHQL_AUTH_ERROR_CODES = new Set([32, 64, 239, 326, 353]);
 const GRAPHQL_STALE_MESSAGE =
   /GRAPHQL_VALIDATION_FAILED|Query: Unspecified|PersistedQueryNotFound|Cannot query field|Unknown (?:argument|field|feature|type)|features cannot be null|must be defined|Variable ["'$]?\w+["']? (?:of required type|got invalid)/i;
@@ -960,13 +978,18 @@ function missingStructureError(jsonData) {
  * Forces endpoint re-discovery on stale IDs, eliminating duplicated retry logic.
  */
 async function withStaleRetry(endpointKey, makeRequest) {
+  const cancellationEpoch = requestCancellationEpoch;
   const triedIds = new Set();
   let transactionRefreshUsed = false;
+  const assertNotCancelled = () => {
+    if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
+  };
 
   // A rotated X transaction challenge looks exactly like a stale query ID.
   // For the signed Replies operation, refresh that context once and retry the
   // SAME candidate before discarding a proven template or cycling query IDs.
   const requestCandidate = async (endpoint) => {
+    assertNotCancelled();
     try {
       return await makeRequest(endpoint);
     } catch (error) {
@@ -981,6 +1004,7 @@ async function withStaleRetry(endpointKey, makeRequest) {
       transactionRefreshUsed = true;
       XPorterTransactionId.invalidate();
       XLog.warn(`Refreshing X transaction challenge for ${endpointKey}...`);
+      assertNotCancelled();
       return await makeRequest(endpoint);
     }
   };
@@ -988,6 +1012,7 @@ async function withStaleRetry(endpointKey, makeRequest) {
   // Attempt 0: a template from a successful native request keeps queryId,
   // features, and fieldToggles from the same X client generation.
   const nativeTemplate = await _getLiveRequestTemplate(endpointKey);
+  assertNotCancelled();
   if (nativeTemplate) {
     triedIds.add(nativeTemplate.queryId);
     try {
@@ -1021,7 +1046,9 @@ async function withStaleRetry(endpointKey, makeRequest) {
   }
 
   // Attempt 1: use discovered (or cached) endpoint
+  assertNotCancelled();
   const endpoints = await discoverEndpoints(false, endpointKey);
+  assertNotCancelled();
   const discoveredId = endpoints[endpointKey]?.queryId;
   if (discoveredId && !triedIds.has(discoveredId)) {
     triedIds.add(discoveredId);
@@ -1038,7 +1065,9 @@ async function withStaleRetry(endpointKey, makeRequest) {
   }
 
   // Attempt 2: force re-discovery from JS bundles
+  assertNotCancelled();
   const freshEndpoints = await discoverEndpoints(true, endpointKey);
+  assertNotCancelled();
   const freshId = freshEndpoints[endpointKey]?.queryId;
   if (freshId && !triedIds.has(freshId)) {
     triedIds.add(freshId);
@@ -1069,6 +1098,7 @@ async function withStaleRetry(endpointKey, makeRequest) {
   // query/template captured from that page can rescue the same first export
   // instead of forcing the user to press Resume after an X deploy.
   const lateNativeTemplate = await _getLiveRequestTemplate(endpointKey);
+  assertNotCancelled();
   if (lateNativeTemplate && !triedIds.has(lateNativeTemplate.queryId)) {
     triedIds.add(lateNativeTemplate.queryId);
     try {
@@ -1200,7 +1230,9 @@ async function fetchFollowing(userId, cursor = null, count = 100) {
 }
 
 async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) {
+  const cancellationEpoch = requestCancellationEpoch;
   const auth = await getAuthTokens();
+  if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
 
   let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${encodeURIComponent(String(userId))}&count=${encodeURIComponent(String(count))}&skip_status=true&include_user_entities=true`;
   if (cursor && cursor !== '0' && cursor !== '-1') {
@@ -1272,7 +1304,7 @@ async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) 
   const nextCursor = (nextCursorStr && nextCursorStr !== '0') ? nextCursorStr : null;
 
   XLog.log(`[REST] Parsed ${users.length} ${endpointKey.toLowerCase()}, nextCursor: ${nextCursor ? 'yes' : 'no'}`);
-  return { users, nextCursor };
+  return markPartialPage(data, { users, nextCursor });
 }
 
 async function fetchVerifiedFollowers(userId, cursor = null, count = 50) {
@@ -1305,7 +1337,7 @@ async function _fetchUserList(endpointKey, userId, cursor, count) {
     if (!Array.isArray(timeline?.instructions)) throw missingStructureError(response);
     const parsed = XPorterApiParsers.parseFollowersResponse(response);
     rejectEmptyGraphqlResults(response, parsed.users);
-    return parsed;
+    return markPartialPage(response, parsed);
   });
 }
 
@@ -1355,7 +1387,7 @@ async function fetchUserTweets(userId, cursor = null, count = 20, profileFeed = 
     }
     const parsed = XPorterApiParsers.parseTimelineResponse(data);
     rejectEmptyGraphqlResults(data, parsed.tweets);
-    return parsed;
+    return markPartialPage(data, parsed);
   });
 }
 
@@ -1381,7 +1413,7 @@ async function fetchBookmarks(cursor = null, count = 20) {
     }
     const parsed = XPorterApiParsers.parseBookmarksResponse(data);
     rejectEmptyGraphqlResults(data, parsed.tweets);
-    return parsed;
+    return markPartialPage(data, parsed);
   });
 }
 

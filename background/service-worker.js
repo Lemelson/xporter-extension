@@ -801,15 +801,16 @@ async function preloadSeenIds(seenIds) {
         }
         return;
     }
-    try {
-        const startBatch = Math.max(0, currentExport.totalBatches - 3);
-        for (let i = startBatch; i < currentExport.totalBatches; i++) {
-            const batch = await XPorterStorage.loadTweetBatch(i);
-            for (const item of batch) {
-                if (item?.id) seenIds.add(item.id);
-            }
+    // Resume can deliberately replay a partly consumed page. Unreadable
+    // saved IDs must stop that replay, or duplicates consume its quantity
+    // budget and hide the remaining rows.
+    const startBatch = Math.max(0, currentExport.totalBatches - 3);
+    for (let i = startBatch; i < currentExport.totalBatches; i++) {
+        const batch = await XPorterStorage.loadTweetBatch(i);
+        for (const item of batch) {
+            if (item?.id) seenIds.add(item.id);
         }
-    } catch (_) { /* best-effort dedup */ }
+    }
 }
 
 // Cursor pagination can overlap around page boundaries, but retaining every ID
@@ -1107,6 +1108,7 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0,
         const countBeforePage = currentExport.tweetCount;
 
         for (const tweet of (result.tweets || [])) {
+            if (!currentExport.running) break;
             if (!acceptTweet(tweet)) continue;
 
             if (!recentIds.add(tweet.id)) continue;
@@ -1140,6 +1142,13 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0,
             if (!hasMore) break;
         }
 
+        // Stop may arrive during an awaited batch write. Its unread page
+        // remainder must stay behind the request cursor for Resume.
+        if (!currentExport.running) {
+            await flushExportBuffer();
+            break;
+        }
+
         const limitReachedThisPage = quantityLimitReached();
         if (limitReachedThisPage) hasMore = false;
 
@@ -1154,6 +1163,10 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0,
         // Commit rows before mutating the cursor or completion reason.
         // On a failed write the error handler must persist the current page.
         await flushExportBuffer();
+        // A partial GraphQL page contains usable rows but cannot certify its
+        // cursor or terminal boundary. Keep these rows and replay this page
+        // after the user resumes the classified failure.
+        if (result.partialError) throw new Error(result.partialError);
         if (limitReachedThisPage) currentExport.completionReason = 'limit_reached';
 
         // Update cursor
@@ -1935,6 +1948,10 @@ async function _fetchUsersLoop() {
         // Commit rows before mutating the cursor or completion reason.
         // On a failed write the error handler must persist the current page.
         await flushExportBuffer();
+        // A partial GraphQL page contains usable rows but cannot certify its
+        // cursor or terminal boundary. Keep these rows and replay this page
+        // after the user resumes the classified failure.
+        if (result.partialError) throw new Error(result.partialError);
         if (limitReachedThisPage) currentExport.completionReason = 'limit_reached';
 
         // Update cursor
@@ -1980,7 +1997,7 @@ async function _fetchUsersLoop() {
 
 async function appendUsersToExport(users) {
     for (const user of users) {
-        if (!currentExport.running) break;
+        if (!currentExport.running || quantityLimitReached()) break;
         currentExport.tweetBuffer.push(user);
         currentExport.tweetCount++;
         recordFirstItemOnce();
@@ -2008,7 +2025,7 @@ function aboutDetailsForUser(about = {}) {
 
 async function enrichUsersWithAboutDetails(users, onBatch = null) {
     for (let start = 0; start < users.length;) {
-        if (!currentExport.running) break;
+        if (!currentExport.running || quantityLimitReached()) break;
         const batchSize = resolveAboutAccountBatchSize(currentExport.settings);
         const batch = users.slice(start, start + batchSize);
         let batchResults;

@@ -95,6 +95,8 @@ try {
             if (theme === 'dark' && !process.env.XPORTER_COPY_FAST) await scanHelp();
             await page.locator('#historyToggle').click();
             await page.locator('#feedDbToggle').click();
+            // Text is judged once both disclosures have finished opening.
+            await page.waitForFunction(() => !document.getAnimations().some(a => a.id === 'xp-motion'));
             await scan('history-collection');
             await page.locator('#tabBtnAbout').click();
             await page.locator('.detail-item').evaluateAll(async elements => {

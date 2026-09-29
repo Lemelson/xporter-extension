@@ -176,3 +176,250 @@ test('temporary X failures and storage read failures have localized guidance', (
         'only server-side statuses are described as temporary');
     assert.match(context.formatError('API_ERROR_502'), /temporary/, 'English fallback without a translator');
 });
+
+test('rapid language choices finish in selection order even when an earlier locale is slow', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const functionStart = source.indexOf('    async function selectLanguage(');
+    const queueStart = source.indexOf('    let pendingLanguageChange =');
+    const start = queueStart >= 0 ? queueStart : functionStart;
+    const selection = source.slice(start, source.indexOf('\n    function langOptions(', start));
+    const rendered = [];
+    const persisted = [];
+    let releaseRussian;
+    const russianGate = new Promise(resolve => { releaseRussian = resolve; });
+    const sandbox = vm.createContext({
+        currentLang: 'en', currentSettings: {}, document: { activeElement: {} },
+        langDropdown: { contains: () => false }, closeLangDropdown() {}, window: {},
+        async renderLanguage(code) {
+            if (code === 'ru') await russianGate;
+            rendered.push(code);
+        },
+        async persistSettingsPatch(settings, patch) {
+            persisted.push(patch.language);
+            settings.language = patch.language;
+            return { success: true };
+        }, showToast() {}, formatError() {}, t() {}
+    });
+    vm.runInContext(selection, sandbox);
+    const first = sandbox.selectLanguage('ru');
+    const second = sandbox.selectLanguage('de');
+    await new Promise(resolve => setImmediate(resolve));
+    releaseRussian();
+    await Promise.all([first, second]);
+    assert.deepEqual(rendered, ['ru', 'de']);
+    assert.deepEqual(persisted, ['ru', 'de']);
+    assert.equal(sandbox.currentLang, 'de');
+    assert.equal(sandbox.currentSettings.language, 'de');
+});
+
+test('failed format save restores every format-dependent control', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const listenerStart = source.indexOf("    outputFormat.addEventListener('change',");
+    const revisionStart = source.indexOf('    let outputFormatRevision =');
+    const start = revisionStart >= 0 ? revisionStart : listenerStart;
+    const handler = source.slice(start, source.indexOf('\n    // ==================== Language Selector', start));
+    let onChange;
+    const layouts = [];
+    const sandbox = vm.createContext({
+        outputFormat: { value: 'xlsx', addEventListener(type, callback) { onChange = callback; } },
+        exportMode: { value: 'posts' }, currentSettings: { outputFormat: 'csv' },
+        applyModeUI() { layouts.push(sandbox.outputFormat.value); },
+        async persistSettingsPatch() { return { error: 'STORAGE_FULL' }; },
+        showToast() {}, formatError() {}, t() {}, lastExportState: null
+    });
+    vm.runInContext(handler, sandbox);
+    await onChange();
+    assert.equal(sandbox.outputFormat.value, 'csv');
+    assert.deepEqual(layouts, ['xlsx', 'csv']);
+});
+
+test('download polling recovers a missed completion without releasing request preparation', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const refreshStart = source.indexOf('    async function refreshDownloadPlan(');
+    const refresh = source.slice(refreshStart, source.indexOf('\n    async function applyLanguage(', refreshStart));
+    const intervalStart = source.indexOf('    setInterval(async () => {');
+    const pendingStart = source.indexOf('    let downloadPollPending =');
+    const pollStart = pendingStart >= 0 ? pendingStart : intervalStart;
+    const poll = source.slice(pollStart, source.indexOf('\n    // ==================== Auto-fill', pollStart));
+    let tick;
+    let workerActive = false;
+    const sandbox = vm.createContext({
+        downloadPlanRequest: 0, lastExportState: { status: 'complete', running: false, tweetCount: 3 },
+        lastItemCount: 3, outputFormat: { value: 'csv' }, downloadInProgress: true,
+        downloadRequestPending: false, lastDownloadProgress: { partNumber: 1 }, statusAvailable: true,
+        document: { visibilityState: 'visible' },
+        async sendMessage() { return { count: 3, active: workerActive }; },
+        renderDownloadPlan() {}, updateUI() {},
+        setDownloadBusy(busy) { sandbox.downloadInProgress = busy; },
+        setInterval(callback) { tick = callback; }
+    });
+    vm.runInContext(refresh + poll, sandbox);
+    await tick();
+    assert.equal(sandbox.downloadInProgress, false, 'missed terminal broadcast must not leave Home locked');
+    sandbox.downloadInProgress = true;
+    workerActive = true;
+    await tick();
+    assert.equal(sandbox.downloadInProgress, true, 'active worker download must retain its lock');
+    workerActive = false;
+    sandbox.downloadRequestPending = true;
+    await tick();
+    assert.equal(sandbox.downloadInProgress, true, 'initial request must retain its lock');
+});
+
+test('an older rejected format save cannot revert a newer successful choice', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const listenerStart = source.indexOf("    outputFormat.addEventListener('change',");
+    const revisionStart = source.indexOf('    let outputFormatRevision =');
+    const start = revisionStart >= 0 ? revisionStart : listenerStart;
+    const handler = source.slice(start, source.indexOf('\n    // ==================== Language Selector', start));
+    let onChange;
+    let rejectFirst;
+    const sandbox = vm.createContext({
+        outputFormat: { value: 'xlsx', addEventListener(type, callback) { onChange = callback; } },
+        exportMode: { value: 'posts' }, currentSettings: { outputFormat: 'csv' },
+        applyModeUI() {},
+        persistSettingsPatch(settings, patch) {
+            if (patch.outputFormat === 'xlsx') return new Promise(resolve => { rejectFirst = resolve; });
+            settings.outputFormat = patch.outputFormat;
+            return Promise.resolve({ success: true });
+        }, showToast() {}, formatError() {}, t() {}, lastExportState: null
+    });
+    vm.runInContext(handler, sandbox);
+    const first = onChange();
+    await new Promise(resolve => setImmediate(resolve));
+    sandbox.outputFormat.value = 'json';
+    const second = onChange();
+    rejectFirst({ error: 'STORAGE_FULL' });
+    await Promise.all([first, second]);
+    assert.equal(sandbox.outputFormat.value, 'json');
+    assert.equal(sandbox.currentSettings.outputFormat, 'json');
+});
+
+test('download recovery polling does not starve slow inactive-plan replies', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const refreshStart = source.indexOf('    async function refreshDownloadPlan(');
+    const refresh = source.slice(refreshStart, source.indexOf('\n    async function applyLanguage(', refreshStart));
+    const intervalStart = source.indexOf('    setInterval(async () => {');
+    const pendingStart = source.indexOf('    let downloadPollPending =');
+    const pollStart = pendingStart >= 0 ? pendingStart : intervalStart;
+    const poll = source.slice(pollStart, source.indexOf('\n    // ==================== Auto-fill', pollStart));
+    let tick;
+    const replies = [];
+    const sandbox = vm.createContext({
+        downloadPlanRequest: 0, lastExportState: { status: 'complete', running: false, tweetCount: 3 },
+        lastItemCount: 3, outputFormat: { value: 'csv' }, downloadInProgress: true,
+        downloadRequestPending: false, lastDownloadProgress: {}, statusAvailable: true,
+        document: { visibilityState: 'visible' },
+        sendMessage() { return new Promise(resolve => replies.push(resolve)); },
+        renderDownloadPlan() {}, updateUI() {},
+        setDownloadBusy(busy) { sandbox.downloadInProgress = busy; },
+        setInterval(callback) { tick = callback; }
+    });
+    vm.runInContext(refresh + poll, sandbox);
+    const first = tick();
+    const second = tick();
+    const requests = replies.length;
+    replies.forEach(resolve => resolve({ active: false, count: 3 }));
+    await Promise.all([first, second]);
+    assert.equal(requests, 1, 'a later interval must await the outstanding recovery request');
+    assert.equal(sandbox.downloadInProgress, false);
+});
+
+test('a queued language choice survives the preceding save failure', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const start = source.indexOf('    let pendingLanguageChange =');
+    const selection = source.slice(start, source.indexOf('\n    function langOptions(', start));
+    const rendered = [];
+    let failRussian;
+    const sandbox = vm.createContext({
+        currentLang: 'en', currentSettings: { language: 'en' }, document: { activeElement: {} },
+        langDropdown: { contains: () => false }, closeLangDropdown() {}, window: {},
+        async renderLanguage(code) { rendered.push(code); },
+        persistSettingsPatch(settings, patch) {
+            if (patch.language === 'ru') return new Promise(resolve => { failRussian = resolve; });
+            settings.language = patch.language;
+            return Promise.resolve({ success: true });
+        }, showToast() {}, formatError() {}, t() {}
+    });
+    vm.runInContext(selection, sandbox);
+    const first = sandbox.selectLanguage('ru');
+    const second = sandbox.selectLanguage('de');
+    await new Promise(resolve => setImmediate(resolve));
+    failRussian({ error: 'STORAGE_FULL' });
+    await Promise.all([first, second]);
+    assert.deepEqual(rendered, ['ru', 'en', 'de']);
+    assert.equal(sandbox.currentLang, 'de');
+    assert.equal(sandbox.currentSettings.language, 'de');
+});
+
+test('delayed successful format replies preserve the confirmed cache and later rollback', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const start = source.indexOf('    let outputFormatRevision =');
+    const handler = source.slice(start, source.indexOf('\n    // ==================== Language Selector', start));
+    let onChange;
+    let releaseFirst;
+    const calls = [];
+    const sandbox = vm.createContext({
+        outputFormat: { value: 'xlsx', addEventListener(type, callback) { onChange = callback; } },
+        exportMode: { value: 'posts' }, currentSettings: { outputFormat: 'csv' },
+        applyModeUI() {},
+        async persistSettingsPatch(settings, patch) {
+            calls.push(patch.outputFormat);
+            if (patch.outputFormat === 'xlsx') await new Promise(resolve => { releaseFirst = resolve; });
+            if (patch.outputFormat === 'txt') return { error: 'STORAGE_FULL' };
+            // Match shared.js: cache changes before the caller gets its reply.
+            Object.assign(settings, patch);
+            return { success: true };
+        }, showToast() {}, formatError() {}, t() {}, lastExportState: null
+    });
+    vm.runInContext(handler, sandbox);
+    const first = onChange();
+    await new Promise(resolve => setImmediate(resolve));
+    sandbox.outputFormat.value = 'json';
+    const second = onChange();
+    await new Promise(resolve => setImmediate(resolve));
+    releaseFirst();
+    await Promise.all([first, second]);
+    assert.equal(sandbox.currentSettings.outputFormat, 'json', 'older success must not overwrite the latest cache');
+    assert.equal(sandbox.outputFormat.value, 'json');
+    sandbox.outputFormat.value = 'txt';
+    await onChange();
+    assert.equal(sandbox.outputFormat.value, 'json', 'failed latest choice rolls back to confirmed JSON');
+    assert.deepEqual(calls, ['xlsx', 'json', 'txt']);
+});
+
+test('switching from a pending TXT selection to accounts persists the normalized CSV format', async () => {
+    const source = fs.readFileSync(path.join(root, 'popup/popup.js'), 'utf8');
+    const modeStart = source.indexOf('    function commitModeChange(') >= 0
+        ? source.indexOf('    function commitModeChange(') : source.indexOf('    async function commitModeChange(');
+    const mode = source.slice(modeStart, source.indexOf("    exportMode.addEventListener('change',", modeStart));
+    const formatStart = source.indexOf('    let outputFormatRevision =');
+    const format = source.slice(formatStart, source.indexOf('\n    // ==================== Language Selector', formatStart));
+    let onChange;
+    let releaseText;
+    const persisted = { outputFormat: 'csv', exportMode: 'posts' };
+    const sandbox = vm.createContext({
+        committedMode: 'posts', exportMode: { value: 'posts' },
+        outputFormat: { value: 'txt', addEventListener(type, callback) { onChange = callback; } },
+        currentSettings: { ...persisted }, lastExportState: { status: 'idle' },
+        applyModeUI(mode) { if (mode === 'followers' && sandbox.outputFormat.value === 'txt') sandbox.outputFormat.value = 'csv'; },
+        async persistSettingsPatch(settings, patch) {
+            Object.assign(persisted, patch);
+            if (patch.outputFormat === 'txt') await new Promise(resolve => { releaseText = resolve; });
+            Object.assign(settings, patch);
+            return { success: true };
+        }, showToast() {}, formatError() {}, t() {}, updateUI() {}
+    });
+    vm.runInContext(mode + format, sandbox);
+    const textSave = onChange();
+    await new Promise(resolve => setImmediate(resolve));
+    sandbox.exportMode.value = 'followers';
+    const modeSave = sandbox.commitModeChange('followers');
+    await new Promise(resolve => setImmediate(resolve));
+    releaseText();
+    await Promise.all([textSave, modeSave]);
+    assert.equal(sandbox.outputFormat.value, 'csv');
+    assert.equal(sandbox.currentSettings.outputFormat, 'csv');
+    assert.equal(persisted.outputFormat, 'csv');
+    assert.equal(persisted.exportMode, 'followers');
+});

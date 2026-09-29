@@ -703,6 +703,40 @@ async function testGraphqlErrorsWithoutTimelineAreNotSuccessfulEmptyExports() {
             error.staleCandidatesExhausted !== true,
         'HTTP 200 with GraphQL errors and no timeline must not become a green zero-row export'
     );
+    // Accepted rows must carry the failure even when a bottom cursor exists:
+    // otherwise callers either claim exhaustion or skip the incomplete page.
+    for (const cursor of [null, 'next-page']) {
+        for (const operation of ['UserTweets', 'Bookmarks', 'BlueVerifiedFollowers', 'Following']) {
+            const entries = [{ entryId: 'tweet-12345', content: { itemContent: {
+                tweet_results: { result: { legacy: { id_str: '12345', full_text: 'Accepted row' } } },
+                user_results: { result: { rest_id: '12345', legacy: { screen_name: 'accepted' } } }
+            } } }];
+            if (cursor) entries.push({ entryId: 'cursor-bottom-0', content: {
+                cursorType: 'Bottom', value: cursor
+            } });
+            const timeline = { instructions: [{ type: 'TimelineAddEntries', entries }] };
+            const payload = {
+                errors: [{ code: 88, message: 'Rate limit exceeded' }],
+                data: { user: { result: { timeline_v2: { timeline } } },
+                    bookmark_timeline_v2: { timeline } },
+                users: [{ id_str: '12345', screen_name: 'accepted' }],
+                next_cursor_str: cursor || '0'
+            };
+            const partial = createApiHarness({
+                fetchImpl: async () => new Response(JSON.stringify(payload), { status: 200 })
+            });
+            partial.context.XPorterAPI.setLiveQueryId(operation, 'partial-query-id');
+            const api = partial.context.XPorterAPI;
+            const page = operation === 'UserTweets' ? await api.fetchUserTweets('1')
+                : operation === 'Bookmarks' ? await api.fetchBookmarks()
+                : operation === 'BlueVerifiedFollowers' ? await api.fetchVerifiedFollowers('1')
+                : await api.fetchFollowing('1');
+            assert.equal((page.tweets || page.users).length, 1, 'partial rows remain available');
+            assert.equal(page.partialError, 'RATE_LIMITED', `${operation} must expose partial failure`);
+            assert.equal(page.nextCursor, cursor, 'cursor evidence remains available to the caller');
+        }
+    }
+
 }
 
 async function testStaleCandidateExhaustionIsMarkedTerminal() {

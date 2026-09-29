@@ -14,7 +14,7 @@ function clone(value) {
 }
 
 function createStorageHarness(initialSettings, {
-    failFirstSet = false, history = [], failHistoryRead = false, usage = {}, failUsageRead = false,
+    failFirstSet = false, firstSetError = 'simulated storage rejection', history = [], failHistoryRead = false, usage = {}, failUsageRead = false,
     extra = {}, failArrayRead = false, failStateRead = false, failSettingsRead = false,
     withGetKeys = false, permissions = ['unlimitedStorage']
 } = {}) {
@@ -79,7 +79,7 @@ function createStorageHarness(initialSettings, {
                     async set(values) {
                         setAttempts++;
                         if (failFirstSet && setAttempts === 1) {
-                            throw new Error('simulated storage rejection');
+                            throw new Error(firstSetError);
                         }
                         // Make the first patch yield so the unlocked baseline
                         // deterministically commits the second stale snapshot
@@ -110,6 +110,7 @@ function createStorageHarness(initialSettings, {
 
     vm.runInContext(storageSource, context, { filename: 'utils/storage.js' });
     return {
+        context,
         storage: context.XPorterStorage,
         settings: () => clone(stored[SETTINGS_KEY]),
         history: () => clone(stored.xporter_export_history),
@@ -186,6 +187,50 @@ async function testFailedSettingsReadCannotExpireRetainedHistory() {
     assert.deepEqual(harness.history(), history, 'retained rows must survive the settings read failure');
 }
 
+async function testHistoryFallbackOnlyDropsPayloadsForQuotaErrors() {
+    const history = [{ id: 'keep', completedAt: 1, hasData: true, items: [{ id: '12345' }] }];
+    const temporary = createStorageHarness({}, { history, failFirstSet: true });
+    assert.equal(await temporary.storage.saveExportHistory({ items: [{ id: '67890' }] }), false,
+        'a transient write failure must remain a failure instead of erasing downloadable history');
+    assert.deepEqual(temporary.history(), history, 'existing history data must survive a non-quota failure');
+    await temporary.storage.saveExportHistory({ items: [{ id: '67890' }] });
+    assert.equal(temporary.history()[1].items[0].id, '12345', 'the queue recovers without losing previous payloads');
+
+    const quota = createStorageHarness({}, {
+        history, failFirstSet: true, firstSetError: 'QUOTA_BYTES quota exceeded'
+    });
+    assert.equal(await quota.storage.saveExportHistory({ items: [{ id: '67890' }] }), true,
+        'a known quota failure can still save metadata');
+    assert.equal(quota.history().length, 2);
+    assert.ok(quota.history().every(entry => entry.hasData === false && !entry.items));
+}
+
+async function testFailedExpiryWriteBlocksHistoryDownload() {
+    const harness = createStorageHarness({}, {
+        history: [{ id: 'old', completedAt: 1, items: [{ id: '12345' }], hasData: true }],
+        failFirstSet: true
+    });
+    let downloads = 0;
+    Object.assign(harness.context, {
+        XPORTER_CONFIG: {}, XLog: { error() {} }, Blob,
+        FileReader: class { readAsDataURL() { this.result = 'data:text/csv;base64,eA=='; this.onload(); } },
+        XPorterCSV: { generateCSV: () => 'id\n12345', generateExportFilename: () => 'history.csv' }
+    });
+    harness.context.chrome.runtime.lastError = null;
+    harness.context.chrome.downloads = { download(_options, callback) { downloads++; callback(1); } };
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'background/downloads.js'), 'utf8'), harness.context);
+    // DOWNLOAD_HISTORY_ENTRY runs expiry before loading and serializing history.
+    const downloadHistoryRoute = async () => {
+        await harness.storage.pruneExpiredExportHistory({ autoExpireHours: 1 }, 10_000_000);
+        return harness.context.XPorterDownloads.downloadHistory('old', 'csv');
+    };
+    await assert.rejects(downloadHistoryRoute(), /STORAGE_WRITE_FAILED/,
+        'an unsuccessful expiry write must block the history download route');
+    assert.equal(downloads, 0, 'expired rows must never reach chrome.downloads after a failed prune');
+    await harness.storage.pruneExpiredExportHistory({ autoExpireHours: 1 }, 10_000_000);
+    assert.equal(harness.history()[0].hasData, false, 'the queue must recover for a subsequent expiry');
+}
+
 async function testExportCleanupListsKeysWithoutLoadingValues() {
     const extra = {
         [EXPORT_STATE]: { totalBatches: 1 },
@@ -258,6 +303,8 @@ async function testRejectedWriteDoesNotPoisonLaterPatch() {
 }
 
 (async () => {
+    await testHistoryFallbackOnlyDropsPayloadsForQuotaErrors();
+    await testFailedExpiryWriteBlocksHistoryDownload();
     await testConcurrentPartialPatchesAreMerged();
     await testRejectedWriteDoesNotPoisonLaterPatch();
     await testBatchReadsNeverDegradeToEmptyData();

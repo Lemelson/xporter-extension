@@ -220,7 +220,47 @@ async function testSeenPostFilenameUsesLocalTime() {
     assert.deepEqual(filenames, ['XPorter_seen_posts_2026-01-02-03-04-05.csv']);
 }
 
+async function testLegacyHistoryWithoutPostSelectionStillDownloads() {
+    const filenames = [];
+    const context = vm.createContext({
+        Blob, TextEncoder, Uint8Array, DataView, ArrayBuffer,
+        FileReader: class { readAsDataURL() { this.result = 'data:,x'; this.onload(); } },
+        XLog: { error() {} }, XPORTER_CONFIG: {},
+        XPorterStorage: {
+            async loadExportHistoryEntry() {
+                return { username: 'legacy', exportMode: 'posts', displayName: 'Legacy profile',
+                    items: [{ id: '12345', text: 'Saved legacy text' }] };
+            },
+            async loadSettings() { return {}; },
+            async recordDownload() {}
+        },
+        chrome: {
+            runtime: { lastError: null },
+            downloads: { download(options, callback) { filenames.push(options.filename); callback(1); } }
+        }
+    });
+    vm.runInContext(csvSource, context);
+    const legacyItems = [{ id: '12345', text: 'Saved legacy text' }];
+    const legacyProfile = { name: 'Legacy profile' };
+    const legacyOptions = { profile: legacyProfile, postSelection: null };
+    const txt = context.XPorterCSV.generatePostsText(legacyItems, legacyProfile, legacyOptions);
+    assert.ok(txt.includes('Saved legacy text'));
+    assert.ok(!txt.includes('Included types:'), 'missing selection metadata must not invent selected types');
+    const workbook = assertXlsxPartsWellFormed(context.XPorterCSV.generateXLSX(legacyItems, false, legacyOptions));
+    assert.ok(text(workbook, 'xl/worksheets/sheet3.xml').includes('Legacy profile'));
+    assert.ok(!text(workbook, 'xl/worksheets/sheet3.xml').includes('Included post types'));
+    vm.runInContext(fs.readFileSync(path.join(root, 'background/downloads.js'), 'utf8'), context);
+    for (const format of ['txt', 'xlsx']) {
+        assert.equal((await context.XPorterDownloads.downloadHistory('legacy', format)).success, true,
+            `${format} must remain downloadable for history saved before postSelection existed`);
+    }
+    assert.equal(filenames.length, 2);
+    assert.ok(filenames[0].endsWith('.txt'));
+    assert.ok(filenames[1].endsWith('.xlsx'));
+}
+
 const tests = [
+    testLegacyHistoryWithoutPostSelectionStillDownloads,
     testXmlInvalidCharactersNeverReachThePackage,
     testDeflateIsUsedOnlyForXmlParts,
     testCompressionFailureFallsBackWithoutUnhandledRejection,

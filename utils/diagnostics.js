@@ -178,6 +178,14 @@
                     if (entry.result === 'complete') milestone(state, 'firstDownloadMs', at);
                     }
                 }
+            } else if (type === 'download_missing' && binding) {
+                // A successful empty browser lookup proves tracking is gone,
+                // not whether the file succeeded or failed. Retire the whole
+                // operation so remaining parts cannot invent a terminal result.
+                downloadResult(state, entry, 'unknown', 'TRACKING_LOST');
+                for (const [id, item] of Object.entries(state.pendingDownloads)) {
+                    if (item.transaction === entry.id) delete state.pendingDownloads[id];
+                }
             } else if (type === 'download_failed') {
                 entry.generationMs = Math.max(0, at - entry.at);
                 downloadResult(state, entry, 'error', data.error);
@@ -187,10 +195,22 @@
                 entry.photosFailed += num(data.failed);
             }
         } else if (type === 'clipboard') state.totals.clipboard++;
-        else if (type === 'recover' && current) {
-            current.result = 'interrupted'; current.error = 'WORKER_RESTART';
-            // The exact interruption time is unknowable after worker death.
-            current.durationMs = null; state.totals.interrupted++; state.currentAttempt = null;
+        else if (type === 'recover') {
+            if (current) {
+                current.result = 'interrupted'; current.error = 'WORKER_RESTART';
+                // The exact interruption time is unknowable after worker death.
+                current.durationMs = null; state.totals.interrupted++; state.currentAttempt = null;
+            }
+            // Generation cannot resume across worker lifetimes. Bound file IDs
+            // alone do not prove the full operation was handed off. Completed
+            // handoffs retain their bindings for browser-state reconciliation.
+            for (const entry of state.downloads) {
+                if (entry.result !== 'generating') continue;
+                downloadResult(state, entry, 'unknown', 'WORKER_RESTART');
+                for (const [id, binding] of Object.entries(state.pendingDownloads)) {
+                    if (binding.transaction === entry.id) delete state.pendingDownloads[id];
+                }
+            }
         }
     }
     function record(type, data = {}) {
@@ -206,7 +226,7 @@
         // Telemetry failure never breaks export or resets existing diagnostics.
         queue = pending.catch(() => {});
         const safe = pending.catch(() => null);
-        if (['terminal', 'rejected', 'download_state', 'download_failed', 'open'].includes(type)) {
+        if (['terminal', 'rejected', 'download_state', 'download_missing', 'download_failed', 'open'].includes(type)) {
             safe.then(() => {
                 globalThis.XPorterFeedback?.maybeRefresh?.(true);
             }).catch(() => {});

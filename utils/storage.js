@@ -72,13 +72,14 @@ async function checkStorageQuota() {
 /**
  * Safe write to chrome.storage.local with error handling
  */
-async function safeSet(data) {
+async function safeSet(data, onError = null) {
     try {
         await chrome.storage.local.set(data);
         return true;
     } catch (e) {
         const log = (typeof XLog !== 'undefined') ? XLog : console;
         log.error('Storage write failed:', e.message);
+        onError?.(e);
         return false;
     }
 }
@@ -305,8 +306,15 @@ function saveExportHistory(entry) {
                 item.hasData = false;
             }
         });
-        const saved = await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
-        if (!saved) {
+        let writeError = null;
+        const saved = await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history }, error => {
+            writeError = error;
+        });
+        const quotaExceeded = writeError?.name === 'QuotaExceededError' ||
+            /QUOTA_BYTES|QUOTA_EXCEEDED|quota exceeded/i.test(String(writeError?.message || ''));
+        if (!saved && quotaExceeded) {
+            // Only a confirmed quota error permits this destructive fallback.
+            // Transient I/O failures leave the previously saved history intact.
             // Quota retry: strip item payloads from EVERY entry, not just the new
             // one — older large entries can be what is actually blocking the write.
             let stripped = false;
@@ -378,7 +386,9 @@ function pruneExpiredExportHistory(settings, now = Date.now()) {
         }
 
         if (changed) {
-            await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history });
+            if (!await safeSet({ [STORAGE_KEYS.EXPORT_HISTORY]: history })) {
+                throw new Error('STORAGE_WRITE_FAILED');
+            }
         }
         return { changed, expired };
     });

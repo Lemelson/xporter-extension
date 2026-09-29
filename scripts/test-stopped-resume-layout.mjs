@@ -185,6 +185,8 @@ async function main() {
       batch: 101
     }));
     await popup.locator('#stopBtn').waitFor({ state: 'visible' });
+    // Geometry is asserted at rest, after the Stop button's entrance.
+    await popup.waitForFunction(() => !document.getAnimations().some(a => a.id === 'xp-motion'));
     const running = await popup.evaluate(() => {
       const infoRect = document.querySelector('.status-info').getBoundingClientRect();
       const actionRect = document.getElementById('statusActionStack').getBoundingClientRect();
@@ -246,6 +248,7 @@ async function main() {
         batch: 101
       }));
       await popup.locator('#stopBtn').waitFor({ state: 'visible' });
+      await popup.waitForFunction(() => !document.getAnimations().some(a => a.id === 'xp-motion'));
       const localizedRunning = await popup.evaluate(() => {
         const actionRect = document.getElementById('statusActionStack').getBoundingClientRect();
         const stop = document.getElementById('stopBtn');

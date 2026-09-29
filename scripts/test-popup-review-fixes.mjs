@@ -104,6 +104,14 @@ try {
     await page.waitForTimeout(200);
     assert.equal(await page.isEnabled('#downloadBtn'), true, 'history progress must not lock Download');
     assert.equal(await page.isEnabled('#exportMode'), true, 'history progress must not lock the mode');
+    // Synthetic progress needs the matching worker plan; an inactive real
+    // plan now correctly reconciles a missing terminal broadcast.
+    await page.evaluate(() => {
+      const original = sendMessage;
+      window.__currentDownloadActive = true;
+      sendMessage = (message, ...args) => message.type === 'GET_DOWNLOAD_PLAN' && window.__currentDownloadActive
+        ? Promise.resolve({ count: 25, multipart: false, active: true }) : original(message, ...args);
+    });
     await worker.evaluate(() => chrome.runtime.sendMessage({ type: 'DOWNLOAD_PROGRESS', source: 'current',
       partNumber: 1, partCount: 2 }).catch(() => {}));
     await page.waitForFunction(() => document.getElementById('downloadBtn').disabled);
@@ -112,12 +120,23 @@ try {
     await page.waitForFunction(() => document.documentElement.lang === 'ru');
     assert.equal((await page.textContent('#downloadBtn [data-i18n="download"]')).trim(), '1 / 2',
       'a language switch must not reset an active download label');
+    await page.evaluate(() => { window.__currentDownloadActive = false; });
     await worker.evaluate(() => chrome.runtime.sendMessage({ type: 'DOWNLOAD_ERROR', source: 'current',
       error: 'DOWNLOAD_FAILED' }).catch(() => {}));
     await page.waitForFunction(() => !document.getElementById('downloadBtn').disabled);
     assert.equal(await page.evaluate(() => document.querySelector('#toastRegion .toast')?.hasAttribute('role')), false,
       'toasts are announced by the persistent region, not per-node roles');
     assert.equal(await page.getAttribute('#toastRegion', 'aria-live'), 'polite');
+
+    // No COMPLETE/ERROR broadcast: polling the inactive worker plan unlocks
+    // every action and restores the export's stopped status text.
+    await worker.evaluate(() => chrome.runtime.sendMessage({ type: 'DOWNLOAD_PROGRESS', source: 'current',
+      partNumber: 1, partCount: 2 }).catch(() => {}));
+    await page.waitForFunction(() => document.getElementById('downloadBtn').disabled);
+    await page.waitForFunction(() => !document.getElementById('downloadBtn').disabled);
+    assert.equal(await page.isEnabled('#exportMode'), true, 'inactive worker plan must unlock mode');
+    assert.equal(await page.isEnabled('#newExportBtn'), true, 'inactive worker plan must unlock New Export');
+    assert.equal((await page.textContent('#statusMessage')).trim(), ru.canBeResumed);
 
     // ---- Confirming the switch persists the mode and clears the export.
     await page.selectOption('#exportMode', 'followers');

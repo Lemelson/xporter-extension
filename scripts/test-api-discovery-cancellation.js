@@ -55,6 +55,55 @@ function createHarness(fetchImpl, config = {}) {
     return { api: context.XPorterAPI, storage };
 }
 
+async function testUserAbortDoesNotBecomeFallbackDiscovery() {
+    for (const useExport of [false, true]) {
+        let started;
+        const ready = new Promise(resolve => { started = resolve; });
+        const calls = [];
+        const fetchImpl = (url, options) => new Promise((_resolve, reject) => {
+            calls.push(String(url));
+            started();
+            options.signal.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError')));
+        });
+        const harness = useExport
+            ? createFullHarness(fetchImpl)
+            : createHarness(fetchImpl, { DISCOVERY_TOTAL_TIMEOUT: 1000 });
+        const request = useExport ? harness.api.fetchUserTweets('1') : harness.api.discoverEndpoints();
+        await ready;
+        harness.api.abortActiveRequests();
+        await assert.rejects(request, /ABORTED/,
+            'Stop must reject discovery rather than start a fallback authenticated request');
+        assert.deepEqual(calls, ['https://x.com'], 'no request may follow the aborted discovery');
+    }
+}
+
+
+async function testUserAbortDuringHydrationStartsNoNetwork() {
+    for (const useExport of [false, true]) {
+        let releaseRead;
+        let readStarted;
+        const ready = new Promise(resolve => { readStarted = resolve; });
+        const calls = [];
+        const harness = createFullHarness(async url => {
+            calls.push(String(url));
+            return new Response('<html></html>');
+        });
+        const key = useExport ? 'xporter_native_request_templates_v1' : 'xporter_discovered_endpoints';
+        const originalGet = harness.context.chrome.storage.local.get;
+        harness.context.chrome.storage.local.get = async name => {
+            if (name !== key) return originalGet(name);
+            readStarted();
+            return new Promise(resolve => { releaseRead = () => resolve({}); });
+        };
+        const request = useExport ? harness.api.fetchUserTweets('1') : harness.api.discoverEndpoints();
+        await ready;
+        harness.api.abortActiveRequests();
+        releaseRead();
+        await assert.rejects(request, /ABORTED/);
+        assert.deepEqual(calls, [], 'a storage read released after Stop must not initiate network');
+    }
+}
+
 async function testTotalTimeoutAbortsOutstandingBundleFetch() {
     let bundleSignal = null;
     const pageHtml = [
@@ -631,6 +680,8 @@ function testParserContentNormalization() {
 }
 
 async function main() {
+    await testUserAbortDuringHydrationStartsNoNetwork();
+    await testUserAbortDoesNotBecomeFallbackDiscovery();
     await testTotalTimeoutAbortsOutstandingBundleFetch();
     await testLateTimedOutGenerationCannotOverwriteNewerDiscovery();
     await testSuccessfulDiscoveryRemainsSingleFlightAndCached();

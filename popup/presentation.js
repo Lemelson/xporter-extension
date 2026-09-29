@@ -48,13 +48,25 @@
             tooltip.style.setProperty('--help-pop-left', `${left / zoom}px`);
             tooltip.style.setProperty('--help-pop-safe-top', `${top / zoom}px`);
             tooltip.style.setProperty('--help-pop-max-height', `${maxHeight / zoom}px`);
+            // Motion grows the help out of its trigger (motion.js).
+            tooltip.style.setProperty('--help-placement', placeBelow ? 'below' : 'above');
+            tooltip.style.setProperty('--help-origin-x',
+                `${(triggerRect.left + trigger.offsetWidth * zoom / 2 - left) / zoom}px`);
         }
-        function closeHelp() {
+        function closeHelp({ instant = false } = {}) {
             clearTimeout(helpCloseTimer);
-            const tooltip = openHelp?.querySelector(':scope > .help-pop');
-            if (tooltip?.matches(':popover-open')) tooltip.hidePopover();
-            openHelp?.classList.remove('help-open');
+            const trigger = openHelp;
+            const tooltip = trigger?.querySelector(':scope > .help-pop');
+            trigger?.classList.remove('help-open');
             openHelp = null;
+            if (!tooltip?.matches(':popover-open')) return;
+            // Reopening during the fade keeps the same popover open.
+            const hide = () => {
+                if (openHelp !== trigger && tooltip.matches(':popover-open')) tooltip.hidePopover();
+            };
+            // Escape is a firm dismissal; pointer departures fade.
+            if (root.XPorterMotion && !instant) root.XPorterMotion.helpHidden(tooltip, hide);
+            else hide();
         }
         function showHelp(trigger) {
             // Localization may still be inserting the popover during initial hover.
@@ -67,13 +79,15 @@
                 trigger.setAttribute('title', trigger.getAttribute('aria-label') || tooltip.textContent);
                 return;
             }
-            if (openHelp !== trigger) closeHelp();
+            if (openHelp === trigger) return positionViewportHelp(trigger);
+            closeHelp();
             openHelp = trigger;
             tooltip.setAttribute('popover', 'manual');
             if (!tooltip.matches(':popover-open')) tooltip.showPopover();
             trigger.classList.remove('help-dismissed');
             trigger.classList.add('help-open');
             positionViewportHelp(trigger);
+            root.XPorterMotion?.helpShown(tooltip);
         }
         document.querySelectorAll('[data-i18n-tooltip]').forEach(trigger => {
             trigger.addEventListener('pointerenter', () => showHelp(trigger));
@@ -88,7 +102,7 @@
             trigger.addEventListener('click', () => showHelp(trigger));
             trigger.addEventListener('keydown', event => {
                 if (event.key === 'Escape') {
-                    closeHelp();
+                    closeHelp({ instant: true });
                     trigger.classList.add('help-dismissed');
                     event.preventDefault();
                 }
@@ -114,16 +128,36 @@
         // One persistent live region (#toastRegion in popup.html), present
         // before the first message: screen readers announce additions to an
         // existing region far more reliably than freshly inserted role nodes.
+        const TOAST_ICONS = {
+            success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>',
+            error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/></svg>'
+        };
         function showToast(message, type = 'info') {
             if (!message) return;
             const toastContainer = document.getElementById('toastRegion');
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
-            toast.textContent = message;
-            toastContainer.appendChild(toast);
-            // Force reflow then animate in
+            if (TOAST_ICONS[type]) {
+                const icon = document.createElement('span');
+                icon.className = 'toast-icon';
+                icon.setAttribute('aria-hidden', 'true');
+                icon.innerHTML = TOAST_ICONS[type];
+                toast.append(icon);
+            }
+            const text = document.createElement('span');
+            text.className = 'toast-text';
+            text.textContent = message;
+            toast.append(text);
+            const motion = root.XPorterMotion;
+            if (motion) motion.toastEnter(toastContainer, toast);
+            else toastContainer.appendChild(toast);
+            // Force reflow then show; motion.js animates on top of this state.
             requestAnimationFrame(() => toast.classList.add('toast-show'));
             setTimeout(() => {
+                if (motion) {
+                    motion.toastLeave(toast);
+                    return;
+                }
                 toast.classList.remove('toast-show');
                 setTimeout(() => toast.remove(), 250);
             }, type === 'error' ? 4500 : 2800);

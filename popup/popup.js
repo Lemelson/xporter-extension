@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastDownloadPlan = null;
     let downloadPlanRequest = 0;
     let downloadInProgress = false;
+    let downloadRequestPending = false;
     // Unknown saved state is not idle: starting a new export clears its rows.
     let statusAvailable = false;
     startBtn.disabled = true;
@@ -177,6 +178,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             setDownloadBusy(false);
             if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
             renderDownloadPlan(lastDownloadPlan);
+            // The part-progress line must not outlive the download.
+            if (lastExportState) updateUI(lastExportState);
+            window.XPorterMotion?.downloadDone(downloadBtn);
             showToast(
                 message.partCount > 1
                     ? templateText('downloadPartsStarted', { count: message.partCount })
@@ -194,6 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setDownloadBusy(false);
             if (lastDownloadPlan) lastDownloadPlan = { ...lastDownloadPlan, active: false };
             renderDownloadPlan(lastDownloadPlan);
+            if (lastExportState) updateUI(lastExportState);
             showToast(formatError(message.error || 'DOWNLOAD_FAILED', t), 'error');
         }
     }
@@ -375,7 +380,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         return state.tweetCount > historyLimit;
     }
 
-    async function commitModeChange(nextMode) {
+    function commitModeChange(nextMode) {
+        // Mode normalization may also persist outputFormat (TXT is unavailable
+        // for accounts), so it shares the format transaction's reply order.
+        const change = pendingOutputFormatChange.then(() => performModeChange(nextMode));
+        pendingOutputFormatChange = change.catch(() => {});
+        return change;
+    }
+
+    async function performModeChange(nextMode) {
         const previousMode = committedMode;
         const previousFormat = currentSettings.outputFormat || outputFormat.value;
         exportMode.value = nextMode;
@@ -443,16 +456,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         outputFormat.value = currentSettings.outputFormat;
     }
     applyModeUI(exportMode.value);
-    outputFormat.addEventListener('change', async () => {
+    let outputFormatRevision = 0;
+    let pendingOutputFormatChange = Promise.resolve();
+    outputFormat.addEventListener('change', () => {
+        const revision = ++outputFormatRevision;
+        const requestedFormat = outputFormat.value;
         applyModeUI(exportMode.value);
-        const previousFormat = currentSettings.outputFormat || 'csv';
-        const result = await persistSettingsPatch(currentSettings, { outputFormat: outputFormat.value });
-        if (result?.success !== true) {
-            outputFormat.value = previousFormat;
-            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
-        } else if (lastExportState) {
-            updateUI(lastExportState);
-        }
+        // The shared persistence helper advances this cache before returning.
+        // Serialize replies as well as writes so an older successful reply
+        // cannot replace the cache used by a later failure's rollback.
+        const change = pendingOutputFormatChange.then(async () => {
+            const previousFormat = currentSettings.outputFormat || 'csv';
+            const result = await persistSettingsPatch(currentSettings, { outputFormat: requestedFormat });
+            if (revision !== outputFormatRevision) return;
+            if (result?.success !== true) {
+                outputFormat.value = currentSettings.outputFormat || previousFormat;
+                applyModeUI(exportMode.value);
+                showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+            } else if (lastExportState) {
+                updateUI(lastExportState);
+            }
+        });
+        pendingOutputFormatChange = change.catch(() => {});
+        return change;
     });
 
     // ==================== Language Selector ====================
@@ -502,6 +528,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function setDownloadBusy(busy) {
         downloadInProgress = busy;
         downloadBtn.disabled = busy;
+        downloadBtn.classList.toggle('is-busy', busy);
+        document.getElementById('exportStatus')?.classList.toggle('is-downloading', busy);
         xlsxPhotoLinks.disabled = busy;
         xlsxPhotoEmbed.disabled = busy;
         outputFormat.disabled = !statusAvailable || busy || !!lastExportState?.running;
@@ -553,6 +581,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             outputFormat: outputFormat.value
         });
         if (request !== downloadPlanRequest || plan?.error) return;
+        // Broadcasts are best effort. A fresh inactive plan is the worker's
+        // authoritative completion signal, except before our start reply.
+        if (downloadInProgress && !downloadRequestPending && plan.active === false) {
+            lastDownloadProgress = null;
+            setDownloadBusy(false);
+            if (lastExportState) updateUI(lastExportState);
+        }
         renderDownloadPlan(plan);
     }
 
@@ -606,20 +641,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         seenPostsView?.refreshLanguage();
     }
 
-    async function selectLanguage(code) {
-        const previousLang = currentLang;
-        const returnFocus = langDropdown.contains(document.activeElement);
-        closeLangDropdown({ returnFocus });
-        if (code === previousLang) return;
-        currentLang = code;
-        await (window.XPorterMotion?.viewTransition(() => renderLanguage(code)) ?? renderLanguage(code));
+    let pendingLanguageChange = Promise.resolve();
+    function selectLanguage(code) {
+        // Locale fetches and view transitions can finish out of order. Keep
+        // rendering, number formatting and persistence in selection order.
+        const change = pendingLanguageChange.then(async () => {
+            const previousLang = currentLang;
+            const returnFocus = langDropdown.contains(document.activeElement);
+            closeLangDropdown({ returnFocus });
+            if (code === previousLang) return;
+            currentLang = code;
+            await (window.XPorterMotion?.viewTransition(() => renderLanguage(code)) ?? renderLanguage(code));
 
-        const result = await persistSettingsPatch(currentSettings, { language: code });
-        if (result?.success !== true) {
-            currentLang = previousLang;
-            await renderLanguage(previousLang);
-            showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
-        }
+            const result = await persistSettingsPatch(currentSettings, { language: code });
+            if (result?.success !== true) {
+                currentLang = previousLang;
+                await renderLanguage(previousLang);
+                showToast(formatError(result?.error || 'STORAGE_FULL', t), 'error');
+            }
+        });
+        pendingLanguageChange = change.catch(() => {});
+        return change;
     }
 
     function langOptions() {
@@ -914,7 +956,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Safety poll: broadcasts can be dropped (SW restart, closed port). Poll
     // while running or waiting for a readable initial state, and visible.
+    let downloadPollPending = false;
     setInterval(async () => {
+        if (document.visibilityState !== 'visible') return;
+        if (downloadInProgress) {
+            if (!downloadRequestPending && !downloadPollPending) {
+                downloadPollPending = true;
+                try {
+                    await refreshDownloadPlan();
+                } finally {
+                    downloadPollPending = false;
+                }
+            }
+            return;
+        }
         if ((statusAvailable && !lastExportState?.running) || document.visibilityState !== 'visible') return;
         const fresh = await sendMessage({ type: 'GET_STATUS' });
         if (fresh?.status) handleStatusUpdate(fresh);
@@ -1088,11 +1143,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ==================== Download ====================
     downloadBtn.addEventListener('click', async () => {
+        if (downloadInProgress) return;
+        downloadRequestPending = true;
         setDownloadBusy(true);
         lastDownloadProgress = null;
         renderDownloadProgress();
         await pendingXlsxPhotoChoice;
         const result = await sendMessage({ type: 'DOWNLOAD_EXPORT', outputFormat: outputFormat.value });
+        downloadRequestPending = false;
         if (result?.success === true) {
             renderDownloadPlan(result);
         } else {

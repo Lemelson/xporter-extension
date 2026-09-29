@@ -19,7 +19,7 @@ function harness(seed = {}) {
         XPorterStorage: { loadUsage: async () => ({ installedAt: now - 50000, exportsStarted: 12 }) }
     });
     vm.runInContext(fs.readFileSync(path.join(root, 'utils/diagnostics.js'), 'utf8'), context);
-    return { api: context.XPorterDiagnostics, data, advance: ms => { now += ms; } };
+    return { context, api: context.XPorterDiagnostics, data, advance: ms => { now += ms; } };
 }
 async function run() {
     const h = harness({ xporter_usage: { exportsStarted: 12, itemsTotal: 400 } });
@@ -69,6 +69,60 @@ async function run() {
     const before = (await h.api.load()).totals.requests;
     await Promise.all(Array.from({length: 30}, () => h.api.record('metric', {key:'requests', attemptId:active})));
     assert.equal((await h.api.load()).totals.requests, before + 30, 'concurrent counter writes serialize');
+    // Worker death before the operation-level handoff cannot prove that all
+    // intended files were generated, even if tracked browser files complete.
+    const unfinishedId = await h.api.record('download_begin', { parts: 2 });
+    await h.api.record('download_file', { id: unfinishedId, downloadId: 20 });
+    await h.api.record('download_file', { id: unfinishedId, downloadId: 21 });
+    const unknownBefore = (await h.api.load()).totals.downloadUnknown;
+    await h.api.record('recover');
+    await h.api.record('download_state', { downloadId: 20, state: 'complete' });
+    await h.api.record('download_state', { downloadId: 21, state: 'complete' });
+    await h.api.record('recover');
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'unknown');
+    assert.equal((await h.api.load()).downloads.at(-1).error, 'WORKER_RESTART');
+    assert.equal((await h.api.load()).totals.downloadUnknown, unknownBefore + 1);
+    await h.api.record('download_begin', { parts: 1 });
+    await h.api.record('recover');
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'unknown', 'generation without any file ID also terminates');
+    assert.equal((await h.api.load()).totals.downloadUnknown, unknownBefore + 2);
+    const survivingId = await h.api.record('download_begin', { parts: 1 });
+    await h.api.record('download_file', { id: survivingId, downloadId: 22 });
+    await h.api.record('download_handoff', { id: survivingId });
+    await h.api.record('recover');
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'handed_off');
+    await h.api.record('download_state', { downloadId: 22, state: 'complete' });
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'complete');
+    // Successful empty browser lookup means tracking was erased; thrown
+    // lookups remain retryable. Exercise the real observer and reducer together.
+    const browserStates = new Map();
+    h.context.chrome.downloads = { search: async ({ id }) => {
+        if (browserStates.get(id) === 'throw') throw new Error('temporary');
+        return browserStates.get(id) || [];
+    }, onChanged: { addListener() {} } };
+    vm.runInContext(fs.readFileSync(path.join(root, 'background/download-diagnostics.js'), 'utf8'), h.context);
+    const missingId = await h.api.record('download_begin', { parts: 2 });
+    await h.api.record('download_file', { id: missingId, downloadId: 30 });
+    await h.api.record('download_file', { id: missingId, downloadId: 31 });
+    await h.api.record('download_handoff', { id: missingId });
+    browserStates.set(31, [{ id: 31, state: 'complete' }]);
+    const beforeMissing = (await h.api.load()).totals.downloadUnknown;
+    await h.context.XPorterDownloadDiagnostics.recover();
+    await h.context.XPorterDownloadDiagnostics.recover();
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'unknown');
+    assert.equal((await h.api.load()).downloads.at(-1).error, 'TRACKING_LOST');
+    assert.equal((await h.api.load()).totals.downloadUnknown, beforeMissing + 1);
+    assert.equal(Object.keys((await h.api.load()).pendingDownloads).length, 0);
+    const retryId = await h.api.record('download_begin', { parts: 1 });
+    await h.api.record('download_file', { id: retryId, downloadId: 32 });
+    await h.api.record('download_handoff', { id: retryId });
+    browserStates.set(32, 'throw');
+    await h.context.XPorterDownloadDiagnostics.recover();
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'handed_off');
+    assert((await h.api.load()).pendingDownloads['32']);
+    browserStates.set(32, [{ id: 32, state: 'complete' }]);
+    await h.context.XPorterDownloadDiagnostics.recover();
+    assert.equal((await h.api.load()).downloads.at(-1).result, 'complete');
     const failuresBefore = (await h.api.load()).totals.downloadFailed;
     for (let i = 0; i < 7; i++) await h.api.record('download_begin', {parts:1});
     assert.equal((await h.api.load()).totals.downloadFailed, failuresBefore, 'evicted tracking is not a failed download');
