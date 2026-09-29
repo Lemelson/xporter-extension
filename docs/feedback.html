@@ -3,6 +3,8 @@
 
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-mJyXrKRuh0ta7Qvm+DHdvTNg7LTAOx0O19hhTGUgLkM=' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'sha256-QHEu2EAiC9MkSOAz6W5rVOqmfc6dOk3htg37cvSzhHA='; img-src 'self'; font-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; worker-src blob:; base-uri 'none'; form-action 'none'; object-src 'none'" />
+  <script src="assets/emoji-platform.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, follow" />
   <title>XPorter — Feedback</title>
@@ -519,7 +521,9 @@
       display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
       color: var(--text-secondary); font-size: 13px; font-weight: 650; margin-bottom: 10px;
     }
-    .subreason-hint { color: var(--text-muted); font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+    .subreason-hint { color: var(--text-muted); font-size: 11.5px; font-weight: 500; }
+    .format-block { margin-top: 16px; }
+    .format-block[hidden] { display: none; }
     .subreason-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .subreason {
       appearance: none; width: 100%; min-height: 42px;
@@ -620,6 +624,7 @@
     textarea::placeholder { color: var(--text-muted); }
     .contact-consent { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; padding-inline: 2px; }
     .contact-consent strong { color: var(--text-secondary); font-weight: 650; }
+    .record-note { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; margin: 10px 2px 0; }
 
     /* Final CTA: organic ocean landscape with a continuous flowing outline. */
     @property --cta-angle {
@@ -1048,6 +1053,7 @@
       .contact { padding-top: 22px; }
     }
   </style>
+  <link rel="stylesheet" href="assets/emoji.css">
 </head>
 
 <body>
@@ -1104,14 +1110,18 @@
           <div class="subreason-block" id="subreasonBlock" hidden>
             <div class="subreason-heading">
               <span id="subreasonPrompt"></span>
-              <span class="subreason-hint" data-i18n="subreasonHint"></span>
+              <span class="subreason-hint" id="subreasonHint" data-i18n="subreasonHint"></span>
             </div>
-            <div class="subreason-options" id="subreasonOptions"></div>
+            <div class="subreason-options" id="subreasonOptions" role="group" aria-labelledby="subreasonPrompt" aria-describedby="subreasonHint"></div>
+            <div class="format-block" id="formatBlock" hidden>
+              <div class="subreason-heading"><span id="formatPrompt" data-i18n="formatPrompt"></span></div>
+              <div class="subreason-options" id="formatOptions" role="group" aria-labelledby="formatPrompt" aria-describedby="subreasonHint"></div>
+            </div>
           </div>
           <div class="action-row">
             <div class="detail-stack">
               <label class="detail-question" id="detailQuestion" for="detail"></label>
-              <textarea id="detail"></textarea>
+              <textarea id="detail" maxlength="2000"></textarea>
               <p class="contact-consent" id="contactConsent"></p>
             </div>
             <button class="btn-send" id="submitBtn">
@@ -1121,6 +1131,7 @@
               <span data-i18n="submit"></span>
             </button>
           </div>
+          <p class="record-note" data-i18n="recordNote"></p>
         </div>
       </div>
     </section>
@@ -1186,6 +1197,7 @@
       </div>
     </div>
     <p class="privacy-note">
+      <a href="assets/attribution.html">Emoji credits</a> ·
       <span data-i18n="privacyNote"></span>
       <a href="privacy-policy.html" target="_blank" rel="noopener" data-i18n="privacyLink"></a>
     </p>
@@ -1196,7 +1208,7 @@
 
   <!-- canvas-confetti 1.9.4, ISC license: vendor/canvas-confetti.LICENSE -->
   <script src="vendor/canvas-confetti.browser.js"></script>
-  <script src="assets/diagnostics-codec.js?v=20260910"></script>
+  <script src="assets/diagnostics-codec.js?v=20260930"></script>
   <script src="assets/feedback-language.js"></script>
   <script src="assets/feedback-receipt.js"></script>
   <script>
@@ -1280,6 +1292,23 @@
       "ko": {"thanks":"의견을 받았습니다.","thanksSub":"의견 감사합니다. 다음에 개선할 부분을 정하는 데 도움이 됩니다.","backToFeedback":"작성한 의견으로 돌아가기"},
       "zh_CN": {"thanks":"已收到反馈。","thanksSub":"感谢你的反馈，这将帮助我决定接下来改进什么。","backToFeedback":"返回填写反馈"}
     };
+    // Short disclosure beside Send; privacy-policy.html has the complete list.
+    const RECORD_I18N = {
+      "en": {"recordNote":"What is recorded: your answers, time on this page and the uninstall diagnostics (version, counters, settings, a random install ID). No exported X content."},
+      "ru": {"recordNote":"Что записывается: ваши ответы, время на этой странице и диагностика удаления (версия, счётчики, настройки, случайный ID установки). Экспортированный контент X не передаётся."},
+      "de": {"recordNote":"Was gespeichert wird: Ihre Antworten, die Zeit auf dieser Seite und die Deinstallationsdiagnose (Version, Zähler, Einstellungen, eine zufällige Installations-ID). Keine exportierten X-Inhalte."},
+      "es": {"recordNote":"Qué se registra: tus respuestas, el tiempo en esta página y el diagnóstico de desinstalación (versión, contadores, ajustes, un ID de instalación aleatorio). Ningún contenido exportado de X."},
+      "fr": {"recordNote":"Ce qui est enregistré : vos réponses, le temps passé sur cette page et le diagnostic de désinstallation (version, compteurs, réglages, un identifiant d’installation aléatoire). Aucun contenu X exporté."},
+      "it": {"recordNote":"Cosa viene registrato: le tue risposte, il tempo su questa pagina e la diagnostica di disinstallazione (versione, contatori, impostazioni, un ID di installazione casuale). Nessun contenuto X esportato."},
+      "pt_BR": {"recordNote":"O que é registrado: suas respostas, o tempo nesta página e o diagnóstico de desinstalação (versão, contadores, configurações, um ID de instalação aleatório). Nenhum conteúdo exportado do X."},
+      "tr": {"recordNote":"Kaydedilenler: yanıtlarınız, bu sayfada geçen süre ve kaldırma tanılaması (sürüm, sayaçlar, ayarlar, rastgele bir kurulum kimliği). Dışa aktarılan X içeriği yoktur."},
+      "id": {"recordNote":"Yang dicatat: jawaban Anda, waktu di halaman ini, dan diagnostik pencopotan (versi, penghitung, pengaturan, ID instalasi acak). Tanpa konten X yang diekspor."},
+      "ar": {"recordNote":"ما يُسجَّل: إجاباتك، ووقتك على هذه الصفحة، وبيانات تشخيص الإزالة (الإصدار والعدّادات والإعدادات ومعرّف تثبيت عشوائي). لا يتضمن أي محتوى مُصدَّر من X."},
+      "hi": {"recordNote":"क्या दर्ज होता है: आपके उत्तर, इस पेज पर बिताया समय और अनइंस्टॉल डायग्नोस्टिक्स (संस्करण, काउंटर, सेटिंग्स, एक रैंडम इंस्टॉल ID)। X से एक्सपोर्ट की गई सामग्री शामिल नहीं है।"},
+      "ja": {"recordNote":"記録される内容：回答、このページの滞在時間、アンインストール診断（バージョン、カウンター、設定、ランダムなインストールID）。エクスポートしたXのコンテンツは含まれません。"},
+      "ko": {"recordNote":"기록되는 내용: 답변, 이 페이지에 머문 시간, 삭제 진단 정보(버전, 카운터, 설정, 무작위 설치 ID). 내보낸 X 콘텐츠는 포함되지 않습니다."},
+      "zh_CN": {"recordNote":"记录的内容：你的回答、在此页面停留的时间和卸载诊断信息（版本、计数、设置、随机安装 ID）。不包含导出的 X 内容。"}
+    };
     Object.keys(REASON_I18N).forEach(function (code) {
       if (I18N[code]) Object.assign(I18N[code], REASON_I18N[code]);
     });
@@ -1288,6 +1317,225 @@
     });
     Object.keys(SUCCESS_I18N).forEach(function (code) {
       if (I18N[code]) Object.assign(I18N[code], SUCCESS_I18N[code]);
+    });
+    Object.keys(RECORD_I18N).forEach(function (code) {
+      if (I18N[code]) Object.assign(I18N[code], RECORD_I18N[code]);
+    });
+
+    const CLARIFICATION_I18N = {
+      "en": {
+        "subreasonHint": "Optional — select all that apply",
+        "sr_broken_window_unusable": "The window did not open or display correctly",
+        "sr_broken_download_failed": "Could not download the file",
+        "formatPrompt": "Which file formats did you need?",
+        "sr_missing_format_other": "Other format",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "Export never finished"
+      },
+      "ru": {
+        "subreasonHint": "Необязательно — можно выбрать несколько",
+        "sr_broken_window_unusable": "Окно не открылось или отображалось неправильно",
+        "sr_broken_download_failed": "Не удалось скачать файл",
+        "formatPrompt": "Какие форматы файла вам были нужны?",
+        "sr_missing_format_other": "Другой формат",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "Выгрузка так и не завершилась"
+      },
+      "de": {
+        "subreasonHint": "Optional — Mehrfachauswahl möglich",
+        "sr_broken_window_unusable": "Das Fenster öffnete sich nicht oder wurde falsch angezeigt",
+        "sr_broken_download_failed": "Die Datei ließ sich nicht herunterladen",
+        "formatPrompt": "Welche Dateiformate haben Sie benötigt?",
+        "sr_missing_format_other": "Anderes Format",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "Der Export wurde nie fertig"
+      },
+      "es": {
+        "subreasonHint": "Opcional — puedes elegir varias opciones",
+        "sr_broken_window_unusable": "La ventana no se abrió o se mostró mal",
+        "sr_broken_download_failed": "No pude descargar el archivo",
+        "formatPrompt": "¿Qué formatos de archivo necesitabas?",
+        "sr_missing_format_other": "Otro formato",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "La exportación nunca terminó"
+      },
+      "fr": {
+        "subreasonHint": "Facultatif — plusieurs choix possibles",
+        "sr_broken_window_unusable": "La fenêtre ne s’ouvrait pas ou s’affichait mal",
+        "sr_broken_download_failed": "Impossible de télécharger le fichier",
+        "formatPrompt": "Quels formats de fichier vous fallait-il ?",
+        "sr_missing_format_other": "Autre format",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "L’export n’a jamais abouti"
+      },
+      "it": {
+        "subreasonHint": "Facoltativo — puoi scegliere più opzioni",
+        "sr_broken_window_unusable": "La finestra non si apriva o si visualizzava male",
+        "sr_broken_download_failed": "Non riuscivo a scaricare il file",
+        "formatPrompt": "Quali formati di file ti servivano?",
+        "sr_missing_format_other": "Altro formato",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "L’esportazione non è mai terminata"
+      },
+      "pt_BR": {
+        "subreasonHint": "Opcional — pode selecionar várias opções",
+        "sr_broken_window_unusable": "A janela não abriu ou foi exibida incorretamente",
+        "sr_broken_download_failed": "Não consegui baixar o arquivo",
+        "formatPrompt": "Quais formatos de arquivo você precisava?",
+        "sr_missing_format_other": "Outro formato",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "A exportação nunca terminou"
+      },
+      "tr": {
+        "subreasonHint": "İsteğe bağlı — birden fazla seçenek seçebilirsiniz",
+        "sr_broken_window_unusable": "Pencere açılmadı veya düzgün görüntülenmedi",
+        "sr_broken_download_failed": "Dosyayı indiremedim",
+        "formatPrompt": "Hangi dosya biçimlerine ihtiyacınız vardı?",
+        "sr_missing_format_other": "Başka bir biçim",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "Dışa aktarma hiç tamamlanmadı"
+      },
+      "id": {
+        "subreasonHint": "Opsional — boleh memilih beberapa",
+        "sr_broken_window_unusable": "Jendela tidak terbuka atau tampilannya bermasalah",
+        "sr_broken_download_failed": "Tidak dapat mengunduh file",
+        "formatPrompt": "Format file apa yang Anda perlukan?",
+        "sr_missing_format_other": "Format lain",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "Ekspor tidak pernah selesai"
+      },
+      "ar": {
+        "subreasonHint": "اختياري — يمكنك اختيار أكثر من خيار",
+        "sr_broken_window_unusable": "لم تُفتح النافذة أو لم تظهر بشكل صحيح",
+        "sr_broken_download_failed": "تعذّر تنزيل الملف",
+        "formatPrompt": "ما تنسيقات الملفات التي كنت تحتاجها؟",
+        "sr_missing_format_other": "تنسيق آخر",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "لم يكتمل التصدير"
+      },
+      "hi": {
+        "subreasonHint": "वैकल्पिक — एक से अधिक विकल्प चुन सकते हैं",
+        "sr_broken_window_unusable": "विंडो नहीं खुली या ठीक से नहीं दिखी",
+        "sr_broken_download_failed": "फ़ाइल डाउनलोड नहीं कर सका",
+        "formatPrompt": "आपको कौन से फ़ाइल फ़ॉर्मैट चाहिए थे?",
+        "sr_missing_format_other": "अन्य फ़ॉर्मैट",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "एक्सपोर्ट कभी पूरा नहीं हुआ"
+      },
+      "ja": {
+        "subreasonHint": "任意 — 複数選択できます",
+        "sr_broken_window_unusable": "ウィンドウが開かない、または正しく表示されなかった",
+        "sr_broken_download_failed": "ファイルをダウンロードできなかった",
+        "formatPrompt": "どのファイル形式が必要でしたか？",
+        "sr_missing_format_other": "その他の形式",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "エクスポートが完了しなかった"
+      },
+      "ko": {
+        "subreasonHint": "선택 사항 — 여러 항목을 고를 수 있어요",
+        "sr_broken_window_unusable": "창이 열리지 않거나 제대로 표시되지 않았어요",
+        "sr_broken_download_failed": "파일을 다운로드할 수 없었어요",
+        "formatPrompt": "어떤 파일 형식이 필요했나요?",
+        "sr_missing_format_other": "다른 형식",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "내보내기가 끝나지 않았어요"
+      },
+      "zh_CN": {
+        "subreasonHint": "可不选，也可多选",
+        "sr_broken_window_unusable": "窗口无法打开或显示不正常",
+        "sr_broken_download_failed": "无法下载文件",
+        "formatPrompt": "你需要哪些文件格式？",
+        "sr_missing_format_other": "其他格式",
+        "sr_missing_format_pdf": "PDF",
+        "sr_missing_format_csv": "CSV",
+        "sr_missing_format_xlsx": "XLSX",
+        "sr_missing_format_json": "JSON",
+        "sr_missing_format_txt": "TXT",
+        "sr_missing_format_html": "HTML",
+        "sr_missing_format_markdown": "Markdown",
+        "sr_broken_did_not_finish": "导出始终未完成"
+      }
+    };
+    Object.keys(CLARIFICATION_I18N).forEach(function (code) {
+      Object.assign(I18N[code], CLARIFICATION_I18N[code]);
     });
 
     // Native language names for the switcher.
@@ -1308,7 +1556,7 @@
       "r_missing", "r_slow", "r_privacy", "r_other"
     ];
     const SUBREASON_OPTIONS = {
-      r_broken: ["sr_broken_did_not_start", "sr_broken_stopped_midway", "sr_broken_empty_or_incomplete", "sr_broken_error_message", "sr_broken_wrong_data"],
+      r_broken: ["sr_broken_window_unusable", "sr_broken_did_not_start", "sr_broken_did_not_finish", "sr_broken_stopped_midway", "sr_broken_download_failed", "sr_broken_empty_or_incomplete", "sr_broken_wrong_data", "sr_broken_error_message"],
       r_confusing: ["sr_confusing_couldnt_find_mode", "sr_confusing_unclear_input", "sr_confusing_unclear_options", "sr_confusing_unclear_progress"],
       r_slow: ["sr_slow_slow_from_start", "sr_slow_slowed_later", "sr_slow_kept_pausing", "sr_slow_never_finished", "sr_slow_x_limits"],
       r_missing: ["sr_missing_replies", "sr_missing_articles", "sr_missing_more_fields", "sr_missing_different_format", "sr_missing_filtering_or_dates"],
@@ -1317,6 +1565,8 @@
       r_privacy: ["sr_privacy_account_safety", "sr_privacy_x_account_access", "sr_privacy_browser_permissions", "sr_privacy_data_handling"],
       r_other: ["sr_other_installed_by_mistake", "sr_other_testing", "sr_other_no_longer_use_x", "sr_other_didnt_meet_expectations"]
     };
+    const FORMAT_SUBREASONS = ["pdf", "csv", "xlsx", "json", "txt", "html", "markdown", "other"]
+      .map(format => "sr_missing_format_" + format);
     const MINI_ICON_PATHS = {
       play: '<circle cx="12" cy="12" r="8"/><path d="m10 8 6 4-6 4Z"/>',
       stop: '<circle cx="12" cy="12" r="8"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
@@ -1354,7 +1604,8 @@
       target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="m4 4 16 16"/>'
     };
     const SUBREASON_ICONS = {
-      sr_broken_did_not_start: "play", sr_broken_stopped_midway: "stop",
+      sr_broken_window_unusable: "browser", sr_broken_download_failed: "file",
+      sr_broken_did_not_start: "play", sr_broken_did_not_finish: "timer", sr_broken_stopped_midway: "stop",
       sr_broken_empty_or_incomplete: "file", sr_broken_error_message: "alert", sr_broken_wrong_data: "shuffle",
       sr_confusing_couldnt_find_mode: "compass", sr_confusing_unclear_input: "keyboard",
       sr_confusing_unclear_options: "sliders", sr_confusing_unclear_progress: "activity",
@@ -1391,7 +1642,7 @@
       "resumes", "dl", "f_csv", "f_json", "f_xlsx", "items", "last_days",
       "last_err", "last_phase", "first_item_ms",
       "s_retweets", "s_replies", "s_articles", "s_limit", "s_localize",
-      "s_speed", "s_adaptive", "inst_approx", "s_safety", "transport_error"
+      "theme_preset", "ladybug_squashes", "s_speed", "s_adaptive", "inst_approx", "s_safety", "transport_error"
     ]);
     function forwardedAnonymousStats() {
       const forwarded = { src: safeSource };
@@ -1674,12 +1925,19 @@
       }
     }
 
-    function renderSubreasons() {
-      if (!subreasonBlockEl || !subreasonOptionsEl) return;
-      const options = SUBREASON_OPTIONS[selectedReason] || [];
-      subreasonBlockEl.hidden = !options.length;
-      document.getElementById("subreasonPrompt").textContent = t("subreasonPrompt");
-      subreasonOptionsEl.innerHTML = "";
+    function setSubreason(key) {
+      if (selectedSubreasons.has(key)) selectedSubreasons.delete(key);
+      else selectedSubreasons.add(key);
+      // A format request has meaning only while its parent answer is selected.
+      if (!selectedSubreasons.has("sr_missing_different_format")) {
+        FORMAT_SUBREASONS.forEach(format => selectedSubreasons.delete(format));
+      }
+      persistFeedbackState();
+      send(basePayload());
+    }
+
+    function renderSubreasonButtons(container, options) {
+      container.innerHTML = "";
       options.forEach(function (key) {
         const button = document.createElement("button");
         button.type = "button";
@@ -1688,20 +1946,35 @@
         button.dataset.group = selectedReason;
         button.setAttribute("aria-pressed", selectedSubreasons.has(key) ? "true" : "false");
         button.innerHTML = '<span class="subreason-icon" aria-hidden="true">'
-          + miniIcon(SUBREASON_ICONS[key])
+          + miniIcon(FORMAT_SUBREASONS.includes(key) ? "codeFile" : SUBREASON_ICONS[key])
           + '</span><span class="subreason-label"></span>'
           + '<span class="subreason-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>';
         button.querySelector(".subreason-label").textContent = t(key);
         button.addEventListener("click", function () {
-          if (selectedSubreasons.has(key)) selectedSubreasons.delete(key);
-          else selectedSubreasons.add(key);
+          setSubreason(key);
           button.setAttribute("aria-pressed", selectedSubreasons.has(key) ? "true" : "false");
-          // Persist chips immediately. Omitting `type` keeps the last meaningful
-          // event (reason/detail) intact while the Sheet stats are updated.
-          send(basePayload());
+          if (key === "sr_missing_different_format") renderFormatOptions();
         });
-        subreasonOptionsEl.appendChild(button);
+        container.appendChild(button);
       });
+    }
+
+    function renderFormatOptions() {
+      const block = document.getElementById("formatBlock");
+      const options = document.getElementById("formatOptions");
+      const visible = selectedReason === "r_missing" && selectedSubreasons.has("sr_missing_different_format");
+      block.hidden = !visible;
+      options.innerHTML = "";
+      if (visible) renderSubreasonButtons(options, FORMAT_SUBREASONS);
+    }
+
+    function renderSubreasons() {
+      if (!subreasonBlockEl || !subreasonOptionsEl) return;
+      const options = SUBREASON_OPTIONS[selectedReason] || [];
+      subreasonBlockEl.hidden = !options.length;
+      document.getElementById("subreasonPrompt").textContent = t("subreasonPrompt");
+      renderSubreasonButtons(subreasonOptionsEl, options);
+      renderFormatOptions();
     }
 
     // contact links
@@ -1724,6 +1997,41 @@
     const selectedSubreasonsByReason = new Map();
     const reasonHistory = [];
     let reasonSent = false;
+    const feedbackStateStorageKey = feedbackSessionStorageKey + ':answers';
+    function persistFeedbackState() {
+      try {
+        sessionStorage.setItem(feedbackStateStorageKey, JSON.stringify({
+          reason: selectedReason,
+          groups: Array.from(selectedSubreasonsByReason, ([reason, keys]) => [reason, Array.from(keys)]),
+          history: reasonHistory,
+          detail: document.getElementById("detail").value
+        }));
+      } catch (_) { /* The form still works when storage is disabled. */ }
+    }
+    function restoreFeedbackState() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(feedbackStateStorageKey) || "null");
+        if (!saved || !REASON_KEYS.includes(saved.reason)) return;
+        if (Array.isArray(saved.groups)) saved.groups.forEach(function (entry) {
+          if (!Array.isArray(entry) || !REASON_KEYS.includes(entry[0]) || !Array.isArray(entry[1])) return;
+          const allowed = SUBREASON_OPTIONS[entry[0]].concat(entry[0] === "r_missing" ? FORMAT_SUBREASONS : []);
+          const keys = new Set(entry[1].filter(key => allowed.includes(key)));
+          if (!keys.has("sr_missing_different_format")) FORMAT_SUBREASONS.forEach(key => keys.delete(key));
+          selectedSubreasonsByReason.set(entry[0], keys);
+        });
+        if (Array.isArray(saved.history)) saved.history.forEach(function (reason) {
+          if (REASON_KEYS.includes(reason) && !reasonHistory.includes(reason)) reasonHistory.push(reason);
+        });
+        selectedReason = saved.reason;
+        if (!selectedSubreasonsByReason.has(selectedReason)) selectedSubreasonsByReason.set(selectedReason, new Set());
+        selectedSubreasons = selectedSubreasonsByReason.get(selectedReason);
+        if (!reasonHistory.includes(selectedReason)) reasonHistory.push(selectedReason);
+        reasonSent = true;
+        document.getElementById("detail").value = typeof saved.detail === "string" ? saved.detail.slice(0, 2000) : "";
+        actionEl.classList.add("show");
+      } catch (_) { /* Ignore malformed or unavailable session state. */ }
+    }
+    document.getElementById("detail").addEventListener("input", persistFeedbackState);
     let reasonTransitioning = false;
     let queuedReason = null;
     const reduceReasonMotion = window.matchMedia
@@ -1755,7 +2063,7 @@
       }).filter(function (entry) { return entry[1].length; });
       const allSubreasonKeys = selectedGroups.flatMap(function (entry) { return entry[1]; });
       const stats = Object.assign(forwardedAnonymousStats(), { page_s: pageSeconds(),
-        form_version: 2, language_source: languageSource, page_opened_at: pageOpenedAt });
+        form_version: 3, language_source: languageSource, page_opened_at: pageOpenedAt });
       if (includeFeedbackState !== false) Object.assign(stats, {
           subreasons: subreasonKeys.length ? subreasonKeys.join(" | ") : "none",
           subreason_labels: subreasonKeys.length
@@ -1817,15 +2125,18 @@
       // would reject even though the POST succeeds server-side. Use no-cors:
       // the response is opaque. Explicit Send additionally checks a server receipt.
       // text/plain keeps this a simple request.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       return fetch(ENDPOINT, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
-        keepalive: true
+        keepalive: true,
+        signal: controller.signal
       }).then(() => payload.type === 'detail'
         ? XPorterFeedbackReceipt.check(ENDPOINT, payload.sessionId, payload.receipt_id, payload.test)
-        : true).catch(() => false);
+        : true).catch(() => false).finally(() => clearTimeout(timeout));
     }
 
     const actionCollapsedFrame = {
@@ -1989,6 +2300,7 @@
       if (!selectedSubreasonsByReason.has(key)) selectedSubreasonsByReason.set(key, new Set());
       selectedSubreasons = selectedSubreasonsByReason.get(key);
       if (!reasonHistory.includes(key)) reasonHistory.push(key);
+      persistFeedbackState();
       // Update selection on the existing chips (no full re-render → the chips
       // smoothly transition in/out of the selected state, no flash).
       reasonsEl.querySelectorAll(".reason").forEach(function (b) {
@@ -2126,12 +2438,8 @@
       if (label) label.textContent = t("sending");
       const delivery = send(Object.assign(basePayload(), { type: "detail", reason: selectedReason, detail }));
       const minimumWait = new Promise(resolve => setTimeout(resolve, 720));
-      const result = await Promise.race([
-        delivery.then(ok => ({ settled: true, ok })),
-        new Promise(resolve => setTimeout(() => resolve({ settled: false, ok: true }), 1200))
-      ]);
-      await minimumWait;
-      if (result.settled && !result.ok && !(ENDPOINT.startsWith("PASTE_"))) {
+      const [confirmed] = await Promise.all([delivery, minimumWait]);
+      if (!confirmed) {
         btn.disabled = false;
         btn.classList.remove("is-sending");
         if (label) label.textContent = t("submit");
@@ -2139,11 +2447,6 @@
         return;
       }
       finish();
-      if (!result.settled) {
-        delivery.then(function (ok) {
-          if (!ok) console.warn("[XPorter feedback] The background detail request did not finish.");
-        });
-      }
     });
     document.getElementById("backToFeedback").addEventListener("click", returnToFeedback);
     document.getElementById("confettiReplay").addEventListener("click", function () {
@@ -2172,6 +2475,7 @@
     }
 
     /* ---------------- init ---------------- */
+    restoreFeedbackState();
     applyI18n();
     renderReasons();
 

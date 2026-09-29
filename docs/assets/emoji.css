@@ -1,0 +1,18 @@
+/* Native Apple on Apple platforms. Selected local artwork elsewhere.
+   Noto (Google), Twemoji (Twitter and contributors), Emojitwo (EmojiOne/Ranks.com
+   and contributors), Fluent Color (Microsoft). Sources and licenses are in
+   THIRD_PARTY_NOTICES and the emoji attribution notice. No runtime CDN calls. */
+@font-face {
+  font-family: 'XPorter UI Emoji';
+  src: url('ui-emoji.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+  /* Keep artwork at text size; baseline placement is built into the font. */
+  size-adjust: 100%;
+  unicode-range: U+26A0, U+27A1, U+1F1E6-1F1FF, U+1F310, U+1F465, U+1F4DD, U+1F516;
+}
+
+html[data-emoji-platform="bundled"] :is(.lang-current-flag, .lang-option-flag, .emoji-copy) {
+  font-family: 'XPorter UI Emoji', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans', Helvetica, Arial, sans-serif;
+}
