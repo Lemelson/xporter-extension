@@ -111,4 +111,36 @@ assert(fullDetail.endsWith(manual));
 assert(collector.post({sessionId:'full-detail',source:'uninstall',type:'detail',reason:'r_missing',detail:fullDetail,feedback_seq:1,stats:{form_version:3}}).ok);
 const fullestRow = Object.fromEntries(collector.sheets.Sheet1.rows[0].map((key,i) => [key,collector.sheets.Sheet1.rows[3][i]]));
 assert.equal(fullestRow.detail,fullDetail,'collector must preserve the complete manual answer and summary');
-console.log('Feedback clarifications passed: 14 locales, multiselect, optional detail, stable collector columns, switching, parent cleanup, session reload.');
+// A POST may reach Sheets even if its opaque response is lost. The actual page
+// sender must use the matching receipt for explicit Send in both transport paths.
+async function responseLost(postCompletes, receiptAccepted, type = 'detail') {
+  let receiptCalls = 0;
+  const context = vm.createContext({
+    ENDPOINT:'https://script.google.com/fixture', previewMode:false,
+    feedbackSequence:0, feedbackSessionStorageKey:'fixture',
+    sessionStorage:{setItem() {}}, crypto:{randomUUID:()=>'fixture-receipt-token'},
+    AbortController, setTimeout, clearTimeout,
+    fetch:(_url, options)=>{
+      assert.equal(JSON.parse(options.body).test,true);
+      return postCompletes ? Promise.resolve({type:'opaque'}) : Promise.reject(new Error('Response lost after write'));
+    },
+    XPorterFeedbackReceipt:{check:(endpoint,session,receipt,test)=>{
+      receiptCalls++;
+      assert.equal(endpoint,'https://script.google.com/fixture');
+      assert.equal(session,'response-lost'); assert.equal(receipt,'fixture-receipt-token'); assert.equal(test,true);
+      return Promise.resolve(receiptAccepted);
+    }}
+  });
+  vm.runInContext(between('    function send(payload) {','    const actionCollapsedFrame = {'),context);
+  const result = await context.send({sessionId:'response-lost',test:true,type,stats:{}});
+  assert.equal(result,type === 'detail' ? receiptAccepted : postCompletes);
+  assert.equal(receiptCalls,type === 'detail' ? 1 : 0);
+}
+(async()=>{
+  await responseLost(false,true);
+  await responseLost(false,false);
+  await responseLost(true,true);
+  await responseLost(true,false);
+  await responseLost(false,true,'open');
+  console.log('Feedback clarifications passed: 14 locales, stable collector columns, switching, cleanup, reload and receipts after lost POST responses.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
