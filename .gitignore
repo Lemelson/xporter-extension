@@ -43,3 +43,17 @@ backups/
 /verification-screenshots/
 /qa-output/
 .playwright-mcp/
+
+# Internal development material lives in the private dev repository, never here
+/agent.md
+/CLAUDE.md
+/AGENTS.md
+/CODE_QUALITY_REVIEW*.md
+/reviews/
+/backend/
+/scripts/
+/deployment/
+/xporter-web/
+docs/audit-*.md
+docs/verification-*.md
+docs/telemetry-copy-audit.md

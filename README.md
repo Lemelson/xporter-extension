@@ -24,11 +24,9 @@
 
 ## Release status
 
-The Chrome Web Store listing reports version `2.0.1`, updated September 20, 2026
-(checked September 22, 2026).
-The current local release candidate reports version `2.0.3`, dated October 6, 2026,
-with printable archives and fixes for date-range capture, export recovery, storage errors and downloads.
-Local verification and packaging do not establish Store publication of this candidate.
+The current release is `2.0.3` (October 6, 2026): printable archives and fixes for date-range
+capture, export recovery, storage errors and downloads. Each Chrome Web Store version is published
+here as a [GitHub Release](https://github.com/Lemelson/xporter-extension/releases) with the same ZIP.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. When you first select **Embed photo previews**,
@@ -218,7 +216,6 @@ The UI auto-detects your Chrome language on first launch and can be changed at a
 ```
 xporter/
 ├── manifest.json             # Manifest V3 configuration
-├── agent.md / CLAUDE.md      # Developer & AI context docs
 ├── background/
 │   ├── service-worker.js     # Export engine, message router, state machine
 │   ├── downloads.js          # File serialization + Chrome download handoff
@@ -252,8 +249,7 @@ xporter/
 │   └── shared.js             # Shared popup/UI helpers
 ├── _locales/                 # Chrome Web Store metadata translations
 ├── icons/                    # icon16/48/128.png + bolt16/48/128.png (toolbar action icons)
-├── docs/                     # GitHub Pages site (landing, feedback, privacy policy)
-└── scripts/                  # Dev/debug scripts + CWS packaging (not shipped)
+└── docs/                     # GitHub Pages site (landing, feedback, privacy policy)
 ```
 
 ### Design Decisions
@@ -278,32 +274,11 @@ xporter/
 
 Contributions are welcome. Please open an [issue](https://github.com/Lemelson/xporter-extension/issues) for bugs or feature requests, or submit a pull request directly.
 
-### Development and verification
+### Development
 
-The extension has no build step or npm dependency installation. After changing runtime code or documentation, run the canonical deterministic gate from the repository root:
-
-```bash
-node scripts/test-all.js
-git diff --check
-```
-
-Opening generated XLSX files in LibreOffice is checked separately with `node scripts/test-xlsx-libreoffice.js`. This requires LibreOffice and fails explicitly if it is missing or cannot complete the conversion. Release packaging runs both checks. CI tests four timezones and has a separate LibreOffice compatibility job. See [Testing](scripts/TESTING.md).
-
-Localized runtime checks cover all 14 languages. Browser copy checks (`scripts/test-popup-localized-copy.mjs` and `scripts/test-feedback-localized-copy.mjs`) separately check clipped text, dropdown labels, help, and conditional states at 100% scale. Run these outside the sandbox; see [Testing](scripts/TESTING.md) for browser configuration.
-
-For focused iteration, the individual `scripts/test-*.js` files remain directly runnable; `test-all.js` is the required complete gate and the source of truth for their order.
-
-For a real unpacked-Chromium check, run `node scripts/test-extension-smoke.mjs` from a normal Terminal session or an approved unsandboxed environment. Do not launch it inside `CODEX_SANDBOX`: macOS can abort GUI-backed Chromium during LaunchServices registration, and the script intentionally fails fast there.
-
-Build a Chrome Web Store archive only with:
-
-```bash
-scripts/package.sh
-```
-
-The packager reads the version from `manifest.json`, runs the deterministic gates, and writes an allowlist-only ZIP beside the repository.
-
-Passing local tests proves repository contracts such as syntax, parsers, persistence, pacing, localization structure, and file generation. It does not prove that X's current private endpoints, query IDs, cookies, feature flags, or live response shapes still work. That requires a separate authenticated live-X verification and should be reported independently from deterministic results.
+The extension has no build step and no npm dependencies: open `chrome://extensions`, enable
+Developer mode and choose **Load unpacked** on this folder. The `main` branch always matches the
+latest Chrome Web Store release.
 
 ## Contact
 
@@ -327,5 +302,3 @@ See [LICENSE](LICENSE) for full terms.
 <p align="center">
   Built by <a href="https://github.com/Lemelson">Lemelson</a>
 </p>
-
-Diagnostic semantics, backward compatibility and collector deployment: [backend/README.md](backend/README.md).
