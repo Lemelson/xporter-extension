@@ -24,9 +24,9 @@
 
 ## Release status
 
-The current release is `2.0.3` (October 6, 2026): printable archives and fixes for date-range
-capture, export recovery, storage errors and downloads. Each Chrome Web Store version is published
-here as a [GitHub Release](https://github.com/Lemelson/xporter-extension/releases) with the same ZIP.
+The `main` branch always matches the latest Chrome Web Store version. Every store version is
+published as a [GitHub Release](https://github.com/Lemelson/xporter-extension/releases) with the
+same ZIP and its SHA-256, and the release notes list what changed.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in
 `optional_host_permissions`. When you first select **Embed photo previews**,
@@ -277,8 +277,7 @@ Contributions are welcome. Please open an [issue](https://github.com/Lemelson/xp
 ### Development
 
 The extension has no build step and no npm dependencies: open `chrome://extensions`, enable
-Developer mode and choose **Load unpacked** on this folder. The `main` branch always matches the
-latest Chrome Web Store release.
+Developer mode and choose **Load unpacked** on this folder.
 
 ## Contact
 
