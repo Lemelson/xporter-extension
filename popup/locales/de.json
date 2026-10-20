@@ -342,5 +342,5 @@
   "errFormatUnsupported": "Dieses Format ist nur für Beiträge und Lesezeichen verfügbar.",
   "pdfPartial": "Dies sind die bisher gesammelten Einträge. Der ursprüngliche Export ist noch nicht abgeschlossen.",
   "update203Title": "Druckbare Archive und Exportkorrekturen",
-  "update203Body": "• Druckbare Archive für Beiträge und Lesezeichen mit Bildbeschreibungen hinzugefügt.\n• Wiederherstellung von Exporten und Erhalt gespeicherter Ergebnisse verbessert.\n• Exporte nach Datumsbereich und Behandlung von Downloadfehlern verbessert."
+  "update203Body": "• Bestätigungsfenster, Designauswahl und Hinweise, die nicht mehr reagieren konnten, wurden behoben. „Über diesen Account“-Details und Fotovorschauen in XLSX lassen sich wieder aktivieren.\n• Druckbare Archive für Beiträge und Lesezeichen mit Bildbeschreibungen hinzugefügt.\n• Wiederherstellung von Exporten und Erhalt gespeicherter Ergebnisse verbessert.\n• Exporte nach Datumsbereich und Behandlung von Downloadfehlern verbessert."
 }

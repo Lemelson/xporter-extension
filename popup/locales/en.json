@@ -342,5 +342,5 @@
   "errFormatUnsupported": "This format is available only for posts and bookmarks.",
   "pdfPartial": "These are the rows collected so far. The source export is unfinished.",
   "update203Title": "Printable archives and export fixes",
-  "update203Body": "• Added printable archives for posts and bookmarks, with image descriptions.\n• Improved recovery and preservation of saved results.\n• Improved date-range exports and download error handling."
+  "update203Body": "• Fixed confirmation windows, the theme picker and notifications that could stop responding. “About this Account” details and XLSX photo previews can be turned on again.\n• Added printable archives for posts and bookmarks, with image descriptions.\n• Improved recovery and preservation of saved results.\n• Improved date-range exports and download error handling."
 }

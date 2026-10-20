@@ -342,5 +342,5 @@
   "errFormatUnsupported": "Ce format est réservé aux posts et aux signets.",
   "pdfPartial": "Voici les lignes collectées jusqu’ici. L’export d’origine n’est pas encore terminé.",
   "update203Title": "Archives imprimables et corrections d’export",
-  "update203Body": "• Ajout d’archives imprimables pour les publications et les signets, avec les descriptions des images.\n• Amélioration de la reprise des exports et de la conservation des résultats enregistrés.\n• Amélioration des exports par période et de la gestion des erreurs de téléchargement."
+  "update203Body": "• Correction des fenêtres de confirmation, du sélecteur de thème et des notifications qui pouvaient ne plus répondre. Les détails « À propos de ce compte » et les aperçus photo XLSX peuvent de nouveau être activés.\n• Ajout d’archives imprimables pour les publications et les signets, avec les descriptions des images.\n• Amélioration de la reprise des exports et de la conservation des résultats enregistrés.\n• Amélioration des exports par période et de la gestion des erreurs de téléchargement."
 }

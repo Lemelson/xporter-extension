@@ -342,5 +342,5 @@
   "errFormatUnsupported": "Questo formato è disponibile solo per post e segnalibri.",
   "pdfPartial": "Queste sono le righe raccolte finora. L’esportazione originale non è ancora terminata.",
   "update203Title": "Archivi stampabili e correzioni dell’esportazione",
-  "update203Body": "• Aggiunti archivi stampabili per post e segnalibri, con descrizioni delle immagini.\n• Migliorati il recupero delle esportazioni e la conservazione dei risultati salvati.\n• Migliorate le esportazioni per intervallo di date e la gestione degli errori di download."
+  "update203Body": "• Corrette le finestre di conferma, il selettore dei temi e le notifiche che potevano smettere di rispondere. È di nuovo possibile attivare i dettagli «Informazioni su questo account» e le anteprime delle foto in XLSX.\n• Aggiunti archivi stampabili per post e segnalibri, con descrizioni delle immagini.\n• Migliorati il recupero delle esportazioni e la conservazione dei risultati salvati.\n• Migliorate le esportazioni per intervallo di date e la gestione degli errori di download."
 }

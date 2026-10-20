@@ -342,5 +342,5 @@
   "errFormatUnsupported": "Este formato solo está disponible para publicaciones y marcadores.",
   "pdfPartial": "Estas son las filas recopiladas hasta ahora. La exportación de origen no ha terminado.",
   "update203Title": "Archivos para imprimir y mejoras de exportación",
-  "update203Body": "• Se añadieron archivos para imprimir publicaciones y marcadores, con descripciones de imágenes.\n• Se mejoraron la recuperación de exportaciones y la conservación de resultados guardados.\n• Se mejoraron las exportaciones por fechas y la gestión de errores de descarga."
+  "update203Body": "• Se corrigieron las ventanas de confirmación, el selector de temas y las notificaciones que podían dejar de responder. Ya se pueden activar de nuevo los detalles de «Acerca de esta cuenta» y las vistas previas de fotos en XLSX.\n• Se añadieron archivos para imprimir publicaciones y marcadores, con descripciones de imágenes.\n• Se mejoraron la recuperación de exportaciones y la conservación de resultados guardados.\n• Se mejoraron las exportaciones por fechas y la gestión de errores de descarga."
 }

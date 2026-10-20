@@ -342,5 +342,5 @@
   "errFormatUnsupported": "Este formato está disponível apenas para posts e itens salvos.",
   "pdfPartial": "Estas são as linhas coletadas até agora. A exportação original ainda não terminou.",
   "update203Title": "Arquivos para impressão e correções de exportação",
-  "update203Body": "• Adicionados arquivos para impressão de publicações e favoritos, com descrições das imagens.\n• Melhoradas a recuperação de exportações e a preservação dos resultados salvos.\n• Melhoradas as exportações por período e o tratamento de erros de download."
+  "update203Body": "• Corrigidas as janelas de confirmação, o seletor de temas e as notificações que podiam parar de responder. Os detalhes de «Sobre esta conta» e as prévias de fotos no XLSX podem ser ativados novamente.\n• Adicionados arquivos para impressão de publicações e favoritos, com descrições das imagens.\n• Melhoradas a recuperação de exportações e a preservação dos resultados salvos.\n• Melhoradas as exportações por período e o tratamento de erros de download."
 }

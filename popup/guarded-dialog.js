@@ -8,6 +8,10 @@
         let countdown = null;
         let generation = 0;
         dialog.setAttribute('tabindex', '-1');
+        // The dialog must sit outside the popup: opening marks the popup inert,
+        // and a hidden tab would hide it. An unclosed tag once nested it there,
+        // leaving an invisible dialog over an inert popup.
+        if (dialog.parentElement !== document.body) document.body.append(dialog);
 
         function close(confirmed, replacing = false) {
             if (!active || (!replacing && confirmButton.disabled)) return;

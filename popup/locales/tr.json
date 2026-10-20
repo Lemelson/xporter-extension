@@ -342,5 +342,5 @@
   "errFormatUnsupported": "Bu biçim yalnızca gönderiler ve yer işaretleri için kullanılabilir.",
   "pdfPartial": "Bunlar şimdiye kadar toplanan satırlardır. Kaynak dışa aktarımı henüz tamamlanmadı.",
   "update203Title": "Yazdırılabilir arşivler ve dışa aktarma düzeltmeleri",
-  "update203Body": "• Gönderiler ve yer işaretleri için görsel açıklamaları içeren yazdırılabilir arşivler eklendi.\n• Dışa aktarmanın kurtarılması ve kaydedilen sonuçların korunması iyileştirildi.\n• Tarih aralığına göre dışa aktarma ve indirme hatalarının işlenmesi iyileştirildi."
+  "update203Body": "• Yanıt vermeyi durdurabilen onay pencereleri, tema seçici ve bildirimler düzeltildi. “Bu hesap hakkında” ayrıntıları ve XLSX fotoğraf önizlemeleri yeniden açılabiliyor.\n• Gönderiler ve yer işaretleri için görsel açıklamaları içeren yazdırılabilir arşivler eklendi.\n• Dışa aktarmanın kurtarılması ve kaydedilen sonuçların korunması iyileştirildi.\n• Tarih aralığına göre dışa aktarma ve indirme hatalarının işlenmesi iyileştirildi."
 }
