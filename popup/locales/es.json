@@ -340,5 +340,7 @@
   "pdfPrintHelp": "En el diálogo de impresión del navegador, selecciona Guardar como PDF. Guarda por separado cada parte de las exportaciones grandes.",
   "errPdfPostTooLarge": "Esta publicación es demasiado grande para la exportación imprimible. Elige TXT o JSON para conservar todo el contenido.",
   "errFormatUnsupported": "Este formato solo está disponible para publicaciones y marcadores.",
-  "pdfPartial": "Estas son las filas recopiladas hasta ahora. La exportación de origen no ha terminado."
+  "pdfPartial": "Estas son las filas recopiladas hasta ahora. La exportación de origen no ha terminado.",
+  "update203Title": "Archivos para imprimir y mejoras de exportación",
+  "update203Body": "• Se añadieron archivos para imprimir publicaciones y marcadores, con descripciones de imágenes.\n• Se mejoraron la recuperación de exportaciones y la conservación de resultados guardados.\n• Se mejoraron las exportaciones por fechas y la gestión de errores de descarga."
 }

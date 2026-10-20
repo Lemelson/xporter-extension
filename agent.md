@@ -2,7 +2,7 @@
 
 > **Purpose**: This file gives any AI/LLM working on this codebase a complete, structured understanding of the project. Read this (and `CLAUDE.md` for the short version) before making changes. **Keep this file updated** when adding files, changing architecture, or modifying critical logic.
 >
-> Local runtime version: **v2.0.2** (`manifest.json`). Local checks and packages do not establish the published Chrome Web Store version.
+> Local runtime version: **v2.0.3** (`manifest.json`). Local checks and packages do not establish the published Chrome Web Store version.
 
 ---
 
@@ -13,7 +13,7 @@
 | Property | Value |
 |---|---|
 | Type | Chrome Extension (Manifest V3) |
-| Version | 2.0.2 (`manifest.json`), local working copy |
+| Version | 2.0.3 (`manifest.json`), local working copy |
 | Language | Vanilla JavaScript (ES2020+), HTML, CSS |
 | Frameworks | None — zero dependencies, no build step, no bundler |
 | Target Browser | Chrome / Chromium-based, 111+ |

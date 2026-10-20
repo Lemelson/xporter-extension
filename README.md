@@ -26,8 +26,8 @@
 
 The Chrome Web Store listing reports version `2.0.1`, updated September 20, 2026
 (checked September 22, 2026).
-The current local release candidate reports version `2.0.2`, dated September 22, 2026,
-with fixes for export recovery, storage errors, XLSX generation and downloads.
+The current local release candidate reports version `2.0.3`, dated October 6, 2026,
+with printable archives and fixes for date-range capture, export recovery, storage errors and downloads.
 Local verification and packaging do not establish Store publication of this candidate.
 
 Unlike the withdrawn 1.5.9, this build declares `pbs.twimg.com` only in

@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Nella finestra di stampa del browser scegli Salva come PDF. Salva separatamente ogni parte delle esportazioni grandi.",
   "errPdfPostTooLarge": "Questo post è troppo grande per il file stampabile. Scegli TXT o JSON per conservarne tutto il contenuto.",
   "errFormatUnsupported": "Questo formato è disponibile solo per post e segnalibri.",
-  "pdfPartial": "Queste sono le righe raccolte finora. L’esportazione originale non è ancora terminata."
+  "pdfPartial": "Queste sono le righe raccolte finora. L’esportazione originale non è ancora terminata.",
+  "update203Title": "Archivi stampabili e correzioni dell’esportazione",
+  "update203Body": "• Aggiunti archivi stampabili per post e segnalibri, con descrizioni delle immagini.\n• Migliorati il recupero delle esportazioni e la conservazione dei risultati salvati.\n• Migliorate le esportazioni per intervallo di date e la gestione degli errori di download."
 }

@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Na janela de impressão do navegador, escolha Salvar como PDF. Salve separadamente cada parte de exportações grandes.",
   "errPdfPostTooLarge": "Este post é grande demais para a exportação imprimível. Escolha TXT ou JSON para preservar todo o conteúdo.",
   "errFormatUnsupported": "Este formato está disponível apenas para posts e itens salvos.",
-  "pdfPartial": "Estas são as linhas coletadas até agora. A exportação original ainda não terminou."
+  "pdfPartial": "Estas são as linhas coletadas até agora. A exportação original ainda não terminou.",
+  "update203Title": "Arquivos para impressão e correções de exportação",
+  "update203Body": "• Adicionados arquivos para impressão de publicações e favoritos, com descrições das imagens.\n• Melhoradas a recuperação de exportações e a preservação dos resultados salvos.\n• Melhoradas as exportações por período e o tratamento de erros de download."
 }

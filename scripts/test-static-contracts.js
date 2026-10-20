@@ -487,15 +487,15 @@ assert.match(updateEntries[1], /<time data-release-date datetime=/,
     'release history must retain its date without requiring a Released prefix');
 assert.match(
     updateEntries[1],
-    /<span class="update-meta-version">v2\.0\.1<\/span>/,
-    'the previous build must be v2.0.1'
+    /<span class="update-meta-version">v2\.0\.2<\/span>/,
+    'the previous build must be v2.0.2'
 );
 assert.match(updateEntries[2], /<time data-release-date datetime=/,
     'release history must retain its date without requiring a Released prefix');
 assert.match(
     updateEntries[2],
-    /<span class="update-meta-version">v1\.6\.5<\/span>/,
-    'the older update must be v1.6.5'
+    /<span class="update-meta-version">v2\.0\.1<\/span>/,
+    'the older update must be v2.0.1'
 );
 const currentBuildDate = /<time data-release-date datetime="([^"]+)"/.exec(updateEntries[0])?.[1];
 const footerBuildDate = /footer-build-date">([^<]+)</.exec(popupHtml)?.[1];

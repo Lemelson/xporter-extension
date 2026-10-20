@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Tarayıcının yazdırma penceresinde PDF olarak kaydet seçeneğini seçin. Büyük dışa aktarımların her bölümünü ayrı kaydedin.",
   "errPdfPostTooLarge": "Bu gönderi yazdırılabilir dışa aktarım için çok büyük. Tam içeriği korumak için TXT veya JSON seçin.",
   "errFormatUnsupported": "Bu biçim yalnızca gönderiler ve yer işaretleri için kullanılabilir.",
-  "pdfPartial": "Bunlar şimdiye kadar toplanan satırlardır. Kaynak dışa aktarımı henüz tamamlanmadı."
+  "pdfPartial": "Bunlar şimdiye kadar toplanan satırlardır. Kaynak dışa aktarımı henüz tamamlanmadı.",
+  "update203Title": "Yazdırılabilir arşivler ve dışa aktarma düzeltmeleri",
+  "update203Body": "• Gönderiler ve yer işaretleri için görsel açıklamaları içeren yazdırılabilir arşivler eklendi.\n• Dışa aktarmanın kurtarılması ve kaydedilen sonuçların korunması iyileştirildi.\n• Tarih aralığına göre dışa aktarma ve indirme hatalarının işlenmesi iyileştirildi."
 }

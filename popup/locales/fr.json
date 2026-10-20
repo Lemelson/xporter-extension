@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Dans la fenêtre d’impression du navigateur, choisissez Enregistrer en PDF. Enregistrez séparément chaque partie des exports volumineux.",
   "errPdfPostTooLarge": "Ce post est trop volumineux pour l’export imprimable. Choisissez TXT ou JSON pour conserver tout le contenu.",
   "errFormatUnsupported": "Ce format est réservé aux posts et aux signets.",
-  "pdfPartial": "Voici les lignes collectées jusqu’ici. L’export d’origine n’est pas encore terminé."
+  "pdfPartial": "Voici les lignes collectées jusqu’ici. L’export d’origine n’est pas encore terminé.",
+  "update203Title": "Archives imprimables et corrections d’export",
+  "update203Body": "• Ajout d’archives imprimables pour les publications et les signets, avec les descriptions des images.\n• Amélioration de la reprise des exports et de la conservation des résultats enregistrés.\n• Amélioration des exports par période et de la gestion des erreurs de téléchargement."
 }

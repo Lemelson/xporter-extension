@@ -7,7 +7,7 @@ toolingPolicy.assertBrowserSmokeCanLaunch();
 const {chromium}=await import('playwright');
 const root=process.cwd();
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
-const expectedPoints=JSON.parse(fs.readFileSync(path.join(root,'popup/locales/en.json'),'utf8')).update202Body.split('\n').length;
+const expectedPoints=JSON.parse(fs.readFileSync(path.join(root,'popup/locales/en.json'),'utf8')).update203Body.split('\n').length;
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'xporter-release-'));
 const context=await chromium.launchPersistentContext(profile,{headless:true,executablePath:process.env.XPORTER_BROWSER_EXECUTABLE || chromium.executablePath(),args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`]});
 try {

@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Wähle im Druckdialog des Browsers Als PDF speichern. Speichere bei großen Exporten jeden Teil einzeln.",
   "errPdfPostTooLarge": "Dieser Beitrag ist zu groß für den druckbaren Export. Wähle TXT oder JSON, um den vollständigen Inhalt zu erhalten.",
   "errFormatUnsupported": "Dieses Format ist nur für Beiträge und Lesezeichen verfügbar.",
-  "pdfPartial": "Dies sind die bisher gesammelten Einträge. Der ursprüngliche Export ist noch nicht abgeschlossen."
+  "pdfPartial": "Dies sind die bisher gesammelten Einträge. Der ursprüngliche Export ist noch nicht abgeschlossen.",
+  "update203Title": "Druckbare Archive und Exportkorrekturen",
+  "update203Body": "• Druckbare Archive für Beiträge und Lesezeichen mit Bildbeschreibungen hinzugefügt.\n• Wiederherstellung von Exporten und Erhalt gespeicherter Ergebnisse verbessert.\n• Exporte nach Datumsbereich und Behandlung von Downloadfehlern verbessert."
 }

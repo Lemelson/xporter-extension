@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Use your browser’s Print dialog and choose Save as PDF. For large exports, save each part separately.",
   "errPdfPostTooLarge": "This post is too large for the printable export. Choose TXT or JSON to preserve its full content.",
   "errFormatUnsupported": "This format is available only for posts and bookmarks.",
-  "pdfPartial": "These are the rows collected so far. The source export is unfinished."
+  "pdfPartial": "These are the rows collected so far. The source export is unfinished.",
+  "update203Title": "Printable archives and export fixes",
+  "update203Body": "• Added printable archives for posts and bookmarks, with image descriptions.\n• Improved recovery and preservation of saved results.\n• Improved date-range exports and download error handling."
 }

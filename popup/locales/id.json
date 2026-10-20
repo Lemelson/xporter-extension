@@ -340,5 +340,7 @@
   "pdfPrintHelp": "Pilih Simpan sebagai PDF pada dialog cetak browser. Simpan setiap bagian ekspor besar secara terpisah.",
   "errPdfPostTooLarge": "Postingan ini terlalu besar untuk ekspor cetak. Pilih TXT atau JSON untuk mempertahankan seluruh isinya.",
   "errFormatUnsupported": "Format ini hanya tersedia untuk postingan dan markah.",
-  "pdfPartial": "Ini adalah baris yang terkumpul sejauh ini. Ekspor sumber belum selesai."
+  "pdfPartial": "Ini adalah baris yang terkumpul sejauh ini. Ekspor sumber belum selesai.",
+  "update203Title": "Arsip siap cetak dan perbaikan ekspor",
+  "update203Body": "• Menambahkan arsip siap cetak untuk postingan dan bookmark, termasuk deskripsi gambar.\n• Memperbaiki pemulihan ekspor dan penyimpanan hasil yang sudah dikumpulkan.\n• Memperbaiki ekspor berdasarkan rentang tanggal dan penanganan kesalahan unduhan."
 }

@@ -8,11 +8,11 @@
 - Popup language changes serialize rendering and saving. Captured format changes and mode normalization share a transaction queue; format rollback belongs to the latest selection. A single outstanding download-plan poll recovers missed terminal broadcasts while keeping request preparation locked.
 - Download diagnostics settle interrupted generation as `unknown/WORKER_RESTART` and a missing browser record as `unknown/TRACKING_LOST`; handed-off downloads still reconcile against browser state.
 - Checkbox tick strokes use physical borders so the symbol stays a check in RTL; layout still follows logical direction.
-- Detailed review and verification: `reviews/2026-09-29.md`. Existing version 2.0.2 is retained for this local review branch.
+- Detailed review and verification: `reviews/2026-09-29.md`. Release candidate 2.0.3 is prepared from the reviewed September 30 snapshot.
 
 **XPorter** — a Chrome **Manifest V3** extension (vanilla JS, **no build step, no dependencies**) that exports X/Twitter posts, personal bookmarks, followers, following, and verified followers to **CSV / JSON / XLSX / TXT**, using X's internal GraphQL API through the user's own logged-in session.
 
-- **Local version:** 2.0.2 (`manifest.json`). A local verification or ZIP does not establish the published Chrome Web Store version.
+- **Local version:** 2.0.3 (`manifest.json`). A local verification or ZIP does not establish the published Chrome Web Store version.
 - **Run it:** `chrome://extensions` → Developer mode → *Load unpacked* → this folder. No npm, no compile.
 - **Deep docs:** read **[`agent.md`](agent.md)** for the full architecture/reference. `README.md` is the user-facing doc.
 
