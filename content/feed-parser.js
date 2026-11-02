@@ -42,6 +42,9 @@
     const userLegacy = user?.legacy || {};
     const userCore = user?.core || {};
     const username = userCore.screen_name || userLegacy.screen_name || '';
+    const authorProfileImageUrl = (
+      user?.avatar?.image_url || userLegacy.profile_image_url_https || ''
+    ).replace('_normal', '_400x400');
     const text = result.note_tweet?.note_tweet_results?.result?.text ||
       decodeTextEntities(legacy.full_text);
     const media = legacy.extended_entities?.media || legacy.entities?.media || [];
@@ -55,6 +58,7 @@
       author_id: user?.rest_id || '',
       author_name: userCore.name || userLegacy.name || '',
       author_username: username,
+      author_profile_image_url: authorProfileImageUrl,
       author_followers_count: toCount(userLegacy.followers_count),
       author_verified: Boolean(user?.is_blue_verified || userLegacy.verified),
       view_count: toCount(result.views?.count),

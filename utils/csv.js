@@ -6,7 +6,7 @@
 // ==================== Header Definitions ====================
 
 const POST_CONTEXT_FIELDS = [
-    'id', 'type', 'text', 'url', 'author_name', 'author_username',
+    'id', 'type', 'text', 'url', 'author_name', 'author_username', 'author_profile_image_url',
     'view_count', 'bookmark_count', 'favorite_count', 'retweet_count',
     'reply_count', 'quote_count', 'created_at',
     'media_type', 'media_urls', 'media_alt_texts',
@@ -15,7 +15,7 @@ const POST_CONTEXT_FIELDS = [
 
 const POSTS_HEADERS = [
     'id', 'text', 'tweet_url', 'language', 'type',
-    'author_name', 'author_username', 'view_count',
+    'author_name', 'author_username', 'author_profile_image_url', 'view_count',
     'bookmark_count', 'favorite_count', 'retweet_count',
     'reply_count', 'quote_count', 'created_at', 'source',
     'hashtags', 'urls', 'media_type', 'media_urls', 'media_alt_texts',
@@ -862,7 +862,7 @@ function buildXlsxMediaPackage(mediaAssets, skippedCount = 0) {
 
 function userColumnWidth(key) {
     if (key === 'bio') return 44;
-    if (key === 'profile_image_url' || key === 'profile_url' || key === 'url') return 36;
+    if (key === 'profile_image_url' || key === 'author_profile_image_url' || key === 'profile_url' || key === 'url') return 36;
     if (key === 'created_at' || key.endsWith('_at') || key === 'premium_since') return 28;
     if (key.endsWith('_count')) return 14;
     if (key === 'verified' || key === 'protected' || key === 'account_location_accurate') return 14;

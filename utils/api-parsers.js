@@ -310,6 +310,7 @@
       tweet_url: tweet.tweet_url,
       author_name: tweet.author_name,
       author_username: tweet.author_username,
+      author_profile_image_url: tweet.author_profile_image_url,
       created_at: tweet.created_at,
       media_type: tweet.media_type,
       media_urls: tweet.media_urls,
@@ -401,6 +402,9 @@
     const userCore = tweetUser?.core || {};
     const authorName = userCore.name || userLegacy.name || '';
     const authorUsername = userCore.screen_name || userLegacy.screen_name || '';
+    const authorProfileImageUrl = (
+      tweetUser?.avatar?.image_url || userLegacy.profile_image_url_https || ''
+    ).replace('_normal', '_400x400');
 
     // A repost row stays owned by the reposter (id, URL, date, author and the
     // stable author ID the worker filters by), but its content and engagement
@@ -449,6 +453,7 @@
       type: detectTweetType(legacy, result),
       author_name: authorName,
       author_username: authorUsername,
+      author_profile_image_url: authorProfileImageUrl,
       reply_to_id: legacy.in_reply_to_status_id_str || '',
       reply_to_username: legacy.in_reply_to_screen_name || '',
       conversation_id: legacy.conversation_id_str || '',
@@ -496,6 +501,7 @@
         tweet_url: quotedTweet.tweet_url,
         author_name: quotedTweet.author_name,
         author_username: quotedTweet.author_username,
+        author_profile_image_url: quotedTweet.author_profile_image_url,
         created_at: quotedTweet.created_at,
         media_type: quotedTweet.media_type,
         media_urls: quotedTweet.media_urls,

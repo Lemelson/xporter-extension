@@ -960,7 +960,7 @@
 
     const FEED_EXPORT_HEADERS = [
         'id', 'text', 'tweet_url', 'language', 'created_at',
-        'author_id', 'author_name', 'author_username',
+        'author_id', 'author_name', 'author_username', 'author_profile_image_url',
         'author_followers_count', 'first_author_followers_count', 'author_verified',
         'view_count', 'bookmark_count', 'favorite_count', 'retweet_count', 'reply_count', 'quote_count',
         'first_view_count', 'first_bookmark_count', 'first_favorite_count',

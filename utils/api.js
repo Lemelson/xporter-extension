@@ -1234,7 +1234,7 @@ async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) 
   const auth = await getAuthTokens();
   if (cancellationEpoch !== requestCancellationEpoch) throw new Error('ABORTED');
 
-  let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${encodeURIComponent(String(userId))}&count=${encodeURIComponent(String(count))}&skip_status=true&include_user_entities=true`;
+  let url = `https://x.com/i/api/1.1/${resource}/list.json?user_id=${encodeURIComponent(String(userId))}&count=${encodeURIComponent(String(count))}&skip_status=true&include_user_entities=true&include_ext_is_blue_verified=1`;
   if (cursor && cursor !== '0' && cursor !== '-1') {
     url += `&cursor=${encodeURIComponent(String(cursor))}`;
   }
@@ -1292,7 +1292,9 @@ async function _fetchRestUserList(resource, endpointKey, userId, cursor, count) 
     following_count: u.friends_count || 0,
     tweet_count: u.statuses_count || 0,
     listed_count: u.listed_count || 0,
-    verified: u.verified || u.is_blue_verified || false,
+    // v1.1 never sets `verified` for Premium checkmarks and omits the blue
+    // flag unless include_ext_is_blue_verified asks for ext_is_blue_verified.
+    verified: u.ext_is_blue_verified || u.is_blue_verified || u.verified || false,
     protected: u.protected || false,
     created_at: u.created_at || '',
     profile_image_url: (u.profile_image_url_https || '').replace('_normal', '_400x400'),

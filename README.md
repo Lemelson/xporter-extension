@@ -135,6 +135,7 @@ Post exports include:
 | `type` | `tweet` · `retweet` · `reply` · `quote` |
 | `author_name` | Display name |
 | `author_username` | Handle (without @) |
+| `author_profile_image_url` | Author profile image URL |
 | `view_count` | Views |
 | `bookmark_count` | Bookmarks |
 | `favorite_count` | Likes |

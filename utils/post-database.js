@@ -89,6 +89,7 @@
             author_id: cleanText(post.author_id, 32),
             author_name: cleanText(post.author_name, 200),
             author_username: cleanText(post.author_username, 40),
+            author_profile_image_url: cleanText(post.author_profile_image_url, 500),
             author_followers_count: finiteCount(post.author_followers_count),
             first_author_followers_count: finiteCount(post.author_followers_count),
             author_verified: Boolean(post.author_verified),
@@ -115,7 +116,7 @@
         const next = { ...existing, ...incoming };
         for (const field of [
             'text', 'tweet_url', 'language', 'created_at',
-            'author_id', 'author_name', 'author_username', 'media_types', 'media_alt_texts'
+            'author_id', 'author_name', 'author_username', 'author_profile_image_url', 'media_types', 'media_alt_texts'
         ]) {
             if (!incoming[field]) next[field] = existing[field] || incoming[field];
         }

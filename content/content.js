@@ -328,6 +328,7 @@ function sanitizeSeenPost(post) {
         author_id: text(post.author_id, 32),
         author_name: text(post.author_name, 200),
         author_username: text(post.author_username, 40),
+        author_profile_image_url: text(post.author_profile_image_url, 500),
         author_followers_count: count(post.author_followers_count),
         author_verified: post.author_verified === true,
         view_count: count(post.view_count),
