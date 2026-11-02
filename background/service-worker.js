@@ -877,6 +877,11 @@ function quantityLimitReached() {
     return limit > 0 && currentExport.tweetCount >= limit;
 }
 
+// Profile info stores a 200x200 avatar; post rows use the 400x400 variant.
+function profileAvatarUrl(exportState = currentExport) {
+    return (exportState?.userInfo?.profileImageUrl || '').replace('_200x200', '_400x400');
+}
+
 function getExpectedItemCount(exportState = currentExport) {
     const info = exportState?.userInfo || {};
     let value;
@@ -1156,6 +1161,7 @@ async function _fetchPostTimelineLoop(fetchPage, acceptTweet, { maxNewItems = 0,
                 !tweet.author_name && currentExport.userInfo) {
                 tweet.author_name = currentExport.userInfo.name || '';
                 tweet.author_username = currentExport.userInfo.screenName || currentExport.username || '';
+                tweet.author_profile_image_url ||= profileAvatarUrl();
                 if (tweet.tweet_url && tweet.tweet_url.includes('/undefined/')) {
                     tweet.tweet_url = tweet.tweet_url.replace('/undefined/', `/${tweet.author_username}/`);
                 }
@@ -1440,6 +1446,7 @@ async function _fetchPostsByDateRangeLoop() {
                 // Only fill display fields after author identity has been verified.
                 tweet.author_name ||= currentExport.userInfo?.name || '';
                 tweet.author_username ||= currentExport.userInfo?.screenName || currentExport.username || '';
+                tweet.author_profile_image_url ||= profileAvatarUrl();
                 if (!postSelectionAllowsTweet(currentExport.settings, tweet)) continue;
                 if (seenIds.has(tweet.id)) {
                     if (currentExport.dateResume && searchCapture) searchCapture.resumeScanned++;

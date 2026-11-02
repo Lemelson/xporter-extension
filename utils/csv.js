@@ -862,7 +862,7 @@ function buildXlsxMediaPackage(mediaAssets, skippedCount = 0) {
 
 function userColumnWidth(key) {
     if (key === 'bio') return 44;
-    if (key === 'profile_image_url' || key === 'author_profile_image_url' || key === 'profile_url' || key === 'url') return 36;
+    if (key === 'profile_image_url' || key === 'profile_url' || key === 'url') return 36;
     if (key === 'created_at' || key.endsWith('_at') || key === 'premium_since') return 28;
     if (key.endsWith('_count')) return 14;
     if (key === 'verified' || key === 'protected' || key === 'account_location_accurate') return 14;
